@@ -1,0 +1,80 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0005-gateway-file-binding
+      author: codex
+      changes:
+        - createTable:
+            tableName: gateway_file_binding
+            remarks: 网关文件对象与上游文件对象的绑定关系。
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_gateway_file_binding
+                    nullable: false
+              - column:
+                  name: gateway_file_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: provider_type
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: credential_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: external_file_id
+                  type: VARCHAR(256)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: external_filename
+                  type: VARCHAR(256)
+              - column:
+                  name: status
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: last_synced_at
+                  type: TIMESTAMP WITH TIME ZONE
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addUniqueConstraint:
+            tableName: gateway_file_binding
+            columnNames: gateway_file_id,provider_type,external_file_id
+            constraintName: uk_gateway_file_binding_scope
+        - createIndex:
+            tableName: gateway_file_binding
+            indexName: idx_gateway_file_binding_file_created
+            columns:
+              - column:
+                  name: gateway_file_id
+              - column:
+                  name: created_at
+        - createIndex:
+            tableName: gateway_file_binding
+            indexName: idx_gateway_file_binding_credential_status
+            columns:
+              - column:
+                  name: credential_id
+              - column:
+                  name: status

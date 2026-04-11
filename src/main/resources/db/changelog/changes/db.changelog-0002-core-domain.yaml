@@ -1,0 +1,567 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0002-core-domain-part-1
+      author: codex
+      changes:
+        - createTable:
+            tableName: upstream_credential
+            remarks: 上游厂商凭证表，保存真实厂商 API key 及其健康状态。
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_upstream_credential
+                    nullable: false
+              - column:
+                  name: credential_name
+                  type: VARCHAR(128)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: provider_type
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: base_url
+                  type: VARCHAR(512)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: api_key_ciphertext
+                  type: TEXT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: api_key_fingerprint
+                  type: VARCHAR(128)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: is_active
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+              - column:
+                  name: cooldown_until
+                  type: TIMESTAMP WITH TIME ZONE
+              - column:
+                  name: last_error_code
+                  type: VARCHAR(64)
+              - column:
+                  name: last_error_message
+                  type: VARCHAR(512)
+              - column:
+                  name: last_error_at
+                  type: TIMESTAMP WITH TIME ZONE
+              - column:
+                  name: last_used_at
+                  type: TIMESTAMP WITH TIME ZONE
+              - column:
+                  name: deleted
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addUniqueConstraint:
+            tableName: upstream_credential
+            columnNames: api_key_fingerprint
+            constraintName: uk_upstream_credential_api_key_fingerprint
+        - createIndex:
+            tableName: upstream_credential
+            indexName: idx_upstream_credential_provider_active
+            columns:
+              - column:
+                  name: provider_type
+              - column:
+                  name: is_active
+        - createIndex:
+            tableName: upstream_credential
+            indexName: idx_upstream_credential_cooldown_until
+            columns:
+              - column:
+                  name: cooldown_until
+        - createIndex:
+            tableName: upstream_credential
+            indexName: idx_upstream_credential_deleted_updated_at
+            columns:
+              - column:
+                  name: deleted
+              - column:
+                  name: updated_at
+        - createTable:
+            tableName: distributed_key
+            remarks: 对前台分发的网关 key。
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_distributed_key
+                    nullable: false
+              - column:
+                  name: key_name
+                  type: VARCHAR(128)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: key_prefix
+                  type: VARCHAR(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: secret_hash
+                  type: VARCHAR(256)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: masked_key
+                  type: VARCHAR(128)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: description
+                  type: VARCHAR(512)
+              - column:
+                  name: is_active
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+              - column:
+                  name: allowed_protocols_json
+                  type: TEXT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: allowed_models_json
+                  type: TEXT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: last_used_at
+                  type: TIMESTAMP WITH TIME ZONE
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addUniqueConstraint:
+            tableName: distributed_key
+            columnNames: key_prefix
+            constraintName: uk_distributed_key_key_prefix
+        - createIndex:
+            tableName: distributed_key
+            indexName: idx_distributed_key_is_active
+            columns:
+              - column:
+                  name: is_active
+        - createIndex:
+            tableName: distributed_key
+            indexName: idx_distributed_key_last_used_at
+            columns:
+              - column:
+                  name: last_used_at
+        - createIndex:
+            tableName: distributed_key
+            indexName: idx_distributed_key_updated_at
+            columns:
+              - column:
+                  name: updated_at
+  - changeSet:
+      id: 0002-core-domain-part-2
+      author: codex
+      changes:
+        - createTable:
+            tableName: distributed_key_binding
+            remarks: 分发 key 与上游凭证的绑定关系。
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_distributed_key_binding
+                    nullable: false
+              - column:
+                  name: distributed_key_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: credential_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: priority
+                  type: INT
+                  defaultValueNumeric: 100
+                  constraints:
+                    nullable: false
+              - column:
+                  name: weight
+                  type: INT
+                  defaultValueNumeric: 100
+                  constraints:
+                    nullable: false
+              - column:
+                  name: is_active
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+              - column:
+                  name: description
+                  type: VARCHAR(512)
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addUniqueConstraint:
+            tableName: distributed_key_binding
+            columnNames: distributed_key_id,credential_id
+            constraintName: uk_distributed_key_binding_pair
+        - addForeignKeyConstraint:
+            baseTableName: distributed_key_binding
+            baseColumnNames: distributed_key_id
+            referencedTableName: distributed_key
+            referencedColumnNames: id
+            constraintName: fk_distributed_key_binding_key
+        - addForeignKeyConstraint:
+            baseTableName: distributed_key_binding
+            baseColumnNames: credential_id
+            referencedTableName: upstream_credential
+            referencedColumnNames: id
+            constraintName: fk_distributed_key_binding_credential
+        - createIndex:
+            tableName: distributed_key_binding
+            indexName: idx_distributed_key_binding_key_active
+            columns:
+              - column:
+                  name: distributed_key_id
+              - column:
+                  name: is_active
+        - createIndex:
+            tableName: distributed_key_binding
+            indexName: idx_distributed_key_binding_credential_active
+            columns:
+              - column:
+                  name: credential_id
+              - column:
+                  name: is_active
+        - createTable:
+            tableName: model_alias
+            remarks: 统一模型别名表。
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_model_alias
+                    nullable: false
+              - column:
+                  name: alias_name
+                  type: VARCHAR(128)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: alias_key
+                  type: VARCHAR(128)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+              - column:
+                  name: description
+                  type: VARCHAR(512)
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addUniqueConstraint:
+            tableName: model_alias
+            columnNames: alias_key
+            constraintName: uk_model_alias_alias_key
+        - createIndex:
+            tableName: model_alias
+            indexName: idx_model_alias_enabled
+            columns:
+              - column:
+                  name: enabled
+        - createIndex:
+            tableName: model_alias
+            indexName: idx_model_alias_updated_at
+            columns:
+              - column:
+                  name: updated_at
+        - createTable:
+            tableName: model_alias_rule
+            remarks: 统一模型别名规则表。
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_model_alias_rule
+                    nullable: false
+              - column:
+                  name: alias_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: protocol
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: target_model_name
+                  type: VARCHAR(256)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: target_model_key
+                  type: VARCHAR(256)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: provider_type
+                  type: VARCHAR(32)
+              - column:
+                  name: base_url_pattern
+                  type: VARCHAR(256)
+              - column:
+                  name: priority
+                  type: INT
+                  defaultValueNumeric: 100
+                  constraints:
+                    nullable: false
+              - column:
+                  name: enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+              - column:
+                  name: description
+                  type: VARCHAR(512)
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: model_alias_rule
+            baseColumnNames: alias_id
+            referencedTableName: model_alias
+            referencedColumnNames: id
+            constraintName: fk_model_alias_rule_alias
+        - createIndex:
+            tableName: model_alias_rule
+            indexName: idx_model_alias_rule_alias_enabled
+            columns:
+              - column:
+                  name: alias_id
+              - column:
+                  name: enabled
+        - createIndex:
+            tableName: model_alias_rule
+            indexName: idx_model_alias_rule_protocol_priority
+            columns:
+              - column:
+                  name: protocol
+              - column:
+                  name: priority
+        - createIndex:
+            tableName: model_alias_rule
+            indexName: idx_model_alias_rule_target_model_key
+            columns:
+              - column:
+                  name: target_model_key
+  - changeSet:
+      id: 0002-core-domain-part-3
+      author: codex
+      changes:
+        - createTable:
+            tableName: credential_model_catalog
+            remarks: 按上游凭证发现的模型目录缓存。
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_credential_model_catalog
+                    nullable: false
+              - column:
+                  name: credential_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: model_name
+                  type: VARCHAR(256)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: model_key
+                  type: VARCHAR(256)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: supported_protocols_json
+                  type: TEXT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: supports_chat
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: supports_embeddings
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: supports_cache
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: supports_thinking
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: supports_visible_reasoning
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: supports_reasoning_reuse
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: reasoning_transport
+                  type: VARCHAR(32)
+                  defaultValue: NONE
+                  constraints:
+                    nullable: false
+              - column:
+                  name: active
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+              - column:
+                  name: source_refreshed_at
+                  type: TIMESTAMP WITH TIME ZONE
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addUniqueConstraint:
+            tableName: credential_model_catalog
+            columnNames: credential_id,model_key
+            constraintName: uk_credential_model_catalog_pair
+        - addForeignKeyConstraint:
+            baseTableName: credential_model_catalog
+            baseColumnNames: credential_id
+            referencedTableName: upstream_credential
+            referencedColumnNames: id
+            constraintName: fk_credential_model_catalog_credential
+        - createIndex:
+            tableName: credential_model_catalog
+            indexName: idx_credential_model_catalog_model_key
+            columns:
+              - column:
+                  name: model_key
+        - createIndex:
+            tableName: credential_model_catalog
+            indexName: idx_credential_model_catalog_credential_active
+            columns:
+              - column:
+                  name: credential_id
+              - column:
+                  name: active
+        - createIndex:
+            tableName: credential_model_catalog
+            indexName: idx_credential_model_catalog_supports_chat
+            columns:
+              - column:
+                  name: supports_chat

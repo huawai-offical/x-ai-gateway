@@ -1,0 +1,70 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0001-bootstrap-system-setting
+      author: codex
+      changes:
+        - createTable:
+            tableName: system_setting
+            remarks: 系统设置表，保存网关运行时的持久化配置项。
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  remarks: 主键。
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_system_setting
+                    nullable: false
+              - column:
+                  name: setting_key
+                  type: VARCHAR(128)
+                  remarks: 配置键，使用稳定的业务名称。
+                  constraints:
+                    nullable: false
+              - column:
+                  name: setting_value
+                  type: TEXT
+                  remarks: 配置值，序列化后保存。
+                  constraints:
+                    nullable: false
+              - column:
+                  name: value_type
+                  type: VARCHAR(32)
+                  remarks: 配置值类型，例如 string、json、boolean。
+                  constraints:
+                    nullable: false
+              - column:
+                  name: description
+                  type: VARCHAR(512)
+                  remarks: 配置项说明。
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  remarks: 创建时间（UTC）。
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  remarks: 最后更新时间（UTC）。
+                  constraints:
+                    nullable: false
+        - addUniqueConstraint:
+            tableName: system_setting
+            columnNames: setting_key
+            constraintName: uk_system_setting_setting_key
+        - createIndex:
+            tableName: system_setting
+            indexName: idx_system_setting_value_type
+            columns:
+              - column:
+                  name: value_type
+        - createIndex:
+            tableName: system_setting
+            indexName: idx_system_setting_updated_at
+            columns:
+              - column:
+                  name: updated_at

@@ -1,0 +1,325 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0003-observability-logs-part-1
+      author: codex
+      changes:
+        - createTable:
+            tableName: route_decision_log
+            remarks: 路由决策日志，记录一次请求为何选中某个上游候选。
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_route_decision_log
+                    nullable: false
+              - column:
+                  name: request_id
+                  type: VARCHAR(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: distributed_key_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: distributed_key_prefix
+                  type: VARCHAR(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: requested_model
+                  type: VARCHAR(256)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: public_model
+                  type: VARCHAR(256)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: resolved_model_key
+                  type: VARCHAR(256)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: protocol
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: model_group
+                  type: VARCHAR(256)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: selection_source
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: selected_credential_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: selected_provider_type
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: selected_base_url
+                  type: VARCHAR(512)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: prefix_hash
+                  type: VARCHAR(128)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: fingerprint
+                  type: VARCHAR(128)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: candidate_count
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: candidate_summary_json
+                  type: TEXT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: route_decision_log
+            indexName: idx_route_decision_log_distributed_key_created
+            columns:
+              - column:
+                  name: distributed_key_id
+              - column:
+                  name: created_at
+        - createIndex:
+            tableName: route_decision_log
+            indexName: idx_route_decision_log_protocol_created
+            columns:
+              - column:
+                  name: protocol
+              - column:
+                  name: created_at
+        - createIndex:
+            tableName: route_decision_log
+            indexName: idx_route_decision_log_provider_created
+            columns:
+              - column:
+                  name: selected_provider_type
+              - column:
+                  name: created_at
+  - changeSet:
+      id: 0003-observability-logs-part-2
+      author: codex
+      changes:
+        - createTable:
+            tableName: cache_hit_log
+            remarks: 缓存命中日志，记录一次请求中的 cache hit / cache write 收益。
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_cache_hit_log
+                    nullable: false
+              - column:
+                  name: request_id
+                  type: VARCHAR(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: distributed_key_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: protocol
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: provider_type
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: credential_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: model_group
+                  type: VARCHAR(256)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: prefix_hash
+                  type: VARCHAR(128)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: fingerprint
+                  type: VARCHAR(128)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: cache_kind
+                  type: VARCHAR(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: cache_hit_tokens
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: cache_write_tokens
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: saved_input_tokens
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: cached_content_ref
+                  type: VARCHAR(512)
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: cache_hit_log
+            indexName: idx_cache_hit_log_distributed_key_created
+            columns:
+              - column:
+                  name: distributed_key_id
+              - column:
+                  name: created_at
+        - createIndex:
+            tableName: cache_hit_log
+            indexName: idx_cache_hit_log_provider_created
+            columns:
+              - column:
+                  name: provider_type
+              - column:
+                  name: created_at
+        - createIndex:
+            tableName: cache_hit_log
+            indexName: idx_cache_hit_log_model_group_created
+            columns:
+              - column:
+                  name: model_group
+              - column:
+                  name: created_at
+  - changeSet:
+      id: 0003-observability-logs-part-3
+      author: codex
+      changes:
+        - createTable:
+            tableName: upstream_cache_reference
+            remarks: 上游显式缓存引用表，例如 Gemini cached_content 的映射。
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_upstream_cache_reference
+                    nullable: false
+              - column:
+                  name: distributed_key_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: provider_type
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: credential_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: model_group
+                  type: VARCHAR(256)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: prefix_hash
+                  type: VARCHAR(128)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: external_cache_ref
+                  type: VARCHAR(512)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: expire_at
+                  type: TIMESTAMP WITH TIME ZONE
+              - column:
+                  name: last_used_at
+                  type: TIMESTAMP WITH TIME ZONE
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addUniqueConstraint:
+            tableName: upstream_cache_reference
+            columnNames: distributed_key_id,provider_type,model_group,prefix_hash
+            constraintName: uk_upstream_cache_reference_scope
+        - createIndex:
+            tableName: upstream_cache_reference
+            indexName: idx_upstream_cache_reference_provider_created
+            columns:
+              - column:
+                  name: provider_type
+              - column:
+                  name: created_at
+        - createIndex:
+            tableName: upstream_cache_reference
+            indexName: idx_upstream_cache_reference_status_expire
+            columns:
+              - column:
+                  name: status
+              - column:
+                  name: expire_at

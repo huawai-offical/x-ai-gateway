@@ -1,0 +1,11 @@
+databaseChangeLog:
+  - include:
+      file: db/changelog/changes/db.changelog-0001-bootstrap-system-setting.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0002-core-domain.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0003-observability-logs.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0004-gateway-file.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0005-gateway-file-binding.yaml

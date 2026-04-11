@@ -1,0 +1,98 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0004-gateway-file
+      author: codex
+      changes:
+        - createTable:
+            tableName: gateway_file
+            remarks: 网关文件对象元数据表。
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_gateway_file
+                    nullable: false
+              - column:
+                  name: file_key
+                  type: VARCHAR(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: distributed_key_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: filename
+                  type: VARCHAR(256)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: mime_type
+                  type: VARCHAR(128)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: purpose
+                  type: VARCHAR(64)
+              - column:
+                  name: size_bytes
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: sha256
+                  type: VARCHAR(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: storage_path
+                  type: VARCHAR(512)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: deleted
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addUniqueConstraint:
+            tableName: gateway_file
+            columnNames: file_key
+            constraintName: uk_gateway_file_file_key
+        - createIndex:
+            tableName: gateway_file
+            indexName: idx_gateway_file_distributed_key_created
+            columns:
+              - column:
+                  name: distributed_key_id
+              - column:
+                  name: created_at
+        - createIndex:
+            tableName: gateway_file
+            indexName: idx_gateway_file_status_created
+            columns:
+              - column:
+                  name: status
+              - column:
+                  name: created_at

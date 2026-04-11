@@ -1,0 +1,159 @@
+package com.prodigalgal.xaigateway.protocol.ingress.openai;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionStreamResponse;
+import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionResponse;
+import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolCall;
+import com.prodigalgal.xaigateway.gateway.core.usage.GatewayUsage;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+
+public record OpenAiResponsesResponse(
+        String id,
+        String object,
+        @JsonProperty("created_at")
+        long createdAt,
+        String status,
+        String model,
+        List<OutputItem> output,
+        @JsonProperty("output_text")
+        String outputText,
+        Usage usage
+) {
+
+    public record OutputItem(
+            String id,
+            String type,
+            String role,
+            List<ContentItem> content,
+            String name,
+            String arguments,
+            @JsonProperty("call_id")
+            String callId,
+            String status
+    ) {
+    }
+
+    public record ContentItem(
+            String type,
+            String text
+    ) {
+    }
+
+    public record Usage(
+            @JsonProperty("input_tokens")
+            int inputTokens,
+            @JsonProperty("output_tokens")
+            int outputTokens,
+            @JsonProperty("total_tokens")
+            int totalTokens,
+            @JsonProperty("input_tokens_details")
+            InputTokensDetails inputTokensDetails,
+            @JsonProperty("output_tokens_details")
+            OutputTokensDetails outputTokensDetails
+    ) {
+    }
+
+    public record InputTokensDetails(
+            @JsonProperty("cached_tokens")
+            int cachedTokens
+    ) {
+    }
+
+    public record OutputTokensDetails(
+            @JsonProperty("reasoning_tokens")
+            int reasoningTokens
+    ) {
+    }
+
+    public static OpenAiResponsesResponse from(ChatExecutionResponse response) {
+        return build(
+                "resp-" + response.requestId(),
+                "completed",
+                response.routeSelection().publicModel(),
+                response.text(),
+                response.usage(),
+                response.toolCalls()
+        );
+    }
+
+    public static OpenAiResponsesResponse inProgress(ChatExecutionStreamResponse response) {
+        return build(
+                "resp-" + response.requestId(),
+                "in_progress",
+                response.routeSelection().publicModel(),
+                null,
+                null,
+                List.of()
+        );
+    }
+
+    public static OpenAiResponsesResponse completed(
+            ChatExecutionStreamResponse response,
+            String text,
+            GatewayUsage usage) {
+        return build(
+                "resp-" + response.requestId(),
+                "completed",
+                response.routeSelection().publicModel(),
+                text,
+                usage,
+                List.of()
+        );
+    }
+
+    private static OpenAiResponsesResponse build(
+            String responseId,
+            String status,
+            String model,
+            String text,
+            GatewayUsage usage,
+            List<GatewayToolCall> toolCalls) {
+        Instant now = Instant.now();
+        List<OutputItem> output = new ArrayList<>();
+
+        if (text != null && !text.isBlank()) {
+            output.add(new OutputItem(
+                    "msg_" + now.toEpochMilli(),
+                    "message",
+                    "assistant",
+                    List.of(new ContentItem("output_text", text)),
+                    null,
+                    null,
+                    null,
+                    status
+            ));
+        }
+
+        for (GatewayToolCall toolCall : toolCalls) {
+            output.add(new OutputItem(
+                    toolCall.id(),
+                    "function_call",
+                    null,
+                    null,
+                    toolCall.name(),
+                    toolCall.arguments(),
+                    toolCall.id(),
+                    status
+            ));
+        }
+
+        return new OpenAiResponsesResponse(
+                responseId,
+                "response",
+                now.getEpochSecond(),
+                status,
+                model,
+                List.copyOf(output),
+                text == null || text.isBlank() ? null : text,
+                usage == null ? null : new Usage(
+                        usage.promptTokens(),
+                        usage.completionTokens(),
+                        usage.totalTokens(),
+                        new InputTokensDetails(usage.cacheHitTokens()),
+                        new OutputTokensDetails(usage.reasoningTokens())
+                )
+        );
+    }
+}
