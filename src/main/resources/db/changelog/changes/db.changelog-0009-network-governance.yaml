@@ -1,0 +1,45 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0009-network-governance
+      author: codex
+      changes:
+        - createTable:
+            tableName: network_proxy
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: proxy_name, type: VARCHAR(128), constraints: { nullable: false } }
+              - column: { name: proxy_url, type: VARCHAR(512), constraints: { nullable: false } }
+              - column: { name: is_active, type: BOOLEAN, defaultValueBoolean: true, constraints: { nullable: false } }
+              - column: { name: last_status, type: VARCHAR(32) }
+              - column: { name: last_latency_ms, type: BIGINT }
+              - column: { name: last_error_message, type: VARCHAR(512) }
+              - column: { name: last_probed_at, type: TIMESTAMP WITH TIME ZONE }
+              - column: { name: description, type: VARCHAR(512) }
+              - column: { name: created_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+              - column: { name: updated_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+        - createTable:
+            tableName: network_proxy_probe_result
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: proxy_id, type: BIGINT, constraints: { nullable: false } }
+              - column: { name: status, type: VARCHAR(32), constraints: { nullable: false } }
+              - column: { name: latency_ms, type: BIGINT }
+              - column: { name: target_host, type: VARCHAR(256) }
+              - column: { name: error_message, type: VARCHAR(512) }
+              - column: { name: created_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+        - createTable:
+            tableName: tls_fingerprint_profile
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: profile_name, type: VARCHAR(128), constraints: { nullable: false } }
+              - column: { name: profile_code, type: VARCHAR(64), constraints: { nullable: false } }
+              - column: { name: settings_json, type: TEXT }
+              - column: { name: description, type: VARCHAR(512) }
+              - column: { name: is_active, type: BOOLEAN, defaultValueBoolean: true, constraints: { nullable: false } }
+              - column: { name: created_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+              - column: { name: updated_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+        - addColumn:
+            tableName: upstream_credential
+            columns:
+              - column: { name: proxy_id, type: BIGINT }
+              - column: { name: tls_fingerprint_profile_id, type: BIGINT }

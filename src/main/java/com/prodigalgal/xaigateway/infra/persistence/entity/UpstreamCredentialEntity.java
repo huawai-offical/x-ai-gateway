@@ -82,6 +82,14 @@ public class UpstreamCredentialEntity {
     @Comment("最后一次被选中调用的时间（UTC）。")
     private Instant lastUsedAt;
 
+    @Column(name = "proxy_id")
+    @Comment("绑定的代理 ID。")
+    private Long proxyId;
+
+    @Column(name = "tls_fingerprint_profile_id")
+    @Comment("绑定的 TLS 指纹画像 ID。")
+    private Long tlsFingerprintProfileId;
+
     @Column(name = "deleted", nullable = false)
     @Comment("逻辑删除标记。")
     private boolean deleted = false;
@@ -186,6 +194,22 @@ public class UpstreamCredentialEntity {
 
     public void setLastUsedAt(Instant lastUsedAt) {
         this.lastUsedAt = lastUsedAt;
+    }
+
+    public Long getProxyId() {
+        return proxyId;
+    }
+
+    public void setProxyId(Long proxyId) {
+        this.proxyId = proxyId;
+    }
+
+    public Long getTlsFingerprintProfileId() {
+        return tlsFingerprintProfileId;
+    }
+
+    public void setTlsFingerprintProfileId(Long tlsFingerprintProfileId) {
+        this.tlsFingerprintProfileId = tlsFingerprintProfileId;
     }
 
     public boolean isDeleted() {

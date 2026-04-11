@@ -1,0 +1,41 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0007-distributed-key-governance
+      author: codex
+      changes:
+        - addColumn:
+            tableName: distributed_key
+            columns:
+              - column:
+                  name: expires_at
+                  type: TIMESTAMP WITH TIME ZONE
+              - column:
+                  name: allowed_provider_types_json
+                  type: TEXT
+              - column:
+                  name: budget_limit_micros
+                  type: BIGINT
+              - column:
+                  name: budget_window_seconds
+                  type: INT
+              - column:
+                  name: rpm_limit
+                  type: INT
+              - column:
+                  name: tpm_limit
+                  type: INT
+              - column:
+                  name: concurrency_limit
+                  type: INT
+              - column:
+                  name: sticky_session_ttl_seconds
+                  type: INT
+              - column:
+                  name: allowed_client_families_json
+                  type: TEXT
+              - column:
+                  name: require_client_family_match
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false

@@ -1,9 +1,12 @@
 package com.prodigalgal.xaigateway.gateway.core.routing;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.prodigalgal.xaigateway.gateway.core.account.AccountSelectionService;
+import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyGovernanceService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedCredentialBindingView;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyQueryService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyView;
+import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
 import com.prodigalgal.xaigateway.gateway.core.cache.AffinityCacheService;
 import com.prodigalgal.xaigateway.gateway.core.cache.PromptFingerprintService;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
@@ -12,6 +15,8 @@ import com.prodigalgal.xaigateway.gateway.core.catalog.ResolvedModelView;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.shared.ReasoningTransport;
 import com.prodigalgal.xaigateway.infra.config.GatewayProperties;
+import com.prodigalgal.xaigateway.infra.persistence.repository.NetworkProxyRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -31,6 +36,10 @@ class GatewayRouteSelectionServiceTests {
         DistributedKeyQueryService distributedKeyQueryService = Mockito.mock(DistributedKeyQueryService.class);
         ModelCatalogQueryService modelCatalogQueryService = Mockito.mock(ModelCatalogQueryService.class);
         AffinityCacheService affinityCacheService = Mockito.mock(AffinityCacheService.class);
+        DistributedKeyGovernanceService distributedKeyGovernanceService = Mockito.mock(DistributedKeyGovernanceService.class);
+        UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        NetworkProxyRepository networkProxyRepository = Mockito.mock(NetworkProxyRepository.class);
+        AccountSelectionService accountSelectionService = Mockito.mock(AccountSelectionService.class);
 
         GatewayProperties properties = new GatewayProperties();
         PromptFingerprintService promptFingerprintService = new PromptFingerprintService(new ObjectMapper(), properties);
@@ -39,7 +48,11 @@ class GatewayRouteSelectionServiceTests {
                 distributedKeyQueryService,
                 modelCatalogQueryService,
                 promptFingerprintService,
-                affinityCacheService
+                affinityCacheService,
+                distributedKeyGovernanceService,
+                upstreamCredentialRepository,
+                networkProxyRepository,
+                accountSelectionService
         );
 
         DistributedKeyView keyView = new DistributedKeyView(
@@ -77,6 +90,14 @@ class GatewayRouteSelectionServiceTests {
         );
 
         when(distributedKeyQueryService.findActiveByKeyPrefix("sk-gw-test")).thenReturn(Optional.of(keyView));
+        when(distributedKeyGovernanceService.evaluate(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.anyBoolean()))
+                .thenReturn(new DistributedKeyGovernanceService.GovernanceDecision(List.of(), List.of(), 1L, 1000L, null));
+        when(accountSelectionService.hasHealthyAccountBinding(1L, ProviderType.OPENAI_DIRECT, GatewayClientFamily.GENERIC_OPENAI))
+                .thenReturn(true);
+        when(upstreamCredentialRepository.findById(101L)).thenReturn(Optional.of(new com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity() {{
+            setProviderType(ProviderType.OPENAI_DIRECT);
+            setBaseUrl("https://api.openai.com");
+        }}));
         when(modelCatalogQueryService.resolveRequestedModel("gpt-4o", "openai"))
                 .thenReturn(Optional.of(new ResolvedModelView(
                         "gpt-4o",
@@ -93,7 +114,9 @@ class GatewayRouteSelectionServiceTests {
                 "openai",
                 "/v1/chat/completions",
                 "gpt-4o",
-                Map.of("messages", List.of(Map.of("role", "user", "content", "hello")))
+                Map.of("messages", List.of(Map.of("role", "user", "content", "hello"))),
+                GatewayClientFamily.GENERIC_OPENAI,
+                false
         ));
 
         assertEquals(RouteSelectionSource.PREFIX_AFFINITY, result.selectionSource());

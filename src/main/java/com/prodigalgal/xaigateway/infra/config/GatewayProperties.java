@@ -10,6 +10,8 @@ public class GatewayProperties {
     private final Cache cache = new Cache();
     private final Security security = new Security();
     private final Storage storage = new Storage();
+    private final Web web = new Web();
+    private final Oauth oauth = new Oauth();
 
     public Routing getRouting() {
         return routing;
@@ -25,6 +27,14 @@ public class GatewayProperties {
 
     public Storage getStorage() {
         return storage;
+    }
+
+    public Web getWeb() {
+        return web;
+    }
+
+    public Oauth getOauth() {
+        return oauth;
     }
 
     public static class Routing {
@@ -158,5 +168,34 @@ public class GatewayProperties {
         public void setFileRoot(String fileRoot) {
             this.fileRoot = fileRoot;
         }
+    }
+
+    public static class Web {
+        private String publicBaseUrl = "http://localhost:3000";
+
+        public String getPublicBaseUrl() { return publicBaseUrl; }
+        public void setPublicBaseUrl(String publicBaseUrl) { this.publicBaseUrl = publicBaseUrl; }
+    }
+
+    public static class Oauth {
+        private String openaiAuthBaseUrl = "https://auth.openai.com/oauth/authorize";
+        private String geminiAuthBaseUrl = "https://accounts.google.com/o/oauth2/v2/auth";
+        private String claudeAuthBaseUrl = "https://claude.ai/oauth/authorize";
+        private String openaiClientId = "openai-local-client";
+        private String geminiClientId = "gemini-local-client";
+        private String claudeClientId = "claude-local-client";
+
+        public String getOpenaiAuthBaseUrl() { return openaiAuthBaseUrl; }
+        public void setOpenaiAuthBaseUrl(String openaiAuthBaseUrl) { this.openaiAuthBaseUrl = openaiAuthBaseUrl; }
+        public String getGeminiAuthBaseUrl() { return geminiAuthBaseUrl; }
+        public void setGeminiAuthBaseUrl(String geminiAuthBaseUrl) { this.geminiAuthBaseUrl = geminiAuthBaseUrl; }
+        public String getClaudeAuthBaseUrl() { return claudeAuthBaseUrl; }
+        public void setClaudeAuthBaseUrl(String claudeAuthBaseUrl) { this.claudeAuthBaseUrl = claudeAuthBaseUrl; }
+        public String getOpenaiClientId() { return openaiClientId; }
+        public void setOpenaiClientId(String openaiClientId) { this.openaiClientId = openaiClientId; }
+        public String getGeminiClientId() { return geminiClientId; }
+        public void setGeminiClientId(String geminiClientId) { this.geminiClientId = geminiClientId; }
+        public String getClaudeClientId() { return claudeClientId; }
+        public void setClaudeClientId(String claudeClientId) { this.claudeClientId = claudeClientId; }
     }
 }

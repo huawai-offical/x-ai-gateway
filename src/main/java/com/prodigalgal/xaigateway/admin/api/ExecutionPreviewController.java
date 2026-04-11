@@ -3,6 +3,7 @@ package com.prodigalgal.xaigateway.admin.api;
 import com.prodigalgal.xaigateway.gateway.core.routing.GatewayRouteSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionRequest;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
+import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.provider.adapter.PreparedChatExecution;
 import com.prodigalgal.xaigateway.provider.adapter.ProviderExecutionSupportService;
@@ -39,7 +40,9 @@ public class ExecutionPreviewController {
                 request.protocol(),
                 request.requestPath(),
                 request.requestedModel(),
-                request.requestBody()
+                request.requestBody(),
+                GatewayClientFamily.GENERIC_OPENAI,
+                false
         ));
 
         ProviderType providerType = selectionResult.selectedCandidate().candidate().providerType();

@@ -1,0 +1,89 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0006-gateway-async-resource
+      author: codex
+      changes:
+        - createTable:
+            tableName: gateway_async_resource
+            remarks: 网关异步资源与会话对象表。
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_gateway_async_resource
+                    nullable: false
+              - column:
+                  name: resource_key
+                  type: VARCHAR(96)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: distributed_key_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: resource_type
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: request_model
+                  type: VARCHAR(256)
+              - column:
+                  name: status
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: request_payload_json
+                  type: TEXT
+              - column:
+                  name: response_payload_json
+                  type: TEXT
+              - column:
+                  name: metadata_json
+                  type: TEXT
+              - column:
+                  name: deleted
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addUniqueConstraint:
+            tableName: gateway_async_resource
+            columnNames: resource_key
+            constraintName: uk_gateway_async_resource_resource_key
+        - createIndex:
+            tableName: gateway_async_resource
+            indexName: idx_gateway_async_resource_scope
+            columns:
+              - column:
+                  name: distributed_key_id
+              - column:
+                  name: resource_type
+              - column:
+                  name: created_at
+        - createIndex:
+            tableName: gateway_async_resource
+            indexName: idx_gateway_async_resource_status_created
+            columns:
+              - column:
+                  name: status
+              - column:
+                  name: created_at

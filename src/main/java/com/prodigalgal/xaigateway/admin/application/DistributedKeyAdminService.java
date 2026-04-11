@@ -3,9 +3,11 @@ package com.prodigalgal.xaigateway.admin.application;
 import com.prodigalgal.xaigateway.admin.api.DistributedKeyCreateResponse;
 import com.prodigalgal.xaigateway.admin.api.DistributedKeyRequest;
 import com.prodigalgal.xaigateway.admin.api.DistributedKeyResponse;
+import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeySecretService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeySecrets;
 import com.prodigalgal.xaigateway.gateway.core.shared.ModelIdNormalizer;
+import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyRepository;
 import java.util.ArrayList;
@@ -85,6 +87,16 @@ public class DistributedKeyAdminService {
         entity.setActive(request.active() == null || request.active());
         entity.setAllowedProtocols(normalizeProtocols(request.allowedProtocols()));
         entity.setAllowedModels(normalizeModels(request.allowedModels()));
+        entity.setAllowedProviderTypes(normalizeProviderTypes(request.allowedProviderTypes()));
+        entity.setExpiresAt(request.expiresAt());
+        entity.setBudgetLimitMicros(request.budgetLimitMicros());
+        entity.setBudgetWindowSeconds(request.budgetWindowSeconds());
+        entity.setRpmLimit(request.rpmLimit());
+        entity.setTpmLimit(request.tpmLimit());
+        entity.setConcurrencyLimit(request.concurrencyLimit());
+        entity.setStickySessionTtlSeconds(request.stickySessionTtlSeconds());
+        entity.setAllowedClientFamilies(normalizeClientFamilies(request.allowedClientFamilies()));
+        entity.setRequireClientFamilyMatch(Boolean.TRUE.equals(request.requireClientFamilyMatch()));
     }
 
     private List<String> normalizeProtocols(List<String> protocols) {
@@ -117,6 +129,40 @@ public class DistributedKeyAdminService {
         return List.copyOf(normalized);
     }
 
+    private List<String> normalizeProviderTypes(List<String> providerTypes) {
+        if (providerTypes == null) {
+            return List.of();
+        }
+        List<String> normalized = new ArrayList<>();
+        for (String providerType : providerTypes) {
+            if (providerType == null || providerType.isBlank()) {
+                continue;
+            }
+            String value = ProviderType.valueOf(providerType.trim().toUpperCase(Locale.ROOT)).name();
+            if (!normalized.contains(value)) {
+                normalized.add(value);
+            }
+        }
+        return List.copyOf(normalized);
+    }
+
+    private List<String> normalizeClientFamilies(List<String> clientFamilies) {
+        if (clientFamilies == null) {
+            return List.of();
+        }
+        List<String> normalized = new ArrayList<>();
+        for (String clientFamily : clientFamilies) {
+            if (clientFamily == null || clientFamily.isBlank()) {
+                continue;
+            }
+            String value = GatewayClientFamily.from(clientFamily).name();
+            if (!normalized.contains(value)) {
+                normalized.add(value);
+            }
+        }
+        return List.copyOf(normalized);
+    }
+
     private String blankToNull(String value) {
         if (value == null || value.isBlank()) {
             return null;
@@ -134,6 +180,16 @@ public class DistributedKeyAdminService {
                 entity.isActive(),
                 entity.getAllowedProtocols(),
                 entity.getAllowedModels(),
+                entity.getAllowedProviderTypes(),
+                entity.getExpiresAt(),
+                entity.getBudgetLimitMicros(),
+                entity.getBudgetWindowSeconds(),
+                entity.getRpmLimit(),
+                entity.getTpmLimit(),
+                entity.getConcurrencyLimit(),
+                entity.getStickySessionTtlSeconds(),
+                entity.getAllowedClientFamilies(),
+                entity.isRequireClientFamilyMatch(),
                 entity.getLastUsedAt(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()

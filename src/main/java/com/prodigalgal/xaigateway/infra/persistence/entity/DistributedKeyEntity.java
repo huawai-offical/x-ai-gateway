@@ -71,6 +71,48 @@ public class DistributedKeyEntity {
     @Comment("允许的模型或别名白名单，JSON 数组。")
     private List<String> allowedModels = List.of();
 
+    @Convert(converter = StringListJsonConverter.class)
+    @Column(name = "allowed_provider_types_json", columnDefinition = "text")
+    @Comment("允许的 provider 类型白名单，JSON 数组。")
+    private List<String> allowedProviderTypes = List.of();
+
+    @Column(name = "expires_at", columnDefinition = "timestamp with time zone")
+    @Comment("分发 key 过期时间（UTC）。")
+    private Instant expiresAt;
+
+    @Column(name = "budget_limit_micros")
+    @Comment("预算上限，单位 micros。")
+    private Long budgetLimitMicros;
+
+    @Column(name = "budget_window_seconds")
+    @Comment("预算窗口秒数。")
+    private Integer budgetWindowSeconds;
+
+    @Column(name = "rpm_limit")
+    @Comment("每分钟请求数限制。")
+    private Integer rpmLimit;
+
+    @Column(name = "tpm_limit")
+    @Comment("每分钟 token 估算限制。")
+    private Integer tpmLimit;
+
+    @Column(name = "concurrency_limit")
+    @Comment("并发请求上限。")
+    private Integer concurrencyLimit;
+
+    @Column(name = "sticky_session_ttl_seconds")
+    @Comment("会话粘性 TTL 秒数。")
+    private Integer stickySessionTtlSeconds;
+
+    @Convert(converter = StringListJsonConverter.class)
+    @Column(name = "allowed_client_families_json", columnDefinition = "text")
+    @Comment("允许的客户端家族白名单，JSON 数组。")
+    private List<String> allowedClientFamilies = List.of();
+
+    @Column(name = "require_client_family_match", nullable = false)
+    @Comment("是否要求客户端家族必须显式匹配。")
+    private boolean requireClientFamilyMatch = false;
+
     @Column(name = "last_used_at", columnDefinition = "timestamp with time zone")
     @Comment("最后一次使用时间（UTC）。")
     private Instant lastUsedAt;
@@ -151,6 +193,86 @@ public class DistributedKeyEntity {
 
     public void setAllowedModels(List<String> allowedModels) {
         this.allowedModels = allowedModels;
+    }
+
+    public List<String> getAllowedProviderTypes() {
+        return allowedProviderTypes;
+    }
+
+    public void setAllowedProviderTypes(List<String> allowedProviderTypes) {
+        this.allowedProviderTypes = allowedProviderTypes;
+    }
+
+    public Instant getExpiresAt() {
+        return expiresAt;
+    }
+
+    public void setExpiresAt(Instant expiresAt) {
+        this.expiresAt = expiresAt;
+    }
+
+    public Long getBudgetLimitMicros() {
+        return budgetLimitMicros;
+    }
+
+    public void setBudgetLimitMicros(Long budgetLimitMicros) {
+        this.budgetLimitMicros = budgetLimitMicros;
+    }
+
+    public Integer getBudgetWindowSeconds() {
+        return budgetWindowSeconds;
+    }
+
+    public void setBudgetWindowSeconds(Integer budgetWindowSeconds) {
+        this.budgetWindowSeconds = budgetWindowSeconds;
+    }
+
+    public Integer getRpmLimit() {
+        return rpmLimit;
+    }
+
+    public void setRpmLimit(Integer rpmLimit) {
+        this.rpmLimit = rpmLimit;
+    }
+
+    public Integer getTpmLimit() {
+        return tpmLimit;
+    }
+
+    public void setTpmLimit(Integer tpmLimit) {
+        this.tpmLimit = tpmLimit;
+    }
+
+    public Integer getConcurrencyLimit() {
+        return concurrencyLimit;
+    }
+
+    public void setConcurrencyLimit(Integer concurrencyLimit) {
+        this.concurrencyLimit = concurrencyLimit;
+    }
+
+    public Integer getStickySessionTtlSeconds() {
+        return stickySessionTtlSeconds;
+    }
+
+    public void setStickySessionTtlSeconds(Integer stickySessionTtlSeconds) {
+        this.stickySessionTtlSeconds = stickySessionTtlSeconds;
+    }
+
+    public List<String> getAllowedClientFamilies() {
+        return allowedClientFamilies;
+    }
+
+    public void setAllowedClientFamilies(List<String> allowedClientFamilies) {
+        this.allowedClientFamilies = allowedClientFamilies;
+    }
+
+    public boolean isRequireClientFamilyMatch() {
+        return requireClientFamilyMatch;
+    }
+
+    public void setRequireClientFamilyMatch(boolean requireClientFamilyMatch) {
+        this.requireClientFamilyMatch = requireClientFamilyMatch;
     }
 
     public Instant getLastUsedAt() {

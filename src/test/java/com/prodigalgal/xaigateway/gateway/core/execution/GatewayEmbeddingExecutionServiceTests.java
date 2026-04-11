@@ -3,6 +3,8 @@ package com.prodigalgal.xaigateway.gateway.core.execution;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.admin.application.CredentialCryptoService;
+import com.prodigalgal.xaigateway.gateway.core.account.AccountSelectionService;
+import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyGovernanceService;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityService;
 import com.prodigalgal.xaigateway.gateway.core.routing.GatewayRouteSelectionService;
@@ -50,6 +52,8 @@ class GatewayEmbeddingExecutionServiceTests {
         UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
         CredentialCryptoService credentialCryptoService = Mockito.mock(CredentialCryptoService.class);
         GatewayObservabilityService gatewayObservabilityService = Mockito.mock(GatewayObservabilityService.class);
+        DistributedKeyGovernanceService distributedKeyGovernanceService = Mockito.mock(DistributedKeyGovernanceService.class);
+        AccountSelectionService accountSelectionService = Mockito.mock(AccountSelectionService.class);
         ObjectMapper objectMapper = new ObjectMapper();
 
         AtomicReference<String> upstreamUrl = new AtomicReference<>();
@@ -77,6 +81,8 @@ class GatewayEmbeddingExecutionServiceTests {
                 upstreamCredentialRepository,
                 credentialCryptoService,
                 gatewayObservabilityService,
+                distributedKeyGovernanceService,
+                accountSelectionService,
                 WebClient.builder().exchangeFunction(exchangeFunction)
         );
 

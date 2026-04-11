@@ -6,6 +6,9 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.prodigalgal.xaigateway.admin.api.AdminChatExecuteRequest;
 import com.prodigalgal.xaigateway.admin.api.AdminChatExecuteResponse;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyQueryService;
+import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
+import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyGovernanceService;
+import com.prodigalgal.xaigateway.gateway.core.account.AccountSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest;
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionResponse;
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionStreamChunk;
@@ -60,7 +63,9 @@ public class GatewayChatExecutionService {
     private final UpstreamCredentialRepository upstreamCredentialRepository;
     private final CredentialCryptoService credentialCryptoService;
     private final GatewayObservabilityService gatewayObservabilityService;
+    private final DistributedKeyGovernanceService distributedKeyGovernanceService;
     private final DistributedKeyQueryService distributedKeyQueryService;
+    private final AccountSelectionService accountSelectionService;
     private final GatewayFileService gatewayFileService;
     private final OpenAiChatModelFactory openAiChatModelFactory;
     private final AnthropicChatModelFactory anthropicChatModelFactory;
@@ -72,7 +77,9 @@ public class GatewayChatExecutionService {
             UpstreamCredentialRepository upstreamCredentialRepository,
             CredentialCryptoService credentialCryptoService,
             GatewayObservabilityService gatewayObservabilityService,
+            DistributedKeyGovernanceService distributedKeyGovernanceService,
             DistributedKeyQueryService distributedKeyQueryService,
+            AccountSelectionService accountSelectionService,
             GatewayFileService gatewayFileService,
             OpenAiChatModelFactory openAiChatModelFactory,
             AnthropicChatModelFactory anthropicChatModelFactory,
@@ -82,7 +89,9 @@ public class GatewayChatExecutionService {
         this.upstreamCredentialRepository = upstreamCredentialRepository;
         this.credentialCryptoService = credentialCryptoService;
         this.gatewayObservabilityService = gatewayObservabilityService;
+        this.distributedKeyGovernanceService = distributedKeyGovernanceService;
         this.distributedKeyQueryService = distributedKeyQueryService;
+        this.accountSelectionService = accountSelectionService;
         this.gatewayFileService = gatewayFileService;
         this.openAiChatModelFactory = openAiChatModelFactory;
         this.anthropicChatModelFactory = anthropicChatModelFactory;
@@ -117,12 +126,20 @@ public class GatewayChatExecutionService {
                 request.protocol(),
                 request.requestPath(),
                 request.requestedModel(),
-                buildRouteBody(request)
+                buildRouteBody(request),
+                GatewayClientFamily.GENERIC_OPENAI,
+                true
         ));
         gatewayObservabilityService.recordRouteDecision(requestId, selectionResult);
 
         UpstreamCredentialEntity credential = getRequiredCredential(selectionResult.selectedCandidate().candidate().credentialId());
-        String apiKey = credentialCryptoService.decrypt(credential.getApiKeyCiphertext());
+        String apiKey = accountSelectionService.resolveActiveAccount(
+                        selectionResult.distributedKeyId(),
+                        selectionResult.selectedCandidate().candidate().providerType(),
+                        selectionResult.clientFamily(),
+                        300)
+                .map(account -> credentialCryptoService.decrypt(account.getAccessTokenCiphertext()))
+                .orElseGet(() -> credentialCryptoService.decrypt(credential.getApiKeyCiphertext()));
 
         try {
             ChatResponse response = switch (selectionResult.selectedCandidate().candidate().providerType()) {
@@ -159,6 +176,8 @@ public class GatewayChatExecutionService {
         } catch (RuntimeException exception) {
             gatewayRouteSelectionService.invalidateSelection(selectionResult);
             throw exception;
+        } finally {
+            distributedKeyGovernanceService.releaseConcurrency(selectionResult.governanceReservationKey());
         }
     }
 
@@ -169,12 +188,20 @@ public class GatewayChatExecutionService {
                 request.protocol(),
                 request.requestPath(),
                 request.requestedModel(),
-                buildRouteBody(request)
+                buildRouteBody(request),
+                GatewayClientFamily.GENERIC_OPENAI,
+                true
         ));
         gatewayObservabilityService.recordRouteDecision(requestId, selectionResult);
 
         UpstreamCredentialEntity credential = getRequiredCredential(selectionResult.selectedCandidate().candidate().credentialId());
-        String apiKey = credentialCryptoService.decrypt(credential.getApiKeyCiphertext());
+        String apiKey = accountSelectionService.resolveActiveAccount(
+                        selectionResult.distributedKeyId(),
+                        selectionResult.selectedCandidate().candidate().providerType(),
+                        selectionResult.clientFamily(),
+                        300)
+                .map(account -> credentialCryptoService.decrypt(account.getAccessTokenCiphertext()))
+                .orElseGet(() -> credentialCryptoService.decrypt(credential.getApiKeyCiphertext()));
 
         ChatModel model = switch (selectionResult.selectedCandidate().candidate().providerType()) {
             case OPENAI_DIRECT, OPENAI_COMPATIBLE -> {
@@ -253,7 +280,10 @@ public class GatewayChatExecutionService {
                 .doOnComplete(() -> gatewayRouteSelectionService.recordSuccessfulSelection(selectionResult))
                 .doOnError(error -> gatewayRouteSelectionService.invalidateSelection(selectionResult))
                 .doOnCancel(() -> gatewayRouteSelectionService.invalidateSelection(selectionResult))
-                .doFinally(signalType -> closeModel(model, signalType));
+                .doFinally(signalType -> {
+                    closeModel(model, signalType);
+                    distributedKeyGovernanceService.releaseConcurrency(selectionResult.governanceReservationKey());
+                });
 
         return new ChatExecutionStreamResponse(requestId, selectionResult, chunks);
     }

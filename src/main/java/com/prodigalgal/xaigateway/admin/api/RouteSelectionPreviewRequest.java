@@ -12,6 +12,7 @@ public record RouteSelectionPreviewRequest(
         String requestPath,
         @NotBlank(message = "模型不能为空。")
         String requestedModel,
+        String clientFamily,
         JsonNode requestBody
 ) {
 }

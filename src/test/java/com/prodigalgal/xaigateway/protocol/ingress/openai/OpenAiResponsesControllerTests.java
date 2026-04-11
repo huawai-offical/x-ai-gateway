@@ -1,5 +1,6 @@
 package com.prodigalgal.xaigateway.protocol.ingress.openai;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.admin.application.GatewayChatExecutionService;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthenticationService;
@@ -9,6 +10,7 @@ import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionResponse;
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionStreamChunk;
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionStreamResponse;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolCall;
+import com.prodigalgal.xaigateway.gateway.core.resource.GatewayAsyncResourceService;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionSource;
@@ -40,6 +42,9 @@ class OpenAiResponsesControllerTests {
 
     @MockitoBean
     private GatewayChatExecutionService gatewayChatExecutionService;
+
+    @MockitoBean
+    private GatewayAsyncResourceService gatewayAsyncResourceService;
 
     @Test
     void shouldExecuteMinimalResponsesRequest() {
@@ -386,6 +391,46 @@ class OpenAiResponsesControllerTests {
         org.junit.jupiter.api.Assertions.assertTrue(joined.contains("event: response.function_call_arguments.done"));
         org.junit.jupiter.api.Assertions.assertTrue(joined.contains("\"name\":\"lookup_weather\""));
         org.junit.jupiter.api.Assertions.assertTrue(joined.contains("{\\\"city\\\":\\\"Shanghai\\\"}"));
+    }
+
+    @Test
+    void shouldGetStoredResponse() {
+        Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayAsyncResourceService.getResponse("resp_stored_1", 1L))
+                .thenReturn(new ObjectMapper().createObjectNode()
+                        .put("id", "resp_stored_1")
+                        .put("object", "response")
+                        .put("status", "completed"));
+
+        webTestClient.get()
+                .uri("/v1/responses/resp_stored_1")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.id").isEqualTo("resp_stored_1")
+                .jsonPath("$.status").isEqualTo("completed");
+    }
+
+    @Test
+    void shouldDeleteStoredResponse() {
+        Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayAsyncResourceService.deleteResponse("resp_stored_1", 1L))
+                .thenReturn(new ObjectMapper().createObjectNode()
+                        .put("id", "resp_stored_1")
+                        .put("object", "response.deleted")
+                        .put("deleted", true));
+
+        webTestClient.delete()
+                .uri("/v1/responses/resp_stored_1")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.object").isEqualTo("response.deleted")
+                .jsonPath("$.deleted").isEqualTo(true);
     }
 
     private RouteSelectionResult selectionResult() {

@@ -42,6 +42,16 @@ public class DistributedKeyQueryService {
                 entity.getMaskedKey(),
                 entity.getAllowedProtocols(),
                 entity.getAllowedModels(),
+                entity.getAllowedProviderTypes(),
+                entity.getExpiresAt(),
+                entity.getBudgetLimitMicros(),
+                entity.getBudgetWindowSeconds(),
+                entity.getRpmLimit(),
+                entity.getTpmLimit(),
+                entity.getConcurrencyLimit(),
+                entity.getStickySessionTtlSeconds(),
+                entity.getAllowedClientFamilies(),
+                entity.isRequireClientFamilyMatch(),
                 bindings
         );
     }

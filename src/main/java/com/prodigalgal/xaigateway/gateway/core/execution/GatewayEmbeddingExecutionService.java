@@ -3,6 +3,9 @@ package com.prodigalgal.xaigateway.gateway.core.execution;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.prodigalgal.xaigateway.admin.application.CredentialCryptoService;
+import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyGovernanceService;
+import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
+import com.prodigalgal.xaigateway.gateway.core.account.AccountSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityService;
 import com.prodigalgal.xaigateway.gateway.core.routing.GatewayRouteSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionRequest;
@@ -25,6 +28,8 @@ public class GatewayEmbeddingExecutionService {
     private final UpstreamCredentialRepository upstreamCredentialRepository;
     private final CredentialCryptoService credentialCryptoService;
     private final GatewayObservabilityService gatewayObservabilityService;
+    private final DistributedKeyGovernanceService distributedKeyGovernanceService;
+    private final AccountSelectionService accountSelectionService;
     private final WebClient.Builder webClientBuilder;
 
     public GatewayEmbeddingExecutionService(
@@ -32,11 +37,15 @@ public class GatewayEmbeddingExecutionService {
             UpstreamCredentialRepository upstreamCredentialRepository,
             CredentialCryptoService credentialCryptoService,
             GatewayObservabilityService gatewayObservabilityService,
+            DistributedKeyGovernanceService distributedKeyGovernanceService,
+            AccountSelectionService accountSelectionService,
             WebClient.Builder webClientBuilder) {
         this.gatewayRouteSelectionService = gatewayRouteSelectionService;
         this.upstreamCredentialRepository = upstreamCredentialRepository;
         this.credentialCryptoService = credentialCryptoService;
         this.gatewayObservabilityService = gatewayObservabilityService;
+        this.distributedKeyGovernanceService = distributedKeyGovernanceService;
+        this.accountSelectionService = accountSelectionService;
         this.webClientBuilder = webClientBuilder;
     }
 
@@ -50,7 +59,9 @@ public class GatewayEmbeddingExecutionService {
                 "openai",
                 "/v1/embeddings",
                 requestedModel,
-                payload
+                payload,
+                GatewayClientFamily.GENERIC_OPENAI,
+                true
         ));
         gatewayObservabilityService.recordRouteDecision(requestId, selectionResult);
 
@@ -59,7 +70,13 @@ public class GatewayEmbeddingExecutionService {
         }
 
         UpstreamCredentialEntity credential = getRequiredCredential(selectionResult.selectedCandidate().candidate().credentialId());
-        String apiKey = credentialCryptoService.decrypt(credential.getApiKeyCiphertext());
+        String apiKey = accountSelectionService.resolveActiveAccount(
+                        selectionResult.distributedKeyId(),
+                        selectionResult.selectedCandidate().candidate().providerType(),
+                        selectionResult.clientFamily(),
+                        300)
+                .map(account -> credentialCryptoService.decrypt(account.getAccessTokenCiphertext()))
+                .orElseGet(() -> credentialCryptoService.decrypt(credential.getApiKeyCiphertext()));
 
         try {
             ObjectNode upstreamPayload = payload.deepCopy();
@@ -97,6 +114,8 @@ public class GatewayEmbeddingExecutionService {
         } catch (RuntimeException exception) {
             gatewayRouteSelectionService.invalidateSelection(selectionResult);
             throw exception;
+        } finally {
+            distributedKeyGovernanceService.releaseConcurrency(selectionResult.governanceReservationKey());
         }
     }
 

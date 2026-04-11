@@ -14,6 +14,7 @@ import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionResponse;
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionStreamChunk;
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionStreamResponse;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolDefinition;
+import com.prodigalgal.xaigateway.gateway.core.resource.GatewayAsyncResourceService;
 import com.prodigalgal.xaigateway.gateway.core.usage.GatewayUsage;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -24,6 +25,9 @@ import org.springframework.http.MediaType;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -38,14 +42,17 @@ public class OpenAiResponsesController {
 
     private final DistributedKeyAuthenticationService distributedKeyAuthenticationService;
     private final GatewayChatExecutionService gatewayChatExecutionService;
+    private final GatewayAsyncResourceService gatewayAsyncResourceService;
     private final ObjectMapper objectMapper;
 
     public OpenAiResponsesController(
             DistributedKeyAuthenticationService distributedKeyAuthenticationService,
             GatewayChatExecutionService gatewayChatExecutionService,
+            GatewayAsyncResourceService gatewayAsyncResourceService,
             ObjectMapper objectMapper) {
         this.distributedKeyAuthenticationService = distributedKeyAuthenticationService;
         this.gatewayChatExecutionService = gatewayChatExecutionService;
+        this.gatewayAsyncResourceService = gatewayAsyncResourceService;
         this.objectMapper = objectMapper;
     }
 
@@ -64,7 +71,32 @@ public class OpenAiResponsesController {
         }
 
         ChatExecutionResponse response = gatewayChatExecutionService.execute(executionRequest);
-        return ResponseEntity.ok(OpenAiResponsesResponse.from(response));
+        OpenAiResponsesResponse payload = OpenAiResponsesResponse.from(response);
+        if (requestBody.path("store").asBoolean(false)) {
+            return ResponseEntity.ok(gatewayAsyncResourceService.storeResponse(
+                    distributedKey.id(),
+                    executionRequest.requestedModel(),
+                    requestBody,
+                    objectMapper.valueToTree(payload)
+            ));
+        }
+        return ResponseEntity.ok(payload);
+    }
+
+    @GetMapping("/{responseId}")
+    public JsonNode getStoredResponse(
+            @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
+            @PathVariable String responseId) {
+        AuthenticatedDistributedKey distributedKey = distributedKeyAuthenticationService.authenticateBearerToken(authorization);
+        return gatewayAsyncResourceService.getResponse(responseId, distributedKey.id());
+    }
+
+    @DeleteMapping("/{responseId}")
+    public JsonNode deleteStoredResponse(
+            @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
+            @PathVariable String responseId) {
+        AuthenticatedDistributedKey distributedKey = distributedKeyAuthenticationService.authenticateBearerToken(authorization);
+        return gatewayAsyncResourceService.deleteResponse(responseId, distributedKey.id());
     }
 
     private ChatExecutionRequest toExecutionRequest(String distributedKeyPrefix, JsonNode requestBody) {

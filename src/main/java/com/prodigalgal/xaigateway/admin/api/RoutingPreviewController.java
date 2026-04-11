@@ -3,6 +3,7 @@ package com.prodigalgal.xaigateway.admin.api;
 import com.prodigalgal.xaigateway.gateway.core.routing.GatewayRouteSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionRequest;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
+import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
 import jakarta.validation.Valid;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -28,7 +29,9 @@ public class RoutingPreviewController {
                 request.protocol(),
                 request.requestPath(),
                 request.requestedModel(),
-                request.requestBody()
+                request.requestBody(),
+                request.clientFamily() == null ? GatewayClientFamily.GENERIC_OPENAI : GatewayClientFamily.from(request.clientFamily()),
+                false
         ));
 
         return new RouteSelectionPreviewResponse(
@@ -41,6 +44,8 @@ public class RoutingPreviewController {
                 result.prefixHash(),
                 result.fingerprint(),
                 result.modelGroup(),
+                result.clientFamily(),
+                result.governanceNotes(),
                 result.selectionSource(),
                 result.selectedCandidate(),
                 result.candidates().size(),

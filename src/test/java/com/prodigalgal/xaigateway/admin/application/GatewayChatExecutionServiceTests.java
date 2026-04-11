@@ -1,7 +1,9 @@
 package com.prodigalgal.xaigateway.admin.application;
 
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyQueryService;
+import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyGovernanceService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyView;
+import com.prodigalgal.xaigateway.gateway.core.account.AccountSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileResource;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileService;
@@ -31,7 +33,9 @@ class GatewayChatExecutionServiceTests {
         UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
         CredentialCryptoService credentialCryptoService = Mockito.mock(CredentialCryptoService.class);
         GatewayObservabilityService gatewayObservabilityService = Mockito.mock(GatewayObservabilityService.class);
+        DistributedKeyGovernanceService distributedKeyGovernanceService = Mockito.mock(DistributedKeyGovernanceService.class);
         DistributedKeyQueryService distributedKeyQueryService = Mockito.mock(DistributedKeyQueryService.class);
+        AccountSelectionService accountSelectionService = Mockito.mock(AccountSelectionService.class);
         GatewayFileService gatewayFileService = Mockito.mock(GatewayFileService.class);
         OpenAiChatModelFactory openAiChatModelFactory = Mockito.mock(OpenAiChatModelFactory.class);
         AnthropicChatModelFactory anthropicChatModelFactory = Mockito.mock(AnthropicChatModelFactory.class);
@@ -43,7 +47,9 @@ class GatewayChatExecutionServiceTests {
                 upstreamCredentialRepository,
                 credentialCryptoService,
                 gatewayObservabilityService,
+                distributedKeyGovernanceService,
                 distributedKeyQueryService,
+                accountSelectionService,
                 gatewayFileService,
                 openAiChatModelFactory,
                 anthropicChatModelFactory,

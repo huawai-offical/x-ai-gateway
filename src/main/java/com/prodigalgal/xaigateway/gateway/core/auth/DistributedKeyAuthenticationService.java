@@ -52,7 +52,12 @@ public class DistributedKeyAuthenticationService {
             throw new GatewayUnauthorizedException("网关 key 校验失败。");
         }
 
-        return new AuthenticatedDistributedKey(entity.get().getId(), entity.get().getKeyPrefix(), entity.get().getKeyName());
+        return new AuthenticatedDistributedKey(
+                entity.get().getId(),
+                entity.get().getKeyPrefix(),
+                entity.get().getKeyName(),
+                entity.get().getAllowedClientFamilies()
+        );
     }
 
     private String extractBearerToken(String authorizationHeader) {

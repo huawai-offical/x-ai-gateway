@@ -1,15 +1,20 @@
 package com.prodigalgal.xaigateway.gateway.core.routing;
 
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedCredentialBindingView;
+import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyGovernanceService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyQueryService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyView;
+import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
 import com.prodigalgal.xaigateway.gateway.core.cache.AffinityBindingType;
 import com.prodigalgal.xaigateway.gateway.core.cache.AffinityCacheService;
 import com.prodigalgal.xaigateway.gateway.core.cache.PromptFingerprintService;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.catalog.ModelCatalogQueryService;
 import com.prodigalgal.xaigateway.gateway.core.catalog.ResolvedModelView;
+import com.prodigalgal.xaigateway.gateway.core.account.AccountSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.shared.ModelIdNormalizer;
+import com.prodigalgal.xaigateway.infra.persistence.repository.NetworkProxyRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -31,16 +36,28 @@ public class GatewayRouteSelectionService {
     private final ModelCatalogQueryService modelCatalogQueryService;
     private final PromptFingerprintService promptFingerprintService;
     private final AffinityCacheService affinityCacheService;
+    private final DistributedKeyGovernanceService distributedKeyGovernanceService;
+    private final UpstreamCredentialRepository upstreamCredentialRepository;
+    private final NetworkProxyRepository networkProxyRepository;
+    private final AccountSelectionService accountSelectionService;
 
     public GatewayRouteSelectionService(
             DistributedKeyQueryService distributedKeyQueryService,
             ModelCatalogQueryService modelCatalogQueryService,
             PromptFingerprintService promptFingerprintService,
-            AffinityCacheService affinityCacheService) {
+            AffinityCacheService affinityCacheService,
+            DistributedKeyGovernanceService distributedKeyGovernanceService,
+            UpstreamCredentialRepository upstreamCredentialRepository,
+            NetworkProxyRepository networkProxyRepository,
+            AccountSelectionService accountSelectionService) {
         this.distributedKeyQueryService = distributedKeyQueryService;
         this.modelCatalogQueryService = modelCatalogQueryService;
         this.promptFingerprintService = promptFingerprintService;
         this.affinityCacheService = affinityCacheService;
+        this.distributedKeyGovernanceService = distributedKeyGovernanceService;
+        this.upstreamCredentialRepository = upstreamCredentialRepository;
+        this.networkProxyRepository = networkProxyRepository;
+        this.accountSelectionService = accountSelectionService;
     }
 
     public RouteSelectionResult select(RouteSelectionRequest request) {
@@ -51,6 +68,9 @@ public class GatewayRouteSelectionService {
         if (!isProtocolAllowed(distributedKey, normalizedProtocol)) {
             throw new IllegalArgumentException("当前 DistributedKey 不允许访问该协议。");
         }
+        if (distributedKey.expiresAt() != null && distributedKey.expiresAt().isBefore(java.time.Instant.now())) {
+            throw new IllegalArgumentException("当前 DistributedKey 已过期。");
+        }
 
         ResolvedModelView resolved = modelCatalogQueryService
                 .resolveRequestedModel(request.requestedModel(), normalizedProtocol)
@@ -60,9 +80,34 @@ public class GatewayRouteSelectionService {
             throw new IllegalArgumentException("当前 DistributedKey 不允许访问该模型。");
         }
 
-        List<RouteCandidateView> candidates = mergeCandidates(distributedKey, resolved);
-        if (candidates.isEmpty()) {
+        GatewayClientFamily clientFamily = request.clientFamily() == null ? GatewayClientFamily.GENERIC_OPENAI : request.clientFamily();
+        DistributedKeyGovernanceService.GovernanceDecision governanceDecision =
+                distributedKeyGovernanceService.evaluate(distributedKey, clientFamily, request.requestBody(), request.reserveGovernance());
+        if (!governanceDecision.blockers().isEmpty()) {
+            throw new IllegalArgumentException(String.join("；", governanceDecision.blockers()));
+        }
+
+        List<RouteCandidateView> mergedCandidates = mergeCandidates(distributedKey, resolved);
+        List<RouteCandidateView> providerFilteredCandidates = mergedCandidates.stream()
+                .filter(candidate -> isProviderAllowed(distributedKey, candidate))
+                .toList();
+        if (mergedCandidates.isEmpty()) {
             throw new IllegalArgumentException("当前 DistributedKey 绑定的上游凭证中没有可用候选。");
+        }
+        if (providerFilteredCandidates.isEmpty()) {
+            throw new IllegalArgumentException("当前 DistributedKey 不允许所选 provider。");
+        }
+        List<RouteCandidateView> networkFilteredCandidates = providerFilteredCandidates.stream()
+                .filter(this::isNetworkHealthy)
+                .toList();
+        if (networkFilteredCandidates.isEmpty()) {
+            throw new IllegalArgumentException("当前 provider 候选均被网络治理策略阻断。");
+        }
+        List<RouteCandidateView> candidates = networkFilteredCandidates.stream()
+                .filter(candidate -> hasHealthyAccountIfBound(distributedKey.id(), candidate.candidate().providerType(), clientFamily))
+                .toList();
+        if (candidates.isEmpty()) {
+            throw new IllegalArgumentException("当前 provider 候选没有健康账号池可用。");
         }
 
         String prefixHash = promptFingerprintService.buildPrefixHash(
@@ -105,6 +150,9 @@ public class GatewayRouteSelectionService {
                 prefixHash,
                 fingerprint,
                 modelGroup,
+                clientFamily,
+                governanceDecision.notes(),
+                governanceDecision.concurrencyReservationKey(),
                 source,
                 selected,
                 candidates
@@ -249,6 +297,30 @@ public class GatewayRouteSelectionService {
         return distributedKey.allowedModels().contains(requested)
                 || distributedKey.allowedModels().contains(publicNormalized)
                 || distributedKey.allowedModels().contains(resolvedModelKey);
+    }
+
+    private boolean isProviderAllowed(DistributedKeyView distributedKey, RouteCandidateView candidate) {
+        if (distributedKey.allowedProviderTypes().isEmpty()) {
+            return true;
+        }
+        return distributedKey.allowedProviderTypes().contains(candidate.candidate().providerType().name());
+    }
+
+    private boolean isNetworkHealthy(RouteCandidateView candidate) {
+        return upstreamCredentialRepository.findById(candidate.candidate().credentialId())
+                .map(credential -> {
+                    if (credential.getProxyId() == null) {
+                        return true;
+                    }
+                    return networkProxyRepository.findById(credential.getProxyId())
+                            .map(proxy -> proxy.isActive() && !"FAILED".equalsIgnoreCase(proxy.getLastStatus()))
+                            .orElse(false);
+                })
+                .orElse(false);
+    }
+
+    private boolean hasHealthyAccountIfBound(Long distributedKeyId, com.prodigalgal.xaigateway.gateway.core.shared.ProviderType providerType, GatewayClientFamily clientFamily) {
+        return accountSelectionService.hasHealthyAccountBinding(distributedKeyId, providerType, clientFamily);
     }
 
     private String normalize(String protocol) {

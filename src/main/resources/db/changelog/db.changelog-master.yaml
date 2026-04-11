@@ -9,3 +9,11 @@ databaseChangeLog:
       file: db/changelog/changes/db.changelog-0004-gateway-file.yaml
   - include:
       file: db/changelog/changes/db.changelog-0005-gateway-file-binding.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0006-gateway-async-resource.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0007-distributed-key-governance.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0008-upstream-account-pool.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0009-network-governance.yaml

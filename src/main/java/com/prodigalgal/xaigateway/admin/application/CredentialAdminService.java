@@ -118,6 +118,8 @@ public class CredentialAdminService {
         entity.setApiKeyCiphertext(credentialCryptoService.encrypt(request.apiKey().trim()));
         entity.setApiKeyFingerprint(credentialCryptoService.fingerprint(request.apiKey().trim()));
         entity.setActive(request.active() == null || request.active());
+        entity.setProxyId(request.proxyId());
+        entity.setTlsFingerprintProfileId(request.tlsFingerprintProfileId());
     }
 
     private CredentialResponse toResponse(UpstreamCredentialEntity entity) {
@@ -133,6 +135,8 @@ public class CredentialAdminService {
                 entity.getLastErrorMessage(),
                 entity.getLastErrorAt(),
                 entity.getLastUsedAt(),
+                entity.getProxyId(),
+                entity.getTlsFingerprintProfileId(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
         );

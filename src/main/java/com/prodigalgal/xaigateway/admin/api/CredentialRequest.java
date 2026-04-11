@@ -13,6 +13,8 @@ public record CredentialRequest(
         String baseUrl,
         @NotBlank(message = "apiKey 不能为空。")
         String apiKey,
-        Boolean active
+        Boolean active,
+        Long proxyId,
+        Long tlsFingerprintProfileId
 ) {
 }

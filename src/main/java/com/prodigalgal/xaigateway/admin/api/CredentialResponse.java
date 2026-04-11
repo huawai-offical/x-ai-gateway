@@ -15,6 +15,8 @@ public record CredentialResponse(
         String lastErrorMessage,
         Instant lastErrorAt,
         Instant lastUsedAt,
+        Long proxyId,
+        Long tlsFingerprintProfileId,
         Instant createdAt,
         Instant updatedAt
 ) {
