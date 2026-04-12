@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthenticationService;
-import com.prodigalgal.xaigateway.gateway.core.execution.GatewayEmbeddingExecutionService;
+import com.prodigalgal.xaigateway.gateway.core.execution.GatewayResourceExecutionService;
 import com.prodigalgal.xaigateway.testsupport.PermitAllSecurityTestConfig;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -31,7 +31,7 @@ class OpenAiEmbeddingsControllerTests {
     private DistributedKeyAuthenticationService distributedKeyAuthenticationService;
 
     @MockitoBean
-    private GatewayEmbeddingExecutionService gatewayEmbeddingExecutionService;
+    private GatewayResourceExecutionService gatewayResourceExecutionService;
 
     @Test
     void shouldCreateEmbeddings() {
@@ -47,7 +47,7 @@ class OpenAiEmbeddingsControllerTests {
 
         Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayEmbeddingExecutionService.executeOpenAiEmbeddings(Mockito.eq("sk-gw-test"), Mockito.any()))
+        Mockito.when(gatewayResourceExecutionService.executeEmbeddings(Mockito.eq("sk-gw-test"), Mockito.any(), Mockito.isNull()))
                 .thenReturn(ResponseEntity.ok()
                         .contentType(MediaType.APPLICATION_JSON)
                         .body(body));

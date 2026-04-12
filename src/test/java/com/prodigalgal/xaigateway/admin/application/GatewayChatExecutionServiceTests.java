@@ -5,6 +5,7 @@ import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyGovernanceServ
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyView;
 import com.prodigalgal.xaigateway.gateway.core.account.AccountSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest;
+import com.prodigalgal.xaigateway.gateway.core.execution.GatewayChatPromptBuilder;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileResource;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileService;
 import com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityService;
@@ -40,21 +41,7 @@ class GatewayChatExecutionServiceTests {
         OpenAiChatModelFactory openAiChatModelFactory = Mockito.mock(OpenAiChatModelFactory.class);
         AnthropicChatModelFactory anthropicChatModelFactory = Mockito.mock(AnthropicChatModelFactory.class);
         GeminiChatModelFactory geminiChatModelFactory = Mockito.mock(GeminiChatModelFactory.class);
-
-        GatewayChatExecutionService service = new GatewayChatExecutionService(
-                routeSelectionService,
-                providerExecutionSupportService,
-                upstreamCredentialRepository,
-                credentialCryptoService,
-                gatewayObservabilityService,
-                distributedKeyGovernanceService,
-                distributedKeyQueryService,
-                accountSelectionService,
-                gatewayFileService,
-                openAiChatModelFactory,
-                anthropicChatModelFactory,
-                geminiChatModelFactory
-        );
+        GatewayChatPromptBuilder promptBuilder = new GatewayChatPromptBuilder(distributedKeyQueryService, gatewayFileService);
 
         Mockito.when(distributedKeyQueryService.findActiveByKeyPrefix("sk-gw-test"))
                 .thenReturn(Optional.of(new DistributedKeyView(
@@ -75,7 +62,7 @@ class GatewayChatExecutionServiceTests {
                 ));
 
         Object media = ReflectionTestUtils.invokeMethod(
-                service,
+                promptBuilder,
                 "toMedia",
                 "sk-gw-test",
                 new ChatExecutionRequest.MediaInput(

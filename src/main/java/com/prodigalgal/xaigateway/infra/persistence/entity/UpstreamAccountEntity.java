@@ -64,6 +64,9 @@ public class UpstreamAccountEntity {
     @Column(name = "tls_fingerprint_profile_id")
     private Long tlsFingerprintProfileId;
 
+    @Column(name = "site_profile_id")
+    private Long siteProfileId;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false, columnDefinition = "timestamp with time zone")
     private Instant createdAt;
@@ -103,6 +106,8 @@ public class UpstreamAccountEntity {
     public void setProxyId(Long proxyId) { this.proxyId = proxyId; }
     public Long getTlsFingerprintProfileId() { return tlsFingerprintProfileId; }
     public void setTlsFingerprintProfileId(Long tlsFingerprintProfileId) { this.tlsFingerprintProfileId = tlsFingerprintProfileId; }
+    public Long getSiteProfileId() { return siteProfileId; }
+    public void setSiteProfileId(Long siteProfileId) { this.siteProfileId = siteProfileId; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }

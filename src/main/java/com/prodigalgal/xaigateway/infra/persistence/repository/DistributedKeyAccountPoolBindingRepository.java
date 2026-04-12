@@ -6,6 +6,6 @@ import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface DistributedKeyAccountPoolBindingRepository extends JpaRepository<DistributedKeyAccountPoolBindingEntity, Long> {
-    List<DistributedKeyAccountPoolBindingEntity> findAllByDistributedKeyIdAndActiveTrueOrderByPriorityAscCreatedAtAsc(Long distributedKeyId);
-    List<DistributedKeyAccountPoolBindingEntity> findAllByDistributedKeyIdAndProviderTypeAndActiveTrueOrderByPriorityAscCreatedAtAsc(Long distributedKeyId, ProviderType providerType);
+    List<DistributedKeyAccountPoolBindingEntity> findAllByDistributedKey_IdAndActiveTrueOrderByPriorityAscCreatedAtAsc(Long distributedKeyId);
+    List<DistributedKeyAccountPoolBindingEntity> findAllByDistributedKey_IdAndProviderTypeAndActiveTrueOrderByPriorityAscCreatedAtAsc(Long distributedKeyId, ProviderType providerType);
 }

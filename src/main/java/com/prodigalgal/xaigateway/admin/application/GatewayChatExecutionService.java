@@ -11,6 +11,9 @@ import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyGovernanceServ
 import com.prodigalgal.xaigateway.gateway.core.account.AccountSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest;
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionResponse;
+import com.prodigalgal.xaigateway.gateway.core.execution.GatewayChatRuntime;
+import com.prodigalgal.xaigateway.gateway.core.execution.GatewayChatRuntimeContext;
+import com.prodigalgal.xaigateway.gateway.core.execution.GatewayChatRuntimeResult;
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionStreamChunk;
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionStreamResponse;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolCall;
@@ -70,6 +73,7 @@ public class GatewayChatExecutionService {
     private final OpenAiChatModelFactory openAiChatModelFactory;
     private final AnthropicChatModelFactory anthropicChatModelFactory;
     private final GeminiChatModelFactory geminiChatModelFactory;
+    private final List<GatewayChatRuntime> gatewayChatRuntimes;
 
     public GatewayChatExecutionService(
             GatewayRouteSelectionService gatewayRouteSelectionService,
@@ -83,7 +87,8 @@ public class GatewayChatExecutionService {
             GatewayFileService gatewayFileService,
             OpenAiChatModelFactory openAiChatModelFactory,
             AnthropicChatModelFactory anthropicChatModelFactory,
-            GeminiChatModelFactory geminiChatModelFactory) {
+            GeminiChatModelFactory geminiChatModelFactory,
+            List<GatewayChatRuntime> gatewayChatRuntimes) {
         this.gatewayRouteSelectionService = gatewayRouteSelectionService;
         this.providerExecutionSupportService = providerExecutionSupportService;
         this.upstreamCredentialRepository = upstreamCredentialRepository;
@@ -96,6 +101,7 @@ public class GatewayChatExecutionService {
         this.openAiChatModelFactory = openAiChatModelFactory;
         this.anthropicChatModelFactory = anthropicChatModelFactory;
         this.geminiChatModelFactory = geminiChatModelFactory;
+        this.gatewayChatRuntimes = gatewayChatRuntimes;
     }
 
     public AdminChatExecuteResponse execute(AdminChatExecuteRequest request) {
@@ -142,36 +148,27 @@ public class GatewayChatExecutionService {
                 .orElseGet(() -> credentialCryptoService.decrypt(credential.getApiKeyCiphertext()));
 
         try {
-            ChatResponse response = switch (selectionResult.selectedCandidate().candidate().providerType()) {
-                case OPENAI_DIRECT, OPENAI_COMPATIBLE -> executeOpenAi(selectionResult, credential.getBaseUrl(), apiKey, request);
-                case ANTHROPIC_DIRECT -> executeAnthropic(selectionResult, credential.getBaseUrl(), apiKey, request);
-                case GEMINI_DIRECT -> executeGemini(selectionResult, credential.getBaseUrl(), apiKey, request);
-                case OLLAMA_DIRECT -> throw new IllegalArgumentException("当前 smoke 执行入口暂未接入 Ollama。");
-            };
-
+            GatewayChatRuntime runtime = resolveRuntime(selectionResult.selectedCandidate().candidate());
+            GatewayChatRuntimeResult result = runtime.execute(new GatewayChatRuntimeContext(
+                    selectionResult,
+                    credential,
+                    apiKey,
+                    request
+            ));
             gatewayRouteSelectionService.recordSuccessfulSelection(selectionResult);
-            GatewayUsage usage = providerExecutionSupportService.normalizeUsage(selectionResult, response.getMetadata().getUsage());
             gatewayObservabilityService.recordCacheUsage(
                     requestId,
                     selectionResult,
-                    usage,
+                    result.usage(),
                     "prompt_cache",
                     null
             );
-            String text = response.getResult().getOutput().getText();
             return new ChatExecutionResponse(
                     requestId,
                     selectionResult,
-                    text,
-                    usage,
-                    response.getResult().getOutput().getToolCalls().stream()
-                            .map(toolCall -> new GatewayToolCall(
-                                    toolCall.id(),
-                                    toolCall.type(),
-                                    toolCall.name(),
-                                    toolCall.arguments()
-                            ))
-                            .toList()
+                    result.text(),
+                    result.usage(),
+                    result.toolCalls()
             );
         } catch (RuntimeException exception) {
             gatewayRouteSelectionService.invalidateSelection(selectionResult);
@@ -203,89 +200,36 @@ public class GatewayChatExecutionService {
                 .map(account -> credentialCryptoService.decrypt(account.getAccessTokenCiphertext()))
                 .orElseGet(() -> credentialCryptoService.decrypt(credential.getApiKeyCiphertext()));
 
-        ChatModel model = switch (selectionResult.selectedCandidate().candidate().providerType()) {
-            case OPENAI_DIRECT, OPENAI_COMPATIBLE -> {
-                OpenAiChatOptions baseOptions = OpenAiChatOptions.builder()
-                        .model(selectionResult.resolvedModelKey())
-                        .temperature(request.temperature())
-                        .maxTokens(request.maxTokens())
-                        .streamUsage(true)
-                        .build();
-                PreparedChatExecution<OpenAiChatOptions> prepared = providerExecutionSupportService.prepareOpenAi(
+        GatewayChatRuntime runtime = resolveRuntime(selectionResult.selectedCandidate().candidate());
+        Flux<ChatExecutionStreamChunk> chunks = runtime.executeStream(new GatewayChatRuntimeContext(
                         selectionResult,
-                        baseOptions,
-                        request.tools(),
-                        request.toolChoice()
-                );
-                yield openAiChatModelFactory.create(credential.getBaseUrl(), apiKey, prepared.options());
-            }
-            case ANTHROPIC_DIRECT -> {
-                AnthropicChatOptions baseOptions = AnthropicChatOptions.builder()
-                        .model(selectionResult.resolvedModelKey())
-                        .temperature(request.temperature())
-                        .maxTokens(request.maxTokens())
-                        .build();
-                PreparedChatExecution<AnthropicChatOptions> prepared = providerExecutionSupportService.prepareAnthropic(
-                        selectionResult,
-                        baseOptions,
-                        request.tools(),
-                        request.toolChoice()
-                );
-                yield anthropicChatModelFactory.create(credential.getBaseUrl(), apiKey, prepared.options());
-            }
-            case GEMINI_DIRECT -> {
-                GoogleGenAiChatOptions baseOptions = GoogleGenAiChatOptions.builder()
-                        .model(selectionResult.resolvedModelKey())
-                        .temperature(request.temperature())
-                        .maxOutputTokens(request.maxTokens())
-                        .build();
-                PreparedChatExecution<GoogleGenAiChatOptions> prepared = providerExecutionSupportService.prepareGemini(
-                        selectionResult,
-                        baseOptions,
-                        request.tools()
-                );
-                yield geminiChatModelFactory.create(credential.getBaseUrl(), apiKey, prepared.options());
-            }
-            case OLLAMA_DIRECT -> throw new IllegalArgumentException("当前 stream 执行入口暂未接入 Ollama。");
-        };
-
-        Prompt prompt = buildPrompt(model.getDefaultOptions(), request);
-        Flux<ChatExecutionStreamChunk> chunks = model.stream(prompt)
-                .map(response -> {
-                    GatewayUsage usage = providerExecutionSupportService.normalizeUsage(selectionResult, response.getMetadata().getUsage());
+                        credential,
+                        apiKey,
+                        request
+                ))
+                .map(chunk -> {
                     gatewayObservabilityService.recordCacheUsage(
                             requestId,
                             selectionResult,
-                            usage,
+                            chunk.usage(),
                             "prompt_cache",
                             null
                     );
-                    List<GatewayToolCall> toolCalls = response.getResult().getOutput().getToolCalls().stream()
-                            .map(toolCall -> new GatewayToolCall(
-                                    toolCall.id(),
-                                    toolCall.type(),
-                                    toolCall.name(),
-                                    toolCall.arguments()
-                            ))
-                            .toList();
-                    return new ChatExecutionStreamChunk(
-                            response.getResult().getOutput().getText(),
-                            null,
-                            usage,
-                            false,
-                            toolCalls
-                    );
+                    return chunk;
                 })
-                .concatWithValues(new ChatExecutionStreamChunk(null, "stop", GatewayUsage.empty(), true))
                 .doOnComplete(() -> gatewayRouteSelectionService.recordSuccessfulSelection(selectionResult))
                 .doOnError(error -> gatewayRouteSelectionService.invalidateSelection(selectionResult))
                 .doOnCancel(() -> gatewayRouteSelectionService.invalidateSelection(selectionResult))
-                .doFinally(signalType -> {
-                    closeModel(model, signalType);
-                    distributedKeyGovernanceService.releaseConcurrency(selectionResult.governanceReservationKey());
-                });
+                .doFinally(signalType -> distributedKeyGovernanceService.releaseConcurrency(selectionResult.governanceReservationKey()));
 
         return new ChatExecutionStreamResponse(requestId, selectionResult, chunks);
+    }
+
+    private GatewayChatRuntime resolveRuntime(com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView candidate) {
+        return gatewayChatRuntimes.stream()
+                .filter(runtime -> runtime.supports(candidate))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("未找到匹配的聊天运行时：" + candidate.providerType()));
     }
 
     private ChatResponse executeOpenAi(RouteSelectionResult selectionResult, String baseUrl, String apiKey, ChatExecutionRequest request) {

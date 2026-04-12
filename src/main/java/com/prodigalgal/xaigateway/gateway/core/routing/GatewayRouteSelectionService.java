@@ -12,6 +12,10 @@ import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.catalog.ModelCatalogQueryService;
 import com.prodigalgal.xaigateway.gateway.core.catalog.ResolvedModelView;
 import com.prodigalgal.xaigateway.gateway.core.account.AccountSelectionService;
+import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestFeatureService;
+import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
+import com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature;
+import com.prodigalgal.xaigateway.gateway.core.interop.SiteCapabilityTruthService;
 import com.prodigalgal.xaigateway.gateway.core.shared.ModelIdNormalizer;
 import com.prodigalgal.xaigateway.infra.persistence.repository.NetworkProxyRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
@@ -40,6 +44,8 @@ public class GatewayRouteSelectionService {
     private final UpstreamCredentialRepository upstreamCredentialRepository;
     private final NetworkProxyRepository networkProxyRepository;
     private final AccountSelectionService accountSelectionService;
+    private final GatewayRequestFeatureService gatewayRequestFeatureService;
+    private final SiteCapabilityTruthService siteCapabilityTruthService;
 
     public GatewayRouteSelectionService(
             DistributedKeyQueryService distributedKeyQueryService,
@@ -49,7 +55,9 @@ public class GatewayRouteSelectionService {
             DistributedKeyGovernanceService distributedKeyGovernanceService,
             UpstreamCredentialRepository upstreamCredentialRepository,
             NetworkProxyRepository networkProxyRepository,
-            AccountSelectionService accountSelectionService) {
+            AccountSelectionService accountSelectionService,
+            GatewayRequestFeatureService gatewayRequestFeatureService,
+            SiteCapabilityTruthService siteCapabilityTruthService) {
         this.distributedKeyQueryService = distributedKeyQueryService;
         this.modelCatalogQueryService = modelCatalogQueryService;
         this.promptFingerprintService = promptFingerprintService;
@@ -58,6 +66,8 @@ public class GatewayRouteSelectionService {
         this.upstreamCredentialRepository = upstreamCredentialRepository;
         this.networkProxyRepository = networkProxyRepository;
         this.accountSelectionService = accountSelectionService;
+        this.gatewayRequestFeatureService = gatewayRequestFeatureService;
+        this.siteCapabilityTruthService = siteCapabilityTruthService;
     }
 
     public RouteSelectionResult select(RouteSelectionRequest request) {
@@ -103,7 +113,17 @@ public class GatewayRouteSelectionService {
         if (networkFilteredCandidates.isEmpty()) {
             throw new IllegalArgumentException("当前 provider 候选均被网络治理策略阻断。");
         }
-        List<RouteCandidateView> candidates = networkFilteredCandidates.stream()
+        List<InteropFeature> requiredFeatures = gatewayRequestFeatureService.detectRequiredFeatures(
+                request.requestPath(),
+                request.requestBody() instanceof com.fasterxml.jackson.databind.JsonNode jsonNode ? jsonNode : null
+        );
+        List<RouteCandidateView> featureCompatibleCandidates = networkFilteredCandidates.stream()
+                .filter(candidate -> supportsRequiredFeatures(candidate, requiredFeatures))
+                .toList();
+        if (featureCompatibleCandidates.isEmpty()) {
+            throw new IllegalArgumentException("当前 provider 候选无法满足请求特征。");
+        }
+        List<RouteCandidateView> candidates = featureCompatibleCandidates.stream()
                 .filter(candidate -> hasHealthyAccountIfBound(distributedKey.id(), candidate.candidate().providerType(), clientFamily))
                 .toList();
         if (candidates.isEmpty()) {
@@ -321,6 +341,18 @@ public class GatewayRouteSelectionService {
 
     private boolean hasHealthyAccountIfBound(Long distributedKeyId, com.prodigalgal.xaigateway.gateway.core.shared.ProviderType providerType, GatewayClientFamily clientFamily) {
         return accountSelectionService.hasHealthyAccountBinding(distributedKeyId, providerType, clientFamily);
+    }
+
+    private boolean supportsRequiredFeatures(RouteCandidateView candidate, List<InteropFeature> requiredFeatures) {
+        if (candidate.candidate().capabilityLevel() == InteropCapabilityLevel.UNSUPPORTED) {
+            return false;
+        }
+        for (InteropFeature feature : requiredFeatures) {
+            if (siteCapabilityTruthService.capabilityLevel(candidate.candidate(), feature) == InteropCapabilityLevel.UNSUPPORTED) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private String normalize(String protocol) {

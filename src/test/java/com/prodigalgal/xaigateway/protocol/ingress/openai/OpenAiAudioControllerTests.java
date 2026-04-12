@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayTokenAuthenticationResolver;
-import com.prodigalgal.xaigateway.gateway.core.execution.GatewayOpenAiPassthroughService;
+import com.prodigalgal.xaigateway.gateway.core.execution.GatewayResourceExecutionService;
 import com.prodigalgal.xaigateway.testsupport.PermitAllSecurityTestConfig;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
@@ -35,7 +35,7 @@ class OpenAiAudioControllerTests {
     private GatewayTokenAuthenticationResolver gatewayTokenAuthenticationResolver;
 
     @MockitoBean
-    private GatewayOpenAiPassthroughService gatewayOpenAiPassthroughService;
+    private GatewayResourceExecutionService gatewayResourceExecutionService;
 
     @Test
     void shouldCreateTranscription() {
@@ -44,7 +44,7 @@ class OpenAiAudioControllerTests {
 
         Mockito.when(gatewayTokenAuthenticationResolver.authenticate("Bearer sk-gw-test.secret", null, null, null))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayOpenAiPassthroughService.executeMultipartJson(
+        Mockito.when(gatewayResourceExecutionService.executeMultipartJson(
                         Mockito.eq("sk-gw-test"),
                         Mockito.eq("/v1/audio/transcriptions"),
                         Mockito.eq("gpt-4o-mini-transcribe"),
@@ -76,7 +76,7 @@ class OpenAiAudioControllerTests {
     void shouldCreateSpeech() {
         Mockito.when(gatewayTokenAuthenticationResolver.authenticate("Bearer sk-gw-test.secret", null, null, null))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayOpenAiPassthroughService.executeBinaryJson(
+        Mockito.when(gatewayResourceExecutionService.executeBinaryJson(
                         Mockito.eq("sk-gw-test"),
                         Mockito.eq("/v1/audio/speech"),
                         Mockito.any(),

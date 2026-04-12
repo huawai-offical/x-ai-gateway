@@ -12,6 +12,8 @@ import com.prodigalgal.xaigateway.gateway.core.cache.PromptFingerprintService;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.catalog.ModelCatalogQueryService;
 import com.prodigalgal.xaigateway.gateway.core.catalog.ResolvedModelView;
+import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestFeatureService;
+import com.prodigalgal.xaigateway.gateway.core.interop.SiteCapabilityTruthService;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.shared.ReasoningTransport;
 import com.prodigalgal.xaigateway.infra.config.GatewayProperties;
@@ -40,6 +42,8 @@ class GatewayRouteSelectionServiceTests {
         UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
         NetworkProxyRepository networkProxyRepository = Mockito.mock(NetworkProxyRepository.class);
         AccountSelectionService accountSelectionService = Mockito.mock(AccountSelectionService.class);
+        GatewayRequestFeatureService gatewayRequestFeatureService = Mockito.mock(GatewayRequestFeatureService.class);
+        SiteCapabilityTruthService siteCapabilityTruthService = Mockito.mock(SiteCapabilityTruthService.class);
 
         GatewayProperties properties = new GatewayProperties();
         PromptFingerprintService promptFingerprintService = new PromptFingerprintService(new ObjectMapper(), properties);
@@ -52,7 +56,9 @@ class GatewayRouteSelectionServiceTests {
                 distributedKeyGovernanceService,
                 upstreamCredentialRepository,
                 networkProxyRepository,
-                accountSelectionService
+                accountSelectionService,
+                gatewayRequestFeatureService,
+                siteCapabilityTruthService
         );
 
         DistributedKeyView keyView = new DistributedKeyView(
@@ -106,6 +112,10 @@ class GatewayRouteSelectionServiceTests {
                         false,
                         List.of(candidate)
                 )));
+        when(gatewayRequestFeatureService.detectRequiredFeatures(Mockito.anyString(), Mockito.any()))
+                .thenReturn(List.of(com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature.CHAT_TEXT));
+        when(siteCapabilityTruthService.capabilityLevel(Mockito.any(), Mockito.any()))
+                .thenReturn(com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel.NATIVE);
         when(affinityCacheService.getPrefixAffinity(eq(1L), eq("OPENAI_DIRECT"), eq("gpt-4o"), anyString()))
                 .thenReturn("101");
 

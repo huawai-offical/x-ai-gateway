@@ -3,7 +3,7 @@ package com.prodigalgal.xaigateway.protocol.ingress.openai;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayTokenAuthenticationResolver;
-import com.prodigalgal.xaigateway.gateway.core.execution.GatewayOpenAiPassthroughService;
+import com.prodigalgal.xaigateway.gateway.core.execution.GatewayResourceExecutionService;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.http.HttpHeaders;
@@ -23,13 +23,13 @@ import reactor.core.publisher.Mono;
 public class OpenAiImagesController {
 
     private final GatewayTokenAuthenticationResolver gatewayTokenAuthenticationResolver;
-    private final GatewayOpenAiPassthroughService gatewayOpenAiPassthroughService;
+    private final GatewayResourceExecutionService gatewayResourceExecutionService;
 
     public OpenAiImagesController(
             GatewayTokenAuthenticationResolver gatewayTokenAuthenticationResolver,
-            GatewayOpenAiPassthroughService gatewayOpenAiPassthroughService) {
+            GatewayResourceExecutionService gatewayResourceExecutionService) {
         this.gatewayTokenAuthenticationResolver = gatewayTokenAuthenticationResolver;
-        this.gatewayOpenAiPassthroughService = gatewayOpenAiPassthroughService;
+        this.gatewayResourceExecutionService = gatewayResourceExecutionService;
     }
 
     @PostMapping("/generations")
@@ -37,7 +37,7 @@ public class OpenAiImagesController {
             @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
             @RequestBody JsonNode requestBody) {
         AuthenticatedDistributedKey distributedKey = gatewayTokenAuthenticationResolver.authenticate(authorization, null, null, null);
-        return gatewayOpenAiPassthroughService.executeJson(
+        return gatewayResourceExecutionService.executeJson(
                 distributedKey.keyPrefix(),
                 "/v1/images/generations",
                 requestBody,
@@ -67,7 +67,7 @@ public class OpenAiImagesController {
             fileParts.put("mask", mask);
         }
 
-        return gatewayOpenAiPassthroughService.executeMultipartJson(
+        return gatewayResourceExecutionService.executeMultipartJson(
                 distributedKey.keyPrefix(),
                 "/v1/images/edits",
                 formFields.get("model"),
@@ -86,7 +86,7 @@ public class OpenAiImagesController {
         Map<String, String> formFields = new LinkedHashMap<>();
         formFields.put("model", model == null || model.isBlank() ? "gpt-image-1" : model);
         putIfPresent(formFields, "size", size);
-        return gatewayOpenAiPassthroughService.executeMultipartJson(
+        return gatewayResourceExecutionService.executeMultipartJson(
                 distributedKey.keyPrefix(),
                 "/v1/images/variations",
                 formFields.get("model"),

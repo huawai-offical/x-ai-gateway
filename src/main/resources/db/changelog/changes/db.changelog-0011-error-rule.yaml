@@ -1,0 +1,25 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0011-error-rule
+      author: codex
+      changes:
+        - createTable:
+            tableName: error_rule
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: enabled, type: BOOLEAN, defaultValueBoolean: true, constraints: { nullable: false } }
+              - column: { name: priority, type: INT, defaultValueNumeric: 100, constraints: { nullable: false } }
+              - column: { name: provider_type, type: VARCHAR(32) }
+              - column: { name: protocol, type: VARCHAR(32) }
+              - column: { name: model_pattern, type: VARCHAR(128) }
+              - column: { name: request_path, type: VARCHAR(256) }
+              - column: { name: http_status, type: INT }
+              - column: { name: error_code, type: VARCHAR(128) }
+              - column: { name: match_scope, type: VARCHAR(16), constraints: { nullable: false } }
+              - column: { name: action, type: VARCHAR(16), constraints: { nullable: false } }
+              - column: { name: rewrite_status, type: INT }
+              - column: { name: rewrite_code, type: VARCHAR(128) }
+              - column: { name: rewrite_message, type: VARCHAR(1024) }
+              - column: { name: downgrade_policy, type: VARCHAR(32) }
+              - column: { name: created_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+              - column: { name: updated_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }

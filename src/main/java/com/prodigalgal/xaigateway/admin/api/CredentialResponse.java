@@ -17,6 +17,7 @@ public record CredentialResponse(
         Instant lastUsedAt,
         Long proxyId,
         Long tlsFingerprintProfileId,
+        Long siteProfileId,
         Instant createdAt,
         Instant updatedAt
 ) {

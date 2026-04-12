@@ -3,6 +3,7 @@ package com.prodigalgal.xaigateway.gateway.core.execution;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.prodigalgal.xaigateway.admin.application.CredentialCryptoService;
+import com.prodigalgal.xaigateway.admin.application.ErrorRuleService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyGovernanceService;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
 import com.prodigalgal.xaigateway.gateway.core.account.AccountSelectionService;
@@ -10,6 +11,7 @@ import com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilit
 import com.prodigalgal.xaigateway.gateway.core.routing.GatewayRouteSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionRequest;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
+import com.prodigalgal.xaigateway.gateway.core.error.ErrorRuleMatchContext;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
@@ -40,6 +42,7 @@ public class GatewayOpenAiPassthroughService {
     private final GatewayObservabilityService gatewayObservabilityService;
     private final DistributedKeyGovernanceService distributedKeyGovernanceService;
     private final AccountSelectionService accountSelectionService;
+    private final ErrorRuleService errorRuleService;
     private final WebClient.Builder webClientBuilder;
 
     public GatewayOpenAiPassthroughService(
@@ -49,6 +52,7 @@ public class GatewayOpenAiPassthroughService {
             GatewayObservabilityService gatewayObservabilityService,
             DistributedKeyGovernanceService distributedKeyGovernanceService,
             AccountSelectionService accountSelectionService,
+            ErrorRuleService errorRuleService,
             WebClient.Builder webClientBuilder) {
         this.gatewayRouteSelectionService = gatewayRouteSelectionService;
         this.upstreamCredentialRepository = upstreamCredentialRepository;
@@ -56,6 +60,7 @@ public class GatewayOpenAiPassthroughService {
         this.gatewayObservabilityService = gatewayObservabilityService;
         this.distributedKeyGovernanceService = distributedKeyGovernanceService;
         this.accountSelectionService = accountSelectionService;
+        this.errorRuleService = errorRuleService;
         this.webClientBuilder = webClientBuilder;
     }
 
@@ -182,6 +187,9 @@ public class GatewayOpenAiPassthroughService {
             throw new IllegalStateException("上游响应为空。");
         }
         recordRouteOutcome(context.selectionResult(), upstreamResponse.getStatusCode().value());
+        if (!upstreamResponse.getStatusCode().is2xxSuccessful()) {
+            maybeRaiseRule(context, upstreamResponse.getStatusCode().value(), upstreamResponse.getBody());
+        }
         JsonNode body = rewriteModelField(upstreamResponse.getBody(), context.selectionResult().publicModel());
         MediaType contentType = upstreamResponse.getHeaders().getContentType() == null
                 ? MediaType.APPLICATION_JSON
@@ -251,7 +259,7 @@ public class GatewayOpenAiPassthroughService {
                 .baseUrl(normalizeBaseUrl(credential.getBaseUrl()))
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
                 .build();
-        return new RouteExecutionContext(selectionResult, credential, client);
+        return new RouteExecutionContext(selectionResult, credential, client, requestPath);
     }
 
     private ObjectNode requireObjectPayload(JsonNode requestBody) {
@@ -300,10 +308,26 @@ public class GatewayOpenAiPassthroughService {
         return responseBody;
     }
 
+    private void maybeRaiseRule(RouteExecutionContext context, int status, JsonNode body) {
+        String errorCode = body == null ? null : body.path("error").path("code").asText(null);
+        String message = body == null ? null : body.path("error").path("message").asText(null);
+        errorRuleService.evaluate(new ErrorRuleMatchContext(
+                context.selectionResult().selectedCandidate().candidate().providerType().name(),
+                "openai",
+                context.selectionResult().requestedModel(),
+                context.requestPath(),
+                status,
+                errorCode,
+                "UPSTREAM",
+                message
+        )).ifPresent(exception -> { throw exception; });
+    }
+
     private record RouteExecutionContext(
             RouteSelectionResult selectionResult,
             UpstreamCredentialEntity credential,
-            WebClient client
+            WebClient client,
+            String requestPath
     ) {
     }
 }

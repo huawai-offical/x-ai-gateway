@@ -11,6 +11,19 @@ import { ProxiesPage } from '../features/network/proxies-page'
 import { ProxyDetailPage } from '../features/network/proxy-detail-page'
 import { TlsProfilesPage } from '../features/network/tls-profiles-page'
 import { ProbesPage } from '../features/network/probes-page'
+import { OpsPage } from '../features/ops/ops-page'
+import { OpsAlertsPage } from '../features/ops/ops-alerts-page'
+import { OpsProbesPage } from '../features/ops/ops-probes-page'
+import { OpsLogsPage } from '../features/ops/ops-logs-page'
+import { ErrorRulesPage } from '../features/error-rules/error-rules-page'
+import { InstallPage } from '../features/operations/install-page'
+import { BackupsPage } from '../features/operations/backups-page'
+import { UpgradesPage } from '../features/operations/upgrades-page'
+import { RollbacksPage } from '../features/operations/rollbacks-page'
+import { ProviderSitesPage } from '../features/provider-sites/provider-sites-page'
+import { ProviderSiteDetailPage } from '../features/provider-sites/provider-site-detail-page'
+import { CapabilityMatrixPage } from '../features/provider-sites/capability-matrix-page'
+import { TranslationDebugPage } from '../features/provider-sites/translation-debug-page'
 
 export const router = createBrowserRouter([
   {
@@ -29,6 +42,19 @@ export const router = createBrowserRouter([
       { path: 'network/proxies/:id', element: <ProxyDetailPage /> },
       { path: 'network/tls-profiles', element: <TlsProfilesPage /> },
       { path: 'network/probes', element: <ProbesPage /> },
+      { path: 'ops', element: <OpsPage /> },
+      { path: 'ops/alerts', element: <OpsAlertsPage /> },
+      { path: 'ops/probes', element: <OpsProbesPage /> },
+      { path: 'ops/logs', element: <OpsLogsPage /> },
+      { path: 'error-rules', element: <ErrorRulesPage /> },
+      { path: 'provider-sites', element: <ProviderSitesPage /> },
+      { path: 'provider-sites/:id', element: <ProviderSiteDetailPage /> },
+      { path: 'capability-matrix', element: <CapabilityMatrixPage /> },
+      { path: 'translation-debug', element: <TranslationDebugPage /> },
+      { path: 'operations/install', element: <InstallPage /> },
+      { path: 'operations/backups', element: <BackupsPage /> },
+      { path: 'operations/upgrades', element: <UpgradesPage /> },
+      { path: 'operations/rollbacks', element: <RollbacksPage /> },
     ],
   },
 ])

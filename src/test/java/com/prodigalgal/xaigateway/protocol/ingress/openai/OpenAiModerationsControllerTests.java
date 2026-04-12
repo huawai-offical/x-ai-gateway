@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayTokenAuthenticationResolver;
-import com.prodigalgal.xaigateway.gateway.core.execution.GatewayOpenAiPassthroughService;
+import com.prodigalgal.xaigateway.gateway.core.execution.GatewayResourceExecutionService;
 import com.prodigalgal.xaigateway.testsupport.PermitAllSecurityTestConfig;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -31,7 +31,7 @@ class OpenAiModerationsControllerTests {
     private GatewayTokenAuthenticationResolver gatewayTokenAuthenticationResolver;
 
     @MockitoBean
-    private GatewayOpenAiPassthroughService gatewayOpenAiPassthroughService;
+    private GatewayResourceExecutionService gatewayResourceExecutionService;
 
     @Test
     void shouldCreateModeration() {
@@ -41,7 +41,7 @@ class OpenAiModerationsControllerTests {
 
         Mockito.when(gatewayTokenAuthenticationResolver.authenticate("Bearer sk-gw-test.secret", null, null, null))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayOpenAiPassthroughService.executeJson(
+        Mockito.when(gatewayResourceExecutionService.executeJson(
                         Mockito.eq("sk-gw-test"),
                         Mockito.eq("/v1/moderations"),
                         Mockito.any(),

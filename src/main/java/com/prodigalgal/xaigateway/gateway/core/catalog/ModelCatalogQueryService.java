@@ -6,9 +6,12 @@ import com.prodigalgal.xaigateway.gateway.core.alias.ModelAliasView;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedCredentialBindingView;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyView;
 import com.prodigalgal.xaigateway.gateway.core.shared.ModelIdNormalizer;
-import com.prodigalgal.xaigateway.infra.persistence.entity.CredentialModelCatalogEntity;
-import com.prodigalgal.xaigateway.infra.persistence.repository.CredentialModelCatalogRepository;
+import com.prodigalgal.xaigateway.infra.persistence.entity.SiteModelCapabilityEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
+import com.prodigalgal.xaigateway.infra.persistence.repository.SiteModelCapabilityRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -23,21 +26,22 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class ModelCatalogQueryService {
 
-    private final CredentialModelCatalogRepository credentialModelCatalogRepository;
+    private final SiteModelCapabilityRepository siteModelCapabilityRepository;
+    private final UpstreamCredentialRepository upstreamCredentialRepository;
     private final ModelAliasQueryService modelAliasQueryService;
 
     public ModelCatalogQueryService(
-            CredentialModelCatalogRepository credentialModelCatalogRepository,
+            SiteModelCapabilityRepository siteModelCapabilityRepository,
+            UpstreamCredentialRepository upstreamCredentialRepository,
             ModelAliasQueryService modelAliasQueryService) {
-        this.credentialModelCatalogRepository = credentialModelCatalogRepository;
+        this.siteModelCapabilityRepository = siteModelCapabilityRepository;
+        this.upstreamCredentialRepository = upstreamCredentialRepository;
         this.modelAliasQueryService = modelAliasQueryService;
     }
 
     public List<CatalogCandidateView> listCandidatesByModelKey(String modelKey) {
-        return credentialModelCatalogRepository.findAllByModelKeyAndActiveTrue(modelKey).stream()
-                .map(this::toCandidateView)
-                .sorted(Comparator.comparing(CatalogCandidateView::credentialId))
-                .toList();
+        List<SiteModelCapabilityEntity> capabilities = siteModelCapabilityRepository.findAllByModelKeyAndActiveTrue(modelKey);
+        return expandCandidates(capabilities);
     }
 
     public List<GatewayPublicModelView> listAccessiblePublicModels(DistributedKeyView distributedKey, String protocol) {
@@ -53,10 +57,20 @@ public class ModelCatalogQueryService {
             return List.of();
         }
 
-        List<CatalogCandidateView> accessibleCandidates = credentialModelCatalogRepository
-                .findAllByCredentialIdInAndActiveTrue(boundCredentialIds)
-                .stream()
-                .map(this::toCandidateView)
+        List<UpstreamCredentialEntity> credentials = upstreamCredentialRepository.findAllByIdInAndDeletedFalse(boundCredentialIds);
+        Set<Long> siteProfileIds = credentials.stream()
+                .map(UpstreamCredentialEntity::getSiteProfileId)
+                .filter(id -> id != null)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        if (siteProfileIds.isEmpty()) {
+            return List.of();
+        }
+
+        List<CatalogCandidateView> accessibleCandidates = expandCandidates(
+                siteModelCapabilityRepository.findAllBySiteProfile_IdInAndActiveTrue(siteProfileIds),
+                credentials
+        ).stream()
+                .filter(candidate -> candidate.capabilityLevel() != com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel.UNSUPPORTED)
                 .filter(candidate -> candidate.supportedProtocols().contains(normalizedProtocol))
                 .sorted(Comparator.comparing(CatalogCandidateView::modelKey).thenComparing(CatalogCandidateView::credentialId))
                 .toList();
@@ -73,7 +87,13 @@ public class ModelCatalogQueryService {
             models.putIfAbsent(candidate.modelKey(), new GatewayPublicModelView(
                     candidate.modelKey(),
                     candidate.modelKey(),
-                    false
+                    false,
+                    candidate.siteProfileId(),
+                    candidate.providerFamily(),
+                    candidate.siteKind(),
+                    candidate.capabilityLevel(),
+                    candidate.supportsChat(),
+                    candidate.supportsEmbeddings()
             ));
         }
 
@@ -90,10 +110,22 @@ public class ModelCatalogQueryService {
                             .anyMatch(candidate -> matchesRule(candidate, rule)));
 
             if (aliasReachable) {
+                CatalogCandidateView representative = alias.rules().stream()
+                        .filter(rule -> rule.protocol() == null || normalizedProtocol.equalsIgnoreCase(rule.protocol()))
+                        .flatMap(rule -> candidatesByModelKey.getOrDefault(rule.targetModelKey(), List.of()).stream()
+                                .filter(candidate -> matchesRule(candidate, rule)))
+                        .findFirst()
+                        .orElse(null);
                 models.putIfAbsent(alias.aliasName(), new GatewayPublicModelView(
                         alias.aliasName(),
                         alias.aliasKey(),
-                        true
+                        true,
+                        representative == null ? null : representative.siteProfileId(),
+                        representative == null ? null : representative.providerFamily(),
+                        representative == null ? null : representative.siteKind(),
+                        representative == null ? com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel.EMULATED : representative.capabilityLevel(),
+                        representative == null || representative.supportsChat(),
+                        representative != null && representative.supportsEmbeddings()
                 ));
             }
         }
@@ -176,22 +208,58 @@ public class ModelCatalogQueryService {
         return protocol == null ? "openai" : protocol.trim().toLowerCase(Locale.ROOT);
     }
 
-    private CatalogCandidateView toCandidateView(CredentialModelCatalogEntity entity) {
+    private List<CatalogCandidateView> expandCandidates(List<SiteModelCapabilityEntity> capabilities) {
+        Set<Long> siteProfileIds = capabilities.stream()
+                .map(item -> item.getSiteProfile().getId())
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        List<UpstreamCredentialEntity> credentials = upstreamCredentialRepository.findAllBySiteProfileIdInAndDeletedFalseAndActiveTrue(siteProfileIds);
+        return expandCandidates(capabilities, credentials);
+    }
+
+    private List<CatalogCandidateView> expandCandidates(
+            List<SiteModelCapabilityEntity> capabilities,
+            List<UpstreamCredentialEntity> credentials) {
+        Map<Long, List<UpstreamCredentialEntity>> credentialsBySiteProfile = new HashMap<>();
+        for (UpstreamCredentialEntity credential : credentials) {
+            if (credential.getSiteProfileId() == null) {
+                continue;
+            }
+            credentialsBySiteProfile.computeIfAbsent(credential.getSiteProfileId(), ignored -> new java.util.ArrayList<>())
+                    .add(credential);
+        }
+
+        return capabilities.stream()
+                .flatMap(capability -> credentialsBySiteProfile
+                        .getOrDefault(capability.getSiteProfile().getId(), List.of())
+                        .stream()
+                        .map(credential -> toCandidateView(credential, capability)))
+                .sorted(Comparator.comparing(CatalogCandidateView::credentialId))
+                .toList();
+    }
+
+    private CatalogCandidateView toCandidateView(UpstreamCredentialEntity credential, SiteModelCapabilityEntity capability) {
         return new CatalogCandidateView(
-                entity.getCredential().getId(),
-                entity.getCredential().getCredentialName(),
-                entity.getCredential().getProviderType(),
-                entity.getCredential().getBaseUrl(),
-                entity.getModelName(),
-                entity.getModelKey(),
-                entity.getSupportedProtocols(),
-                entity.isSupportsChat(),
-                entity.isSupportsEmbeddings(),
-                entity.isSupportsCache(),
-                entity.isSupportsThinking(),
-                entity.isSupportsVisibleReasoning(),
-                entity.isSupportsReasoningReuse(),
-                entity.getReasoningTransport()
+                credential.getId(),
+                credential.getCredentialName(),
+                credential.getProviderType(),
+                capability.getSiteProfile().getId(),
+                capability.getSiteProfile().getProviderFamily(),
+                capability.getSiteProfile().getSiteKind(),
+                capability.getSiteProfile().getAuthStrategy(),
+                capability.getSiteProfile().getPathStrategy(),
+                capability.getSiteProfile().getErrorSchemaStrategy(),
+                credential.getBaseUrl(),
+                capability.getModelName(),
+                capability.getModelKey(),
+                capability.getSupportedProtocols(),
+                capability.isSupportsChat(),
+                capability.isSupportsEmbeddings(),
+                capability.isSupportsCache(),
+                capability.isSupportsThinking(),
+                capability.isSupportsVisibleReasoning(),
+                capability.isSupportsReasoningReuse(),
+                capability.getReasoningTransport(),
+                capability.getCapabilityLevel()
         );
     }
 }

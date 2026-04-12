@@ -3,7 +3,7 @@ package com.prodigalgal.xaigateway.protocol.ingress.openai;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthenticationService;
-import com.prodigalgal.xaigateway.gateway.core.execution.GatewayEmbeddingExecutionService;
+import com.prodigalgal.xaigateway.gateway.core.execution.GatewayResourceExecutionService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -17,13 +17,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class OpenAiEmbeddingsController {
 
     private final DistributedKeyAuthenticationService distributedKeyAuthenticationService;
-    private final GatewayEmbeddingExecutionService gatewayEmbeddingExecutionService;
+    private final GatewayResourceExecutionService gatewayResourceExecutionService;
 
     public OpenAiEmbeddingsController(
             DistributedKeyAuthenticationService distributedKeyAuthenticationService,
-            GatewayEmbeddingExecutionService gatewayEmbeddingExecutionService) {
+            GatewayResourceExecutionService gatewayResourceExecutionService) {
         this.distributedKeyAuthenticationService = distributedKeyAuthenticationService;
-        this.gatewayEmbeddingExecutionService = gatewayEmbeddingExecutionService;
+        this.gatewayResourceExecutionService = gatewayResourceExecutionService;
     }
 
     @PostMapping
@@ -31,6 +31,6 @@ public class OpenAiEmbeddingsController {
             @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
             @RequestBody JsonNode requestBody) {
         AuthenticatedDistributedKey distributedKey = distributedKeyAuthenticationService.authenticateBearerToken(authorization);
-        return gatewayEmbeddingExecutionService.executeOpenAiEmbeddings(distributedKey.keyPrefix(), requestBody);
+        return gatewayResourceExecutionService.executeEmbeddings(distributedKey.keyPrefix(), requestBody, null);
     }
 }

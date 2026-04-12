@@ -5,6 +5,12 @@ const navItems = [
   { to: '/account-pools', label: '账号池' },
   { to: '/network/proxies', label: '代理池' },
   { to: '/network/tls-profiles', label: 'TLS 指纹' },
+  { to: '/ops', label: 'Ops' },
+  { to: '/error-rules', label: '错误规则' },
+  { to: '/provider-sites', label: '站点档案' },
+  { to: '/capability-matrix', label: '能力矩阵' },
+  { to: '/translation-debug', label: '执行解释' },
+  { to: '/operations/upgrades', label: '升级回滚' },
 ]
 
 export function AppLayout() {
@@ -14,9 +20,9 @@ export function AppLayout() {
         <p className="eyebrow">x-ai-gateway / phase 4 admin</p>
         <div className="hero-copy">
           <span className="status-pill">control plane</span>
-          <h1>第二轮后台流程已经进入可操作界面。</h1>
+          <h1>全厂商自动翻译闭环已经开始切换到站点真相源。</h1>
           <p className="lead">
-            这一版前端直接对接 `DistributedKey` 策略、账号池 OAuth 和网络治理接口，先把流程跑通，再逐步做细节优化。
+            这一版前端开始承载 `provider site / capability snapshot / translation explainability`，让目录、预检、执行和后台调试共享同一套站点能力视图。
           </p>
         </div>
         <nav className="nav-bar">

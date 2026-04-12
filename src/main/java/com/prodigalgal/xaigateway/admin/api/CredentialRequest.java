@@ -15,6 +15,7 @@ public record CredentialRequest(
         String apiKey,
         Boolean active,
         Long proxyId,
-        Long tlsFingerprintProfileId
+        Long tlsFingerprintProfileId,
+        Long siteProfileId
 ) {
 }

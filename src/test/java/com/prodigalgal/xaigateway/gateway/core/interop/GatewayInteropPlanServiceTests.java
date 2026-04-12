@@ -21,8 +21,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class GatewayInteropPlanServiceTests {
 
     private final GatewayRouteSelectionService gatewayRouteSelectionService = Mockito.mock(GatewayRouteSelectionService.class);
+    private final SiteCapabilityTruthService siteCapabilityTruthService = Mockito.mock(SiteCapabilityTruthService.class);
+    private final GatewayRequestFeatureService gatewayRequestFeatureService = Mockito.mock(GatewayRequestFeatureService.class);
     private final GatewayInteropPlanService gatewayInteropPlanService =
-            new GatewayInteropPlanService(gatewayRouteSelectionService, new ObjectMapper());
+            new GatewayInteropPlanService(gatewayRouteSelectionService, new ObjectMapper(), null, siteCapabilityTruthService, gatewayRequestFeatureService);
 
     @Test
     void shouldBlockWhenDegradationPolicyDoesNotAllowSelectedCapability() {
@@ -98,5 +100,25 @@ class GatewayInteropPlanServiceTests {
                 routeCandidateView,
                 List.of(routeCandidateView)
         );
+    }
+
+    GatewayInteropPlanServiceTests() {
+        Mockito.when(gatewayRequestFeatureService.detectRequiredFeatures(Mockito.anyString(), Mockito.any()))
+                .thenAnswer(invocation -> {
+                    String path = invocation.getArgument(0);
+                    if ("/v1/responses".equals(path)) {
+                        return List.of(InteropFeature.RESPONSE_OBJECT);
+                    }
+                    if ("/v1/audio/transcriptions".equals(path)) {
+                        return List.of(InteropFeature.AUDIO_TRANSCRIPTION);
+                    }
+                    return List.of(InteropFeature.CHAT_TEXT);
+                });
+        Mockito.when(siteCapabilityTruthService.capabilityLevel(Mockito.any(), Mockito.eq(InteropFeature.RESPONSE_OBJECT)))
+                .thenReturn(InteropCapabilityLevel.EMULATED);
+        Mockito.when(siteCapabilityTruthService.capabilityLevel(Mockito.any(), Mockito.eq(InteropFeature.AUDIO_TRANSCRIPTION)))
+                .thenReturn(InteropCapabilityLevel.NATIVE);
+        Mockito.when(siteCapabilityTruthService.capabilityLevel(Mockito.any(), Mockito.eq(InteropFeature.CHAT_TEXT)))
+                .thenReturn(InteropCapabilityLevel.NATIVE);
     }
 }

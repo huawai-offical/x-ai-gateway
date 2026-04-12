@@ -90,6 +90,10 @@ public class UpstreamCredentialEntity {
     @Comment("绑定的 TLS 指纹画像 ID。")
     private Long tlsFingerprintProfileId;
 
+    @Column(name = "site_profile_id")
+    @Comment("绑定的站点档案 ID。")
+    private Long siteProfileId;
+
     @Column(name = "deleted", nullable = false)
     @Comment("逻辑删除标记。")
     private boolean deleted = false;
@@ -210,6 +214,14 @@ public class UpstreamCredentialEntity {
 
     public void setTlsFingerprintProfileId(Long tlsFingerprintProfileId) {
         this.tlsFingerprintProfileId = tlsFingerprintProfileId;
+    }
+
+    public Long getSiteProfileId() {
+        return siteProfileId;
+    }
+
+    public void setSiteProfileId(Long siteProfileId) {
+        this.siteProfileId = siteProfileId;
     }
 
     public boolean isDeleted() {

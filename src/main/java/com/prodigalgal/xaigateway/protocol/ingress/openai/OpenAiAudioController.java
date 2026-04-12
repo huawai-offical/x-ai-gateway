@@ -3,7 +3,7 @@ package com.prodigalgal.xaigateway.protocol.ingress.openai;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayTokenAuthenticationResolver;
-import com.prodigalgal.xaigateway.gateway.core.execution.GatewayOpenAiPassthroughService;
+import com.prodigalgal.xaigateway.gateway.core.execution.GatewayResourceExecutionService;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.http.HttpHeaders;
@@ -23,13 +23,13 @@ import reactor.core.publisher.Mono;
 public class OpenAiAudioController {
 
     private final GatewayTokenAuthenticationResolver gatewayTokenAuthenticationResolver;
-    private final GatewayOpenAiPassthroughService gatewayOpenAiPassthroughService;
+    private final GatewayResourceExecutionService gatewayResourceExecutionService;
 
     public OpenAiAudioController(
             GatewayTokenAuthenticationResolver gatewayTokenAuthenticationResolver,
-            GatewayOpenAiPassthroughService gatewayOpenAiPassthroughService) {
+            GatewayResourceExecutionService gatewayResourceExecutionService) {
         this.gatewayTokenAuthenticationResolver = gatewayTokenAuthenticationResolver;
-        this.gatewayOpenAiPassthroughService = gatewayOpenAiPassthroughService;
+        this.gatewayResourceExecutionService = gatewayResourceExecutionService;
     }
 
     @PostMapping(value = "/transcriptions", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -48,7 +48,7 @@ public class OpenAiAudioController {
         putIfPresent(formFields, "prompt", prompt);
         putIfPresent(formFields, "response_format", responseFormat);
         putIfPresent(formFields, "temperature", temperature);
-        return gatewayOpenAiPassthroughService.executeMultipartJson(
+        return gatewayResourceExecutionService.executeMultipartJson(
                 distributedKey.keyPrefix(),
                 "/v1/audio/transcriptions",
                 model,
@@ -71,7 +71,7 @@ public class OpenAiAudioController {
         putIfPresent(formFields, "prompt", prompt);
         putIfPresent(formFields, "response_format", responseFormat);
         putIfPresent(formFields, "temperature", temperature);
-        return gatewayOpenAiPassthroughService.executeMultipartJson(
+        return gatewayResourceExecutionService.executeMultipartJson(
                 distributedKey.keyPrefix(),
                 "/v1/audio/translations",
                 model,
@@ -85,7 +85,7 @@ public class OpenAiAudioController {
             @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
             @RequestBody JsonNode requestBody) {
         AuthenticatedDistributedKey distributedKey = gatewayTokenAuthenticationResolver.authenticate(authorization, null, null, null);
-        return gatewayOpenAiPassthroughService.executeBinaryJson(
+        return gatewayResourceExecutionService.executeBinaryJson(
                 distributedKey.keyPrefix(),
                 "/v1/audio/speech",
                 requestBody,

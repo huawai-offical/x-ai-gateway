@@ -1,0 +1,111 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0013-site-profile-capability
+      author: codex
+      changes:
+        - createTable:
+            tableName: upstream_site_profile
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: profile_code, type: VARCHAR(64), constraints: { nullable: false, unique: true } }
+              - column: { name: display_name, type: VARCHAR(128), constraints: { nullable: false } }
+              - column: { name: provider_family, type: VARCHAR(32), constraints: { nullable: false } }
+              - column: { name: site_kind, type: VARCHAR(64), constraints: { nullable: false } }
+              - column: { name: auth_strategy, type: VARCHAR(32), constraints: { nullable: false } }
+              - column: { name: path_strategy, type: VARCHAR(32), constraints: { nullable: false } }
+              - column: { name: model_addressing_strategy, type: VARCHAR(32), constraints: { nullable: false } }
+              - column: { name: error_schema_strategy, type: VARCHAR(32), constraints: { nullable: false } }
+              - column: { name: base_url_pattern, type: VARCHAR(512) }
+              - column: { name: description, type: VARCHAR(512) }
+              - column: { name: is_active, type: BOOLEAN, defaultValueBoolean: true, constraints: { nullable: false } }
+              - column: { name: created_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+              - column: { name: updated_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+        - createIndex:
+            indexName: idx_upstream_site_profile_family_active
+            tableName: upstream_site_profile
+            columns:
+              - column: { name: provider_family }
+              - column: { name: is_active }
+        - createIndex:
+            indexName: idx_upstream_site_profile_kind_active
+            tableName: upstream_site_profile
+            columns:
+              - column: { name: site_kind }
+              - column: { name: is_active }
+        - createTable:
+            tableName: site_capability_snapshot
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: site_profile_id, type: BIGINT, constraints: { nullable: false, unique: true } }
+              - column: { name: supported_protocols_json, type: TEXT, constraints: { nullable: false } }
+              - column: { name: supports_responses, type: BOOLEAN, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: supports_embeddings, type: BOOLEAN, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: supports_audio, type: BOOLEAN, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: supports_images, type: BOOLEAN, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: supports_moderation, type: BOOLEAN, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: supports_files, type: BOOLEAN, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: supports_uploads, type: BOOLEAN, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: supports_batches, type: BOOLEAN, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: supports_tuning, type: BOOLEAN, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: supports_realtime, type: BOOLEAN, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: auth_strategy, type: VARCHAR(32), constraints: { nullable: false } }
+              - column: { name: path_strategy, type: VARCHAR(32), constraints: { nullable: false } }
+              - column: { name: error_schema_strategy, type: VARCHAR(32), constraints: { nullable: false } }
+              - column: { name: stream_transport, type: VARCHAR(32) }
+              - column: { name: fallback_strategy, type: VARCHAR(128) }
+              - column: { name: health_state, type: VARCHAR(32), constraints: { nullable: false } }
+              - column: { name: blocked_reason, type: VARCHAR(512) }
+              - column: { name: refreshed_at, type: TIMESTAMP WITH TIME ZONE }
+              - column: { name: created_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+              - column: { name: updated_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+        - createIndex:
+            indexName: idx_site_capability_snapshot_health_state
+            tableName: site_capability_snapshot
+            columns:
+              - column: { name: health_state }
+        - createIndex:
+            indexName: idx_site_capability_snapshot_refreshed_at
+            tableName: site_capability_snapshot
+            columns:
+              - column: { name: refreshed_at }
+        - createTable:
+            tableName: site_model_capability
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: site_profile_id, type: BIGINT, constraints: { nullable: false } }
+              - column: { name: model_name, type: VARCHAR(256), constraints: { nullable: false } }
+              - column: { name: model_key, type: VARCHAR(256), constraints: { nullable: false } }
+              - column: { name: supported_protocols_json, type: TEXT, constraints: { nullable: false } }
+              - column: { name: supports_chat, type: BOOLEAN, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: supports_embeddings, type: BOOLEAN, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: supports_cache, type: BOOLEAN, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: supports_thinking, type: BOOLEAN, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: supports_visible_reasoning, type: BOOLEAN, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: supports_reasoning_reuse, type: BOOLEAN, defaultValueBoolean: false, constraints: { nullable: false } }
+              - column: { name: reasoning_transport, type: VARCHAR(32), constraints: { nullable: false } }
+              - column: { name: capability_level, type: VARCHAR(32), constraints: { nullable: false } }
+              - column: { name: is_active, type: BOOLEAN, defaultValueBoolean: true, constraints: { nullable: false } }
+              - column: { name: source_refreshed_at, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }
+        - addUniqueConstraint:
+            tableName: site_model_capability
+            columnNames: site_profile_id,model_key
+            constraintName: uk_site_model_capability_profile_model_key
+        - createIndex:
+            indexName: idx_site_model_capability_model_key_active
+            tableName: site_model_capability
+            columns:
+              - column: { name: model_key }
+              - column: { name: is_active }
+        - createIndex:
+            indexName: idx_site_model_capability_site_profile
+            tableName: site_model_capability
+            columns:
+              - column: { name: site_profile_id }
+        - addColumn:
+            tableName: upstream_credential
+            columns:
+              - column: { name: site_profile_id, type: BIGINT }
+        - addColumn:
+            tableName: upstream_account
+            columns:
+              - column: { name: site_profile_id, type: BIGINT }

@@ -21,14 +21,17 @@ public class CredentialAdminService {
     private final UpstreamCredentialRepository upstreamCredentialRepository;
     private final CredentialCryptoService credentialCryptoService;
     private final CredentialModelDiscoveryService credentialModelDiscoveryService;
+    private final ProviderSiteRegistryService providerSiteRegistryService;
 
     public CredentialAdminService(
             UpstreamCredentialRepository upstreamCredentialRepository,
             CredentialCryptoService credentialCryptoService,
-            CredentialModelDiscoveryService credentialModelDiscoveryService) {
+            CredentialModelDiscoveryService credentialModelDiscoveryService,
+            ProviderSiteRegistryService providerSiteRegistryService) {
         this.upstreamCredentialRepository = upstreamCredentialRepository;
         this.credentialCryptoService = credentialCryptoService;
         this.credentialModelDiscoveryService = credentialModelDiscoveryService;
+        this.providerSiteRegistryService = providerSiteRegistryService;
     }
 
     @Transactional(readOnly = true)
@@ -120,6 +123,11 @@ public class CredentialAdminService {
         entity.setActive(request.active() == null || request.active());
         entity.setProxyId(request.proxyId());
         entity.setTlsFingerprintProfileId(request.tlsFingerprintProfileId());
+        entity.setSiteProfileId(providerSiteRegistryService.ensureSiteProfile(
+                request.providerType(),
+                request.baseUrl().trim(),
+                request.siteProfileId()
+        ).getId());
     }
 
     private CredentialResponse toResponse(UpstreamCredentialEntity entity) {
@@ -137,6 +145,7 @@ public class CredentialAdminService {
                 entity.getLastUsedAt(),
                 entity.getProxyId(),
                 entity.getTlsFingerprintProfileId(),
+                entity.getSiteProfileId(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
         );

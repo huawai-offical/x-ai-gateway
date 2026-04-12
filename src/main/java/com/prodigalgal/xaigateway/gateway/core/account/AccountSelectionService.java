@@ -39,13 +39,13 @@ public class AccountSelectionService {
     @Transactional(readOnly = true)
     public boolean hasHealthyAccountBinding(Long distributedKeyId, ProviderType providerType, GatewayClientFamily clientFamily) {
         List<DistributedKeyAccountPoolBindingEntity> bindings = distributedKeyAccountPoolBindingRepository
-                .findAllByDistributedKeyIdAndProviderTypeAndActiveTrueOrderByPriorityAscCreatedAtAsc(distributedKeyId, providerType);
+                .findAllByDistributedKey_IdAndProviderTypeAndActiveTrueOrderByPriorityAscCreatedAtAsc(distributedKeyId, providerType);
         if (bindings.isEmpty()) {
             return true;
         }
         for (DistributedKeyAccountPoolBindingEntity binding : bindings) {
             List<UpstreamAccountEntity> accounts = upstreamAccountRepository
-                    .findAllByPoolIdAndActiveTrueAndFrozenFalseAndHealthyTrueOrderByUpdatedAtDesc(binding.getPool().getId());
+                    .findAllByPool_IdAndActiveTrueAndFrozenFalseAndHealthyTrueOrderByUpdatedAtDesc(binding.getPool().getId());
             for (UpstreamAccountEntity account : accounts) {
                 if (!binding.getPool().getAllowedClientFamilies().isEmpty()
                         && !binding.getPool().getAllowedClientFamilies().contains(clientFamily.name())) {
@@ -61,7 +61,7 @@ public class AccountSelectionService {
 
     public Optional<UpstreamAccountEntity> resolveActiveAccount(Long distributedKeyId, ProviderType providerType, GatewayClientFamily clientFamily, int stickyTtlSeconds) {
         List<DistributedKeyAccountPoolBindingEntity> bindings = distributedKeyAccountPoolBindingRepository
-                .findAllByDistributedKeyIdAndProviderTypeAndActiveTrueOrderByPriorityAscCreatedAtAsc(distributedKeyId, providerType);
+                .findAllByDistributedKey_IdAndProviderTypeAndActiveTrueOrderByPriorityAscCreatedAtAsc(distributedKeyId, providerType);
         if (bindings.isEmpty()) {
             return Optional.empty();
         }
@@ -80,7 +80,7 @@ public class AccountSelectionService {
 
         for (DistributedKeyAccountPoolBindingEntity binding : bindings) {
             List<UpstreamAccountEntity> accounts = upstreamAccountRepository
-                    .findAllByPoolIdAndActiveTrueAndFrozenFalseAndHealthyTrueOrderByUpdatedAtDesc(binding.getPool().getId());
+                    .findAllByPool_IdAndActiveTrueAndFrozenFalseAndHealthyTrueOrderByUpdatedAtDesc(binding.getPool().getId());
             for (UpstreamAccountEntity account : accounts) {
                 if (!binding.getPool().getAllowedClientFamilies().isEmpty()
                         && !binding.getPool().getAllowedClientFamilies().contains(clientFamily.name())) {

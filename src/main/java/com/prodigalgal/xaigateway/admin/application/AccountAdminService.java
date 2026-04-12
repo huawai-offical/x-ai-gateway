@@ -26,7 +26,7 @@ public class AccountAdminService {
 
     @Transactional(readOnly = true)
     public List<UpstreamAccountResponse> listByPool(Long poolId) {
-        return upstreamAccountRepository.findAllByPoolIdOrderByCreatedAtDesc(poolId).stream().map(this::toResponse).toList();
+        return upstreamAccountRepository.findAllByPool_IdOrderByCreatedAtDesc(poolId).stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)

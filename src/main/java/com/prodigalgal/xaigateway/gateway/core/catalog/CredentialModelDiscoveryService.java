@@ -1,13 +1,12 @@
 package com.prodigalgal.xaigateway.gateway.core.catalog;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.prodigalgal.xaigateway.admin.application.ProviderSiteRegistryService;
 import com.prodigalgal.xaigateway.admin.application.CredentialCryptoService;
 import com.prodigalgal.xaigateway.gateway.core.shared.ModelIdNormalizer;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.shared.ReasoningTransport;
-import com.prodigalgal.xaigateway.infra.persistence.entity.CredentialModelCatalogEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
-import com.prodigalgal.xaigateway.infra.persistence.repository.CredentialModelCatalogRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import java.net.URI;
 import java.time.Duration;
@@ -33,18 +32,18 @@ public class CredentialModelDiscoveryService {
     private static final String ANTHROPIC_VERSION = "2023-06-01";
 
     private final UpstreamCredentialRepository upstreamCredentialRepository;
-    private final CredentialModelCatalogRepository credentialModelCatalogRepository;
     private final CredentialCryptoService credentialCryptoService;
+    private final ProviderSiteRegistryService providerSiteRegistryService;
     private final WebClient.Builder webClientBuilder;
 
     public CredentialModelDiscoveryService(
             UpstreamCredentialRepository upstreamCredentialRepository,
-            CredentialModelCatalogRepository credentialModelCatalogRepository,
             CredentialCryptoService credentialCryptoService,
+            ProviderSiteRegistryService providerSiteRegistryService,
             WebClient.Builder webClientBuilder) {
         this.upstreamCredentialRepository = upstreamCredentialRepository;
-        this.credentialModelCatalogRepository = credentialModelCatalogRepository;
         this.credentialCryptoService = credentialCryptoService;
+        this.providerSiteRegistryService = providerSiteRegistryService;
         this.webClientBuilder = webClientBuilder;
     }
 
@@ -60,13 +59,21 @@ public class CredentialModelDiscoveryService {
         UpstreamCredentialEntity credential = getRequiredCredential(credentialId);
         String apiKey = credentialCryptoService.decrypt(credential.getApiKeyCiphertext());
         List<DiscoveredModelDefinition> models = discover(credential.getProviderType(), credential.getBaseUrl(), apiKey);
-
-        credentialModelCatalogRepository.deleteAllByCredentialId(credentialId);
-
-        List<CredentialModelCatalogEntity> entities = models.stream()
-                .map(model -> toCatalogEntity(credential, model))
-                .toList();
-        credentialModelCatalogRepository.saveAll(entities);
+        if (credential.getSiteProfileId() == null) {
+            credential.setSiteProfileId(providerSiteRegistryService.ensureSiteProfile(
+                    credential.getProviderType(),
+                    credential.getBaseUrl(),
+                    null
+            ).getId());
+        }
+        providerSiteRegistryService.refreshCapabilities(
+                providerSiteRegistryService.ensureSiteProfile(
+                        credential.getProviderType(),
+                        credential.getBaseUrl(),
+                        credential.getSiteProfileId()
+                ),
+                models
+        );
         credential.setLastErrorAt(null);
         credential.setLastErrorCode(null);
         credential.setLastErrorMessage(null);
@@ -83,26 +90,6 @@ public class CredentialModelDiscoveryService {
             throw new IllegalArgumentException("未找到指定的上游凭证。");
         }
         return credential.get();
-    }
-
-    private CredentialModelCatalogEntity toCatalogEntity(
-            UpstreamCredentialEntity credential,
-            DiscoveredModelDefinition model) {
-        CredentialModelCatalogEntity entity = new CredentialModelCatalogEntity();
-        entity.setCredential(credential);
-        entity.setModelName(model.modelName());
-        entity.setModelKey(model.modelKey());
-        entity.setSupportedProtocols(model.supportedProtocols());
-        entity.setSupportsChat(model.supportsChat());
-        entity.setSupportsEmbeddings(model.supportsEmbeddings());
-        entity.setSupportsCache(model.supportsCache());
-        entity.setSupportsThinking(model.supportsThinking());
-        entity.setSupportsVisibleReasoning(model.supportsVisibleReasoning());
-        entity.setSupportsReasoningReuse(model.supportsReasoningReuse());
-        entity.setReasoningTransport(model.reasoningTransport());
-        entity.setActive(true);
-        entity.setSourceRefreshedAt(Instant.now());
-        return entity;
     }
 
     private List<DiscoveredModelDefinition> discover(ProviderType providerType, String baseUrl, String apiKey) {

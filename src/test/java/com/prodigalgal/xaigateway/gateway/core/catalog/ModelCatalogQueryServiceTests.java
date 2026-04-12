@@ -5,11 +5,18 @@ import com.prodigalgal.xaigateway.gateway.core.alias.ModelAliasRuleView;
 import com.prodigalgal.xaigateway.gateway.core.alias.ModelAliasView;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedCredentialBindingView;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyView;
+import com.prodigalgal.xaigateway.gateway.core.shared.AuthStrategy;
+import com.prodigalgal.xaigateway.gateway.core.shared.ErrorSchemaStrategy;
+import com.prodigalgal.xaigateway.gateway.core.shared.PathStrategy;
+import com.prodigalgal.xaigateway.gateway.core.shared.ProviderFamily;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.shared.ReasoningTransport;
-import com.prodigalgal.xaigateway.infra.persistence.entity.CredentialModelCatalogEntity;
+import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
+import com.prodigalgal.xaigateway.infra.persistence.entity.SiteModelCapabilityEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
-import com.prodigalgal.xaigateway.infra.persistence.repository.CredentialModelCatalogRepository;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamSiteProfileEntity;
+import com.prodigalgal.xaigateway.infra.persistence.repository.SiteModelCapabilityRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -25,16 +32,23 @@ class ModelCatalogQueryServiceTests {
 
     @Test
     void shouldListDirectModelsAndAccessibleAliasesForDistributedKey() {
-        CredentialModelCatalogRepository credentialModelCatalogRepository = Mockito.mock(CredentialModelCatalogRepository.class);
+        SiteModelCapabilityRepository siteModelCapabilityRepository = Mockito.mock(SiteModelCapabilityRepository.class);
+        UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
         ModelAliasQueryService modelAliasQueryService = Mockito.mock(ModelAliasQueryService.class);
-        ModelCatalogQueryService service = new ModelCatalogQueryService(credentialModelCatalogRepository, modelAliasQueryService);
+        ModelCatalogQueryService service = new ModelCatalogQueryService(siteModelCapabilityRepository, upstreamCredentialRepository, modelAliasQueryService);
 
-        when(credentialModelCatalogRepository.findAllByCredentialIdInAndActiveTrue(argThat(ids ->
+        when(upstreamCredentialRepository.findAllByIdInAndDeletedFalse(argThat(ids ->
                 ids != null && ids.containsAll(List.of(101L, 102L)) && ids.size() == 2)))
                 .thenReturn(List.of(
-                        catalogEntity(101L, "gpt-4o", List.of("openai")),
-                        catalogEntity(102L, "gpt-4.1", List.of("openai")),
-                        catalogEntity(101L, "text-embedding-3-large", List.of("openai"))
+                        credentialEntity(101L, 1001L),
+                        credentialEntity(102L, 1002L)
+                ));
+        when(siteModelCapabilityRepository.findAllBySiteProfile_IdInAndActiveTrue(argThat(ids ->
+                ids != null && ids.containsAll(List.of(1001L, 1002L)) && ids.size() == 2)))
+                .thenReturn(List.of(
+                        siteCapabilityEntity(1001L, "gpt-4o", List.of("openai")),
+                        siteCapabilityEntity(1002L, "gpt-4.1", List.of("openai")),
+                        siteCapabilityEntity(1001L, "text-embedding-3-large", List.of("openai"))
                 ));
         when(modelAliasQueryService.listEnabledAliases())
                 .thenReturn(List.of(new ModelAliasView(
@@ -76,9 +90,10 @@ class ModelCatalogQueryServiceTests {
 
     @Test
     void shouldRejectWhenProtocolIsNotAllowed() {
-        CredentialModelCatalogRepository credentialModelCatalogRepository = Mockito.mock(CredentialModelCatalogRepository.class);
+        SiteModelCapabilityRepository siteModelCapabilityRepository = Mockito.mock(SiteModelCapabilityRepository.class);
+        UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
         ModelAliasQueryService modelAliasQueryService = Mockito.mock(ModelAliasQueryService.class);
-        ModelCatalogQueryService service = new ModelCatalogQueryService(credentialModelCatalogRepository, modelAliasQueryService);
+        ModelCatalogQueryService service = new ModelCatalogQueryService(siteModelCapabilityRepository, upstreamCredentialRepository, modelAliasQueryService);
 
         DistributedKeyView distributedKeyView = new DistributedKeyView(
                 1L,
@@ -103,13 +118,17 @@ class ModelCatalogQueryServiceTests {
 
     @Test
     void shouldFindAccessibleModelDetailByAliasNameIgnoringCase() {
-        CredentialModelCatalogRepository credentialModelCatalogRepository = Mockito.mock(CredentialModelCatalogRepository.class);
+        SiteModelCapabilityRepository siteModelCapabilityRepository = Mockito.mock(SiteModelCapabilityRepository.class);
+        UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
         ModelAliasQueryService modelAliasQueryService = Mockito.mock(ModelAliasQueryService.class);
-        ModelCatalogQueryService service = new ModelCatalogQueryService(credentialModelCatalogRepository, modelAliasQueryService);
+        ModelCatalogQueryService service = new ModelCatalogQueryService(siteModelCapabilityRepository, upstreamCredentialRepository, modelAliasQueryService);
 
-        when(credentialModelCatalogRepository.findAllByCredentialIdInAndActiveTrue(argThat(ids ->
+        when(upstreamCredentialRepository.findAllByIdInAndDeletedFalse(argThat(ids ->
                 ids != null && ids.contains(101L) && ids.size() == 1)))
-                .thenReturn(List.of(catalogEntity(101L, "gpt-4o", List.of("openai"))));
+                .thenReturn(List.of(credentialEntity(101L, 1001L)));
+        when(siteModelCapabilityRepository.findAllBySiteProfile_IdInAndActiveTrue(argThat(ids ->
+                ids != null && ids.contains(1001L) && ids.size() == 1)))
+                .thenReturn(List.of(siteCapabilityEntity(1001L, "gpt-4o", List.of("openai"))));
         when(modelAliasQueryService.listEnabledAliases())
                 .thenReturn(List.of(new ModelAliasView(
                         1L,
@@ -152,15 +171,27 @@ class ModelCatalogQueryServiceTests {
         assertTrue(model.alias());
     }
 
-    private CredentialModelCatalogEntity catalogEntity(Long credentialId, String modelKey, List<String> protocols) {
+    private UpstreamCredentialEntity credentialEntity(Long credentialId, Long siteProfileId) {
         UpstreamCredentialEntity credential = new UpstreamCredentialEntity();
         credential.setCredentialName("credential-" + credentialId);
         credential.setProviderType(ProviderType.OPENAI_DIRECT);
         credential.setBaseUrl("https://api.openai.com");
+        credential.setSiteProfileId(siteProfileId);
         setId(credential, credentialId);
+        return credential;
+    }
 
-        CredentialModelCatalogEntity entity = new CredentialModelCatalogEntity();
-        entity.setCredential(credential);
+    private SiteModelCapabilityEntity siteCapabilityEntity(Long siteProfileId, String modelKey, List<String> protocols) {
+        UpstreamSiteProfileEntity siteProfile = new UpstreamSiteProfileEntity();
+        org.springframework.test.util.ReflectionTestUtils.setField(siteProfile, "id", siteProfileId);
+        siteProfile.setProviderFamily(ProviderFamily.OPENAI);
+        siteProfile.setSiteKind(UpstreamSiteKind.OPENAI_DIRECT);
+        siteProfile.setAuthStrategy(AuthStrategy.BEARER);
+        siteProfile.setPathStrategy(PathStrategy.OPENAI_V1);
+        siteProfile.setErrorSchemaStrategy(ErrorSchemaStrategy.OPENAI_ERROR);
+
+        SiteModelCapabilityEntity entity = new SiteModelCapabilityEntity();
+        entity.setSiteProfile(siteProfile);
         entity.setModelName(modelKey);
         entity.setModelKey(modelKey);
         entity.setSupportedProtocols(protocols);
@@ -172,6 +203,7 @@ class ModelCatalogQueryServiceTests {
         entity.setSupportsReasoningReuse(true);
         entity.setReasoningTransport(ReasoningTransport.OPENAI_CHAT);
         entity.setActive(true);
+        entity.setSourceRefreshedAt(java.time.Instant.now());
         return entity;
     }
 

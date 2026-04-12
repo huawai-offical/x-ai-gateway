@@ -12,6 +12,8 @@ import com.prodigalgal.xaigateway.gateway.core.cache.PromptFingerprintService;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.catalog.ModelCatalogQueryService;
 import com.prodigalgal.xaigateway.gateway.core.catalog.ResolvedModelView;
+import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestFeatureService;
+import com.prodigalgal.xaigateway.gateway.core.interop.SiteCapabilityTruthService;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.shared.ReasoningTransport;
 import com.prodigalgal.xaigateway.infra.config.GatewayProperties;
@@ -41,6 +43,8 @@ class GatewayRouteSelectionGovernanceTests {
         UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
         NetworkProxyRepository networkProxyRepository = Mockito.mock(NetworkProxyRepository.class);
         AccountSelectionService accountSelectionService = Mockito.mock(AccountSelectionService.class);
+        GatewayRequestFeatureService gatewayRequestFeatureService = Mockito.mock(GatewayRequestFeatureService.class);
+        SiteCapabilityTruthService siteCapabilityTruthService = Mockito.mock(SiteCapabilityTruthService.class);
 
         PromptFingerprintService promptFingerprintService = new PromptFingerprintService(new ObjectMapper(), new GatewayProperties());
         GatewayRouteSelectionService service = new GatewayRouteSelectionService(
@@ -51,7 +55,9 @@ class GatewayRouteSelectionGovernanceTests {
                 governanceService,
                 upstreamCredentialRepository,
                 networkProxyRepository,
-                accountSelectionService
+                accountSelectionService,
+                gatewayRequestFeatureService,
+                siteCapabilityTruthService
         );
 
         when(keyQueryService.findActiveByKeyPrefix("sk-gw-test")).thenReturn(Optional.of(new DistributedKeyView(
@@ -76,6 +82,8 @@ class GatewayRouteSelectionGovernanceTests {
         UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
         NetworkProxyRepository networkProxyRepository = Mockito.mock(NetworkProxyRepository.class);
         AccountSelectionService accountSelectionService = Mockito.mock(AccountSelectionService.class);
+        GatewayRequestFeatureService gatewayRequestFeatureService = Mockito.mock(GatewayRequestFeatureService.class);
+        SiteCapabilityTruthService siteCapabilityTruthService = Mockito.mock(SiteCapabilityTruthService.class);
 
         PromptFingerprintService promptFingerprintService = new PromptFingerprintService(new ObjectMapper(), new GatewayProperties());
         GatewayRouteSelectionService service = new GatewayRouteSelectionService(
@@ -86,7 +94,9 @@ class GatewayRouteSelectionGovernanceTests {
                 governanceService,
                 upstreamCredentialRepository,
                 networkProxyRepository,
-                accountSelectionService
+                accountSelectionService,
+                gatewayRequestFeatureService,
+                siteCapabilityTruthService
         );
 
         DistributedKeyView keyView = new DistributedKeyView(
@@ -103,6 +113,10 @@ class GatewayRouteSelectionGovernanceTests {
                 "gpt-4o", "gpt-4o", "gpt-4o", false,
                 List.of(new CatalogCandidateView(101L, "openai", ProviderType.OPENAI_DIRECT, "https://api.openai.com", "gpt-4o", "gpt-4o", List.of("openai"), true, false, false, false, false, false, ReasoningTransport.OPENAI_CHAT))
         )));
+        when(gatewayRequestFeatureService.detectRequiredFeatures(Mockito.anyString(), Mockito.any()))
+                .thenReturn(List.of(com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature.CHAT_TEXT));
+        when(siteCapabilityTruthService.capabilityLevel(Mockito.any(), Mockito.any()))
+                .thenReturn(com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel.NATIVE);
         UpstreamCredentialEntity credential = new UpstreamCredentialEntity();
         credential.setProviderType(ProviderType.OPENAI_DIRECT);
         credential.setBaseUrl("https://api.openai.com");
