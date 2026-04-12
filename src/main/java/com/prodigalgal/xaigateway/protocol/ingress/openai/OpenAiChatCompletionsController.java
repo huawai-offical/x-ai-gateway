@@ -150,21 +150,26 @@ public class OpenAiChatCompletionsController {
     }
 
     private Flux<String> encodeChunk(ChatExecutionStreamResponse streamResponse, ChatExecutionStreamChunk chunk) {
+        List<String> events = new ArrayList<>();
+        if (chunk.toolCalls() != null && !chunk.toolCalls().isEmpty()) {
+            events.add(encode(OpenAiChatCompletionResponse.toolCallChunk(
+                    streamResponse.routeSelection().resolvedModelKey(),
+                    chunk.toolCalls()
+            )));
+        }
+        if (chunk.textDelta() != null && !chunk.textDelta().isBlank()) {
+            events.add(encode(OpenAiChatCompletionResponse.contentChunk(
+                    streamResponse.routeSelection().resolvedModelKey(),
+                    chunk.textDelta()
+            )));
+        }
         if (chunk.terminal()) {
-            return Flux.just(encode(OpenAiChatCompletionResponse.finishChunk(
+            events.add(encode(OpenAiChatCompletionResponse.finishChunk(
                     streamResponse.routeSelection().resolvedModelKey(),
                     chunk.finishReason() == null ? "stop" : chunk.finishReason()
             )));
         }
-
-        if (chunk.textDelta() == null || chunk.textDelta().isBlank()) {
-            return Flux.empty();
-        }
-
-        return Flux.just(encode(OpenAiChatCompletionResponse.contentChunk(
-                streamResponse.routeSelection().resolvedModelKey(),
-                chunk.textDelta()
-        )));
+        return events.isEmpty() ? Flux.empty() : Flux.fromIterable(events);
     }
 
     private String encode(Object payload) {

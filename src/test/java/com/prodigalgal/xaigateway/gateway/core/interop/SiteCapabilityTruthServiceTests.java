@@ -97,6 +97,71 @@ class SiteCapabilityTruthServiceTests {
         assertTrue(plan.blockedReasons().stream().anyMatch(item -> item.contains("moderation")));
     }
 
+    @Test
+    void shouldUseCandidateLevelOllamaToolAndImageCapabilities() {
+        SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        Mockito.when(repository.findBySiteProfile_Id(6L)).thenReturn(Optional.of(snapshot(true, false, false, false, false, false, false, false, false, false)));
+        SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
+
+        CatalogCandidateView capableCandidate = new CatalogCandidateView(
+                101L,
+                "ollama-capable",
+                ProviderType.OLLAMA_DIRECT,
+                6L,
+                ProviderFamily.OLLAMA,
+                UpstreamSiteKind.OLLAMA_DIRECT,
+                AuthStrategy.UNSUPPORTED,
+                PathStrategy.OLLAMA_API_CHAT,
+                ErrorSchemaStrategy.OLLAMA_ERROR,
+                "http://localhost:11434",
+                "qwen3",
+                "qwen3",
+                List.of("openai", "responses"),
+                true,
+                true,
+                true,
+                false,
+                false,
+                true,
+                true,
+                false,
+                ReasoningTransport.OLLAMA_THINKING,
+                InteropCapabilityLevel.NATIVE
+        );
+        CatalogCandidateView blockedCandidate = new CatalogCandidateView(
+                102L,
+                "ollama-blocked",
+                ProviderType.OLLAMA_DIRECT,
+                6L,
+                ProviderFamily.OLLAMA,
+                UpstreamSiteKind.OLLAMA_DIRECT,
+                AuthStrategy.UNSUPPORTED,
+                PathStrategy.OLLAMA_API_CHAT,
+                ErrorSchemaStrategy.OLLAMA_ERROR,
+                "http://localhost:11434",
+                "llama3",
+                "llama3",
+                List.of("openai", "responses"),
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                ReasoningTransport.NONE,
+                InteropCapabilityLevel.NATIVE
+        );
+
+        assertEquals(InteropCapabilityLevel.NATIVE, service.capabilityLevel(capableCandidate, InteropFeature.TOOLS));
+        assertEquals(InteropCapabilityLevel.NATIVE, service.capabilityLevel(capableCandidate, InteropFeature.IMAGE_INPUT));
+        assertEquals(InteropCapabilityLevel.NATIVE, service.capabilityLevel(capableCandidate, InteropFeature.REASONING));
+        assertEquals(InteropCapabilityLevel.UNSUPPORTED, service.capabilityLevel(blockedCandidate, InteropFeature.TOOLS));
+        assertEquals(InteropCapabilityLevel.UNSUPPORTED, service.capabilityLevel(blockedCandidate, InteropFeature.IMAGE_INPUT));
+        assertEquals(InteropCapabilityLevel.UNSUPPORTED, service.capabilityLevel(blockedCandidate, InteropFeature.FILE_INPUT));
+    }
+
     private CatalogCandidateView candidate(Long siteProfileId, ProviderType providerType, UpstreamSiteKind siteKind) {
         return new CatalogCandidateView(
                 101L,

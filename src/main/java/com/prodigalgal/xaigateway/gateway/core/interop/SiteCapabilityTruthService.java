@@ -35,6 +35,8 @@ public class SiteCapabilityTruthService {
                 candidate.siteKind(),
                 snapshot,
                 candidate.supportsChat(),
+                candidate.supportsTools(),
+                candidate.supportsImageInput(),
                 candidate.supportsEmbeddings(),
                 candidate.supportsThinking(),
                 feature
@@ -48,7 +50,7 @@ public class SiteCapabilityTruthService {
         if (siteProfile == null) {
             return false;
         }
-        return capabilityLevel(siteProfile.getSiteKind(), snapshot, true, true, true, feature)
+        return capabilityLevel(siteProfile.getSiteKind(), snapshot, true, true, true, true, true, feature)
                 != InteropCapabilityLevel.UNSUPPORTED;
     }
 
@@ -143,6 +145,8 @@ public class SiteCapabilityTruthService {
             UpstreamSiteKind siteKind,
             SiteCapabilitySnapshotEntity snapshot,
             boolean supportsChat,
+            boolean supportsTools,
+            boolean supportsImageInput,
             boolean supportsEmbeddings,
             boolean supportsThinking,
             InteropFeature feature) {
@@ -153,10 +157,11 @@ public class SiteCapabilityTruthService {
 
         return switch (feature) {
             case CHAT_TEXT -> supportsChat ? InteropCapabilityLevel.NATIVE : InteropCapabilityLevel.UNSUPPORTED;
-            case TOOLS -> supportsChat && siteKind != UpstreamSiteKind.OLLAMA_DIRECT
-                    ? InteropCapabilityLevel.NATIVE
-                    : InteropCapabilityLevel.UNSUPPORTED;
+            case TOOLS -> siteKind == UpstreamSiteKind.OLLAMA_DIRECT
+                    ? supportsTools ? InteropCapabilityLevel.NATIVE : InteropCapabilityLevel.UNSUPPORTED
+                    : supportsChat ? InteropCapabilityLevel.NATIVE : InteropCapabilityLevel.UNSUPPORTED;
             case IMAGE_INPUT -> switch (siteKind) {
+                case OLLAMA_DIRECT -> supportsImageInput ? InteropCapabilityLevel.NATIVE : InteropCapabilityLevel.UNSUPPORTED;
                 case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, GROK, MISTRAL, TOGETHER, FIREWORKS,
                         OPENROUTER, ANTHROPIC_DIRECT, GEMINI_DIRECT -> InteropCapabilityLevel.NATIVE;
                 case AZURE_OPENAI -> InteropCapabilityLevel.LOSSY;
@@ -229,15 +234,22 @@ public class SiteCapabilityTruthService {
     }
 
     private boolean supportsUpstreamAudio(UpstreamSiteKind siteKind) {
-        return siteKind == UpstreamSiteKind.OPENAI_DIRECT;
+        return supportsOpenAiPassthroughResources(siteKind);
     }
 
     private boolean supportsUpstreamImages(UpstreamSiteKind siteKind) {
-        return siteKind == UpstreamSiteKind.OPENAI_DIRECT;
+        return supportsOpenAiPassthroughResources(siteKind);
     }
 
     private boolean supportsUpstreamModeration(UpstreamSiteKind siteKind) {
-        return siteKind == UpstreamSiteKind.OPENAI_DIRECT;
+        return supportsOpenAiPassthroughResources(siteKind);
+    }
+
+    private boolean supportsOpenAiPassthroughResources(UpstreamSiteKind siteKind) {
+        return switch (siteKind) {
+            case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, GROK, MISTRAL, TOGETHER, FIREWORKS, OPENROUTER -> true;
+            default -> false;
+        };
     }
 
     private boolean supportsUpstreamFileObjects(UpstreamSiteKind siteKind) {

@@ -188,7 +188,7 @@ public class UpstreamSitePolicyService {
                     PathStrategy.OLLAMA_API_CHAT,
                     ModelAddressingStrategy.OLLAMA_MODEL_TAG,
                     ErrorSchemaStrategy.OLLAMA_ERROR,
-                    List.of("openai", "responses"),
+                    List.of("openai", "responses", "anthropic_native", "google_native"),
                     false,
                     false,
                     false,

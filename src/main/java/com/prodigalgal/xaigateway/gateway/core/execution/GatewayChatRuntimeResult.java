@@ -6,6 +6,14 @@ import java.util.List;
 public record GatewayChatRuntimeResult(
         String text,
         GatewayUsage usage,
-        List<GatewayToolCall> toolCalls
+        List<GatewayToolCall> toolCalls,
+        String reasoning
 ) {
+    public GatewayChatRuntimeResult(
+            String text,
+            GatewayUsage usage,
+            List<GatewayToolCall> toolCalls
+    ) {
+        this(text, usage, toolCalls, null);
+    }
 }

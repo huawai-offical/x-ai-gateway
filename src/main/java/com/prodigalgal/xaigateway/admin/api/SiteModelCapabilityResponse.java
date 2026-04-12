@@ -11,6 +11,8 @@ public record SiteModelCapabilityResponse(
         String modelKey,
         List<String> supportedProtocols,
         boolean supportsChat,
+        boolean supportsTools,
+        boolean supportsImageInput,
         boolean supportsEmbeddings,
         boolean supportsCache,
         boolean supportsThinking,

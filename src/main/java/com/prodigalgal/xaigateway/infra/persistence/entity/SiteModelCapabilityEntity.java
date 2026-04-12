@@ -63,6 +63,14 @@ public class SiteModelCapabilityEntity {
     @Comment("是否支持 chat。")
     private boolean supportsChat;
 
+    @Column(name = "supports_tools", nullable = false)
+    @Comment("是否支持 tool calling。")
+    private boolean supportsTools;
+
+    @Column(name = "supports_image_input", nullable = false)
+    @Comment("是否支持图片输入。")
+    private boolean supportsImageInput;
+
     @Column(name = "supports_embeddings", nullable = false)
     @Comment("是否支持 embeddings。")
     private boolean supportsEmbeddings;
@@ -143,6 +151,22 @@ public class SiteModelCapabilityEntity {
 
     public void setSupportsChat(boolean supportsChat) {
         this.supportsChat = supportsChat;
+    }
+
+    public boolean isSupportsTools() {
+        return supportsTools;
+    }
+
+    public void setSupportsTools(boolean supportsTools) {
+        this.supportsTools = supportsTools;
+    }
+
+    public boolean isSupportsImageInput() {
+        return supportsImageInput;
+    }
+
+    public void setSupportsImageInput(boolean supportsImageInput) {
+        this.supportsImageInput = supportsImageInput;
     }
 
     public boolean isSupportsEmbeddings() {

@@ -97,6 +97,8 @@ public class ProviderSiteAdminService {
                         item.getModelKey(),
                         item.getSupportedProtocols(),
                         item.isSupportsChat(),
+                        item.isSupportsTools(),
+                        item.isSupportsImageInput(),
                         item.isSupportsEmbeddings(),
                         item.isSupportsCache(),
                         item.isSupportsThinking(),

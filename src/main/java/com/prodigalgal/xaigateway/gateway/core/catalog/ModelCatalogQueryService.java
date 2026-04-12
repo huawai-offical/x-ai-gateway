@@ -261,6 +261,8 @@ public class ModelCatalogQueryService {
                 capability.getModelKey(),
                 capability.getSupportedProtocols(),
                 capability.isSupportsChat(),
+                capability.isSupportsTools(),
+                capability.isSupportsImageInput(),
                 capability.isSupportsEmbeddings(),
                 capability.isSupportsCache(),
                 capability.isSupportsThinking(),

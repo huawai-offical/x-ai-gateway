@@ -31,11 +31,18 @@ public record OpenAiResponsesResponse(
             String arguments,
             @JsonProperty("call_id")
             String callId,
-            String status
+            String status,
+            List<SummaryItem> summary
     ) {
     }
 
     public record ContentItem(
+            String type,
+            String text
+    ) {
+    }
+
+    public record SummaryItem(
             String type,
             String text
     ) {
@@ -74,7 +81,8 @@ public record OpenAiResponsesResponse(
                 response.routeSelection().publicModel(),
                 response.text(),
                 response.usage(),
-                response.toolCalls()
+                response.toolCalls(),
+                response.reasoning()
         );
     }
 
@@ -85,21 +93,24 @@ public record OpenAiResponsesResponse(
                 response.routeSelection().publicModel(),
                 null,
                 null,
-                List.of()
+                List.of(),
+                null
         );
     }
 
     public static OpenAiResponsesResponse completed(
             ChatExecutionStreamResponse response,
             String text,
-            GatewayUsage usage) {
+            GatewayUsage usage,
+            String reasoning) {
         return build(
                 "resp-" + response.requestId(),
                 "completed",
                 response.routeSelection().publicModel(),
                 text,
                 usage,
-                List.of()
+                List.of(),
+                reasoning
         );
     }
 
@@ -109,9 +120,24 @@ public record OpenAiResponsesResponse(
             String model,
             String text,
             GatewayUsage usage,
-            List<GatewayToolCall> toolCalls) {
+            List<GatewayToolCall> toolCalls,
+            String reasoning) {
         Instant now = Instant.now();
         List<OutputItem> output = new ArrayList<>();
+
+        if (reasoning != null && !reasoning.isBlank()) {
+            output.add(new OutputItem(
+                    "rs_" + now.toEpochMilli(),
+                    "reasoning",
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    status,
+                    List.of(new SummaryItem("summary_text", reasoning))
+            ));
+        }
 
         if (text != null && !text.isBlank()) {
             output.add(new OutputItem(
@@ -122,7 +148,8 @@ public record OpenAiResponsesResponse(
                     null,
                     null,
                     null,
-                    status
+                    status,
+                    null
             ));
         }
 
@@ -135,7 +162,8 @@ public record OpenAiResponsesResponse(
                     toolCall.name(),
                     toolCall.arguments(),
                     toolCall.id(),
-                    status
+                    status,
+                    null
             ));
         }
 

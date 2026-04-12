@@ -5,5 +5,6 @@ public enum ReasoningTransport {
     OPENAI_CHAT,
     RESPONSES,
     ANTHROPIC,
-    GEMINI_THOUGHTS
+    GEMINI_THOUGHTS,
+    OLLAMA_THINKING
 }

@@ -30,11 +30,19 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.buffer.DataBufferUtils;
+import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 
 @Service
 @Transactional
@@ -136,20 +144,16 @@ public class GatewayAsyncResourceService {
         return readOrSyncResource(uploadId, distributedKeyId, GatewayAsyncResourceType.UPLOAD, "upload");
     }
 
-    public JsonNode addUploadPart(String uploadId, Long distributedKeyId) {
+    public Mono<JsonNode> addUploadPart(String uploadId, Long distributedKeyId, FilePart dataPart) {
         GatewayAsyncResourceEntity entity = getRequired(uploadId, GatewayAsyncResourceType.UPLOAD, distributedKeyId);
-        String upstreamId = readObject(entity.getMetadataJson()).path("upstream_object_id").asText(null);
+        ObjectNode metadata = readObject(entity.getMetadataJson());
+        String upstreamId = metadata.path("upstream_object_id").asText(null);
         if (upstreamId == null || upstreamId.isBlank()) {
-            return addLocalUploadPart(entity);
+            return Mono.fromSupplier(() -> addLocalUploadPart(entity));
         }
-        UpstreamTarget target = resolveUpstreamTarget(distributedKeyId, InteropFeature.UPLOAD_CREATE);
-        JsonNode upstreamResponse = invokeUpstreamJson(target, "/v1/uploads/" + upstreamId + "/parts", objectMapper.createObjectNode());
-        ObjectNode response = copyObject(upstreamResponse);
-        response.put("upload_id", uploadId);
-        appendEvent(readObject(entity.getMetadataJson()), "part_added", entity.getStatus());
-        entity.setMetadataJson(writeJson(appendEvent(readObject(entity.getMetadataJson()), "part_added", entity.getStatus())));
-        gatewayAsyncResourceRepository.save(entity);
-        return response;
+        UpstreamTarget target = resolveUpstreamTargetForEntity(entity, metadata);
+        return invokeUpstreamMultipart(target, target.path() + "/" + upstreamId + "/parts", dataPart)
+                .map(upstreamResponse -> persistUploadPart(entity, uploadId, dataPart, upstreamResponse));
     }
 
     public JsonNode completeUpload(String uploadId, Long distributedKeyId) {
@@ -238,7 +242,7 @@ public class GatewayAsyncResourceService {
         if (upstreamId == null || upstreamId.isBlank()) {
             return updateLocalStatus(resourceKey, distributedKeyId, resourceType, suffix.contains("cancel") ? "cancelled" : "completed");
         }
-        UpstreamTarget target = resolveUpstreamTarget(distributedKeyId, feature);
+        UpstreamTarget target = resolveUpstreamTargetForEntity(entity, metadata);
         JsonNode upstreamResponse = invokeUpstreamJson(target, target.path() + "/" + upstreamId + suffix, objectMapper.createObjectNode());
         return syncPersistedResource(entity, upstreamResponse, inferObjectName(resourceType));
     }
@@ -300,6 +304,31 @@ public class GatewayAsyncResourceService {
         metadata.put("upstream_status", upstreamResponse.path("status").asText(status));
         metadata.put("upstream_synced_at", now().getEpochSecond());
         entity.setMetadataJson(writeJson(appendEvent(metadata, "synced", status)));
+        gatewayAsyncResourceRepository.save(entity);
+        return response;
+    }
+
+    private JsonNode persistUploadPart(
+            GatewayAsyncResourceEntity entity,
+            String uploadId,
+            FilePart dataPart,
+            JsonNode upstreamResponse) {
+        ObjectNode response = copyObject(upstreamResponse);
+        if (!response.has("object")) {
+            response.put("object", "upload.part");
+        }
+        response.put("upload_id", uploadId);
+        String upstreamPartId = response.path("id").asText("part_" + UUID.randomUUID().toString().replace("-", ""));
+
+        ObjectNode metadata = readObject(entity.getMetadataJson());
+        metadata.withArray("parts").add(upstreamPartId);
+        metadata.withArray("part_bindings").addObject()
+                .put("upstream_part_id", upstreamPartId)
+                .put("filename", dataPart.filename())
+                .put("synced_at", now().getEpochSecond());
+        metadata.put("partsCount", metadata.withArray("parts").size());
+        metadata.put("upstream_synced_at", now().getEpochSecond());
+        entity.setMetadataJson(writeJson(appendEvent(metadata, "part_added", entity.getStatus())));
         gatewayAsyncResourceRepository.save(entity);
         return response;
     }
@@ -404,6 +433,33 @@ public class GatewayAsyncResourceService {
                 .retrieve()
                 .bodyToMono(JsonNode.class)
                 .block();
+    }
+
+    private Mono<JsonNode> invokeUpstreamMultipart(UpstreamTarget target, String path, FilePart dataPart) {
+        return DataBufferUtils.join(dataPart.content())
+                .map(buffer -> {
+                    byte[] bytes = new byte[buffer.readableByteCount()];
+                    buffer.read(bytes);
+                    DataBufferUtils.release(buffer);
+                    MultiValueMap<String, HttpEntity<?>> body = new LinkedMultiValueMap<>();
+                    HttpHeaders fileHeaders = new HttpHeaders();
+                    fileHeaders.setContentType(dataPart.headers().getContentType() == null
+                            ? MediaType.APPLICATION_OCTET_STREAM
+                            : dataPart.headers().getContentType());
+                    body.add("data", new HttpEntity<>(new ByteArrayResource(bytes) {
+                        @Override
+                        public String getFilename() {
+                            return dataPart.filename();
+                        }
+                    }, fileHeaders));
+                    return body;
+                })
+                .flatMap(body -> target.client().post()
+                        .uri(path.startsWith("/v1/") ? resolvePath(target.credential().getBaseUrl(), path) : path)
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .body(BodyInserters.fromMultipartData(body))
+                        .retrieve()
+                        .bodyToMono(JsonNode.class));
     }
 
     private ObjectNode rewriteFileRefs(ObjectNode payload, Long distributedKeyId) {

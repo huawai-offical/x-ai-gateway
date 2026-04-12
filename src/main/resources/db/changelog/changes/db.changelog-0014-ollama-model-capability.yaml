@@ -1,0 +1,20 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0014-ollama-model-capability
+      author: codex
+      changes:
+        - addColumn:
+            tableName: site_model_capability
+            columns:
+              - column:
+                  name: supports_tools
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: supports_image_input
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false

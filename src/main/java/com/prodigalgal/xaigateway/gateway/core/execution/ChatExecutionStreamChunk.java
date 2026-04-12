@@ -8,10 +8,21 @@ public record ChatExecutionStreamChunk(
         String finishReason,
         GatewayUsage usage,
         boolean terminal,
-        List<GatewayToolCall> toolCalls
+        List<GatewayToolCall> toolCalls,
+        String reasoningDelta
 ) {
 
     public ChatExecutionStreamChunk(String textDelta, String finishReason, GatewayUsage usage, boolean terminal) {
-        this(textDelta, finishReason, usage, terminal, List.of());
+        this(textDelta, finishReason, usage, terminal, List.of(), null);
+    }
+
+    public ChatExecutionStreamChunk(
+            String textDelta,
+            String finishReason,
+            GatewayUsage usage,
+            boolean terminal,
+            List<GatewayToolCall> toolCalls
+    ) {
+        this(textDelta, finishReason, usage, terminal, toolCalls, null);
     }
 }

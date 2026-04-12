@@ -117,6 +117,67 @@ class OpenAiChatCompletionsControllerTests {
     }
 
     @Test
+    void shouldStreamToolCallDeltas() {
+        Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayChatExecutionService.executeStream(Mockito.<ChatExecutionRequest>any()))
+                .thenReturn(new ChatExecutionStreamResponse(
+                        "req-openai-stream-tool-1",
+                        selectionResult(),
+                        Flux.just(
+                                new ChatExecutionStreamChunk(
+                                        null,
+                                        null,
+                                        GatewayUsage.empty(),
+                                        false,
+                                        List.of(new GatewayToolCall(
+                                                "call_1",
+                                                "function",
+                                                "lookup_weather",
+                                                "{\"city\":\"Shanghai\"}"
+                                        ))
+                                ),
+                                new ChatExecutionStreamChunk(null, "tool_calls", GatewayUsage.empty(), true)
+                        )
+                ));
+
+        var result = webTestClient.post()
+                .uri("/v1/chat/completions")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "model": "gpt-4o",
+                          "messages": [
+                            {"role":"user","content":"帮我查询上海天气"}
+                          ],
+                          "tools": [
+                            {
+                              "type":"function",
+                              "function":{
+                                "name":"lookup_weather",
+                                "description":"Lookup weather",
+                                "parameters":{"type":"object"}
+                              }
+                            }
+                          ],
+                          "stream": true
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .returnResult(String.class);
+
+        var body = result.getResponseBody().collectList().block();
+        assert body != null;
+        String joined = String.join("", body);
+        org.junit.jupiter.api.Assertions.assertTrue(joined.contains("\"tool_calls\""));
+        org.junit.jupiter.api.Assertions.assertTrue(joined.contains("\"lookup_weather\""));
+        org.junit.jupiter.api.Assertions.assertTrue(joined.contains("{\\\"city\\\":\\\"Shanghai\\\"}"));
+        org.junit.jupiter.api.Assertions.assertTrue(joined.contains("\"finish_reason\":\"tool_calls\""));
+    }
+
+    @Test
     void shouldReturnToolCallsWhenModelRequestsFunctionExecution() {
         Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));

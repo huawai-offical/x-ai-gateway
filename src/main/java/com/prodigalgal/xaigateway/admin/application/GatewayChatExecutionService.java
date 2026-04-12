@@ -168,7 +168,8 @@ public class GatewayChatExecutionService {
                     selectionResult,
                     result.text(),
                     result.usage(),
-                    result.toolCalls()
+                    result.toolCalls(),
+                    result.reasoning()
             );
         } catch (RuntimeException exception) {
             gatewayRouteSelectionService.invalidateSelection(selectionResult);

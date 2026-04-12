@@ -24,7 +24,10 @@ type SiteCapability = {
   modelKey: string
   supportedProtocols: string[]
   supportsChat: boolean
+  supportsTools: boolean
+  supportsImageInput: boolean
   supportsEmbeddings: boolean
+  supportsThinking: boolean
   capabilityLevel: string
 }
 
@@ -92,7 +95,10 @@ export function ProviderSiteDetailPage() {
               <span>{item.modelKey}</span>
               <span>{item.capabilityLevel}</span>
               <span>chat: {String(item.supportsChat)}</span>
+              <span>tools: {String(item.supportsTools)}</span>
+              <span>image_input: {String(item.supportsImageInput)}</span>
               <span>embeddings: {String(item.supportsEmbeddings)}</span>
+              <span>thinking: {String(item.supportsThinking)}</span>
               <span>{item.supportedProtocols.join(', ')}</span>
             </div>
           ))}

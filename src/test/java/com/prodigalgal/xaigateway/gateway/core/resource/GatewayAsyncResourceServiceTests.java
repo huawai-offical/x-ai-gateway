@@ -36,9 +36,12 @@ import org.mockito.Mockito;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.ExchangeFunction;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.core.io.buffer.DefaultDataBufferFactory;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -120,6 +123,76 @@ class GatewayAsyncResourceServiceTests {
         Mockito.verify(gatewayAsyncResourceRepository).save(captor.capture());
         assertTrue(captor.getValue().getRequestPayloadJson().contains("file-upstream-1"));
         assertTrue(captor.getValue().getMetadataJson().contains("batch-upstream-1"));
+    }
+
+    @Test
+    void shouldAddUploadPartUsingBoundUpstreamMetadata() {
+        GatewayAsyncResourceRepository gatewayAsyncResourceRepository = Mockito.mock(GatewayAsyncResourceRepository.class);
+        DistributedKeyQueryService distributedKeyQueryService = Mockito.mock(DistributedKeyQueryService.class);
+        UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        UpstreamSiteProfileRepository upstreamSiteProfileRepository = Mockito.mock(UpstreamSiteProfileRepository.class);
+        SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        GatewayFileRepository gatewayFileRepository = Mockito.mock(GatewayFileRepository.class);
+        GatewayFileBindingRepository gatewayFileBindingRepository = Mockito.mock(GatewayFileBindingRepository.class);
+        CredentialCryptoService credentialCryptoService = Mockito.mock(CredentialCryptoService.class);
+
+        java.util.concurrent.atomic.AtomicReference<String> requestedPath = new java.util.concurrent.atomic.AtomicReference<>();
+        ExchangeFunction exchangeFunction = request -> {
+            requestedPath.set(request.url().getPath());
+            return Mono.just(ClientResponse.create(HttpStatus.OK)
+                    .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                    .body("""
+                            {"id":"part-upstream-1","object":"upload.part"}
+                            """)
+                    .build());
+        };
+
+        GatewayAsyncResourceService service = new GatewayAsyncResourceService(
+                gatewayAsyncResourceRepository,
+                distributedKeyQueryService,
+                upstreamCredentialRepository,
+                upstreamSiteProfileRepository,
+                snapshotRepository,
+                gatewayFileRepository,
+                gatewayFileBindingRepository,
+                credentialCryptoService,
+                new SiteCapabilityTruthService(new UpstreamSitePolicyService(), snapshotRepository),
+                new ObjectMapper(),
+                Clock.fixed(Instant.parse("2026-04-12T04:00:00Z"), ZoneOffset.UTC),
+                WebClient.builder().exchangeFunction(exchangeFunction)
+        );
+
+        GatewayAsyncResourceEntity entity = new GatewayAsyncResourceEntity();
+        entity.setResourceKey("upload_1");
+        entity.setDistributedKeyId(1L);
+        entity.setResourceType(GatewayAsyncResourceType.UPLOAD);
+        entity.setStatus("created");
+        entity.setMetadataJson("""
+                {"upstream_object_id":"upload-upstream-1","credential_id":101,"site_profile_id":1,"events":[]}
+                """);
+        Mockito.when(gatewayAsyncResourceRepository.findByResourceKeyAndResourceTypeAndDeletedFalse("upload_1", GatewayAsyncResourceType.UPLOAD))
+                .thenReturn(Optional.of(entity));
+        Mockito.when(upstreamCredentialRepository.findById(101L)).thenReturn(Optional.of(credential()));
+        Mockito.when(upstreamSiteProfileRepository.findById(1L)).thenReturn(Optional.of(siteProfile()));
+        Mockito.when(credentialCryptoService.decrypt("cipher")).thenReturn("api-key");
+        Mockito.when(gatewayAsyncResourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        FilePart filePart = Mockito.mock(FilePart.class);
+        Mockito.when(filePart.filename()).thenReturn("part.bin");
+        Mockito.when(filePart.headers()).thenReturn(new HttpHeaders() {{
+            setContentType(MediaType.APPLICATION_OCTET_STREAM);
+        }});
+        Mockito.when(filePart.content()).thenReturn(Flux.just(new DefaultDataBufferFactory().wrap("hello".getBytes())));
+
+        com.fasterxml.jackson.databind.JsonNode response = service.addUploadPart("upload_1", 1L, filePart).block();
+
+        assertEquals("/v1/uploads/upload-upstream-1/parts", requestedPath.get());
+        assertEquals("part-upstream-1", response.path("id").asText());
+        assertEquals("upload_1", response.path("upload_id").asText());
+        ArgumentCaptor<GatewayAsyncResourceEntity> captor = ArgumentCaptor.forClass(GatewayAsyncResourceEntity.class);
+        Mockito.verify(gatewayAsyncResourceRepository).save(captor.capture());
+        assertTrue(captor.getValue().getMetadataJson().contains("part-upstream-1"));
+        Mockito.verifyNoInteractions(distributedKeyQueryService);
     }
 
     private UpstreamCredentialEntity credential() {

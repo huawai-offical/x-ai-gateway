@@ -8,6 +8,8 @@ public record DiscoveredModelDefinition(
         String modelKey,
         List<String> supportedProtocols,
         boolean supportsChat,
+        boolean supportsTools,
+        boolean supportsImageInput,
         boolean supportsEmbeddings,
         boolean supportsCache,
         boolean supportsThinking,

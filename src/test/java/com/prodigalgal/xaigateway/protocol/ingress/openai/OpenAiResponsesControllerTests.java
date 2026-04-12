@@ -66,7 +66,8 @@ class OpenAiResponsesControllerTests {
                         selectionResult(),
                         "hello back",
                         new GatewayUsage(100, 40, 20, 5, 60, 0, 20, 0, null, 160, null),
-                        List.of()
+                        List.of(),
+                        "reasoning trace"
                 ));
 
         webTestClient.post()
@@ -86,8 +87,10 @@ class OpenAiResponsesControllerTests {
                 .jsonPath("$.object").isEqualTo("response")
                 .jsonPath("$.model").isEqualTo("writer-fast")
                 .jsonPath("$.output_text").isEqualTo("hello back")
-                .jsonPath("$.output[0].type").isEqualTo("message")
-                .jsonPath("$.output[0].content[0].type").isEqualTo("output_text")
+                .jsonPath("$.output[0].type").isEqualTo("reasoning")
+                .jsonPath("$.output[0].summary[0].text").isEqualTo("reasoning trace")
+                .jsonPath("$.output[1].type").isEqualTo("message")
+                .jsonPath("$.output[1].content[0].type").isEqualTo("output_text")
                 .jsonPath("$.usage.input_tokens_details.cached_tokens").isEqualTo(60);
     }
 
@@ -328,6 +331,56 @@ class OpenAiResponsesControllerTests {
         org.junit.jupiter.api.Assertions.assertTrue(joined.contains("event: response.output_text.delta"));
         org.junit.jupiter.api.Assertions.assertTrue(joined.contains("\"delta\":\"hello\""));
         org.junit.jupiter.api.Assertions.assertTrue(joined.contains("event: response.completed"));
+    }
+
+    @Test
+    void shouldStreamResponsesReasoningEvents() {
+        Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayChatExecutionService.executeStream(Mockito.<ChatExecutionRequest>argThat(request ->
+                        request != null
+                                && "responses".equals(request.protocol())
+                                && "/v1/responses".equals(request.requestPath())
+                )))
+                .thenReturn(new ChatExecutionStreamResponse(
+                        "req-responses-stream-reasoning-1",
+                        selectionResult(),
+                        Flux.just(
+                                new ChatExecutionStreamChunk(
+                                        null,
+                                        null,
+                                        GatewayUsage.empty(),
+                                        false,
+                                        List.of(),
+                                        "step 1"
+                                ),
+                                new ChatExecutionStreamChunk("hello", null, GatewayUsage.empty(), false),
+                                new ChatExecutionStreamChunk(null, "stop", GatewayUsage.empty(), true)
+                        )
+                ));
+
+        var result = webTestClient.post()
+                .uri("/v1/responses")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "model":"writer-fast",
+                          "input":"hello",
+                          "stream":true
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM)
+                .returnResult(String.class);
+
+        var body = result.getResponseBody().collectList().block();
+        assert body != null;
+        String joined = String.join("", body);
+        org.junit.jupiter.api.Assertions.assertTrue(joined.contains("event: response.reasoning_summary_text.delta"));
+        org.junit.jupiter.api.Assertions.assertTrue(joined.contains("event: response.reasoning_summary_text.done"));
+        org.junit.jupiter.api.Assertions.assertTrue(joined.contains("\"text\":\"step 1\""));
     }
 
     @Test

@@ -12,11 +12,13 @@ import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -117,6 +119,8 @@ public class CredentialModelDiscoveryService {
                         ModelIdNormalizer.normalize(modelId),
                         List.of("openai", "responses"),
                         !modelId.toLowerCase(Locale.ROOT).contains("embedding"),
+                        !modelId.toLowerCase(Locale.ROOT).contains("embedding"),
+                        !modelId.toLowerCase(Locale.ROOT).contains("embedding"),
                         modelId.toLowerCase(Locale.ROOT).contains("embedding"),
                         !modelId.toLowerCase(Locale.ROOT).contains("embedding"),
                         inferOpenAiThinking(modelId),
@@ -143,6 +147,8 @@ public class CredentialModelDiscoveryService {
                         modelId,
                         ModelIdNormalizer.normalize(modelId),
                         List.of("anthropic_native"),
+                        true,
+                        true,
                         true,
                         false,
                         true,
@@ -180,6 +186,8 @@ public class CredentialModelDiscoveryService {
                     ModelIdNormalizer.normalize(modelId),
                     List.of("google_native", "openai"),
                     chat,
+                    chat,
+                    chat,
                     embeddings,
                     true,
                     thinking,
@@ -206,20 +214,48 @@ public class CredentialModelDiscoveryService {
             if (modelId == null || modelId.isBlank()) {
                 continue;
             }
+            OllamaModelCapability capability = inspectOllamaModel(baseUrl, modelId);
             result.add(new DiscoveredModelDefinition(
                     modelId,
                     ModelIdNormalizer.normalize(modelId),
-                    List.of("ollama_native"),
+                    List.of("openai", "responses", "anthropic_native", "google_native"),
                     true,
+                    capability.supportsTools(),
+                    capability.supportsImageInput(),
                     false,
                     false,
+                    capability.supportsThinking(),
+                    capability.supportsVisibleReasoning(),
                     false,
-                    false,
-                    false,
-                    ReasoningTransport.NONE
+                    capability.supportsThinking() ? ReasoningTransport.OLLAMA_THINKING : ReasoningTransport.NONE
             ));
         }
         return result;
+    }
+
+    private OllamaModelCapability inspectOllamaModel(String baseUrl, String modelId) {
+        JsonNode body = buildClient(baseUrl)
+                .post()
+                .uri("/api/show")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("model", modelId))
+                .retrieve()
+                .bodyToMono(JsonNode.class)
+                .timeout(DISCOVERY_TIMEOUT)
+                .onErrorResume(error -> Mono.empty())
+                .block();
+        if (body == null || body.isMissingNode() || body.isNull()) {
+            return inferOllamaModelCapability(modelId, Set.of());
+        }
+
+        Set<String> capabilities = new HashSet<>();
+        for (JsonNode capability : body.path("capabilities")) {
+            String value = capability.asText(null);
+            if (value != null && !value.isBlank()) {
+                capabilities.add(value.trim().toLowerCase(Locale.ROOT));
+            }
+        }
+        return inferOllamaModelCapability(modelId, capabilities);
     }
 
     private WebClient buildClient(String baseUrl) {
@@ -264,6 +300,27 @@ public class CredentialModelDiscoveryService {
                 || normalized.contains("opus-4");
     }
 
+    private OllamaModelCapability inferOllamaModelCapability(String modelId, Set<String> capabilities) {
+        String normalized = modelId.toLowerCase(Locale.ROOT);
+        boolean supportsTools = capabilities.contains("tools")
+                || normalized.contains("gpt-oss")
+                || normalized.contains("qwen")
+                || normalized.contains("llama3")
+                || normalized.contains("llama-3");
+        boolean supportsImageInput = capabilities.contains("vision")
+                || normalized.contains("vision")
+                || normalized.contains("llava")
+                || normalized.contains("bakllava")
+                || normalized.contains("moondream")
+                || normalized.contains("gemma3");
+        boolean supportsThinking = capabilities.contains("thinking")
+                || normalized.contains("gpt-oss")
+                || normalized.contains("qwen3")
+                || normalized.contains("deepseek-r1")
+                || normalized.contains("deepseek-v3.1");
+        return new OllamaModelCapability(supportsTools, supportsImageInput, supportsThinking, supportsThinking);
+    }
+
     public record CredentialConnectivityProbe(
             ProviderType providerType,
             String baseUrl,
@@ -276,6 +333,14 @@ public class CredentialModelDiscoveryService {
             Long credentialId,
             List<DiscoveredModelDefinition> models,
             Instant refreshedAt
+    ) {
+    }
+
+    private record OllamaModelCapability(
+            boolean supportsTools,
+            boolean supportsImageInput,
+            boolean supportsThinking,
+            boolean supportsVisibleReasoning
     ) {
     }
 }

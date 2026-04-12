@@ -120,6 +120,8 @@ public class ProviderSiteRegistryService {
         entity.setModelKey(model.modelKey());
         entity.setSupportedProtocols(collectProtocols(List.of(model), policy));
         entity.setSupportsChat(model.supportsChat());
+        entity.setSupportsTools(model.supportsTools());
+        entity.setSupportsImageInput(model.supportsImageInput());
         entity.setSupportsEmbeddings(model.supportsEmbeddings());
         entity.setSupportsCache(model.supportsCache());
         entity.setSupportsThinking(model.supportsThinking());

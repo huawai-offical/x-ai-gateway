@@ -2,7 +2,8 @@ package com.prodigalgal.xaigateway.gateway.core.execution;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
-import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
+import com.prodigalgal.xaigateway.gateway.core.shared.AuthStrategy;
+import com.prodigalgal.xaigateway.gateway.core.shared.PathStrategy;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 
@@ -18,8 +19,7 @@ public class OpenAiModerationsGatewayResourceExecutor implements GatewayResource
     @Override
     public boolean supports(String requestPath, CatalogCandidateView candidate) {
         return "/v1/moderations".equals(requestPath)
-                && candidate != null
-                && candidate.providerType() == ProviderType.OPENAI_DIRECT;
+                && candidate != null;
     }
 
     @Override
@@ -27,6 +27,7 @@ public class OpenAiModerationsGatewayResourceExecutor implements GatewayResource
             GatewayResourceExecutionContext context,
             JsonNode requestBody,
             String defaultModel) {
+        ensureCompatible(context.selectionResult().selectedCandidate().candidate());
         GatewayOpenAiPassthroughService.CatalogSiteRequest siteRequest = gatewayOpenAiPassthroughService.buildPreparedSiteRequest(
                 context.selectionResult(),
                 context.credential(),
@@ -41,5 +42,17 @@ public class OpenAiModerationsGatewayResourceExecutor implements GatewayResource
                 context.requestPath(),
                 requestBody
         );
+    }
+
+    private void ensureCompatible(CatalogCandidateView candidate) {
+        if (candidate.pathStrategy() != PathStrategy.OPENAI_V1) {
+            throw new IllegalArgumentException("当前站点路径策略不支持 moderations 执行。");
+        }
+        if (candidate.authStrategy() != AuthStrategy.BEARER
+                && candidate.authStrategy() != AuthStrategy.API_KEY_HEADER
+                && candidate.authStrategy() != AuthStrategy.API_KEY_QUERY
+                && candidate.authStrategy() != AuthStrategy.AZURE_API_KEY) {
+            throw new IllegalArgumentException("当前站点鉴权策略不支持 moderations 执行。");
+        }
     }
 }

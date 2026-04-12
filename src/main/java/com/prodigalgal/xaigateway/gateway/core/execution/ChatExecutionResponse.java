@@ -9,6 +9,16 @@ public record ChatExecutionResponse(
         RouteSelectionResult routeSelection,
         String text,
         GatewayUsage usage,
-        List<GatewayToolCall> toolCalls
+        List<GatewayToolCall> toolCalls,
+        String reasoning
 ) {
+    public ChatExecutionResponse(
+            String requestId,
+            RouteSelectionResult routeSelection,
+            String text,
+            GatewayUsage usage,
+            List<GatewayToolCall> toolCalls
+    ) {
+        this(requestId, routeSelection, text, usage, toolCalls, null);
+    }
 }

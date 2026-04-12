@@ -2,7 +2,8 @@ package com.prodigalgal.xaigateway.gateway.core.execution;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
-import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
+import com.prodigalgal.xaigateway.gateway.core.shared.AuthStrategy;
+import com.prodigalgal.xaigateway.gateway.core.shared.PathStrategy;
 import java.util.Map;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.multipart.FilePart;
@@ -22,8 +23,7 @@ public class OpenAiImagesGatewayResourceExecutor implements GatewayResourceExecu
     public boolean supports(String requestPath, CatalogCandidateView candidate) {
         return requestPath != null
                 && requestPath.startsWith("/v1/images/")
-                && candidate != null
-                && candidate.providerType() == ProviderType.OPENAI_DIRECT;
+                && candidate != null;
     }
 
     @Override
@@ -31,6 +31,7 @@ public class OpenAiImagesGatewayResourceExecutor implements GatewayResourceExecu
             GatewayResourceExecutionContext context,
             JsonNode requestBody,
             String defaultModel) {
+        ensureCompatible(context.selectionResult().selectedCandidate().candidate());
         GatewayOpenAiPassthroughService.CatalogSiteRequest siteRequest = gatewayOpenAiPassthroughService.buildPreparedSiteRequest(
                 context.selectionResult(),
                 context.credential(),
@@ -53,6 +54,7 @@ public class OpenAiImagesGatewayResourceExecutor implements GatewayResourceExecu
             String requestedModel,
             Map<String, String> formFields,
             Map<String, FilePart> files) {
+        ensureCompatible(context.selectionResult().selectedCandidate().candidate());
         GatewayOpenAiPassthroughService.CatalogSiteRequest siteRequest = gatewayOpenAiPassthroughService.buildPreparedSiteRequest(
                 context.selectionResult(),
                 context.credential(),
@@ -68,5 +70,17 @@ public class OpenAiImagesGatewayResourceExecutor implements GatewayResourceExecu
                         context.requestPath(),
                         body
                 ));
+    }
+
+    private void ensureCompatible(CatalogCandidateView candidate) {
+        if (candidate.pathStrategy() != PathStrategy.OPENAI_V1) {
+            throw new IllegalArgumentException("当前站点路径策略不支持 images 执行。");
+        }
+        if (candidate.authStrategy() != AuthStrategy.BEARER
+                && candidate.authStrategy() != AuthStrategy.API_KEY_HEADER
+                && candidate.authStrategy() != AuthStrategy.API_KEY_QUERY
+                && candidate.authStrategy() != AuthStrategy.AZURE_API_KEY) {
+            throw new IllegalArgumentException("当前站点鉴权策略不支持 images 执行。");
+        }
     }
 }

@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.springframework.http.MediaType;
 import org.springframework.http.HttpHeaders;
@@ -132,8 +133,11 @@ public class OpenAiResponsesController {
 
     private Flux<String> encodeStream(ChatExecutionStreamResponse response) {
         AtomicReference<StringBuilder> textAccumulator = new AtomicReference<>(new StringBuilder());
+        AtomicReference<StringBuilder> reasoningAccumulator = new AtomicReference<>(new StringBuilder());
         AtomicReference<GatewayUsage> latestUsage = new AtomicReference<>(GatewayUsage.empty());
+        AtomicBoolean reasoningStarted = new AtomicBoolean(false);
         String itemId = "msg_" + response.requestId();
+        String reasoningItemId = "rs_" + response.requestId();
 
         return Flux.concat(
                 Flux.just(
@@ -142,7 +146,16 @@ public class OpenAiResponsesController {
                         encodeEvent("response.output_item.added", outputItemAddedEvent(itemId)),
                         encodeEvent("response.content_part.added", contentPartAddedEvent(itemId))
                 ),
-                response.chunks().flatMap(chunk -> encodeChunk(response, chunk, itemId, textAccumulator, latestUsage))
+                response.chunks().flatMap(chunk -> encodeChunk(
+                        response,
+                        chunk,
+                        itemId,
+                        reasoningItemId,
+                        textAccumulator,
+                        reasoningAccumulator,
+                        latestUsage,
+                        reasoningStarted
+                ))
         );
     }
 
@@ -150,35 +163,51 @@ public class OpenAiResponsesController {
             ChatExecutionStreamResponse response,
             ChatExecutionStreamChunk chunk,
             String itemId,
+            String reasoningItemId,
             AtomicReference<StringBuilder> textAccumulator,
-            AtomicReference<GatewayUsage> latestUsage) {
-        List<String> toolEvents = new ArrayList<>();
-        if (chunk.terminal()) {
-            String finalText = textAccumulator.get().toString();
-            GatewayUsage usage = latestUsage.get();
-            return Flux.just(
-                    encodeEvent("response.output_text.done", outputTextDoneEvent(itemId, finalText)),
-                    encodeEvent("response.content_part.done", contentPartDoneEvent(itemId, finalText)),
-                    encodeEvent("response.output_item.done", outputItemDoneEvent(itemId, finalText)),
-                    encodeEvent("response.completed", completedEvent(response, finalText, usage))
-            );
-        }
+            AtomicReference<StringBuilder> reasoningAccumulator,
+            AtomicReference<GatewayUsage> latestUsage,
+            AtomicBoolean reasoningStarted) {
+        List<String> events = new ArrayList<>();
 
         if (chunk.usage() != null) {
             latestUsage.set(chunk.usage());
         }
+        if (chunk.reasoningDelta() != null && !chunk.reasoningDelta().isBlank()) {
+            if (reasoningStarted.compareAndSet(false, true)) {
+                events.add(encodeEvent("response.output_item.added", reasoningItemAddedEvent(reasoningItemId)));
+                events.add(encodeEvent("response.reasoning_summary_part.added", reasoningSummaryPartAddedEvent(reasoningItemId)));
+            }
+            reasoningAccumulator.get().append(chunk.reasoningDelta());
+            events.add(encodeEvent("response.reasoning_summary_text.delta", reasoningSummaryTextDeltaEvent(reasoningItemId, chunk.reasoningDelta())));
+        }
         if (chunk.toolCalls() != null && !chunk.toolCalls().isEmpty()) {
+            int outputIndexBase = reasoningStarted.get() ? 2 : 1;
             for (int index = 0; index < chunk.toolCalls().size(); index++) {
-                toolEvents.addAll(encodeToolCallEvents(chunk.toolCalls().get(index), index));
+                events.addAll(encodeToolCallEvents(chunk.toolCalls().get(index), outputIndexBase + index));
             }
         }
-        if (chunk.textDelta() == null || chunk.textDelta().isBlank()) {
-            return toolEvents.isEmpty() ? Flux.empty() : Flux.fromIterable(toolEvents);
+        if (chunk.textDelta() != null && !chunk.textDelta().isBlank()) {
+            textAccumulator.get().append(chunk.textDelta());
+            events.add(encodeEvent("response.output_text.delta", outputTextDeltaEvent(itemId, chunk.textDelta())));
         }
 
-        textAccumulator.get().append(chunk.textDelta());
-        List<String> events = new ArrayList<>(toolEvents);
-        events.add(encodeEvent("response.output_text.delta", outputTextDeltaEvent(itemId, chunk.textDelta())));
+        if (!chunk.terminal()) {
+            return events.isEmpty() ? Flux.empty() : Flux.fromIterable(events);
+        }
+
+        String finalReasoning = reasoningAccumulator.get().toString();
+        String finalText = textAccumulator.get().toString();
+        GatewayUsage usage = latestUsage.get();
+        if (reasoningStarted.get()) {
+            events.add(encodeEvent("response.reasoning_summary_text.done", reasoningSummaryTextDoneEvent(reasoningItemId, finalReasoning)));
+            events.add(encodeEvent("response.reasoning_summary_part.done", reasoningSummaryPartDoneEvent(reasoningItemId, finalReasoning)));
+            events.add(encodeEvent("response.output_item.done", reasoningItemDoneEvent(reasoningItemId, finalReasoning)));
+        }
+        events.add(encodeEvent("response.output_text.done", outputTextDoneEvent(itemId, finalText)));
+        events.add(encodeEvent("response.content_part.done", contentPartDoneEvent(itemId, finalText)));
+        events.add(encodeEvent("response.output_item.done", outputItemDoneEvent(itemId, finalText)));
+        events.add(encodeEvent("response.completed", completedEvent(response, finalText, usage, finalReasoning.isBlank() ? null : finalReasoning)));
         return Flux.fromIterable(events);
     }
 
@@ -221,6 +250,81 @@ public class OpenAiResponsesController {
                         "type", "output_text",
                         "text", "",
                         "annotations", List.of()
+                )
+        );
+    }
+
+    private Map<String, Object> reasoningItemAddedEvent(String itemId) {
+        return Map.of(
+                "type", "response.output_item.added",
+                "output_index", 1,
+                "item", Map.of(
+                        "id", itemId,
+                        "type", "reasoning",
+                        "status", "in_progress",
+                        "summary", List.of()
+                )
+        );
+    }
+
+    private Map<String, Object> reasoningSummaryPartAddedEvent(String itemId) {
+        return Map.of(
+                "type", "response.reasoning_summary_part.added",
+                "item_id", itemId,
+                "output_index", 1,
+                "summary_index", 0,
+                "part", Map.of(
+                        "type", "summary_text",
+                        "text", ""
+                )
+        );
+    }
+
+    private Map<String, Object> reasoningSummaryTextDeltaEvent(String itemId, String delta) {
+        return Map.of(
+                "type", "response.reasoning_summary_text.delta",
+                "item_id", itemId,
+                "output_index", 1,
+                "summary_index", 0,
+                "delta", delta
+        );
+    }
+
+    private Map<String, Object> reasoningSummaryTextDoneEvent(String itemId, String text) {
+        return Map.of(
+                "type", "response.reasoning_summary_text.done",
+                "item_id", itemId,
+                "output_index", 1,
+                "summary_index", 0,
+                "text", text
+        );
+    }
+
+    private Map<String, Object> reasoningSummaryPartDoneEvent(String itemId, String text) {
+        return Map.of(
+                "type", "response.reasoning_summary_part.done",
+                "item_id", itemId,
+                "output_index", 1,
+                "summary_index", 0,
+                "part", Map.of(
+                        "type", "summary_text",
+                        "text", text
+                )
+        );
+    }
+
+    private Map<String, Object> reasoningItemDoneEvent(String itemId, String text) {
+        return Map.of(
+                "type", "response.output_item.done",
+                "output_index", 1,
+                "item", Map.of(
+                        "id", itemId,
+                        "type", "reasoning",
+                        "status", "completed",
+                        "summary", List.of(Map.of(
+                                "type", "summary_text",
+                                "text", text
+                        ))
                 )
         );
     }
@@ -349,10 +453,11 @@ public class OpenAiResponsesController {
     private Map<String, Object> completedEvent(
             ChatExecutionStreamResponse response,
             String text,
-            GatewayUsage usage) {
+            GatewayUsage usage,
+            String reasoning) {
         return Map.of(
                 "type", "response.completed",
-                "response", OpenAiResponsesResponse.completed(response, text, usage)
+                "response", OpenAiResponsesResponse.completed(response, text, usage, reasoning)
         );
     }
 

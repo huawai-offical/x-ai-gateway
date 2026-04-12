@@ -128,7 +128,9 @@ public record OpenAiChatCompletionResponse(
 
     public record Delta(
             String role,
-            String content
+            String content,
+            @JsonProperty("tool_calls")
+            List<ToolCall> toolCalls
     ) {
     }
 
@@ -138,7 +140,7 @@ public record OpenAiChatCompletionResponse(
                 "chat.completion.chunk",
                 Instant.now().getEpochSecond(),
                 model,
-                List.of(new ChunkChoice(0, new Delta("assistant", null), null))
+                List.of(new ChunkChoice(0, new Delta("assistant", null, null), null))
         );
     }
 
@@ -148,7 +150,17 @@ public record OpenAiChatCompletionResponse(
                 "chat.completion.chunk",
                 Instant.now().getEpochSecond(),
                 model,
-                List.of(new ChunkChoice(0, new Delta(null, textDelta), null))
+                List.of(new ChunkChoice(0, new Delta(null, textDelta, null), null))
+        );
+    }
+
+    public static Chunk toolCallChunk(String model, List<GatewayToolCall> toolCalls) {
+        return new Chunk(
+                "chatcmpl-" + Instant.now().toEpochMilli(),
+                "chat.completion.chunk",
+                Instant.now().getEpochSecond(),
+                model,
+                List.of(new ChunkChoice(0, new Delta(null, null, toToolCalls(toolCalls)), null))
         );
     }
 
@@ -158,7 +170,7 @@ public record OpenAiChatCompletionResponse(
                 "chat.completion.chunk",
                 Instant.now().getEpochSecond(),
                 model,
-                List.of(new ChunkChoice(0, new Delta(null, null), finishReason))
+                List.of(new ChunkChoice(0, new Delta(null, null, null), finishReason))
         );
     }
 }
