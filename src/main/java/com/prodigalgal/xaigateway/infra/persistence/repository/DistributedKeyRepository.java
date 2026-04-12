@@ -7,4 +7,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface DistributedKeyRepository extends JpaRepository<DistributedKeyEntity, Long> {
 
     Optional<DistributedKeyEntity> findByKeyPrefixAndActiveTrue(String keyPrefix);
+
+    Optional<DistributedKeyEntity> findByIdAndActiveTrue(Long id);
 }

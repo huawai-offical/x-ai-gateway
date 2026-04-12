@@ -64,8 +64,7 @@ public class OllamaGatewayChatRuntime implements GatewayChatRuntime {
                 .bodyValue(body)
                 .retrieve()
                 .bodyToFlux(String.class)
-                .flatMap(this::decodeChunk)
-                .concatWithValues(new ChatExecutionStreamChunk(null, "stop", GatewayUsage.empty(), true));
+                .flatMap(this::decodeChunk);
     }
 
     private WebClient client(GatewayChatRuntimeContext context) {
@@ -84,6 +83,11 @@ public class OllamaGatewayChatRuntime implements GatewayChatRuntime {
         }
         if (request.tools() != null && !request.tools().isEmpty()) {
             throw new IllegalArgumentException("当前 Ollama 运行时暂不支持 tools。");
+        }
+        if (request.executionMetadata() != null) {
+            if (request.executionMetadata().has("reasoning") || request.executionMetadata().has("reasoning_effort")) {
+                throw new IllegalArgumentException("当前 Ollama 运行时暂不支持 reasoning。");
+            }
         }
     }
 
@@ -143,7 +147,7 @@ public class OllamaGatewayChatRuntime implements GatewayChatRuntime {
                             content == null || content.isBlank() ? null : content,
                             payload.path("done_reason").asText("stop"),
                             new GatewayUsage(promptTokens, promptTokens, completionTokens, 0, 0, 0, 0, 0, null, promptTokens + completionTokens, payload),
-                            false,
+                            true,
                             List.of()
                     ));
                     continue;

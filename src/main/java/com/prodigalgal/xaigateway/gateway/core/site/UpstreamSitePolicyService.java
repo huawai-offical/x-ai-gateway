@@ -86,14 +86,14 @@ public class UpstreamSitePolicyService {
                     List.of("openai", "responses"),
                     true,
                     true,
-                    true,
-                    true,
-                    true,
-                    true,
-                    true,
-                    true,
-                    true,
-                    true,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
                     "sse",
                     "provider-native",
                     null
@@ -173,7 +173,7 @@ public class UpstreamSitePolicyService {
                     false,
                     false,
                     false,
-                    true,
+                    false,
                     false,
                     false,
                     false,
@@ -248,6 +248,9 @@ public class UpstreamSitePolicyService {
                 case ANTHROPIC_DIRECT -> InteropCapabilityLevel.EMULATED;
                 default -> InteropCapabilityLevel.UNSUPPORTED;
             };
+            case FILE_OBJECT -> policy.supportsFiles()
+                    ? InteropCapabilityLevel.NATIVE
+                    : InteropCapabilityLevel.UNSUPPORTED;
             case REASONING -> supportsThinking ? InteropCapabilityLevel.NATIVE : InteropCapabilityLevel.UNSUPPORTED;
             case RESPONSE_OBJECT -> policy.supportedProtocols().contains("responses")
                     ? InteropCapabilityLevel.EMULATED

@@ -24,6 +24,9 @@ public class GatewayRequestFeatureService {
         if ("/v1/embeddings".equals(requestPath)) {
             return List.of(InteropFeature.EMBEDDINGS);
         }
+        if ("/v1/files".equals(requestPath)) {
+            return List.of(InteropFeature.FILE_OBJECT);
+        }
         if ("/v1/audio/transcriptions".equals(requestPath)) {
             return List.of(InteropFeature.AUDIO_TRANSCRIPTION);
         }
@@ -45,16 +48,16 @@ public class GatewayRequestFeatureService {
         if ("/v1/moderations".equals(requestPath)) {
             return List.of(InteropFeature.MODERATION);
         }
-        if ("/v1/uploads".equals(requestPath)) {
+        if (requestPath != null && requestPath.startsWith("/v1/uploads")) {
             return List.of(InteropFeature.UPLOAD_CREATE);
         }
-        if ("/v1/batches".equals(requestPath)) {
+        if (requestPath != null && requestPath.startsWith("/v1/batches")) {
             return List.of(InteropFeature.BATCH_CREATE);
         }
-        if ("/v1/fine_tuning/jobs".equals(requestPath)) {
+        if (requestPath != null && requestPath.startsWith("/v1/fine_tuning/jobs")) {
             return List.of(InteropFeature.TUNING_CREATE);
         }
-        if ("/v1/realtime/client_secrets".equals(requestPath)) {
+        if (requestPath != null && requestPath.startsWith("/v1/realtime/client_secrets")) {
             return List.of(InteropFeature.REALTIME_CLIENT_SECRET);
         }
         return List.of(InteropFeature.CHAT_TEXT);

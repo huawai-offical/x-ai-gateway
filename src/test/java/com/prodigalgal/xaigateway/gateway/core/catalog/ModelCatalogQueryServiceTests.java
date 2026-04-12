@@ -5,6 +5,8 @@ import com.prodigalgal.xaigateway.gateway.core.alias.ModelAliasRuleView;
 import com.prodigalgal.xaigateway.gateway.core.alias.ModelAliasView;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedCredentialBindingView;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyView;
+import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
+import com.prodigalgal.xaigateway.gateway.core.interop.SiteCapabilityTruthService;
 import com.prodigalgal.xaigateway.gateway.core.shared.AuthStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ErrorSchemaStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.PathStrategy;
@@ -35,7 +37,15 @@ class ModelCatalogQueryServiceTests {
         SiteModelCapabilityRepository siteModelCapabilityRepository = Mockito.mock(SiteModelCapabilityRepository.class);
         UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
         ModelAliasQueryService modelAliasQueryService = Mockito.mock(ModelAliasQueryService.class);
-        ModelCatalogQueryService service = new ModelCatalogQueryService(siteModelCapabilityRepository, upstreamCredentialRepository, modelAliasQueryService);
+        SiteCapabilityTruthService siteCapabilityTruthService = Mockito.mock(SiteCapabilityTruthService.class);
+        Mockito.when(siteCapabilityTruthService.capabilityLevel(Mockito.any(), Mockito.any()))
+                .thenReturn(InteropCapabilityLevel.NATIVE);
+        ModelCatalogQueryService service = new ModelCatalogQueryService(
+                siteModelCapabilityRepository,
+                upstreamCredentialRepository,
+                modelAliasQueryService,
+                siteCapabilityTruthService
+        );
 
         when(upstreamCredentialRepository.findAllByIdInAndDeletedFalse(argThat(ids ->
                 ids != null && ids.containsAll(List.of(101L, 102L)) && ids.size() == 2)))
@@ -93,7 +103,15 @@ class ModelCatalogQueryServiceTests {
         SiteModelCapabilityRepository siteModelCapabilityRepository = Mockito.mock(SiteModelCapabilityRepository.class);
         UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
         ModelAliasQueryService modelAliasQueryService = Mockito.mock(ModelAliasQueryService.class);
-        ModelCatalogQueryService service = new ModelCatalogQueryService(siteModelCapabilityRepository, upstreamCredentialRepository, modelAliasQueryService);
+        SiteCapabilityTruthService siteCapabilityTruthService = Mockito.mock(SiteCapabilityTruthService.class);
+        Mockito.when(siteCapabilityTruthService.capabilityLevel(Mockito.any(), Mockito.any()))
+                .thenReturn(InteropCapabilityLevel.NATIVE);
+        ModelCatalogQueryService service = new ModelCatalogQueryService(
+                siteModelCapabilityRepository,
+                upstreamCredentialRepository,
+                modelAliasQueryService,
+                siteCapabilityTruthService
+        );
 
         DistributedKeyView distributedKeyView = new DistributedKeyView(
                 1L,
@@ -121,7 +139,15 @@ class ModelCatalogQueryServiceTests {
         SiteModelCapabilityRepository siteModelCapabilityRepository = Mockito.mock(SiteModelCapabilityRepository.class);
         UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
         ModelAliasQueryService modelAliasQueryService = Mockito.mock(ModelAliasQueryService.class);
-        ModelCatalogQueryService service = new ModelCatalogQueryService(siteModelCapabilityRepository, upstreamCredentialRepository, modelAliasQueryService);
+        SiteCapabilityTruthService siteCapabilityTruthService = Mockito.mock(SiteCapabilityTruthService.class);
+        Mockito.when(siteCapabilityTruthService.capabilityLevel(Mockito.any(), Mockito.any()))
+                .thenReturn(InteropCapabilityLevel.NATIVE);
+        ModelCatalogQueryService service = new ModelCatalogQueryService(
+                siteModelCapabilityRepository,
+                upstreamCredentialRepository,
+                modelAliasQueryService,
+                siteCapabilityTruthService
+        );
 
         when(upstreamCredentialRepository.findAllByIdInAndDeletedFalse(argThat(ids ->
                 ids != null && ids.contains(101L) && ids.size() == 1)))

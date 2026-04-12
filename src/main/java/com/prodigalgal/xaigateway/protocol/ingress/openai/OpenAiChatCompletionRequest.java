@@ -14,6 +14,9 @@ public record OpenAiChatCompletionRequest(
         List<Tool> tools,
         @JsonProperty("tool_choice")
         JsonNode toolChoice,
+        JsonNode reasoning,
+        @JsonProperty("reasoning_effort")
+        String reasoningEffort,
         Double temperature,
         @JsonProperty("max_tokens")
         Integer maxTokens,

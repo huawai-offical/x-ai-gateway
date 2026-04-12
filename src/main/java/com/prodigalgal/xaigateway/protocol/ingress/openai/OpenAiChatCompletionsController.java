@@ -62,7 +62,8 @@ public class OpenAiChatCompletionsController {
                 toTools(request.tools()),
                 request.toolChoice(),
                 request.temperature(),
-                request.maxTokens()
+                request.maxTokens(),
+                buildExecutionMetadata(request)
         );
 
         if (Boolean.TRUE.equals(request.stream())) {
@@ -135,6 +136,17 @@ public class OpenAiChatCompletionsController {
             ));
         }
         return List.copyOf(result);
+    }
+
+    private JsonNode buildExecutionMetadata(OpenAiChatCompletionRequest request) {
+        com.fasterxml.jackson.databind.node.ObjectNode metadata = objectMapper.createObjectNode();
+        if (request.reasoning() != null && !request.reasoning().isNull()) {
+            metadata.set("reasoning", request.reasoning());
+        }
+        if (request.reasoningEffort() != null && !request.reasoningEffort().isBlank()) {
+            metadata.put("reasoning_effort", request.reasoningEffort());
+        }
+        return metadata.isEmpty() ? null : metadata;
     }
 
     private Flux<String> encodeChunk(ChatExecutionStreamResponse streamResponse, ChatExecutionStreamChunk chunk) {

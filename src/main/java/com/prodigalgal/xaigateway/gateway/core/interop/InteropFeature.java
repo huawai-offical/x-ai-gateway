@@ -5,6 +5,7 @@ public enum InteropFeature {
     TOOLS,
     IMAGE_INPUT,
     FILE_INPUT,
+    FILE_OBJECT,
     REASONING,
     RESPONSE_OBJECT,
     EMBEDDINGS,

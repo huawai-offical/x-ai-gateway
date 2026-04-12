@@ -34,10 +34,13 @@ class TranslationExplainAdminControllerTests {
     void shouldExplainTranslationPlan() {
         Mockito.when(translationExplainService.explain(Mockito.any())).thenReturn(new TranslationExecutionPlan(
                 true,
+                "chat",
+                "chat_completion",
                 ProviderFamily.OPENAI,
                 1L,
                 ExecutionKind.NATIVE,
                 InteropCapabilityLevel.NATIVE,
+                "direct_upstream_execution",
                 List.of(),
                 List.of(),
                 AuthStrategy.BEARER,

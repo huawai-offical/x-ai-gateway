@@ -3,32 +3,81 @@ package com.prodigalgal.xaigateway.gateway.core.resource;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.prodigalgal.xaigateway.admin.application.CredentialCryptoService;
+import com.prodigalgal.xaigateway.gateway.core.auth.DistributedCredentialBindingView;
+import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyQueryService;
+import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyView;
+import com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature;
+import com.prodigalgal.xaigateway.gateway.core.interop.SiteCapabilityTruthService;
+import com.prodigalgal.xaigateway.gateway.core.shared.AuthStrategy;
+import com.prodigalgal.xaigateway.gateway.core.shared.PathStrategy;
 import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayAsyncResourceEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayFileBindingEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayFileEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.SiteCapabilitySnapshotEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamSiteProfileEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayAsyncResourceRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayFileBindingRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayFileRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.SiteCapabilitySnapshotRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamSiteProfileRepository;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.reactive.function.client.WebClient;
 
 @Service
 @Transactional
 public class GatewayAsyncResourceService {
 
     private final GatewayAsyncResourceRepository gatewayAsyncResourceRepository;
+    private final DistributedKeyQueryService distributedKeyQueryService;
+    private final UpstreamCredentialRepository upstreamCredentialRepository;
+    private final UpstreamSiteProfileRepository upstreamSiteProfileRepository;
+    private final SiteCapabilitySnapshotRepository siteCapabilitySnapshotRepository;
+    private final GatewayFileRepository gatewayFileRepository;
+    private final GatewayFileBindingRepository gatewayFileBindingRepository;
+    private final CredentialCryptoService credentialCryptoService;
+    private final SiteCapabilityTruthService siteCapabilityTruthService;
     private final ObjectMapper objectMapper;
     private final Clock clock;
+    private final WebClient.Builder webClientBuilder;
 
     public GatewayAsyncResourceService(
             GatewayAsyncResourceRepository gatewayAsyncResourceRepository,
+            DistributedKeyQueryService distributedKeyQueryService,
+            UpstreamCredentialRepository upstreamCredentialRepository,
+            UpstreamSiteProfileRepository upstreamSiteProfileRepository,
+            SiteCapabilitySnapshotRepository siteCapabilitySnapshotRepository,
+            GatewayFileRepository gatewayFileRepository,
+            GatewayFileBindingRepository gatewayFileBindingRepository,
+            CredentialCryptoService credentialCryptoService,
+            SiteCapabilityTruthService siteCapabilityTruthService,
             ObjectMapper objectMapper,
-            Clock clock) {
+            Clock clock,
+            WebClient.Builder webClientBuilder) {
         this.gatewayAsyncResourceRepository = gatewayAsyncResourceRepository;
+        this.distributedKeyQueryService = distributedKeyQueryService;
+        this.upstreamCredentialRepository = upstreamCredentialRepository;
+        this.upstreamSiteProfileRepository = upstreamSiteProfileRepository;
+        this.siteCapabilitySnapshotRepository = siteCapabilitySnapshotRepository;
+        this.gatewayFileRepository = gatewayFileRepository;
+        this.gatewayFileBindingRepository = gatewayFileBindingRepository;
+        this.credentialCryptoService = credentialCryptoService;
+        this.siteCapabilityTruthService = siteCapabilityTruthService;
         this.objectMapper = objectMapper;
         this.clock = clock;
+        this.webClientBuilder = webClientBuilder;
     }
 
     public JsonNode storeResponse(Long distributedKeyId, String requestModel, JsonNode requestPayload, JsonNode responsePayload) {
@@ -40,6 +89,7 @@ public class GatewayAsyncResourceService {
         }
 
         ObjectNode metadata = objectMapper.createObjectNode();
+        metadata.put("object_mode", "gateway_response_object");
         appendEvent(metadata, "stored", storedResponse.path("status").asText("completed"));
 
         GatewayAsyncResourceEntity entity = new GatewayAsyncResourceEntity();
@@ -77,141 +127,200 @@ public class GatewayAsyncResourceService {
 
     public JsonNode createUpload(Long distributedKeyId, JsonNode requestBody) {
         ObjectNode payload = requireObject(requestBody);
-        String resourceKey = "upload_" + UUID.randomUUID().toString().replace("-", "");
-        ObjectNode metadata = objectMapper.createObjectNode();
-        metadata.put("filename", readRequiredText(payload, "filename"));
-        metadata.put("bytes", payload.path("bytes").asLong());
-        metadata.put("purpose", readRequiredText(payload, "purpose"));
-        metadata.put("partsCount", 0);
-        appendEvent(metadata, "created", "created");
-
-        ObjectNode response = objectMapper.createObjectNode();
-        response.put("id", resourceKey);
-        response.put("object", "upload");
-        response.put("created_at", now().getEpochSecond());
-        response.put("filename", metadata.path("filename").asText());
-        response.put("bytes", metadata.path("bytes").asLong());
-        response.put("purpose", metadata.path("purpose").asText());
-        response.put("status", "created");
-
-        return persistLocalResource(distributedKeyId, GatewayAsyncResourceType.UPLOAD, payload.path("model").asText(null), "created", payload, response, metadata);
+        UpstreamTarget target = resolveUpstreamTarget(distributedKeyId, InteropFeature.UPLOAD_CREATE);
+        JsonNode upstreamResponse = invokeUpstreamJson(target, "/v1/uploads", rewriteFileRefs(payload, distributedKeyId));
+        return persistUpstreamBackedResource(distributedKeyId, GatewayAsyncResourceType.UPLOAD, "upload_", payload, upstreamResponse, "upload", target);
     }
 
-    @Transactional(readOnly = true)
     public JsonNode getUpload(String uploadId, Long distributedKeyId) {
-        return readJson(getRequired(uploadId, GatewayAsyncResourceType.UPLOAD, distributedKeyId).getResponsePayloadJson());
+        return readOrSyncResource(uploadId, distributedKeyId, GatewayAsyncResourceType.UPLOAD, "upload");
     }
 
     public JsonNode addUploadPart(String uploadId, Long distributedKeyId) {
         GatewayAsyncResourceEntity entity = getRequired(uploadId, GatewayAsyncResourceType.UPLOAD, distributedKeyId);
+        String upstreamId = readObject(entity.getMetadataJson()).path("upstream_object_id").asText(null);
+        if (upstreamId == null || upstreamId.isBlank()) {
+            return addLocalUploadPart(entity);
+        }
+        UpstreamTarget target = resolveUpstreamTarget(distributedKeyId, InteropFeature.UPLOAD_CREATE);
+        JsonNode upstreamResponse = invokeUpstreamJson(target, "/v1/uploads/" + upstreamId + "/parts", objectMapper.createObjectNode());
+        ObjectNode response = copyObject(upstreamResponse);
+        response.put("upload_id", uploadId);
+        appendEvent(readObject(entity.getMetadataJson()), "part_added", entity.getStatus());
+        entity.setMetadataJson(writeJson(appendEvent(readObject(entity.getMetadataJson()), "part_added", entity.getStatus())));
+        gatewayAsyncResourceRepository.save(entity);
+        return response;
+    }
+
+    public JsonNode completeUpload(String uploadId, Long distributedKeyId) {
+        return completeRemoteStatus(uploadId, distributedKeyId, GatewayAsyncResourceType.UPLOAD, InteropFeature.UPLOAD_CREATE, "/complete");
+    }
+
+    public JsonNode cancelUpload(String uploadId, Long distributedKeyId) {
+        return completeRemoteStatus(uploadId, distributedKeyId, GatewayAsyncResourceType.UPLOAD, InteropFeature.UPLOAD_CREATE, "/cancel");
+    }
+
+    public JsonNode createBatch(Long distributedKeyId, JsonNode requestBody) {
+        ObjectNode payload = rewriteFileRefs(requireObject(requestBody), distributedKeyId);
+        UpstreamTarget target = resolveUpstreamTarget(distributedKeyId, InteropFeature.BATCH_CREATE);
+        JsonNode upstreamResponse = invokeUpstreamJson(target, "/v1/batches", payload);
+        return persistUpstreamBackedResource(distributedKeyId, GatewayAsyncResourceType.BATCH, "batch_", payload, upstreamResponse, "batch", target);
+    }
+
+    public JsonNode getBatch(String batchId, Long distributedKeyId) {
+        return readOrSyncResource(batchId, distributedKeyId, GatewayAsyncResourceType.BATCH, "batch");
+    }
+
+    public JsonNode cancelBatch(String batchId, Long distributedKeyId) {
+        return completeRemoteStatus(batchId, distributedKeyId, GatewayAsyncResourceType.BATCH, InteropFeature.BATCH_CREATE, "/cancel");
+    }
+
+    public JsonNode createTuning(Long distributedKeyId, JsonNode requestBody) {
+        ObjectNode payload = rewriteFileRefs(requireObject(requestBody), distributedKeyId);
+        UpstreamTarget target = resolveUpstreamTarget(distributedKeyId, InteropFeature.TUNING_CREATE);
+        JsonNode upstreamResponse = invokeUpstreamJson(target, "/v1/fine_tuning/jobs", payload);
+        return persistUpstreamBackedResource(distributedKeyId, GatewayAsyncResourceType.TUNING, "ftjob_", payload, upstreamResponse, "fine_tuning.job", target);
+    }
+
+    public JsonNode getTuning(String tuningId, Long distributedKeyId) {
+        return readOrSyncResource(tuningId, distributedKeyId, GatewayAsyncResourceType.TUNING, "fine_tuning.job");
+    }
+
+    public JsonNode cancelTuning(String tuningId, Long distributedKeyId) {
+        return completeRemoteStatus(tuningId, distributedKeyId, GatewayAsyncResourceType.TUNING, InteropFeature.TUNING_CREATE, "/cancel");
+    }
+
+    public JsonNode createRealtimeClientSecret(Long distributedKeyId, JsonNode requestBody) {
+        ObjectNode payload = requireObject(requestBody);
+        UpstreamTarget target = resolveUpstreamTarget(distributedKeyId, InteropFeature.REALTIME_CLIENT_SECRET);
+        JsonNode upstreamResponse = invokeUpstreamJson(target, "/v1/realtime/client_secrets", payload);
+        return persistUpstreamBackedResource(
+                distributedKeyId,
+                GatewayAsyncResourceType.REALTIME_SESSION,
+                "sess_",
+                payload,
+                upstreamResponse,
+                "realtime.session",
+                target
+        );
+    }
+
+    private JsonNode readOrSyncResource(
+            String resourceKey,
+            Long distributedKeyId,
+            GatewayAsyncResourceType resourceType,
+            String objectName) {
+        GatewayAsyncResourceEntity entity = getRequired(resourceKey, resourceType, distributedKeyId);
         ObjectNode metadata = readObject(entity.getMetadataJson());
-        ArrayNode parts = metadata.withArray("parts");
-        String partId = "part_" + UUID.randomUUID().toString().replace("-", "");
-        parts.add(partId);
-        metadata.put("partsCount", parts.size());
-        appendEvent(metadata, "part_added", entity.getStatus());
+        String upstreamId = metadata.path("upstream_object_id").asText(null);
+        if (upstreamId == null || upstreamId.isBlank()) {
+            return readJson(entity.getResponsePayloadJson());
+        }
+        UpstreamTarget target = resolveUpstreamTargetForEntity(entity, metadata);
+        JsonNode upstreamResponse = target.client()
+                .get()
+                .uri(target.path() + "/" + upstreamId)
+                .retrieve()
+                .bodyToMono(JsonNode.class)
+                .block();
+        return syncPersistedResource(entity, upstreamResponse, objectName);
+    }
+
+    private JsonNode completeRemoteStatus(
+            String resourceKey,
+            Long distributedKeyId,
+            GatewayAsyncResourceType resourceType,
+            InteropFeature feature,
+            String suffix) {
+        GatewayAsyncResourceEntity entity = getRequired(resourceKey, resourceType, distributedKeyId);
+        ObjectNode metadata = readObject(entity.getMetadataJson());
+        String upstreamId = metadata.path("upstream_object_id").asText(null);
+        if (upstreamId == null || upstreamId.isBlank()) {
+            return updateLocalStatus(resourceKey, distributedKeyId, resourceType, suffix.contains("cancel") ? "cancelled" : "completed");
+        }
+        UpstreamTarget target = resolveUpstreamTarget(distributedKeyId, feature);
+        JsonNode upstreamResponse = invokeUpstreamJson(target, target.path() + "/" + upstreamId + suffix, objectMapper.createObjectNode());
+        return syncPersistedResource(entity, upstreamResponse, inferObjectName(resourceType));
+    }
+
+    private JsonNode persistUpstreamBackedResource(
+            Long distributedKeyId,
+            GatewayAsyncResourceType type,
+            String idPrefix,
+            JsonNode requestPayload,
+            JsonNode upstreamResponse,
+            String objectName,
+            UpstreamTarget target) {
+        String resourceKey = idPrefix + UUID.randomUUID().toString().replace("-", "");
+        ObjectNode response = copyObject(upstreamResponse);
+        response.put("id", resourceKey);
+        if (!response.has("object")) {
+            response.put("object", objectName);
+        }
+        String upstreamId = upstreamResponse.path("id").asText(null);
+        String status = response.path("status").asText("created");
+
+        ObjectNode metadata = objectMapper.createObjectNode();
+        metadata.put("object_mode", "upstream_object_with_local_lineage");
+        if (upstreamId != null) {
+            metadata.put("upstream_object_id", upstreamId);
+        }
+        metadata.put("credential_id", target.credential().getId());
+        metadata.put("site_profile_id", target.siteProfile().getId());
+        metadata.put("upstream_status", upstreamResponse.path("status").asText(status));
+        metadata.put("upstream_synced_at", now().getEpochSecond());
+        appendEvent(metadata, "created", status);
+
+        GatewayAsyncResourceEntity entity = new GatewayAsyncResourceEntity();
+        entity.setResourceKey(resourceKey);
+        entity.setDistributedKeyId(distributedKeyId);
+        entity.setResourceType(type);
+        entity.setRequestModel(requestPayload.path("model").asText(null));
+        entity.setStatus(status);
+        entity.setRequestPayloadJson(writeJson(requestPayload));
+        entity.setResponsePayloadJson(writeJson(response));
         entity.setMetadataJson(writeJson(metadata));
+        gatewayAsyncResourceRepository.save(entity);
+        return response;
+    }
+
+    private JsonNode syncPersistedResource(
+            GatewayAsyncResourceEntity entity,
+            JsonNode upstreamResponse,
+            String objectName) {
+        ObjectNode response = copyObject(upstreamResponse);
+        response.put("id", entity.getResourceKey());
+        if (!response.has("object")) {
+            response.put("object", objectName);
+        }
+        String status = response.path("status").asText(entity.getStatus());
+        entity.setStatus(status);
+        entity.setResponsePayloadJson(writeJson(response));
+        ObjectNode metadata = readObject(entity.getMetadataJson());
+        metadata.put("upstream_status", upstreamResponse.path("status").asText(status));
+        metadata.put("upstream_synced_at", now().getEpochSecond());
+        entity.setMetadataJson(writeJson(appendEvent(metadata, "synced", status)));
+        gatewayAsyncResourceRepository.save(entity);
+        return response;
+    }
+
+    private JsonNode addLocalUploadPart(GatewayAsyncResourceEntity entity) {
+        ObjectNode metadata = readObject(entity.getMetadataJson());
+        String partId = "part_" + UUID.randomUUID().toString().replace("-", "");
+        metadata.withArray("parts").add(partId);
+        metadata.put("partsCount", metadata.withArray("parts").size());
+        entity.setMetadataJson(writeJson(appendEvent(metadata, "part_added", entity.getStatus())));
         gatewayAsyncResourceRepository.save(entity);
 
         ObjectNode response = objectMapper.createObjectNode();
         response.put("id", partId);
         response.put("object", "upload.part");
         response.put("created_at", now().getEpochSecond());
-        response.put("upload_id", uploadId);
+        response.put("upload_id", entity.getResourceKey());
         return response;
     }
 
-    public JsonNode completeUpload(String uploadId, Long distributedKeyId) {
-        return updateStatus(uploadId, distributedKeyId, GatewayAsyncResourceType.UPLOAD, "completed");
-    }
-
-    public JsonNode cancelUpload(String uploadId, Long distributedKeyId) {
-        return updateStatus(uploadId, distributedKeyId, GatewayAsyncResourceType.UPLOAD, "cancelled");
-    }
-
-    public JsonNode createBatch(Long distributedKeyId, JsonNode requestBody) {
-        ObjectNode payload = requireObject(requestBody);
-        String resourceKey = "batch_" + UUID.randomUUID().toString().replace("-", "");
-        ObjectNode metadata = objectMapper.createObjectNode();
-        metadata.put("input_file_id", readRequiredText(payload, "input_file_id"));
-        metadata.put("endpoint", readRequiredText(payload, "endpoint"));
-        metadata.put("completion_window", payload.path("completion_window").asText("24h"));
-        appendEvent(metadata, "created", "validating");
-
-        ObjectNode response = objectMapper.createObjectNode();
-        response.put("id", resourceKey);
-        response.put("object", "batch");
-        response.put("created_at", now().getEpochSecond());
-        response.put("status", "validating");
-        response.put("input_file_id", metadata.path("input_file_id").asText());
-        response.put("endpoint", metadata.path("endpoint").asText());
-        response.put("completion_window", metadata.path("completion_window").asText());
-        response.putNull("output_file_id");
-        response.putNull("error_file_id");
-
-        return persistLocalResource(distributedKeyId, GatewayAsyncResourceType.BATCH, payload.path("model").asText(null), "validating", payload, response, metadata);
-    }
-
-    @Transactional(readOnly = true)
-    public JsonNode getBatch(String batchId, Long distributedKeyId) {
-        return readJson(getRequired(batchId, GatewayAsyncResourceType.BATCH, distributedKeyId).getResponsePayloadJson());
-    }
-
-    public JsonNode cancelBatch(String batchId, Long distributedKeyId) {
-        return updateStatus(batchId, distributedKeyId, GatewayAsyncResourceType.BATCH, "cancelled");
-    }
-
-    public JsonNode createTuning(Long distributedKeyId, JsonNode requestBody) {
-        ObjectNode payload = requireObject(requestBody);
-        String resourceKey = "ftjob_" + UUID.randomUUID().toString().replace("-", "");
-        ObjectNode metadata = objectMapper.createObjectNode();
-        metadata.put("training_file", readRequiredText(payload, "training_file"));
-        appendEvent(metadata, "created", "queued");
-
-        ObjectNode response = objectMapper.createObjectNode();
-        response.put("id", resourceKey);
-        response.put("object", "fine_tuning.job");
-        response.put("created_at", now().getEpochSecond());
-        response.put("status", "queued");
-        response.put("model", readRequiredText(payload, "model"));
-        response.put("training_file", metadata.path("training_file").asText());
-
-        return persistLocalResource(distributedKeyId, GatewayAsyncResourceType.TUNING, response.path("model").asText(), "queued", payload, response, metadata);
-    }
-
-    @Transactional(readOnly = true)
-    public JsonNode getTuning(String tuningId, Long distributedKeyId) {
-        return readJson(getRequired(tuningId, GatewayAsyncResourceType.TUNING, distributedKeyId).getResponsePayloadJson());
-    }
-
-    public JsonNode cancelTuning(String tuningId, Long distributedKeyId) {
-        return updateStatus(tuningId, distributedKeyId, GatewayAsyncResourceType.TUNING, "cancelled");
-    }
-
-    public JsonNode createRealtimeClientSecret(Long distributedKeyId, JsonNode requestBody) {
-        ObjectNode payload = requireObject(requestBody);
-        String resourceKey = "sess_" + UUID.randomUUID().toString().replace("-", "");
-        String clientSecret = "rt_" + UUID.randomUUID().toString().replace("-", "");
-        Instant expiresAt = now().plusSeconds(3600);
-
-        ObjectNode metadata = objectMapper.createObjectNode();
-        metadata.put("client_secret_preview", clientSecret.substring(0, Math.min(clientSecret.length(), 12)));
-        appendEvent(metadata, "created", "created");
-
-        ObjectNode response = objectMapper.createObjectNode();
-        response.put("id", resourceKey);
-        response.put("object", "realtime.session");
-        response.put("model", readRequiredText(payload, "model"));
-        response.put("created_at", now().getEpochSecond());
-        response.put("status", "created");
-        ObjectNode secret = response.putObject("client_secret");
-        secret.put("value", clientSecret);
-        secret.put("expires_at", expiresAt.getEpochSecond());
-
-        return persistLocalResource(distributedKeyId, GatewayAsyncResourceType.REALTIME_SESSION, response.path("model").asText(), "created", payload, response, metadata);
-    }
-
-    private JsonNode updateStatus(
+    private JsonNode updateLocalStatus(
             String resourceKey,
             Long distributedKeyId,
             GatewayAsyncResourceType type,
@@ -226,25 +335,97 @@ public class GatewayAsyncResourceService {
         return response;
     }
 
-    private JsonNode persistLocalResource(
-            Long distributedKeyId,
-            GatewayAsyncResourceType type,
-            String requestModel,
-            String status,
-            JsonNode requestPayload,
-            JsonNode responsePayload,
-            JsonNode metadata) {
-        GatewayAsyncResourceEntity entity = new GatewayAsyncResourceEntity();
-        entity.setResourceKey(responsePayload.path("id").asText());
-        entity.setDistributedKeyId(distributedKeyId);
-        entity.setResourceType(type);
-        entity.setRequestModel(requestModel);
-        entity.setStatus(status);
-        entity.setRequestPayloadJson(writeJson(requestPayload));
-        entity.setResponsePayloadJson(writeJson(responsePayload));
-        entity.setMetadataJson(writeJson(metadata));
-        gatewayAsyncResourceRepository.save(entity);
-        return responsePayload;
+    private UpstreamTarget resolveUpstreamTarget(Long distributedKeyId, InteropFeature feature) {
+        DistributedKeyView distributedKey = distributedKeyQueryService.findActiveById(distributedKeyId)
+                .orElseThrow(() -> new IllegalArgumentException("未找到可用的 DistributedKey。"));
+        Map<Long, UpstreamCredentialEntity> credentials = new LinkedHashMap<>();
+        for (UpstreamCredentialEntity credential : upstreamCredentialRepository.findAllByIdInAndDeletedFalse(
+                distributedKey.bindings().stream().map(DistributedCredentialBindingView::credentialId).toList())) {
+            if (credential.isActive()) {
+                credentials.put(credential.getId(), credential);
+            }
+        }
+
+        for (DistributedCredentialBindingView binding : distributedKey.bindings()) {
+            UpstreamCredentialEntity credential = credentials.get(binding.credentialId());
+            if (credential == null || credential.getSiteProfileId() == null) {
+                continue;
+            }
+            UpstreamSiteProfileEntity siteProfile = upstreamSiteProfileRepository.findById(credential.getSiteProfileId()).orElse(null);
+            SiteCapabilitySnapshotEntity snapshot = siteCapabilitySnapshotRepository.findBySiteProfile_Id(credential.getSiteProfileId())
+                    .orElse(null);
+            if (siteProfile == null || !siteCapabilityTruthService.supportsFeature(siteProfile, snapshot, feature)) {
+                continue;
+            }
+            return new UpstreamTarget(credential, siteProfile, buildClient(credential, siteProfile, basePath(feature)));
+        }
+        throw new IllegalArgumentException("当前 DistributedKey 没有可用的异步资源上游编排站点。");
+    }
+
+    private UpstreamTarget resolveUpstreamTargetForEntity(GatewayAsyncResourceEntity entity, ObjectNode metadata) {
+        Long credentialId = metadata.has("credential_id") ? metadata.path("credential_id").asLong() : null;
+        if (credentialId == null) {
+            return resolveUpstreamTarget(entity.getDistributedKeyId(), featureFor(entity.getResourceType()));
+        }
+        UpstreamCredentialEntity credential = upstreamCredentialRepository.findById(credentialId)
+                .orElseThrow(() -> new IllegalArgumentException("未找到异步资源绑定的上游凭证。"));
+        UpstreamSiteProfileEntity siteProfile = upstreamSiteProfileRepository.findById(credential.getSiteProfileId())
+                .orElseThrow(() -> new IllegalArgumentException("未找到异步资源绑定的站点档案。"));
+        return new UpstreamTarget(credential, siteProfile, buildClient(credential, siteProfile, basePath(featureFor(entity.getResourceType()))));
+    }
+
+    private SiteClient buildClient(
+            UpstreamCredentialEntity credential,
+            UpstreamSiteProfileEntity siteProfile,
+            String requestPath) {
+        String apiKey = credentialCryptoService.decrypt(credential.getApiKeyCiphertext());
+        WebClient.Builder builder = webClientBuilder.clone().baseUrl(credential.getBaseUrl().replaceAll("/+$", ""));
+        String path = resolvePath(credential.getBaseUrl(), requestPath);
+        if (siteProfile.getAuthStrategy() == AuthStrategy.BEARER) {
+            builder.defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey);
+        } else if (siteProfile.getAuthStrategy() == AuthStrategy.API_KEY_HEADER) {
+            builder.defaultHeader("x-api-key", apiKey);
+        } else if (siteProfile.getAuthStrategy() == AuthStrategy.AZURE_API_KEY) {
+            builder.defaultHeader("api-key", apiKey);
+        } else {
+            throw new IllegalArgumentException("当前站点鉴权策略不支持异步资源编排。");
+        }
+        if (siteProfile.getPathStrategy() != PathStrategy.OPENAI_V1) {
+            throw new IllegalArgumentException("当前站点路径策略不支持异步资源编排。");
+        }
+        return new SiteClient(builder.build(), path);
+    }
+
+    private JsonNode invokeUpstreamJson(UpstreamTarget target, String path, JsonNode payload) {
+        return target.client().post()
+                .uri(path.startsWith("/v1/") ? resolvePath(target.credential().getBaseUrl(), path) : path)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(payload)
+                .retrieve()
+                .bodyToMono(JsonNode.class)
+                .block();
+    }
+
+    private ObjectNode rewriteFileRefs(ObjectNode payload, Long distributedKeyId) {
+        if (payload.hasNonNull("input_file_id")) {
+            payload.put("input_file_id", resolveExternalFileId(payload.path("input_file_id").asText(), distributedKeyId));
+        }
+        if (payload.hasNonNull("training_file")) {
+            payload.put("training_file", resolveExternalFileId(payload.path("training_file").asText(), distributedKeyId));
+        }
+        return payload;
+    }
+
+    private String resolveExternalFileId(String fileKey, Long distributedKeyId) {
+        GatewayFileEntity file = gatewayFileRepository.findByFileKeyAndDeletedFalse(fileKey)
+                .orElseThrow(() -> new IllegalArgumentException("未找到指定的网关文件对象。"));
+        if (!file.getDistributedKeyId().equals(distributedKeyId)) {
+            throw new IllegalArgumentException("文件对象不属于当前 DistributedKey。");
+        }
+        return gatewayFileBindingRepository.findAllByGatewayFileIdOrderByCreatedAtDesc(file.getId()).stream()
+                .findFirst()
+                .map(GatewayFileBindingEntity::getExternalFileId)
+                .orElseThrow(() -> new IllegalArgumentException("文件对象尚未完成 upstream binding。"));
     }
 
     private GatewayAsyncResourceEntity getRequired(String resourceKey, GatewayAsyncResourceType type, Long distributedKeyId) {
@@ -261,14 +442,6 @@ public class GatewayAsyncResourceService {
             throw new IllegalArgumentException("请求体必须是 JSON object。");
         }
         return (ObjectNode) payload;
-    }
-
-    private String readRequiredText(ObjectNode payload, String field) {
-        String value = payload.path(field).asText(null);
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException("请求缺少 " + field + "。");
-        }
-        return value;
     }
 
     private Instant now() {
@@ -306,6 +479,65 @@ public class GatewayAsyncResourceService {
             return node == null ? null : objectMapper.writeValueAsString(node);
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("序列化异步资源 JSON 失败。", exception);
+        }
+    }
+
+    private String resolvePath(String baseUrl, String requestPath) {
+        String normalizedBaseUrl = baseUrl.replaceAll("/+$", "");
+        String normalizedPath = requestPath.startsWith("/") ? requestPath : "/" + requestPath;
+        if (normalizedBaseUrl.endsWith("/v1") && normalizedPath.startsWith("/v1/")) {
+            return normalizedPath.substring(3);
+        }
+        return normalizedPath;
+    }
+
+    private String basePath(InteropFeature feature) {
+        return switch (feature) {
+            case UPLOAD_CREATE -> "/v1/uploads";
+            case BATCH_CREATE -> "/v1/batches";
+            case TUNING_CREATE -> "/v1/fine_tuning/jobs";
+            case REALTIME_CLIENT_SECRET -> "/v1/realtime/client_secrets";
+            default -> throw new IllegalArgumentException("当前 feature 不支持异步资源编排。");
+        };
+    }
+
+    private InteropFeature featureFor(GatewayAsyncResourceType resourceType) {
+        return switch (resourceType) {
+            case UPLOAD -> InteropFeature.UPLOAD_CREATE;
+            case BATCH -> InteropFeature.BATCH_CREATE;
+            case TUNING -> InteropFeature.TUNING_CREATE;
+            case REALTIME_SESSION -> InteropFeature.REALTIME_CLIENT_SECRET;
+            default -> throw new IllegalArgumentException("当前资源类型不支持 upstream feature 推断。");
+        };
+    }
+
+    private String inferObjectName(GatewayAsyncResourceType resourceType) {
+        return switch (resourceType) {
+            case UPLOAD -> "upload";
+            case BATCH -> "batch";
+            case TUNING -> "fine_tuning.job";
+            case REALTIME_SESSION -> "realtime.session";
+            case RESPONSE -> "response";
+        };
+    }
+
+    private record SiteClient(
+            WebClient client,
+            String path
+    ) {
+    }
+
+    private record UpstreamTarget(
+            UpstreamCredentialEntity credential,
+            UpstreamSiteProfileEntity siteProfile,
+            SiteClient siteClient
+    ) {
+        private WebClient client() {
+            return siteClient.client();
+        }
+
+        private String path() {
+            return siteClient.path();
         }
     }
 }

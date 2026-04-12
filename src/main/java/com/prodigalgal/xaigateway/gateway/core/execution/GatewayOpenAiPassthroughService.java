@@ -12,9 +12,13 @@ import com.prodigalgal.xaigateway.gateway.core.routing.GatewayRouteSelectionServ
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionRequest;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
 import com.prodigalgal.xaigateway.gateway.core.error.ErrorRuleMatchContext;
+import com.prodigalgal.xaigateway.gateway.core.shared.AuthStrategy;
+import com.prodigalgal.xaigateway.gateway.core.shared.PathStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Optional;
 import org.springframework.core.io.ByteArrayResource;
@@ -35,6 +39,8 @@ import reactor.core.publisher.Mono;
 @Service
 @Transactional
 public class GatewayOpenAiPassthroughService {
+
+    private static final String DEFAULT_AZURE_API_VERSION = "2024-10-21";
 
     private final GatewayRouteSelectionService gatewayRouteSelectionService;
     private final UpstreamCredentialRepository upstreamCredentialRepository;
@@ -77,14 +83,7 @@ public class GatewayOpenAiPassthroughService {
             ObjectNode upstreamPayload = payload.deepCopy();
             upstreamPayload.put("model", context.selectionResult().resolvedModelKey());
 
-            ResponseEntity<JsonNode> upstreamResponse = context.client().post()
-                    .uri(resolvePath(context.credential().getBaseUrl(), requestPath))
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .bodyValue(upstreamPayload)
-                    .exchangeToMono(response -> response.toEntity(JsonNode.class))
-                    .block();
-
-            return finalizeJsonResponse(context, upstreamResponse);
+            return executePreparedJson(context.selectionResult(), context.credential(), context.client(), context.upstreamPath(), context.requestPath(), upstreamPayload);
         } catch (RuntimeException exception) {
             gatewayRouteSelectionService.invalidateSelection(context.selectionResult());
             throw exception;
@@ -106,14 +105,7 @@ public class GatewayOpenAiPassthroughService {
             ObjectNode upstreamPayload = payload.deepCopy();
             upstreamPayload.put("model", context.selectionResult().resolvedModelKey());
 
-            ResponseEntity<byte[]> upstreamResponse = context.client().post()
-                    .uri(resolvePath(context.credential().getBaseUrl(), requestPath))
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .bodyValue(upstreamPayload)
-                    .exchangeToMono(response -> response.toEntity(byte[].class))
-                    .block();
-
-            return finalizeBinaryResponse(context, upstreamResponse);
+            return executePreparedBinary(context.selectionResult(), context.credential(), context.client(), context.upstreamPath(), context.requestPath(), upstreamPayload);
         } catch (RuntimeException exception) {
             gatewayRouteSelectionService.invalidateSelection(context.selectionResult());
             throw exception;
@@ -134,14 +126,80 @@ public class GatewayOpenAiPassthroughService {
         RouteExecutionContext context = prepareExecution(distributedKeyPrefix, requestPath, requestedModel, routePayload);
 
         return buildMultipartBody(formFields, files)
-                .flatMap(body -> context.client().post()
-                        .uri(resolvePath(context.credential().getBaseUrl(), requestPath))
-                        .contentType(MediaType.MULTIPART_FORM_DATA)
-                        .body(BodyInserters.fromMultipartData(body))
-                        .exchangeToMono(response -> response.toEntity(JsonNode.class)))
-                .map(response -> finalizeJsonResponse(context, response))
+                .flatMap(body -> executePreparedMultipart(
+                        context.selectionResult(),
+                        context.credential(),
+                        context.client(),
+                        context.upstreamPath(),
+                        context.requestPath(),
+                        body
+                ))
                 .doOnError(error -> gatewayRouteSelectionService.invalidateSelection(context.selectionResult()))
                 .doFinally(signalType -> distributedKeyGovernanceService.releaseConcurrency(context.selectionResult().governanceReservationKey()));
+    }
+
+    ResponseEntity<JsonNode> executePreparedJson(
+            RouteSelectionResult selectionResult,
+            UpstreamCredentialEntity credential,
+            WebClient client,
+            String upstreamPath,
+            String requestPath,
+            JsonNode upstreamPayload) {
+        RouteExecutionContext context = new RouteExecutionContext(selectionResult, credential, client, upstreamPath, requestPath);
+        ResponseEntity<JsonNode> upstreamResponse = client.post()
+                .uri(upstreamPath)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(upstreamPayload)
+                .exchangeToMono(response -> response.toEntity(JsonNode.class))
+                .block();
+        return finalizeJsonResponse(context, upstreamResponse);
+    }
+
+    ResponseEntity<byte[]> executePreparedBinary(
+            RouteSelectionResult selectionResult,
+            UpstreamCredentialEntity credential,
+            WebClient client,
+            String upstreamPath,
+            String requestPath,
+            JsonNode upstreamPayload) {
+        RouteExecutionContext context = new RouteExecutionContext(selectionResult, credential, client, upstreamPath, requestPath);
+        ResponseEntity<byte[]> upstreamResponse = client.post()
+                .uri(upstreamPath)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(upstreamPayload)
+                .exchangeToMono(response -> response.toEntity(byte[].class))
+                .block();
+        return finalizeBinaryResponse(context, upstreamResponse);
+    }
+
+    Mono<ResponseEntity<JsonNode>> executePreparedMultipart(
+            RouteSelectionResult selectionResult,
+            UpstreamCredentialEntity credential,
+            WebClient client,
+            String upstreamPath,
+            String requestPath,
+            MultiValueMap<String, HttpEntity<?>> body) {
+        RouteExecutionContext context = new RouteExecutionContext(selectionResult, credential, client, upstreamPath, requestPath);
+        return client.post()
+                .uri(upstreamPath)
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .body(BodyInserters.fromMultipartData(body))
+                .exchangeToMono(response -> response.toEntity(JsonNode.class))
+                .map(response -> finalizeJsonResponse(context, response));
+    }
+
+    Mono<MultiValueMap<String, HttpEntity<?>>> prepareMultipartBody(
+            Map<String, String> formFields,
+            Map<String, FilePart> files) {
+        return buildMultipartBody(formFields, files);
+    }
+
+    CatalogSiteRequest buildPreparedSiteRequest(
+            RouteSelectionResult selectionResult,
+            UpstreamCredentialEntity credential,
+            String apiKey,
+            String requestPath) {
+        return buildSiteRequest(selectionResult, credential, apiKey, requestPath);
     }
 
     private Mono<MultiValueMap<String, HttpEntity<?>>> buildMultipartBody(
@@ -242,11 +300,6 @@ public class GatewayOpenAiPassthroughService {
         ));
         gatewayObservabilityService.recordRouteDecision(requestId, selectionResult);
 
-        ProviderType providerType = selectionResult.selectedCandidate().candidate().providerType();
-        if (providerType != ProviderType.OPENAI_DIRECT && providerType != ProviderType.OPENAI_COMPATIBLE) {
-            throw new IllegalArgumentException("当前资源协议首版仅支持 OpenAI / OpenAI-compatible 上游。");
-        }
-
         UpstreamCredentialEntity credential = getRequiredCredential(selectionResult.selectedCandidate().candidate().credentialId());
         String apiKey = accountSelectionService.resolveActiveAccount(
                         selectionResult.distributedKeyId(),
@@ -255,11 +308,8 @@ public class GatewayOpenAiPassthroughService {
                         300)
                 .map(account -> credentialCryptoService.decrypt(account.getAccessTokenCiphertext()))
                 .orElseGet(() -> credentialCryptoService.decrypt(credential.getApiKeyCiphertext()));
-        WebClient client = webClientBuilder.clone()
-                .baseUrl(normalizeBaseUrl(credential.getBaseUrl()))
-                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
-                .build();
-        return new RouteExecutionContext(selectionResult, credential, client, requestPath);
+        CatalogSiteRequest siteRequest = buildSiteRequest(selectionResult, credential, apiKey, requestPath);
+        return new RouteExecutionContext(selectionResult, credential, siteRequest.client(), siteRequest.path(), requestPath);
     }
 
     private ObjectNode requireObjectPayload(JsonNode requestBody) {
@@ -301,6 +351,46 @@ public class GatewayOpenAiPassthroughService {
         return normalizedPath;
     }
 
+    private CatalogSiteRequest buildSiteRequest(
+            RouteSelectionResult selectionResult,
+            UpstreamCredentialEntity credential,
+            String apiKey,
+            String requestPath) {
+        var candidate = selectionResult.selectedCandidate().candidate();
+        WebClient.Builder builder = webClientBuilder.clone()
+                .baseUrl(normalizeBaseUrl(credential.getBaseUrl()));
+        String path = resolvePath(credential.getBaseUrl(), requestPath);
+        if (candidate.pathStrategy() == PathStrategy.AZURE_OPENAI_DEPLOYMENT) {
+            builder.defaultHeader("api-key", apiKey);
+            path = resolveAzurePath(requestPath, selectionResult.resolvedModelKey());
+        } else if (candidate.authStrategy() == AuthStrategy.BEARER) {
+            builder.defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey);
+        } else if (candidate.authStrategy() == AuthStrategy.API_KEY_HEADER) {
+            builder.defaultHeader("x-api-key", apiKey);
+        } else if (candidate.authStrategy() == AuthStrategy.API_KEY_QUERY) {
+            path = appendQuery(path, "key", apiKey);
+        } else if (candidate.authStrategy() == AuthStrategy.AZURE_API_KEY) {
+            builder.defaultHeader("api-key", apiKey);
+        }
+        return new CatalogSiteRequest(builder.build(), path);
+    }
+
+    private String resolveAzurePath(String requestPath, String resolvedModelKey) {
+        if ("/v1/embeddings".equals(requestPath)) {
+            return "/openai/deployments/" + encodePath(resolvedModelKey) + "/embeddings?api-version=" + DEFAULT_AZURE_API_VERSION;
+        }
+        return requestPath;
+    }
+
+    private String appendQuery(String path, String key, String value) {
+        String separator = path.contains("?") ? "&" : "?";
+        return path + separator + key + "=" + URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
+    private String encodePath(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
+    }
+
     private JsonNode rewriteModelField(JsonNode responseBody, String publicModel) {
         if (responseBody instanceof ObjectNode objectNode && publicModel != null && !publicModel.isBlank()) {
             objectNode.put("model", publicModel);
@@ -327,7 +417,14 @@ public class GatewayOpenAiPassthroughService {
             RouteSelectionResult selectionResult,
             UpstreamCredentialEntity credential,
             WebClient client,
+            String upstreamPath,
             String requestPath
+    ) {
+    }
+
+    record CatalogSiteRequest(
+            WebClient client,
+            String path
     ) {
     }
 }

@@ -34,12 +34,15 @@ public class TranslationExplainService {
         );
         return new TranslationExecutionPlan(
                 preview.executable(),
+                preview.resourceType(),
+                preview.operation(),
                 preview.providerFamily(),
                 preview.siteProfileId(),
                 preview.executionKind(),
                 preview.capabilityLevel() == null
                         ? null
                         : com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel.valueOf(preview.capabilityLevel().toUpperCase()),
+                preview.upstreamObjectMode(),
                 preview.degradations(),
                 preview.blockers(),
                 preview.authStrategy(),

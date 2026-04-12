@@ -125,7 +125,8 @@ public class OpenAiResponsesController {
                         : null,
                 requestBody.has("max_output_tokens") && !requestBody.get("max_output_tokens").isNull()
                         ? requestBody.get("max_output_tokens").asInt()
-                        : null
+                        : null,
+                requestBody
         );
     }
 

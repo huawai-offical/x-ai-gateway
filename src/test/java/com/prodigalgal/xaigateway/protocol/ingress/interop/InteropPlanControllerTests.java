@@ -43,6 +43,8 @@ class InteropPlanControllerTests {
                         List.of("audio_transcription"),
                         List.of(),
                         List.of(),
+                        "audio",
+                        "audio_transcription",
                         null,
                         Map.of("executable", true),
                         Map.of("featureLevels", Map.of("audio_transcription", "native"))

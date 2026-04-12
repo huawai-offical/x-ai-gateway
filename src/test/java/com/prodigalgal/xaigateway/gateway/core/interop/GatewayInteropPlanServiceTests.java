@@ -120,5 +120,31 @@ class GatewayInteropPlanServiceTests {
                 .thenReturn(InteropCapabilityLevel.NATIVE);
         Mockito.when(siteCapabilityTruthService.capabilityLevel(Mockito.any(), Mockito.eq(InteropFeature.CHAT_TEXT)))
                 .thenReturn(InteropCapabilityLevel.NATIVE);
+        Mockito.when(siteCapabilityTruthService.buildExecutionPlan(Mockito.any(), Mockito.anyString(), Mockito.anyList(), Mockito.anyList(), Mockito.anyList()))
+                .thenAnswer(invocation -> {
+                    RouteSelectionResult selectionResult = invocation.getArgument(0);
+                    String requestPath = invocation.getArgument(1);
+                    @SuppressWarnings("unchecked")
+                    List<String> lossReasons = invocation.getArgument(3);
+                    @SuppressWarnings("unchecked")
+                    List<String> blockedReasons = invocation.getArgument(4);
+                    return new TranslationExecutionPlan(
+                            blockedReasons.isEmpty(),
+                            requestPath.startsWith("/v1/audio") ? "audio" : "response",
+                            requestPath.startsWith("/v1/audio") ? "audio_transcription" : "response_create",
+                            selectionResult.selectedCandidate().candidate().providerFamily(),
+                            selectionResult.selectedCandidate().candidate().siteProfileId(),
+                            blockedReasons.isEmpty() ? com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind.NATIVE : com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind.BLOCKED,
+                            blockedReasons.isEmpty() ? InteropCapabilityLevel.NATIVE : InteropCapabilityLevel.EMULATED,
+                            blockedReasons.isEmpty() ? "direct_upstream_execution" : "translated_execution",
+                            lossReasons,
+                            blockedReasons,
+                            selectionResult.selectedCandidate().candidate().authStrategy(),
+                            selectionResult.selectedCandidate().candidate().pathStrategy(),
+                            selectionResult.selectedCandidate().candidate().errorSchemaStrategy(),
+                            java.util.Map.of(),
+                            java.util.Map.of()
+                    );
+                });
     }
 }

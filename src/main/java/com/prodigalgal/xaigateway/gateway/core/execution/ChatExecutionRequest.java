@@ -12,8 +12,34 @@ public record ChatExecutionRequest(
         List<GatewayToolDefinition> tools,
         JsonNode toolChoice,
         Double temperature,
-        Integer maxTokens
+        Integer maxTokens,
+        JsonNode executionMetadata
 ) {
+
+    public ChatExecutionRequest(
+            String distributedKeyPrefix,
+            String protocol,
+            String requestPath,
+            String requestedModel,
+            List<MessageInput> messages,
+            List<GatewayToolDefinition> tools,
+            JsonNode toolChoice,
+            Double temperature,
+            Integer maxTokens
+    ) {
+        this(
+                distributedKeyPrefix,
+                protocol,
+                requestPath,
+                requestedModel,
+                messages,
+                tools,
+                toolChoice,
+                temperature,
+                maxTokens,
+                null
+        );
+    }
 
     public record MessageInput(
             String role,

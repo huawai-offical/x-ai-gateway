@@ -5,6 +5,8 @@ import com.prodigalgal.xaigateway.admin.api.ProviderSiteRequest;
 import com.prodigalgal.xaigateway.admin.api.ProviderSiteResponse;
 import com.prodigalgal.xaigateway.admin.api.SiteModelCapabilityResponse;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CredentialModelDiscoveryService;
+import com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature;
+import com.prodigalgal.xaigateway.gateway.core.interop.SiteCapabilityTruthService;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SiteCapabilitySnapshotEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SiteModelCapabilityEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
@@ -29,6 +31,7 @@ public class ProviderSiteAdminService {
     private final UpstreamCredentialRepository upstreamCredentialRepository;
     private final ProviderSiteRegistryService providerSiteRegistryService;
     private final CredentialModelDiscoveryService credentialModelDiscoveryService;
+    private final SiteCapabilityTruthService siteCapabilityTruthService;
 
     public ProviderSiteAdminService(
             UpstreamSiteProfileRepository upstreamSiteProfileRepository,
@@ -36,13 +39,15 @@ public class ProviderSiteAdminService {
             SiteModelCapabilityRepository siteModelCapabilityRepository,
             UpstreamCredentialRepository upstreamCredentialRepository,
             ProviderSiteRegistryService providerSiteRegistryService,
-            CredentialModelDiscoveryService credentialModelDiscoveryService) {
+            CredentialModelDiscoveryService credentialModelDiscoveryService,
+            SiteCapabilityTruthService siteCapabilityTruthService) {
         this.upstreamSiteProfileRepository = upstreamSiteProfileRepository;
         this.siteCapabilitySnapshotRepository = siteCapabilitySnapshotRepository;
         this.siteModelCapabilityRepository = siteModelCapabilityRepository;
         this.upstreamCredentialRepository = upstreamCredentialRepository;
         this.providerSiteRegistryService = providerSiteRegistryService;
         this.credentialModelDiscoveryService = credentialModelDiscoveryService;
+        this.siteCapabilityTruthService = siteCapabilityTruthService;
     }
 
     @Transactional(readOnly = true)
@@ -126,16 +131,16 @@ public class ProviderSiteAdminService {
                 snapshot == null ? "UNKNOWN" : snapshot.getHealthState(),
                 snapshot == null ? null : snapshot.getBlockedReason(),
                 snapshot == null ? List.of() : snapshot.getSupportedProtocols(),
-                snapshot != null && snapshot.isSupportsResponses(),
-                snapshot != null && snapshot.isSupportsEmbeddings(),
-                snapshot != null && snapshot.isSupportsAudio(),
-                snapshot != null && snapshot.isSupportsImages(),
-                snapshot != null && snapshot.isSupportsModeration(),
-                snapshot != null && snapshot.isSupportsFiles(),
-                snapshot != null && snapshot.isSupportsUploads(),
-                snapshot != null && snapshot.isSupportsBatches(),
-                snapshot != null && snapshot.isSupportsTuning(),
-                snapshot != null && snapshot.isSupportsRealtime()
+                siteCapabilityTruthService.supportsFeature(entity, snapshot, InteropFeature.RESPONSE_OBJECT),
+                siteCapabilityTruthService.supportsFeature(entity, snapshot, InteropFeature.EMBEDDINGS),
+                siteCapabilityTruthService.supportsFeature(entity, snapshot, InteropFeature.AUDIO_TRANSCRIPTION),
+                siteCapabilityTruthService.supportsFeature(entity, snapshot, InteropFeature.IMAGE_GENERATION),
+                siteCapabilityTruthService.supportsFeature(entity, snapshot, InteropFeature.MODERATION),
+                siteCapabilityTruthService.supportsFeature(entity, snapshot, InteropFeature.FILE_OBJECT),
+                siteCapabilityTruthService.supportsFeature(entity, snapshot, InteropFeature.UPLOAD_CREATE),
+                siteCapabilityTruthService.supportsFeature(entity, snapshot, InteropFeature.BATCH_CREATE),
+                siteCapabilityTruthService.supportsFeature(entity, snapshot, InteropFeature.TUNING_CREATE),
+                siteCapabilityTruthService.supportsFeature(entity, snapshot, InteropFeature.REALTIME_CLIENT_SECRET)
         );
     }
 

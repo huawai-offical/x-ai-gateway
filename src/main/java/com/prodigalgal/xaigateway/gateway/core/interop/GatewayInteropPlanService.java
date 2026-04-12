@@ -2,22 +2,18 @@ package com.prodigalgal.xaigateway.gateway.core.interop;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.prodigalgal.xaigateway.admin.application.ErrorRuleService;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
 import com.prodigalgal.xaigateway.gateway.core.routing.GatewayRouteSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionRequest;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
-import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind;
-import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
-import com.prodigalgal.xaigateway.admin.application.ErrorRuleService;
 import com.prodigalgal.xaigateway.protocol.ingress.interop.InteropPlanRequest;
 import com.prodigalgal.xaigateway.protocol.ingress.interop.InteropPlanResponse;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -67,28 +63,27 @@ public class GatewayInteropPlanService {
         List<String> blockers = new ArrayList<>();
         List<String> degradations = new ArrayList<>();
         Map<String, String> featureLevels = new LinkedHashMap<>();
-        ProviderType selectedProviderType = null;
 
         try {
             selectionResult = gatewayRouteSelectionService.select(new RouteSelectionRequest(
-                distributedKeyPrefix,
-                protocol,
-                requestPath,
-                requestedModel,
-                body,
-                clientFamily,
-                false
-        ));
+                    distributedKeyPrefix,
+                    protocol,
+                    requestPath,
+                    requestedModel,
+                    body,
+                    clientFamily,
+                    false
+            ));
         } catch (IllegalArgumentException exception) {
             blockers.add(exception.getMessage());
         }
 
         if (selectionResult != null) {
-            selectedProviderType = selectionResult.selectedCandidate().candidate().providerType();
             for (InteropFeature feature : requiredFeatures) {
-                InteropCapabilityLevel level = siteCapabilityTruthService == null
-                        ? capabilityLevel(selectedProviderType, feature)
-                        : siteCapabilityTruthService.capabilityLevel(selectionResult.selectedCandidate().candidate(), feature);
+                InteropCapabilityLevel level = siteCapabilityTruthService.capabilityLevel(
+                        selectionResult.selectedCandidate().candidate(),
+                        feature
+                );
                 featureLevels.put(feature.wireName(), level.name().toLowerCase(Locale.ROOT));
                 if (level == InteropCapabilityLevel.UNSUPPORTED) {
                     blockers.add(feature.wireName() + " 当前 provider 不支持。");
@@ -104,13 +99,21 @@ public class GatewayInteropPlanService {
             }
         }
 
-        boolean executable = selectionResult != null && blockers.isEmpty();
-        TranslationExecutionPlan executionPlan = buildExecutionPlan(selectionResult, degradations, blockers, featureLevels);
+        TranslationExecutionPlan executionPlan = siteCapabilityTruthService.buildExecutionPlan(
+                selectionResult,
+                requestPath,
+                requiredFeatures,
+                degradations,
+                blockers
+        );
+
         Map<String, Object> summary = new LinkedHashMap<>();
-        summary.put("executable", executable);
+        summary.put("executable", executionPlan.executable());
         summary.put("protocol", protocol);
         summary.put("requestPath", requestPath);
         summary.put("requestedModel", requestedModel);
+        summary.put("resourceType", executionPlan.resourceType());
+        summary.put("operation", executionPlan.operation());
         summary.put("degradationPolicy", degradationPolicy.name().toLowerCase(Locale.ROOT));
         summary.put("requiredFeatures", requiredFeatures.stream().map(InteropFeature::wireName).toList());
         summary.put("blockerCount", blockers.size());
@@ -131,7 +134,7 @@ public class GatewayInteropPlanService {
             debug.put("governanceNotes", selectionResult.governanceNotes());
             if (errorRuleService != null) {
                 debug.put("potentialErrorRules", errorRuleService.potentialMatches(
-                        selectedProviderType.name(),
+                        selectionResult.selectedCandidate().candidate().providerType().name(),
                         protocol,
                         requestedModel,
                         requestPath
@@ -140,7 +143,7 @@ public class GatewayInteropPlanService {
         }
 
         return new InteropPlanResponse(
-                executable,
+                executionPlan.executable(),
                 protocol,
                 requestPath,
                 requestedModel,
@@ -148,10 +151,15 @@ public class GatewayInteropPlanService {
                 requiredFeatures.stream().map(InteropFeature::wireName).toList(),
                 blockers,
                 degradations,
+                executionPlan.resourceType(),
+                executionPlan.operation(),
                 executionPlan.providerFamily(),
                 executionPlan.siteProfileId(),
                 executionPlan.executionKind(),
-                executionPlan.capabilityLevel() == null ? null : executionPlan.capabilityLevel().name().toLowerCase(Locale.ROOT),
+                executionPlan.capabilityLevel() == null
+                        ? null
+                        : executionPlan.capabilityLevel().name().toLowerCase(Locale.ROOT),
+                executionPlan.upstreamObjectMode(),
                 executionPlan.authStrategy(),
                 executionPlan.pathStrategy(),
                 executionPlan.errorSchemaStrategy(),
@@ -159,75 +167,6 @@ public class GatewayInteropPlanService {
                 summary,
                 debug
         );
-    }
-
-    private TranslationExecutionPlan buildExecutionPlan(
-            RouteSelectionResult selectionResult,
-            List<String> degradations,
-            List<String> blockers,
-            Map<String, String> featureLevels) {
-        if (selectionResult == null) {
-            return new TranslationExecutionPlan(
-                    false,
-                    null,
-                    null,
-                    ExecutionKind.BLOCKED,
-                    InteropCapabilityLevel.UNSUPPORTED,
-                    List.of(),
-                    List.copyOf(blockers),
-                    null,
-                    null,
-                    null,
-                    Map.of(),
-                    Map.of()
-            );
-        }
-
-        var candidate = selectionResult.selectedCandidate().candidate();
-        InteropCapabilityLevel capabilityLevel = featureLevels.containsValue("unsupported")
-                ? InteropCapabilityLevel.UNSUPPORTED
-                : featureLevels.containsValue("lossy")
-                ? InteropCapabilityLevel.LOSSY
-                : featureLevels.containsValue("emulated")
-                ? InteropCapabilityLevel.EMULATED
-                : InteropCapabilityLevel.NATIVE;
-        ExecutionKind executionKind = !blockers.isEmpty()
-                ? ExecutionKind.BLOCKED
-                : capabilityLevel == InteropCapabilityLevel.NATIVE && isNativeProtocol(selectionResult.protocol(), candidate.providerType())
-                ? ExecutionKind.NATIVE
-                : capabilityLevel == InteropCapabilityLevel.EMULATED
-                ? ExecutionKind.EMULATED
-                : ExecutionKind.TRANSLATED;
-
-        return new TranslationExecutionPlan(
-                blockers.isEmpty(),
-                candidate.providerFamily(),
-                candidate.siteProfileId(),
-                executionKind,
-                capabilityLevel,
-                List.copyOf(degradations),
-                List.copyOf(blockers),
-                candidate.authStrategy(),
-                candidate.pathStrategy(),
-                candidate.errorSchemaStrategy(),
-                Map.of(
-                        "protocol", selectionResult.protocol(),
-                        "requestedModel", selectionResult.requestedModel(),
-                        "resolvedModelKey", selectionResult.resolvedModelKey()
-                ),
-                Map.of(
-                        "publicModel", selectionResult.publicModel(),
-                        "selectionSource", selectionResult.selectionSource().name()
-                )
-        );
-    }
-
-    private boolean isNativeProtocol(String protocol, ProviderType providerType) {
-        return switch (protocol == null ? "" : protocol.toLowerCase(Locale.ROOT)) {
-            case "anthropic_native" -> providerType == ProviderType.ANTHROPIC_DIRECT;
-            case "google_native" -> providerType == ProviderType.GEMINI_DIRECT;
-            default -> providerType == ProviderType.OPENAI_DIRECT || providerType == ProviderType.OPENAI_COMPATIBLE;
-        };
     }
 
     private String normalizeProtocol(String protocol) {
@@ -267,59 +206,11 @@ public class GatewayInteropPlanService {
         if (requestPath.startsWith("/v1/audio/speech")) {
             return "gpt-4o-mini-tts";
         }
+        if (requestPath.startsWith("/v1/files")
+                || requestPath.startsWith("/v1/uploads")
+                || requestPath.startsWith("/v1/batches")) {
+            return "resource-orchestration";
+        }
         throw new IllegalArgumentException("预检请求缺少 model。");
-    }
-
-    private InteropCapabilityLevel capabilityLevel(ProviderType providerType, InteropFeature feature) {
-        return switch (providerType) {
-            case OPENAI_DIRECT -> openAiDirectCapability(feature);
-            case OPENAI_COMPATIBLE -> openAiCompatibleCapability(feature);
-            case ANTHROPIC_DIRECT -> anthropicCapability(feature);
-            case GEMINI_DIRECT -> geminiCapability(feature);
-            case OLLAMA_DIRECT -> ollamaCapability(feature);
-        };
-    }
-
-    private InteropCapabilityLevel openAiDirectCapability(InteropFeature feature) {
-        return switch (feature) {
-            case CHAT_TEXT, TOOLS, IMAGE_INPUT, FILE_INPUT, REASONING, RESPONSE_OBJECT, EMBEDDINGS,
-                    AUDIO_TRANSCRIPTION, AUDIO_TRANSLATION, AUDIO_SPEECH, IMAGE_GENERATION, IMAGE_EDIT,
-                    IMAGE_VARIATION, MODERATION -> InteropCapabilityLevel.NATIVE;
-            case UPLOAD_CREATE, BATCH_CREATE, TUNING_CREATE, REALTIME_CLIENT_SECRET -> InteropCapabilityLevel.EMULATED;
-        };
-    }
-
-    private InteropCapabilityLevel openAiCompatibleCapability(InteropFeature feature) {
-        return switch (feature) {
-            case CHAT_TEXT, TOOLS, IMAGE_INPUT, FILE_INPUT, EMBEDDINGS,
-                    AUDIO_TRANSCRIPTION, AUDIO_TRANSLATION, AUDIO_SPEECH,
-                    IMAGE_GENERATION, IMAGE_EDIT, IMAGE_VARIATION, MODERATION -> InteropCapabilityLevel.NATIVE;
-            case RESPONSE_OBJECT, REASONING, UPLOAD_CREATE, BATCH_CREATE, TUNING_CREATE, REALTIME_CLIENT_SECRET ->
-                    InteropCapabilityLevel.EMULATED;
-        };
-    }
-
-    private InteropCapabilityLevel anthropicCapability(InteropFeature feature) {
-        return switch (feature) {
-            case CHAT_TEXT, TOOLS, IMAGE_INPUT, REASONING -> InteropCapabilityLevel.NATIVE;
-            case RESPONSE_OBJECT, FILE_INPUT -> InteropCapabilityLevel.EMULATED;
-            default -> InteropCapabilityLevel.UNSUPPORTED;
-        };
-    }
-
-    private InteropCapabilityLevel geminiCapability(InteropFeature feature) {
-        return switch (feature) {
-            case CHAT_TEXT, TOOLS, IMAGE_INPUT, FILE_INPUT, REASONING, EMBEDDINGS -> InteropCapabilityLevel.NATIVE;
-            case RESPONSE_OBJECT, TUNING_CREATE, REALTIME_CLIENT_SECRET -> InteropCapabilityLevel.EMULATED;
-            default -> InteropCapabilityLevel.UNSUPPORTED;
-        };
-    }
-
-    private InteropCapabilityLevel ollamaCapability(InteropFeature feature) {
-        return switch (feature) {
-            case CHAT_TEXT -> InteropCapabilityLevel.NATIVE;
-            case RESPONSE_OBJECT, FILE_INPUT -> InteropCapabilityLevel.EMULATED;
-            default -> InteropCapabilityLevel.UNSUPPORTED;
-        };
     }
 }

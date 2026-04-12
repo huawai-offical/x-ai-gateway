@@ -28,6 +28,11 @@ public class DistributedKeyQueryService {
                 .map(this::toView);
     }
 
+    public Optional<DistributedKeyView> findActiveById(Long id) {
+        return distributedKeyRepository.findByIdAndActiveTrue(id)
+                .map(this::toView);
+    }
+
     private DistributedKeyView toView(DistributedKeyEntity entity) {
         List<DistributedCredentialBindingView> bindings = distributedKeyBindingRepository
                 .findAllByDistributedKeyIdAndActiveTrueOrderByPriorityAscCreatedAtAsc(entity.getId())

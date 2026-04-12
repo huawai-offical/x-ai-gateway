@@ -10,10 +10,13 @@ import java.util.Map;
 
 public record TranslationExecutionPlan(
         boolean executable,
+        String resourceType,
+        String operation,
         ProviderFamily providerFamily,
         Long siteProfileId,
         ExecutionKind executionKind,
         InteropCapabilityLevel capabilityLevel,
+        String upstreamObjectMode,
         List<String> lossReasons,
         List<String> blockedReasons,
         AuthStrategy authStrategy,

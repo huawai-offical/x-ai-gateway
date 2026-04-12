@@ -352,6 +352,17 @@ public class GatewayChatExecutionService {
             root.set("tool_choice", request.toolChoice());
         }
 
+        if (request.executionMetadata() != null && request.executionMetadata().isObject()) {
+            JsonNode reasoning = request.executionMetadata().get("reasoning");
+            if (reasoning != null && !reasoning.isNull()) {
+                root.set("reasoning", reasoning);
+            }
+            JsonNode reasoningEffort = request.executionMetadata().get("reasoning_effort");
+            if (reasoningEffort != null && !reasoningEffort.isNull()) {
+                root.set("reasoning_effort", reasoningEffort);
+            }
+        }
+
         return root;
     }
 

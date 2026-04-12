@@ -5,6 +5,9 @@ import com.prodigalgal.xaigateway.gateway.core.alias.ModelAliasRuleView;
 import com.prodigalgal.xaigateway.gateway.core.alias.ModelAliasView;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedCredentialBindingView;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyView;
+import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
+import com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature;
+import com.prodigalgal.xaigateway.gateway.core.interop.SiteCapabilityTruthService;
 import com.prodigalgal.xaigateway.gateway.core.shared.ModelIdNormalizer;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SiteModelCapabilityEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
@@ -29,14 +32,17 @@ public class ModelCatalogQueryService {
     private final SiteModelCapabilityRepository siteModelCapabilityRepository;
     private final UpstreamCredentialRepository upstreamCredentialRepository;
     private final ModelAliasQueryService modelAliasQueryService;
+    private final SiteCapabilityTruthService siteCapabilityTruthService;
 
     public ModelCatalogQueryService(
             SiteModelCapabilityRepository siteModelCapabilityRepository,
             UpstreamCredentialRepository upstreamCredentialRepository,
-            ModelAliasQueryService modelAliasQueryService) {
+            ModelAliasQueryService modelAliasQueryService,
+            SiteCapabilityTruthService siteCapabilityTruthService) {
         this.siteModelCapabilityRepository = siteModelCapabilityRepository;
         this.upstreamCredentialRepository = upstreamCredentialRepository;
         this.modelAliasQueryService = modelAliasQueryService;
+        this.siteCapabilityTruthService = siteCapabilityTruthService;
     }
 
     public List<CatalogCandidateView> listCandidatesByModelKey(String modelKey) {
@@ -70,7 +76,7 @@ public class ModelCatalogQueryService {
                 siteModelCapabilityRepository.findAllBySiteProfile_IdInAndActiveTrue(siteProfileIds),
                 credentials
         ).stream()
-                .filter(candidate -> candidate.capabilityLevel() != com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel.UNSUPPORTED)
+                .filter(candidate -> actualCapabilityLevel(candidate) != InteropCapabilityLevel.UNSUPPORTED)
                 .filter(candidate -> candidate.supportedProtocols().contains(normalizedProtocol))
                 .sorted(Comparator.comparing(CatalogCandidateView::modelKey).thenComparing(CatalogCandidateView::credentialId))
                 .toList();
@@ -91,9 +97,9 @@ public class ModelCatalogQueryService {
                     candidate.siteProfileId(),
                     candidate.providerFamily(),
                     candidate.siteKind(),
-                    candidate.capabilityLevel(),
-                    candidate.supportsChat(),
-                    candidate.supportsEmbeddings()
+                    actualCapabilityLevel(candidate),
+                    siteCapabilityTruthService.capabilityLevel(candidate, InteropFeature.CHAT_TEXT) != InteropCapabilityLevel.UNSUPPORTED,
+                    siteCapabilityTruthService.capabilityLevel(candidate, InteropFeature.EMBEDDINGS) != InteropCapabilityLevel.UNSUPPORTED
             ));
         }
 
@@ -123,9 +129,11 @@ public class ModelCatalogQueryService {
                         representative == null ? null : representative.siteProfileId(),
                         representative == null ? null : representative.providerFamily(),
                         representative == null ? null : representative.siteKind(),
-                        representative == null ? com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel.EMULATED : representative.capabilityLevel(),
-                        representative == null || representative.supportsChat(),
-                        representative != null && representative.supportsEmbeddings()
+                        representative == null ? InteropCapabilityLevel.EMULATED : actualCapabilityLevel(representative),
+                        representative != null
+                                && siteCapabilityTruthService.capabilityLevel(representative, InteropFeature.CHAT_TEXT) != InteropCapabilityLevel.UNSUPPORTED,
+                        representative != null
+                                && siteCapabilityTruthService.capabilityLevel(representative, InteropFeature.EMBEDDINGS) != InteropCapabilityLevel.UNSUPPORTED
                 ));
             }
         }
@@ -261,5 +269,20 @@ public class ModelCatalogQueryService {
                 capability.getReasoningTransport(),
                 capability.getCapabilityLevel()
         );
+    }
+
+    private InteropCapabilityLevel actualCapabilityLevel(CatalogCandidateView candidate) {
+        InteropCapabilityLevel chatLevel = siteCapabilityTruthService.capabilityLevel(candidate, InteropFeature.CHAT_TEXT);
+        InteropCapabilityLevel embeddingsLevel = siteCapabilityTruthService.capabilityLevel(candidate, InteropFeature.EMBEDDINGS);
+        if (chatLevel == InteropCapabilityLevel.NATIVE || embeddingsLevel == InteropCapabilityLevel.NATIVE) {
+            return InteropCapabilityLevel.NATIVE;
+        }
+        if (chatLevel == InteropCapabilityLevel.LOSSY || embeddingsLevel == InteropCapabilityLevel.LOSSY) {
+            return InteropCapabilityLevel.LOSSY;
+        }
+        if (chatLevel == InteropCapabilityLevel.EMULATED || embeddingsLevel == InteropCapabilityLevel.EMULATED) {
+            return InteropCapabilityLevel.EMULATED;
+        }
+        return InteropCapabilityLevel.UNSUPPORTED;
     }
 }
