@@ -10,6 +10,9 @@ public record AnalyticsOverviewResponse(
         long sampledRouteDecisionCount,
         long sampledCacheHitCount,
         long sampledActiveCacheReferenceCount,
+        long sampledUsageRecordCount,
+        long sampledFinalUsageRecordCount,
+        long sampledPartialUsageRecordCount,
         long totalCacheHitTokens,
         long totalCacheWriteTokens,
         long totalSavedInputTokens,
@@ -17,6 +20,8 @@ public record AnalyticsOverviewResponse(
         List<BreakdownItem> protocolBreakdown,
         List<BreakdownItem> selectionSourceBreakdown,
         List<BreakdownItem> modelGroupBreakdown,
+        List<BreakdownItem> cacheSourceBreakdown,
+        List<CountBreakdownItem> usageCompletenessBreakdown,
         List<TimelineBucket> timeline
 ) {
 
@@ -36,6 +41,12 @@ public record AnalyticsOverviewResponse(
             long cacheHitTokens,
             long cacheWriteTokens,
             long savedInputTokens
+    ) {
+    }
+
+    public record CountBreakdownItem(
+            String key,
+            long count
     ) {
     }
 }

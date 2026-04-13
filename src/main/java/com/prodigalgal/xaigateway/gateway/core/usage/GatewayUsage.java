@@ -17,4 +17,22 @@ public record GatewayUsage(
     public static GatewayUsage empty() {
         return new GatewayUsage(0, 0, 0, 0, 0, 0, 0, 0, null, 0, null);
     }
+
+    public boolean isEmpty() {
+        return rawPromptTokens == 0
+                && promptTokens == 0
+                && completionTokens == 0
+                && reasoningTokens == 0
+                && cacheHitTokens == 0
+                && cacheWriteTokens == 0
+                && upstreamCacheHitTokens == 0
+                && upstreamCacheWriteTokens == 0
+                && (cachedContentRef == null || cachedContentRef.isBlank())
+                && totalTokens == 0
+                && nativeUsagePayload == null;
+    }
+
+    public int savedInputTokens() {
+        return Math.max(rawPromptTokens - promptTokens - cacheWriteTokens, 0);
+    }
 }

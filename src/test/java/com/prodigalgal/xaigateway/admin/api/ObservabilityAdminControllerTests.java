@@ -145,6 +145,9 @@ class ObservabilityAdminControllerTests {
                         12,
                         6,
                         2,
+                        5,
+                        4,
+                        1,
                         1800,
                         120,
                         1800
@@ -162,6 +165,8 @@ class ObservabilityAdminControllerTests {
                 .expectBody()
                 .jsonPath("$.sampledFrom").isEqualTo("2026-04-07T07:00:00Z")
                 .jsonPath("$.sampledRouteDecisionCount").isEqualTo(12)
+                .jsonPath("$.sampledUsageRecordCount").isEqualTo(5)
+                .jsonPath("$.sampledFinalUsageRecordCount").isEqualTo(4)
                 .jsonPath("$.totalCacheHitTokens").isEqualTo(1800)
                 .jsonPath("$.sampledActiveUpstreamCacheReferenceCount").isEqualTo(2);
     }

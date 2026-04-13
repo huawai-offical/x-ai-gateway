@@ -1,6 +1,5 @@
 package com.prodigalgal.xaigateway.protocol.ingress.anthropic;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.admin.application.GatewayChatExecutionService;
@@ -9,10 +8,6 @@ import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthentication
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolDefinition;
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest.MessageInput;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionResponse;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionStreamChunk;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionStreamResponse;
-import com.prodigalgal.xaigateway.gateway.core.usage.GatewayUsage;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.List;
@@ -35,7 +30,7 @@ public class AnthropicMessagesController {
 
     private final DistributedKeyAuthenticationService distributedKeyAuthenticationService;
     private final GatewayChatExecutionService gatewayChatExecutionService;
-    private final ObjectMapper objectMapper;
+    private final AnthropicMessagesEncoder anthropicMessagesEncoder;
 
     public AnthropicMessagesController(
             DistributedKeyAuthenticationService distributedKeyAuthenticationService,
@@ -43,7 +38,7 @@ public class AnthropicMessagesController {
             ObjectMapper objectMapper) {
         this.distributedKeyAuthenticationService = distributedKeyAuthenticationService;
         this.gatewayChatExecutionService = gatewayChatExecutionService;
-        this.objectMapper = objectMapper;
+        this.anthropicMessagesEncoder = new AnthropicMessagesEncoder(objectMapper);
     }
 
     @PostMapping
@@ -68,31 +63,15 @@ public class AnthropicMessagesController {
         );
 
         if (Boolean.TRUE.equals(request.stream())) {
-            ChatExecutionStreamResponse streamResponse = gatewayChatExecutionService.executeStream(executionRequest);
-            GatewayUsage startUsage = streamResponse.routeSelection() == null ? GatewayUsage.empty() : GatewayUsage.empty();
-            Flux<String> body = Flux.concat(
-                    Flux.just(encode("message_start", AnthropicMessagesResponse.messageStart(
-                            streamResponse.routeSelection().resolvedModelKey(),
-                            startUsage
-                    ))),
-                    Flux.just(encode("content_block_start", AnthropicMessagesResponse.contentBlockStart())),
-                    streamResponse.chunks().flatMap(chunk -> encodeChunk(chunk)),
-                    Flux.just(encode("content_block_stop", AnthropicMessagesResponse.contentBlockStop())),
-                    Flux.just(encode("message_delta", AnthropicMessagesResponse.messageDelta(GatewayUsage.empty(), "end_turn"))),
-                    Flux.just(encode("message_stop", AnthropicMessagesResponse.messageStop()))
-            );
+            var streamResponse = gatewayChatExecutionService.executeGatewayStream(executionRequest);
+            Flux<String> body = anthropicMessagesEncoder.encodeStream(streamResponse);
             return ResponseEntity.ok()
                     .contentType(MediaType.TEXT_EVENT_STREAM)
                     .body(body);
         }
 
-        ChatExecutionResponse response = gatewayChatExecutionService.execute(executionRequest);
-        return ResponseEntity.ok(AnthropicMessagesResponse.from(
-                response.routeSelection().resolvedModelKey(),
-                response.text(),
-                response.usage(),
-                response.toolCalls()
-        ));
+        var response = gatewayChatExecutionService.executeGatewayResponse(executionRequest);
+        return ResponseEntity.ok(anthropicMessagesEncoder.encode(response));
     }
 
     private List<MessageInput> toMessages(JsonNode systemNode, List<AnthropicMessagesRequest.Message> messages) {
@@ -245,23 +224,4 @@ public class AnthropicMessagesController {
         return contentNode.toString();
     }
 
-    private Flux<String> encodeChunk(ChatExecutionStreamChunk chunk) {
-        if (chunk.terminal()) {
-            return Flux.empty();
-        }
-
-        if (chunk.textDelta() == null || chunk.textDelta().isBlank()) {
-            return Flux.empty();
-        }
-
-        return Flux.just(encode("content_block_delta", AnthropicMessagesResponse.contentBlockDelta(chunk.textDelta())));
-    }
-
-    private String encode(String event, Object payload) {
-        try {
-            return "event: " + event + "\n" + "data: " + objectMapper.writeValueAsString(payload) + "\n\n";
-        } catch (JsonProcessingException exception) {
-            throw new IllegalStateException("无法序列化 Anthropic stream 响应。", exception);
-        }
-    }
 }

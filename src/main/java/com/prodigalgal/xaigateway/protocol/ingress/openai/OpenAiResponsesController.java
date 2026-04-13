@@ -1,6 +1,5 @@
 package com.prodigalgal.xaigateway.protocol.ingress.openai;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
@@ -10,18 +9,10 @@ import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthentication
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest;
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest.MediaInput;
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest.MessageInput;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionResponse;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionStreamChunk;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionStreamResponse;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolDefinition;
 import com.prodigalgal.xaigateway.gateway.core.resource.GatewayAsyncResourceService;
-import com.prodigalgal.xaigateway.gateway.core.usage.GatewayUsage;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 import org.springframework.http.MediaType;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -45,6 +36,7 @@ public class OpenAiResponsesController {
     private final GatewayChatExecutionService gatewayChatExecutionService;
     private final GatewayAsyncResourceService gatewayAsyncResourceService;
     private final ObjectMapper objectMapper;
+    private final OpenAiResponsesEncoder openAiResponsesEncoder;
 
     public OpenAiResponsesController(
             DistributedKeyAuthenticationService distributedKeyAuthenticationService,
@@ -55,6 +47,7 @@ public class OpenAiResponsesController {
         this.gatewayChatExecutionService = gatewayChatExecutionService;
         this.gatewayAsyncResourceService = gatewayAsyncResourceService;
         this.objectMapper = objectMapper;
+        this.openAiResponsesEncoder = new OpenAiResponsesEncoder(objectMapper);
     }
 
     @PostMapping
@@ -65,14 +58,14 @@ public class OpenAiResponsesController {
         ChatExecutionRequest executionRequest = toExecutionRequest(distributedKey.keyPrefix(), requestBody);
 
         if (requestBody.path("stream").asBoolean(false)) {
-            ChatExecutionStreamResponse streamResponse = gatewayChatExecutionService.executeStream(executionRequest);
+            var streamResponse = gatewayChatExecutionService.executeGatewayStream(executionRequest);
             return ResponseEntity.ok()
                     .contentType(MediaType.TEXT_EVENT_STREAM)
-                    .body(encodeStream(streamResponse));
+                    .body(openAiResponsesEncoder.encodeStream(streamResponse));
         }
 
-        ChatExecutionResponse response = gatewayChatExecutionService.execute(executionRequest);
-        OpenAiResponsesResponse payload = OpenAiResponsesResponse.from(response);
+        var response = gatewayChatExecutionService.executeGatewayResponse(executionRequest);
+        OpenAiResponsesResponse payload = openAiResponsesEncoder.encode(response);
         if (requestBody.path("store").asBoolean(false)) {
             return ResponseEntity.ok(gatewayAsyncResourceService.storeResponse(
                     distributedKey.id(),
@@ -129,344 +122,6 @@ public class OpenAiResponsesController {
                         : null,
                 requestBody
         );
-    }
-
-    private Flux<String> encodeStream(ChatExecutionStreamResponse response) {
-        AtomicReference<StringBuilder> textAccumulator = new AtomicReference<>(new StringBuilder());
-        AtomicReference<StringBuilder> reasoningAccumulator = new AtomicReference<>(new StringBuilder());
-        AtomicReference<GatewayUsage> latestUsage = new AtomicReference<>(GatewayUsage.empty());
-        AtomicBoolean reasoningStarted = new AtomicBoolean(false);
-        String itemId = "msg_" + response.requestId();
-        String reasoningItemId = "rs_" + response.requestId();
-
-        return Flux.concat(
-                Flux.just(
-                        encodeEvent("response.created", createdEvent(response)),
-                        encodeEvent("response.in_progress", inProgressEvent(response)),
-                        encodeEvent("response.output_item.added", outputItemAddedEvent(itemId)),
-                        encodeEvent("response.content_part.added", contentPartAddedEvent(itemId))
-                ),
-                response.chunks().flatMap(chunk -> encodeChunk(
-                        response,
-                        chunk,
-                        itemId,
-                        reasoningItemId,
-                        textAccumulator,
-                        reasoningAccumulator,
-                        latestUsage,
-                        reasoningStarted
-                ))
-        );
-    }
-
-    private Flux<String> encodeChunk(
-            ChatExecutionStreamResponse response,
-            ChatExecutionStreamChunk chunk,
-            String itemId,
-            String reasoningItemId,
-            AtomicReference<StringBuilder> textAccumulator,
-            AtomicReference<StringBuilder> reasoningAccumulator,
-            AtomicReference<GatewayUsage> latestUsage,
-            AtomicBoolean reasoningStarted) {
-        List<String> events = new ArrayList<>();
-
-        if (chunk.usage() != null) {
-            latestUsage.set(chunk.usage());
-        }
-        if (chunk.reasoningDelta() != null && !chunk.reasoningDelta().isBlank()) {
-            if (reasoningStarted.compareAndSet(false, true)) {
-                events.add(encodeEvent("response.output_item.added", reasoningItemAddedEvent(reasoningItemId)));
-                events.add(encodeEvent("response.reasoning_summary_part.added", reasoningSummaryPartAddedEvent(reasoningItemId)));
-            }
-            reasoningAccumulator.get().append(chunk.reasoningDelta());
-            events.add(encodeEvent("response.reasoning_summary_text.delta", reasoningSummaryTextDeltaEvent(reasoningItemId, chunk.reasoningDelta())));
-        }
-        if (chunk.toolCalls() != null && !chunk.toolCalls().isEmpty()) {
-            int outputIndexBase = reasoningStarted.get() ? 2 : 1;
-            for (int index = 0; index < chunk.toolCalls().size(); index++) {
-                events.addAll(encodeToolCallEvents(chunk.toolCalls().get(index), outputIndexBase + index));
-            }
-        }
-        if (chunk.textDelta() != null && !chunk.textDelta().isBlank()) {
-            textAccumulator.get().append(chunk.textDelta());
-            events.add(encodeEvent("response.output_text.delta", outputTextDeltaEvent(itemId, chunk.textDelta())));
-        }
-
-        if (!chunk.terminal()) {
-            return events.isEmpty() ? Flux.empty() : Flux.fromIterable(events);
-        }
-
-        String finalReasoning = reasoningAccumulator.get().toString();
-        String finalText = textAccumulator.get().toString();
-        GatewayUsage usage = latestUsage.get();
-        if (reasoningStarted.get()) {
-            events.add(encodeEvent("response.reasoning_summary_text.done", reasoningSummaryTextDoneEvent(reasoningItemId, finalReasoning)));
-            events.add(encodeEvent("response.reasoning_summary_part.done", reasoningSummaryPartDoneEvent(reasoningItemId, finalReasoning)));
-            events.add(encodeEvent("response.output_item.done", reasoningItemDoneEvent(reasoningItemId, finalReasoning)));
-        }
-        events.add(encodeEvent("response.output_text.done", outputTextDoneEvent(itemId, finalText)));
-        events.add(encodeEvent("response.content_part.done", contentPartDoneEvent(itemId, finalText)));
-        events.add(encodeEvent("response.output_item.done", outputItemDoneEvent(itemId, finalText)));
-        events.add(encodeEvent("response.completed", completedEvent(response, finalText, usage, finalReasoning.isBlank() ? null : finalReasoning)));
-        return Flux.fromIterable(events);
-    }
-
-    private Map<String, Object> createdEvent(ChatExecutionStreamResponse response) {
-        return Map.of(
-                "type", "response.created",
-                "response", OpenAiResponsesResponse.inProgress(response)
-        );
-    }
-
-    private Map<String, Object> inProgressEvent(ChatExecutionStreamResponse response) {
-        return Map.of(
-                "type", "response.in_progress",
-                "response", OpenAiResponsesResponse.inProgress(response)
-        );
-    }
-
-    private Map<String, Object> outputItemAddedEvent(String itemId) {
-        Map<String, Object> item = new LinkedHashMap<>();
-        item.put("id", itemId);
-        item.put("type", "message");
-        item.put("status", "in_progress");
-        item.put("role", "assistant");
-        item.put("content", List.of());
-
-        return Map.of(
-                "type", "response.output_item.added",
-                "output_index", 0,
-                "item", item
-        );
-    }
-
-    private Map<String, Object> contentPartAddedEvent(String itemId) {
-        return Map.of(
-                "type", "response.content_part.added",
-                "item_id", itemId,
-                "output_index", 0,
-                "content_index", 0,
-                "part", Map.of(
-                        "type", "output_text",
-                        "text", "",
-                        "annotations", List.of()
-                )
-        );
-    }
-
-    private Map<String, Object> reasoningItemAddedEvent(String itemId) {
-        return Map.of(
-                "type", "response.output_item.added",
-                "output_index", 1,
-                "item", Map.of(
-                        "id", itemId,
-                        "type", "reasoning",
-                        "status", "in_progress",
-                        "summary", List.of()
-                )
-        );
-    }
-
-    private Map<String, Object> reasoningSummaryPartAddedEvent(String itemId) {
-        return Map.of(
-                "type", "response.reasoning_summary_part.added",
-                "item_id", itemId,
-                "output_index", 1,
-                "summary_index", 0,
-                "part", Map.of(
-                        "type", "summary_text",
-                        "text", ""
-                )
-        );
-    }
-
-    private Map<String, Object> reasoningSummaryTextDeltaEvent(String itemId, String delta) {
-        return Map.of(
-                "type", "response.reasoning_summary_text.delta",
-                "item_id", itemId,
-                "output_index", 1,
-                "summary_index", 0,
-                "delta", delta
-        );
-    }
-
-    private Map<String, Object> reasoningSummaryTextDoneEvent(String itemId, String text) {
-        return Map.of(
-                "type", "response.reasoning_summary_text.done",
-                "item_id", itemId,
-                "output_index", 1,
-                "summary_index", 0,
-                "text", text
-        );
-    }
-
-    private Map<String, Object> reasoningSummaryPartDoneEvent(String itemId, String text) {
-        return Map.of(
-                "type", "response.reasoning_summary_part.done",
-                "item_id", itemId,
-                "output_index", 1,
-                "summary_index", 0,
-                "part", Map.of(
-                        "type", "summary_text",
-                        "text", text
-                )
-        );
-    }
-
-    private Map<String, Object> reasoningItemDoneEvent(String itemId, String text) {
-        return Map.of(
-                "type", "response.output_item.done",
-                "output_index", 1,
-                "item", Map.of(
-                        "id", itemId,
-                        "type", "reasoning",
-                        "status", "completed",
-                        "summary", List.of(Map.of(
-                                "type", "summary_text",
-                                "text", text
-                        ))
-                )
-        );
-    }
-
-    private Map<String, Object> outputTextDeltaEvent(String itemId, String delta) {
-        return Map.of(
-                "type", "response.output_text.delta",
-                "item_id", itemId,
-                "output_index", 0,
-                "content_index", 0,
-                "delta", delta
-        );
-    }
-
-    private Map<String, Object> outputTextDoneEvent(String itemId, String text) {
-        return Map.of(
-                "type", "response.output_text.done",
-                "item_id", itemId,
-                "output_index", 0,
-                "content_index", 0,
-                "text", text
-        );
-    }
-
-    private Map<String, Object> contentPartDoneEvent(String itemId, String text) {
-        return Map.of(
-                "type", "response.content_part.done",
-                "item_id", itemId,
-                "output_index", 0,
-                "content_index", 0,
-                "part", Map.of(
-                        "type", "output_text",
-                        "text", text,
-                        "annotations", List.of()
-                )
-        );
-    }
-
-    private Map<String, Object> outputItemDoneEvent(String itemId, String text) {
-        Map<String, Object> item = new LinkedHashMap<>();
-        item.put("id", itemId);
-        item.put("type", "message");
-        item.put("status", "completed");
-        item.put("role", "assistant");
-        item.put("content", List.of(Map.of(
-                "type", "output_text",
-                "text", text,
-                "annotations", List.of()
-        )));
-
-        return Map.of(
-                "type", "response.output_item.done",
-                "output_index", 0,
-                "item", item
-        );
-    }
-
-    private List<String> encodeToolCallEvents(com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolCall toolCall, int outputIndex) {
-        String itemId = toolCall.id() == null || toolCall.id().isBlank() ? "fc_" + outputIndex : toolCall.id();
-        List<String> events = new ArrayList<>();
-        events.add(encodeEvent("response.output_item.added", functionCallAddedEvent(itemId, outputIndex, toolCall)));
-        if (toolCall.arguments() != null && !toolCall.arguments().isBlank()) {
-            events.add(encodeEvent("response.function_call_arguments.delta",
-                    functionCallArgumentsDeltaEvent(itemId, outputIndex, toolCall.arguments())));
-            events.add(encodeEvent("response.function_call_arguments.done",
-                    functionCallArgumentsDoneEvent(itemId, outputIndex, toolCall.arguments())));
-        }
-        events.add(encodeEvent("response.output_item.done", functionCallDoneEvent(itemId, outputIndex, toolCall)));
-        return events;
-    }
-
-    private Map<String, Object> functionCallAddedEvent(
-            String itemId,
-            int outputIndex,
-            com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolCall toolCall) {
-        return Map.of(
-                "type", "response.output_item.added",
-                "output_index", outputIndex,
-                "item", Map.of(
-                        "id", itemId,
-                        "type", "function_call",
-                        "call_id", itemId,
-                        "name", toolCall.name(),
-                        "arguments", "",
-                        "status", "in_progress"
-                )
-        );
-    }
-
-    private Map<String, Object> functionCallArgumentsDeltaEvent(String itemId, int outputIndex, String arguments) {
-        return Map.of(
-                "type", "response.function_call_arguments.delta",
-                "item_id", itemId,
-                "output_index", outputIndex,
-                "delta", arguments
-        );
-    }
-
-    private Map<String, Object> functionCallArgumentsDoneEvent(String itemId, int outputIndex, String arguments) {
-        return Map.of(
-                "type", "response.function_call_arguments.done",
-                "item_id", itemId,
-                "output_index", outputIndex,
-                "arguments", arguments
-        );
-    }
-
-    private Map<String, Object> functionCallDoneEvent(
-            String itemId,
-            int outputIndex,
-            com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolCall toolCall) {
-        return Map.of(
-                "type", "response.output_item.done",
-                "output_index", outputIndex,
-                "item", Map.of(
-                        "id", itemId,
-                        "type", "function_call",
-                        "call_id", itemId,
-                        "name", toolCall.name(),
-                        "arguments", toolCall.arguments() == null ? "" : toolCall.arguments(),
-                        "status", "completed"
-                )
-        );
-    }
-
-    private Map<String, Object> completedEvent(
-            ChatExecutionStreamResponse response,
-            String text,
-            GatewayUsage usage,
-            String reasoning) {
-        return Map.of(
-                "type", "response.completed",
-                "response", OpenAiResponsesResponse.completed(response, text, usage, reasoning)
-        );
-    }
-
-    private String encodeEvent(String eventName, Object payload) {
-        try {
-            return "event: " + eventName + "\n" + "data: " + objectMapper.writeValueAsString(payload) + "\n\n";
-        } catch (JsonProcessingException exception) {
-            throw new IllegalStateException("无法序列化 Responses stream 响应。", exception);
-        }
     }
 
     private List<MessageInput> toMessages(JsonNode instructionsNode, JsonNode inputNode) {

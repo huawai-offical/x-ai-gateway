@@ -5,10 +5,13 @@ import com.prodigalgal.xaigateway.admin.api.CacheHitLogResponse;
 import com.prodigalgal.xaigateway.admin.api.RouteDecisionLogResponse;
 import com.prodigalgal.xaigateway.admin.api.UpstreamCacheReferenceResponse;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UsageRecordEntity;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UsageRecordRepository;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.springframework.data.domain.PageRequest;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -19,7 +22,8 @@ class AnalyticsQueryServiceTests {
     @Test
     void shouldBuildTimelineForRequestedWindowAndKeepCacheOnlyBreakdownKeys() {
         ObservabilityQueryService observabilityQueryService = Mockito.mock(ObservabilityQueryService.class);
-        AnalyticsQueryService service = new AnalyticsQueryService(observabilityQueryService);
+        UsageRecordRepository usageRecordRepository = Mockito.mock(UsageRecordRepository.class);
+        AnalyticsQueryService service = new AnalyticsQueryService(observabilityQueryService, usageRecordRepository);
 
         Instant from = Instant.parse("2026-04-07T08:15:00Z");
         Instant to = Instant.parse("2026-04-07T10:45:00Z");
@@ -53,6 +57,11 @@ class AnalyticsQueryServiceTests {
                         Instant.parse("2026-04-07T08:00:00Z"),
                         Instant.parse("2026-04-07T10:00:00Z")
                 )));
+        when(usageRecordRepository.searchWithinWindow(1L, ProviderType.OPENAI_DIRECT, from, to))
+                .thenReturn(List.of(
+                        usageRecord(com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageCompleteness.FINAL),
+                        usageRecord(com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageCompleteness.PARTIAL)
+                ));
 
         AnalyticsOverviewResponse response = service.overview(1L, ProviderType.OPENAI_DIRECT, from, to, 60);
 
@@ -61,14 +70,25 @@ class AnalyticsQueryServiceTests {
         assertEquals(60, response.bucketMinutes());
         assertEquals(2, response.sampledRouteDecisionCount());
         assertEquals(2, response.sampledCacheHitCount());
+        assertEquals(2, response.sampledUsageRecordCount());
+        assertEquals(1, response.sampledFinalUsageRecordCount());
+        assertEquals(1, response.sampledPartialUsageRecordCount());
         assertEquals(3, response.timeline().size());
         assertEquals(1, response.timeline().get(0).routeDecisionCount());
         assertEquals(1, response.timeline().get(0).cacheHitCount());
         assertEquals(700, response.timeline().get(2).cacheHitTokens());
+        assertEquals("prompt_cache", response.cacheSourceBreakdown().get(0).key());
+        assertTrue(response.usageCompletenessBreakdown().stream().anyMatch(item -> item.key().equals("FINAL") && item.count() == 1));
         assertTrue(response.providerBreakdown().stream().anyMatch(item ->
                 item.key().equals("GEMINI_DIRECT")
                         && item.count() == 0
                         && item.cacheHitTokens() == 700));
+    }
+
+    private UsageRecordEntity usageRecord(com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageCompleteness completeness) {
+        UsageRecordEntity entity = new UsageRecordEntity();
+        entity.setCompleteness(completeness);
+        return entity;
     }
 
     private RouteDecisionLogResponse routeDecision(

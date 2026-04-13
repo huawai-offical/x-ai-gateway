@@ -8,9 +8,11 @@ import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.infra.persistence.entity.CacheHitLogEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.RouteDecisionLogEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCacheReferenceEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UsageRecordEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.CacheHitLogRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.RouteDecisionLogRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCacheReferenceRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UsageRecordRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -28,14 +30,17 @@ public class ObservabilityQueryService {
     private final RouteDecisionLogRepository routeDecisionLogRepository;
     private final CacheHitLogRepository cacheHitLogRepository;
     private final UpstreamCacheReferenceRepository upstreamCacheReferenceRepository;
+    private final UsageRecordRepository usageRecordRepository;
 
     public ObservabilityQueryService(
             RouteDecisionLogRepository routeDecisionLogRepository,
             CacheHitLogRepository cacheHitLogRepository,
-            UpstreamCacheReferenceRepository upstreamCacheReferenceRepository) {
+            UpstreamCacheReferenceRepository upstreamCacheReferenceRepository,
+            UsageRecordRepository usageRecordRepository) {
         this.routeDecisionLogRepository = routeDecisionLogRepository;
         this.cacheHitLogRepository = cacheHitLogRepository;
         this.upstreamCacheReferenceRepository = upstreamCacheReferenceRepository;
+        this.usageRecordRepository = usageRecordRepository;
     }
 
     public List<RouteDecisionLogResponse> listRouteDecisions(Long distributedKeyId) {
@@ -140,6 +145,9 @@ public class ObservabilityQueryService {
                 "ACTIVE",
                 from,
                 to);
+        List<UsageRecordEntity> usageRecords = window == null
+                ? usageRecordRepository.search(distributedKeyId, providerType, DEFAULT_SAMPLE_PAGE)
+                : usageRecordRepository.searchWithinWindow(distributedKeyId, providerType, window.from(), window.to());
 
         long totalCacheHitTokens = cacheHits.stream()
                 .mapToLong(CacheHitLogResponse::cacheHitTokens)
@@ -150,6 +158,12 @@ public class ObservabilityQueryService {
         long totalSavedInputTokens = cacheHits.stream()
                 .mapToLong(CacheHitLogResponse::savedInputTokens)
                 .sum();
+        int finalUsageCount = (int) usageRecords.stream()
+                .filter(entity -> entity.getCompleteness() == com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageCompleteness.FINAL)
+                .count();
+        int partialUsageCount = (int) usageRecords.stream()
+                .filter(entity -> entity.getCompleteness() == com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageCompleteness.PARTIAL)
+                .count();
 
         return new ObservabilitySummaryResponse(
                 window == null ? null : window.from(),
@@ -157,6 +171,9 @@ public class ObservabilityQueryService {
                 routeDecisions.size(),
                 cacheHits.size(),
                 upstreamReferences.size(),
+                usageRecords.size(),
+                finalUsageCount,
+                partialUsageCount,
                 totalCacheHitTokens,
                 totalCacheWriteTokens,
                 totalSavedInputTokens

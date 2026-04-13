@@ -4,7 +4,10 @@ import com.prodigalgal.xaigateway.admin.api.AnalyticsOverviewResponse;
 import com.prodigalgal.xaigateway.admin.api.CacheHitLogResponse;
 import com.prodigalgal.xaigateway.admin.api.RouteDecisionLogResponse;
 import com.prodigalgal.xaigateway.admin.api.UpstreamCacheReferenceResponse;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageCompleteness;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UsageRecordEntity;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UsageRecordRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -16,6 +19,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,9 +34,13 @@ public class AnalyticsQueryService {
     private static final Duration DEFAULT_PARTIAL_WINDOW = Duration.ofHours(24);
 
     private final ObservabilityQueryService observabilityQueryService;
+    private final UsageRecordRepository usageRecordRepository;
 
-    public AnalyticsQueryService(ObservabilityQueryService observabilityQueryService) {
+    public AnalyticsQueryService(
+            ObservabilityQueryService observabilityQueryService,
+            UsageRecordRepository usageRecordRepository) {
         this.observabilityQueryService = observabilityQueryService;
+        this.usageRecordRepository = usageRecordRepository;
     }
 
     public AnalyticsOverviewResponse overview(Long distributedKeyId, ProviderType providerType) {
@@ -64,6 +72,9 @@ public class AnalyticsQueryService {
                 "ACTIVE",
                 requestedWindow == null ? null : requestedWindow.from(),
                 requestedWindow == null ? null : requestedWindow.to());
+        List<UsageRecordEntity> usageRecords = requestedWindow == null
+                ? usageRecordRepository.search(distributedKeyId, providerType, PageRequest.of(0, 100))
+                : usageRecordRepository.searchWithinWindow(distributedKeyId, providerType, requestedWindow.from(), requestedWindow.to());
 
         List<RouteDecisionLogResponse> sortedRouteDecisions = routeDecisions.stream()
                 .sorted(Comparator.comparing(RouteDecisionLogResponse::createdAt, Comparator.nullsLast(Comparator.naturalOrder())))
@@ -75,6 +86,12 @@ public class AnalyticsQueryService {
         long totalCacheHitTokens = sortedCacheHits.stream().mapToLong(CacheHitLogResponse::cacheHitTokens).sum();
         long totalCacheWriteTokens = sortedCacheHits.stream().mapToLong(CacheHitLogResponse::cacheWriteTokens).sum();
         long totalSavedInputTokens = sortedCacheHits.stream().mapToLong(CacheHitLogResponse::savedInputTokens).sum();
+        long finalUsageCount = usageRecords.stream()
+                .filter(entity -> entity.getCompleteness() == GatewayUsageCompleteness.FINAL)
+                .count();
+        long partialUsageCount = usageRecords.stream()
+                .filter(entity -> entity.getCompleteness() == GatewayUsageCompleteness.PARTIAL)
+                .count();
         TimeWindow sampledWindow = resolveSampledWindow(requestedWindow, sortedRouteDecisions, sortedCacheHits);
 
         return new AnalyticsOverviewResponse(
@@ -84,6 +101,9 @@ public class AnalyticsQueryService {
                 sortedRouteDecisions.size(),
                 sortedCacheHits.size(),
                 activeReferences.size(),
+                usageRecords.size(),
+                finalUsageCount,
+                partialUsageCount,
                 totalCacheHitTokens,
                 totalCacheWriteTokens,
                 totalSavedInputTokens,
@@ -91,6 +111,8 @@ public class AnalyticsQueryService {
                 protocolBreakdown(sortedRouteDecisions, sortedCacheHits),
                 selectionSourceBreakdown(sortedRouteDecisions),
                 modelGroupBreakdown(sortedRouteDecisions, sortedCacheHits),
+                cacheSourceBreakdown(sortedCacheHits),
+                usageCompletenessBreakdown(usageRecords),
                 buildTimeline(sortedRouteDecisions, sortedCacheHits, sampledWindow, resolvedBucketMinutes)
         );
     }
@@ -143,6 +165,31 @@ public class AnalyticsQueryService {
                 RouteDecisionLogResponse::modelGroup,
                 CacheHitLogResponse::modelGroup
         );
+    }
+
+    private List<AnalyticsOverviewResponse.BreakdownItem> cacheSourceBreakdown(List<CacheHitLogResponse> cacheHits) {
+        Map<String, List<CacheHitLogResponse>> groups = cacheHits.stream()
+                .collect(Collectors.groupingBy(CacheHitLogResponse::cacheKind));
+
+        return groups.entrySet().stream()
+                .map(entry -> new AnalyticsOverviewResponse.BreakdownItem(
+                        entry.getKey(),
+                        entry.getValue().size(),
+                        entry.getValue().stream().mapToLong(CacheHitLogResponse::cacheHitTokens).sum(),
+                        entry.getValue().stream().mapToLong(CacheHitLogResponse::cacheWriteTokens).sum(),
+                        entry.getValue().stream().mapToLong(CacheHitLogResponse::savedInputTokens).sum()
+                ))
+                .sorted(Comparator.comparingLong(AnalyticsOverviewResponse.BreakdownItem::count).reversed())
+                .toList();
+    }
+
+    private List<AnalyticsOverviewResponse.CountBreakdownItem> usageCompletenessBreakdown(List<UsageRecordEntity> usageRecords) {
+        return usageRecords.stream()
+                .collect(Collectors.groupingBy(entity -> entity.getCompleteness().name(), Collectors.counting()))
+                .entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                .map(entry -> new AnalyticsOverviewResponse.CountBreakdownItem(entry.getKey(), entry.getValue()))
+                .toList();
     }
 
     private <K> List<AnalyticsOverviewResponse.BreakdownItem> buildBreakdown(

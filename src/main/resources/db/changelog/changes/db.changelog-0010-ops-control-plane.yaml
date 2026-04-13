@@ -6,64 +6,265 @@ databaseChangeLog:
         - createTable:
             tableName: ops_alert_rule
             columns:
-              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
-              - column: { name: rule_name, type: VARCHAR(128), constraints: { nullable: false } }
-              - column: { name: metric_key, type: VARCHAR(64), constraints: { nullable: false } }
-              - column: { name: priority, type: INT, defaultValueNumeric: 100, constraints: { nullable: false } }
-              - column: { name: comparison_operator, type: VARCHAR(16), constraints: { nullable: false } }
-              - column: { name: threshold_value, type: DECIMAL(18,4), constraints: { nullable: false } }
-              - column: { name: severity, type: VARCHAR(16), constraints: { nullable: false } }
-              - column: { name: enabled, type: BOOLEAN, defaultValueBoolean: true, constraints: { nullable: false } }
-              - column: { name: description, type: VARCHAR(512) }
-              - column: { name: created_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
-              - column: { name: updated_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: rule_name
+                  type: VARCHAR(128)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: metric_key
+                  type: VARCHAR(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: priority
+                  type: INT
+                  defaultValueNumeric: 100
+                  constraints:
+                    nullable: false
+              - column:
+                  name: comparison_operator
+                  type: VARCHAR(16)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: threshold_value
+                  type: "DECIMAL(18,4)"
+                  constraints:
+                    nullable: false
+              - column:
+                  name: severity
+                  type: VARCHAR(16)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+              - column:
+                  name: description
+                  type: VARCHAR(512)
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
         - createTable:
             tableName: ops_alert_event
             columns:
-              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
-              - column: { name: rule_id, type: BIGINT }
-              - column: { name: event_type, type: VARCHAR(64), constraints: { nullable: false } }
-              - column: { name: severity, type: VARCHAR(16), constraints: { nullable: false } }
-              - column: { name: title, type: VARCHAR(256), constraints: { nullable: false } }
-              - column: { name: message, type: VARCHAR(1024), constraints: { nullable: false } }
-              - column: { name: status, type: VARCHAR(32), constraints: { nullable: false } }
-              - column: { name: entity_type, type: VARCHAR(64) }
-              - column: { name: entity_ref, type: VARCHAR(128) }
-              - column: { name: metric_value, type: DECIMAL(18,4) }
-              - column: { name: acknowledged_at, type: TIMESTAMP WITH TIME ZONE }
-              - column: { name: created_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
-              - column: { name: updated_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: rule_id
+                  type: BIGINT
+              - column:
+                  name: event_type
+                  type: VARCHAR(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: severity
+                  type: VARCHAR(16)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: title
+                  type: VARCHAR(256)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: message
+                  type: VARCHAR(1024)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: entity_type
+                  type: VARCHAR(64)
+              - column:
+                  name: entity_ref
+                  type: VARCHAR(128)
+              - column:
+                  name: metric_value
+                  type: "DECIMAL(18,4)"
+              - column:
+                  name: acknowledged_at
+                  type: TIMESTAMP WITH TIME ZONE
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
         - createTable:
             tableName: ops_runtime_log_setting
             columns:
-              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
-              - column: { name: logger_name, type: VARCHAR(128), constraints: { nullable: false } }
-              - column: { name: log_level, type: VARCHAR(16), constraints: { nullable: false } }
-              - column: { name: payload_logging_enabled, type: BOOLEAN, defaultValueBoolean: false, constraints: { nullable: false } }
-              - column: { name: enabled, type: BOOLEAN, defaultValueBoolean: true, constraints: { nullable: false } }
-              - column: { name: created_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
-              - column: { name: updated_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: logger_name
+                  type: VARCHAR(128)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: log_level
+                  type: VARCHAR(16)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: payload_logging_enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
         - createTable:
             tableName: ops_scheduled_probe_job
             columns:
-              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
-              - column: { name: job_name, type: VARCHAR(128), constraints: { nullable: false } }
-              - column: { name: probe_type, type: VARCHAR(32), constraints: { nullable: false } }
-              - column: { name: target_ref, type: VARCHAR(256), constraints: { nullable: false } }
-              - column: { name: interval_seconds, type: INT, defaultValueNumeric: 60, constraints: { nullable: false } }
-              - column: { name: enabled, type: BOOLEAN, defaultValueBoolean: true, constraints: { nullable: false } }
-              - column: { name: last_run_at, type: TIMESTAMP WITH TIME ZONE }
-              - column: { name: last_status, type: VARCHAR(32) }
-              - column: { name: last_error_message, type: VARCHAR(512) }
-              - column: { name: created_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
-              - column: { name: updated_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: job_name
+                  type: VARCHAR(128)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: probe_type
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: target_ref
+                  type: VARCHAR(256)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: interval_seconds
+                  type: INT
+                  defaultValueNumeric: 60
+                  constraints:
+                    nullable: false
+              - column:
+                  name: enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+              - column:
+                  name: last_run_at
+                  type: TIMESTAMP WITH TIME ZONE
+              - column:
+                  name: last_status
+                  type: VARCHAR(32)
+              - column:
+                  name: last_error_message
+                  type: VARCHAR(512)
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
         - createTable:
             tableName: ops_operation_audit
             columns:
-              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
-              - column: { name: category, type: VARCHAR(32), constraints: { nullable: false } }
-              - column: { name: action, type: VARCHAR(64), constraints: { nullable: false } }
-              - column: { name: resource_type, type: VARCHAR(64) }
-              - column: { name: resource_ref, type: VARCHAR(128) }
-              - column: { name: detail_json, type: TEXT }
-              - column: { name: created_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: category
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: action
+                  type: VARCHAR(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: resource_type
+                  type: VARCHAR(64)
+              - column:
+                  name: resource_ref
+                  type: VARCHAR(128)
+              - column:
+                  name: detail_json
+                  type: TEXT
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false

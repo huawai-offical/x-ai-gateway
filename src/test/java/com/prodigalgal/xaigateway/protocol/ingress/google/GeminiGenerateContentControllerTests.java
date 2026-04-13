@@ -5,10 +5,15 @@ import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthenticationService;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionResponse;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionStreamChunk;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionStreamResponse;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolCall;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayFinishReason;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayResponse;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamEvent;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamEventType;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamResponse;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageCompleteness;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageSource;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageView;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionSource;
@@ -44,14 +49,8 @@ class GeminiGenerateContentControllerTests {
     void shouldExecuteMinimalGenerateContent() {
         Mockito.when(distributedKeyAuthenticationService.authenticateRawToken("sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.execute(Mockito.<ChatExecutionRequest>any()))
-                .thenReturn(new ChatExecutionResponse(
-                        "req-gemini-1",
-                        selectionResult(),
-                        "gemini back",
-                        new GatewayUsage(1000, 720, 350, 40, 280, 0, 280, 0, null, 1350, null),
-                        List.of()
-                ));
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<ChatExecutionRequest>any()))
+                .thenReturn(gatewayResponse("req-gemini-1", "gemini back", new GatewayUsage(1000, 720, 350, 40, 280, 0, 280, 0, null, 1350, null), List.of()));
 
         webTestClient.post()
                 .uri("/v1beta/models/gemini-2.5-pro:generateContent")
@@ -84,10 +83,9 @@ class GeminiGenerateContentControllerTests {
     void shouldReturnFunctionCallParts() {
         Mockito.when(distributedKeyAuthenticationService.authenticateRawToken("sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.execute(Mockito.<ChatExecutionRequest>any()))
-                .thenReturn(new ChatExecutionResponse(
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<ChatExecutionRequest>any()))
+                .thenReturn(gatewayResponse(
                         "req-gemini-tool-1",
-                        selectionResult(),
                         "",
                         GatewayUsage.empty(),
                         List.of(new GatewayToolCall(
@@ -134,14 +132,8 @@ class GeminiGenerateContentControllerTests {
     void shouldAcceptGeminiFileDataImageParts() {
         Mockito.when(distributedKeyAuthenticationService.authenticateRawToken("sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.execute(Mockito.<ChatExecutionRequest>any()))
-                .thenReturn(new ChatExecutionResponse(
-                        "req-gemini-image-1",
-                        selectionResult(),
-                        "image processed",
-                        GatewayUsage.empty(),
-                        List.of()
-                ));
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<ChatExecutionRequest>any()))
+                .thenReturn(gatewayResponse("req-gemini-image-1", "image processed", GatewayUsage.empty(), List.of()));
 
         webTestClient.post()
                 .uri("/v1beta/models/gemini-2.5-pro:generateContent")
@@ -170,14 +162,8 @@ class GeminiGenerateContentControllerTests {
     void shouldAcceptGeminiFileDataDocumentParts() {
         Mockito.when(distributedKeyAuthenticationService.authenticateRawToken("sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.execute(Mockito.<ChatExecutionRequest>any()))
-                .thenReturn(new ChatExecutionResponse(
-                        "req-gemini-doc-1",
-                        selectionResult(),
-                        "document processed",
-                        GatewayUsage.empty(),
-                        List.of()
-                ));
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<ChatExecutionRequest>any()))
+                .thenReturn(gatewayResponse("req-gemini-doc-1", "document processed", GatewayUsage.empty(), List.of()));
 
         webTestClient.post()
                 .uri("/v1beta/models/gemini-2.5-pro:generateContent")
@@ -206,14 +192,8 @@ class GeminiGenerateContentControllerTests {
     void shouldAcceptGeminiGatewayFileIdParts() {
         Mockito.when(distributedKeyAuthenticationService.authenticateRawToken("sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.execute(Mockito.<ChatExecutionRequest>any()))
-                .thenReturn(new ChatExecutionResponse(
-                        "req-gemini-fileid-1",
-                        selectionResult(),
-                        "gateway file processed",
-                        GatewayUsage.empty(),
-                        List.of()
-                ));
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<ChatExecutionRequest>any()))
+                .thenReturn(gatewayResponse("req-gemini-fileid-1", "gateway file processed", GatewayUsage.empty(), List.of()));
 
         webTestClient.post()
                 .uri("/v1beta/models/gemini-2.5-pro:generateContent")
@@ -241,14 +221,8 @@ class GeminiGenerateContentControllerTests {
     void shouldAcceptGeminiFileOnlyMessage() {
         Mockito.when(distributedKeyAuthenticationService.authenticateRawToken("sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.execute(Mockito.<ChatExecutionRequest>any()))
-                .thenReturn(new ChatExecutionResponse(
-                        "req-gemini-file-only-1",
-                        selectionResult(),
-                        "file only processed",
-                        GatewayUsage.empty(),
-                        List.of()
-                ));
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<ChatExecutionRequest>any()))
+                .thenReturn(gatewayResponse("req-gemini-file-only-1", "file only processed", GatewayUsage.empty(), List.of()));
 
         webTestClient.post()
                 .uri("/v1beta/models/gemini-2.5-pro:generateContent")
@@ -276,14 +250,14 @@ class GeminiGenerateContentControllerTests {
     void shouldExecuteMinimalStreamGenerateContent() {
         Mockito.when(distributedKeyAuthenticationService.authenticateRawToken("sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.executeStream(Mockito.<ChatExecutionRequest>any()))
-                .thenReturn(new ChatExecutionStreamResponse(
+        Mockito.when(gatewayChatExecutionService.executeGatewayStream(Mockito.<ChatExecutionRequest>any()))
+                .thenReturn(new GatewayStreamResponse(
                         "req-gemini-stream-1",
                         selectionResult(),
                         Flux.just(
-                                new ChatExecutionStreamChunk("hello", null, GatewayUsage.empty(), false),
-                                new ChatExecutionStreamChunk(" world", null, GatewayUsage.empty(), false),
-                                new ChatExecutionStreamChunk(null, "stop", GatewayUsage.empty(), true)
+                                textEvent("hello"),
+                                textEvent(" world"),
+                                completedEvent("hello world")
                         )
                 ));
 
@@ -343,6 +317,64 @@ class GeminiGenerateContentControllerTests {
                 RouteSelectionSource.PREFIX_AFFINITY,
                 routeCandidateView,
                 List.of(routeCandidateView)
+        );
+    }
+
+    private GatewayResponse gatewayResponse(String requestId, String text, GatewayUsage usage, List<GatewayToolCall> toolCalls) {
+        return new GatewayResponse(
+                requestId,
+                selectionResult(),
+                text,
+                new GatewayUsageView(
+                        usage.rawPromptTokens(),
+                        usage.promptTokens(),
+                        usage.completionTokens(),
+                        usage.reasoningTokens(),
+                        usage.cacheHitTokens(),
+                        usage.cacheWriteTokens(),
+                        usage.upstreamCacheHitTokens(),
+                        usage.upstreamCacheWriteTokens(),
+                        usage.savedInputTokens(),
+                        usage.cachedContentRef(),
+                        usage.totalTokens(),
+                        GatewayUsageCompleteness.FINAL,
+                        GatewayUsageSource.DIRECT_RESPONSE,
+                        usage.nativeUsagePayload()
+                ),
+                toolCalls,
+                null,
+                toolCalls.isEmpty() ? GatewayFinishReason.STOP : GatewayFinishReason.TOOL_CALLS,
+                null
+        );
+    }
+
+    private GatewayStreamEvent textEvent(String delta) {
+        return new GatewayStreamEvent(
+                GatewayStreamEventType.TEXT_DELTA,
+                delta,
+                null,
+                List.of(),
+                GatewayUsageView.empty(),
+                false,
+                null,
+                null,
+                null,
+                null
+        );
+    }
+
+    private GatewayStreamEvent completedEvent(String text) {
+        return new GatewayStreamEvent(
+                GatewayStreamEventType.COMPLETED,
+                null,
+                null,
+                List.of(),
+                GatewayUsageView.empty(),
+                true,
+                GatewayFinishReason.STOP,
+                text,
+                null,
+                null
         );
     }
 }

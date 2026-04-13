@@ -4,9 +4,11 @@ import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.infra.persistence.entity.CacheHitLogEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.RouteDecisionLogEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCacheReferenceEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UsageRecordEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.CacheHitLogRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.RouteDecisionLogRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCacheReferenceRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UsageRecordRepository;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
@@ -25,6 +27,7 @@ class ObservabilityQueryServiceTests {
         RouteDecisionLogRepository routeDecisionLogRepository = Mockito.mock(RouteDecisionLogRepository.class);
         CacheHitLogRepository cacheHitLogRepository = Mockito.mock(CacheHitLogRepository.class);
         UpstreamCacheReferenceRepository upstreamCacheReferenceRepository = Mockito.mock(UpstreamCacheReferenceRepository.class);
+        UsageRecordRepository usageRecordRepository = Mockito.mock(UsageRecordRepository.class);
 
         CacheHitLogEntity entity = new CacheHitLogEntity();
         entity.setDistributedKeyId(7L);
@@ -37,7 +40,8 @@ class ObservabilityQueryServiceTests {
         ObservabilityQueryService service = new ObservabilityQueryService(
                 routeDecisionLogRepository,
                 cacheHitLogRepository,
-                upstreamCacheReferenceRepository
+                upstreamCacheReferenceRepository,
+                usageRecordRepository
         );
 
         assertEquals(1, service.listCacheHits(7L, ProviderType.OPENAI_DIRECT).size());
@@ -49,6 +53,7 @@ class ObservabilityQueryServiceTests {
         RouteDecisionLogRepository routeDecisionLogRepository = Mockito.mock(RouteDecisionLogRepository.class);
         CacheHitLogRepository cacheHitLogRepository = Mockito.mock(CacheHitLogRepository.class);
         UpstreamCacheReferenceRepository upstreamCacheReferenceRepository = Mockito.mock(UpstreamCacheReferenceRepository.class);
+        UsageRecordRepository usageRecordRepository = Mockito.mock(UsageRecordRepository.class);
 
         RouteDecisionLogEntity entity = new RouteDecisionLogEntity();
         entity.setDistributedKeyId(7L);
@@ -60,7 +65,8 @@ class ObservabilityQueryServiceTests {
         ObservabilityQueryService service = new ObservabilityQueryService(
                 routeDecisionLogRepository,
                 cacheHitLogRepository,
-                upstreamCacheReferenceRepository
+                upstreamCacheReferenceRepository,
+                usageRecordRepository
         );
 
         assertEquals(1, service.listRouteDecisions(7L, ProviderType.OPENAI_DIRECT).size());
@@ -72,6 +78,7 @@ class ObservabilityQueryServiceTests {
         RouteDecisionLogRepository routeDecisionLogRepository = Mockito.mock(RouteDecisionLogRepository.class);
         CacheHitLogRepository cacheHitLogRepository = Mockito.mock(CacheHitLogRepository.class);
         UpstreamCacheReferenceRepository upstreamCacheReferenceRepository = Mockito.mock(UpstreamCacheReferenceRepository.class);
+        UsageRecordRepository usageRecordRepository = Mockito.mock(UsageRecordRepository.class);
 
         when(routeDecisionLogRepository.search(eq(7L), eq(ProviderType.OPENAI_DIRECT), ArgumentMatchers.any(Pageable.class)))
                 .thenReturn(List.of(new RouteDecisionLogEntity()));
@@ -83,14 +90,22 @@ class ObservabilityQueryServiceTests {
                 eq("ACTIVE"),
                 ArgumentMatchers.any(Pageable.class)))
                 .thenReturn(List.of(new UpstreamCacheReferenceEntity()));
+        UsageRecordEntity usageRecordEntity = new UsageRecordEntity();
+        usageRecordEntity.setCompleteness(com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageCompleteness.FINAL);
+        when(usageRecordRepository.search(eq(7L), eq(ProviderType.OPENAI_DIRECT), ArgumentMatchers.any(Pageable.class)))
+                .thenReturn(List.of(usageRecordEntity));
 
         ObservabilityQueryService service = new ObservabilityQueryService(
                 routeDecisionLogRepository,
                 cacheHitLogRepository,
-                upstreamCacheReferenceRepository
+                upstreamCacheReferenceRepository,
+                usageRecordRepository
         );
 
-        assertEquals(1, service.summary(7L, ProviderType.OPENAI_DIRECT).sampledActiveUpstreamCacheReferenceCount());
+        var summary = service.summary(7L, ProviderType.OPENAI_DIRECT);
+        assertEquals(1, summary.sampledActiveUpstreamCacheReferenceCount());
+        assertEquals(1, summary.sampledUsageRecordCount());
+        assertEquals(1, summary.sampledFinalUsageRecordCount());
         verify(routeDecisionLogRepository).search(eq(7L), eq(ProviderType.OPENAI_DIRECT), ArgumentMatchers.any(Pageable.class));
         verify(upstreamCacheReferenceRepository).search(
                 eq(7L),

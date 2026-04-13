@@ -4,14 +4,19 @@ import com.prodigalgal.xaigateway.admin.application.GatewayChatExecutionService;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthenticationService;
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionResponse;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionStreamChunk;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionStreamResponse;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolCall;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionSource;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayFinishReason;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayResponse;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamEvent;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamEventType;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamResponse;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageCompleteness;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageSource;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageView;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.shared.ReasoningTransport;
 import com.prodigalgal.xaigateway.gateway.core.usage.GatewayUsage;
@@ -45,13 +50,13 @@ class OpenAiChatCompletionsControllerTests {
     void shouldExecuteMinimalOpenAiCompletion() {
         Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.execute(Mockito.<ChatExecutionRequest>any()))
-                .thenReturn(new ChatExecutionResponse(
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<ChatExecutionRequest>any()))
+                .thenReturn(gatewayResponse(
                         "req-openai-1",
-                        selectionResult(),
                         "hello back",
                         new GatewayUsage(1000, 700, 200, 20, 300, 0, 300, 0, null, 1200, null),
-                        List.of()
+                        List.of(),
+                        GatewayFinishReason.STOP
                 ));
 
         webTestClient.post()
@@ -82,13 +87,13 @@ class OpenAiChatCompletionsControllerTests {
     void shouldExecuteMinimalOpenAiStreamCompletion() {
         Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.executeStream(Mockito.<ChatExecutionRequest>any()))
-                .thenReturn(new ChatExecutionStreamResponse(
+        Mockito.when(gatewayChatExecutionService.executeGatewayStream(Mockito.<ChatExecutionRequest>any()))
+                .thenReturn(new GatewayStreamResponse(
                         "req-openai-stream-1",
                         selectionResult(),
                         Flux.just(
-                                new ChatExecutionStreamChunk("hello", null, GatewayUsage.empty(), false),
-                                new ChatExecutionStreamChunk(null, "stop", GatewayUsage.empty(), true)
+                                textEvent("hello"),
+                                completedEvent(GatewayFinishReason.STOP, "hello", GatewayUsage.empty())
                         )
                 ));
 
@@ -120,24 +125,18 @@ class OpenAiChatCompletionsControllerTests {
     void shouldStreamToolCallDeltas() {
         Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.executeStream(Mockito.<ChatExecutionRequest>any()))
-                .thenReturn(new ChatExecutionStreamResponse(
+        Mockito.when(gatewayChatExecutionService.executeGatewayStream(Mockito.<ChatExecutionRequest>any()))
+                .thenReturn(new GatewayStreamResponse(
                         "req-openai-stream-tool-1",
                         selectionResult(),
                         Flux.just(
-                                new ChatExecutionStreamChunk(
-                                        null,
-                                        null,
-                                        GatewayUsage.empty(),
-                                        false,
-                                        List.of(new GatewayToolCall(
-                                                "call_1",
-                                                "function",
-                                                "lookup_weather",
-                                                "{\"city\":\"Shanghai\"}"
-                                        ))
-                                ),
-                                new ChatExecutionStreamChunk(null, "tool_calls", GatewayUsage.empty(), true)
+                                toolCallEvent(List.of(new GatewayToolCall(
+                                        "call_1",
+                                        "function",
+                                        "lookup_weather",
+                                        "{\"city\":\"Shanghai\"}"
+                                ))),
+                                completedEvent(GatewayFinishReason.TOOL_CALLS, "", GatewayUsage.empty())
                         )
                 ));
 
@@ -181,10 +180,9 @@ class OpenAiChatCompletionsControllerTests {
     void shouldReturnToolCallsWhenModelRequestsFunctionExecution() {
         Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.execute(Mockito.<ChatExecutionRequest>any()))
-                .thenReturn(new ChatExecutionResponse(
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<ChatExecutionRequest>any()))
+                .thenReturn(gatewayResponse(
                         "req-openai-tool-1",
-                        selectionResult(),
                         "",
                         GatewayUsage.empty(),
                         List.of(new GatewayToolCall(
@@ -192,7 +190,8 @@ class OpenAiChatCompletionsControllerTests {
                                 "function",
                                 "lookup_weather",
                                 "{\"city\":\"Shanghai\"}"
-                        ))
+                        )),
+                        GatewayFinishReason.TOOL_CALLS
                 ));
 
         webTestClient.post()
@@ -230,14 +229,8 @@ class OpenAiChatCompletionsControllerTests {
     void shouldAcceptOpenAiContentArrayWithImageUrl() {
         Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.execute(Mockito.<ChatExecutionRequest>any()))
-                .thenReturn(new ChatExecutionResponse(
-                        "req-openai-image-1",
-                        selectionResult(),
-                        "image processed",
-                        GatewayUsage.empty(),
-                        List.of()
-                ));
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<ChatExecutionRequest>any()))
+                .thenReturn(gatewayResponse("req-openai-image-1", "image processed", GatewayUsage.empty(), List.of(), GatewayFinishReason.STOP));
 
         webTestClient.post()
                 .uri("/v1/chat/completions")
@@ -267,14 +260,8 @@ class OpenAiChatCompletionsControllerTests {
     void shouldAcceptOpenAiInputFileBlocks() {
         Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.execute(Mockito.<ChatExecutionRequest>any()))
-                .thenReturn(new ChatExecutionResponse(
-                        "req-openai-file-1",
-                        selectionResult(),
-                        "file processed",
-                        GatewayUsage.empty(),
-                        List.of()
-                ));
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<ChatExecutionRequest>any()))
+                .thenReturn(gatewayResponse("req-openai-file-1", "file processed", GatewayUsage.empty(), List.of(), GatewayFinishReason.STOP));
 
         webTestClient.post()
                 .uri("/v1/chat/completions")
@@ -304,14 +291,8 @@ class OpenAiChatCompletionsControllerTests {
     void shouldAcceptOpenAiGatewayFileIdBlocks() {
         Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.execute(Mockito.<ChatExecutionRequest>any()))
-                .thenReturn(new ChatExecutionResponse(
-                        "req-openai-fileid-1",
-                        selectionResult(),
-                        "gateway file processed",
-                        GatewayUsage.empty(),
-                        List.of()
-                ));
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<ChatExecutionRequest>any()))
+                .thenReturn(gatewayResponse("req-openai-fileid-1", "gateway file processed", GatewayUsage.empty(), List.of(), GatewayFinishReason.STOP));
 
         webTestClient.post()
                 .uri("/v1/chat/completions")
@@ -340,14 +321,8 @@ class OpenAiChatCompletionsControllerTests {
     void shouldAcceptOpenAiImageOnlyMessage() {
         Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.execute(Mockito.<ChatExecutionRequest>any()))
-                .thenReturn(new ChatExecutionResponse(
-                        "req-openai-image-only-1",
-                        selectionResult(),
-                        "image only processed",
-                        GatewayUsage.empty(),
-                        List.of()
-                ));
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<ChatExecutionRequest>any()))
+                .thenReturn(gatewayResponse("req-openai-image-only-1", "image only processed", GatewayUsage.empty(), List.of(), GatewayFinishReason.STOP));
 
         webTestClient.post()
                 .uri("/v1/chat/completions")
@@ -403,6 +378,88 @@ class OpenAiChatCompletionsControllerTests {
                 RouteSelectionSource.PREFIX_AFFINITY,
                 routeCandidateView,
                 List.of(routeCandidateView)
+        );
+    }
+
+    private GatewayResponse gatewayResponse(
+            String requestId,
+            String text,
+            GatewayUsage usage,
+            List<GatewayToolCall> toolCalls,
+            GatewayFinishReason finishReason) {
+        return new GatewayResponse(
+                requestId,
+                selectionResult(),
+                text,
+                usageView(usage),
+                toolCalls,
+                null,
+                finishReason,
+                null
+        );
+    }
+
+    private GatewayUsageView usageView(GatewayUsage usage) {
+        return new GatewayUsageView(
+                usage.rawPromptTokens(),
+                usage.promptTokens(),
+                usage.completionTokens(),
+                usage.reasoningTokens(),
+                usage.cacheHitTokens(),
+                usage.cacheWriteTokens(),
+                usage.upstreamCacheHitTokens(),
+                usage.upstreamCacheWriteTokens(),
+                usage.savedInputTokens(),
+                usage.cachedContentRef(),
+                usage.totalTokens(),
+                GatewayUsageCompleteness.FINAL,
+                GatewayUsageSource.DIRECT_RESPONSE,
+                usage.nativeUsagePayload()
+        );
+    }
+
+    private GatewayStreamEvent textEvent(String delta) {
+        return new GatewayStreamEvent(
+                GatewayStreamEventType.TEXT_DELTA,
+                delta,
+                null,
+                List.of(),
+                GatewayUsageView.empty(),
+                false,
+                null,
+                null,
+                null,
+                null
+        );
+    }
+
+    private GatewayStreamEvent toolCallEvent(List<GatewayToolCall> toolCalls) {
+        return new GatewayStreamEvent(
+                GatewayStreamEventType.TOOL_CALLS,
+                null,
+                null,
+                toolCalls,
+                GatewayUsageView.empty(),
+                false,
+                null,
+                null,
+                null,
+                null
+        );
+    }
+
+    private GatewayStreamEvent completedEvent(GatewayFinishReason finishReason, String outputText, GatewayUsage usage) {
+        return new GatewayStreamEvent(
+                GatewayStreamEventType.COMPLETED,
+                null,
+                null,
+                List.of(),
+                usage.isEmpty() ? GatewayUsageView.empty() : usageView(usage),
+                true,
+                finishReason,
+                outputText,
+                null,
+                null
         );
     }
 }

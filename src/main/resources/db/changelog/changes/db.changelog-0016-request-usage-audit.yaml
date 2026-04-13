@@ -1,0 +1,405 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0016-request-log
+      author: codex
+      changes:
+        - createTable:
+            tableName: request_log
+            remarks: 请求生命周期日志。
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_request_log
+                    nullable: false
+              - column:
+                  name: request_id
+                  type: VARCHAR(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: distributed_key_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: distributed_key_prefix
+                  type: VARCHAR(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: protocol
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: request_path
+                  type: VARCHAR(256)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: requested_model
+                  type: VARCHAR(256)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: public_model
+                  type: VARCHAR(256)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: resolved_model_key
+                  type: VARCHAR(256)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: model_group
+                  type: VARCHAR(256)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: provider_type
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: credential_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: selection_source
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: prefix_hash
+                  type: VARCHAR(128)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: fingerprint
+                  type: VARCHAR(128)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: is_stream
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: error_code
+                  type: VARCHAR(64)
+              - column:
+                  name: error_message
+                  type: VARCHAR(1024)
+              - column:
+                  name: duration_ms
+                  type: BIGINT
+              - column:
+                  name: started_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints:
+                    nullable: false
+              - column:
+                  name: completed_at
+                  type: TIMESTAMP WITH TIME ZONE
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addUniqueConstraint:
+            tableName: request_log
+            columnNames: request_id
+            constraintName: uk_request_log_request_id
+        - createIndex:
+            tableName: request_log
+            indexName: idx_request_log_distributed_key_started
+            columns:
+              - column:
+                  name: distributed_key_id
+              - column:
+                  name: started_at
+        - createIndex:
+            tableName: request_log
+            indexName: idx_request_log_provider_started
+            columns:
+              - column:
+                  name: provider_type
+              - column:
+                  name: started_at
+        - createIndex:
+            tableName: request_log
+            indexName: idx_request_log_status_started
+            columns:
+              - column:
+                  name: status
+              - column:
+                  name: started_at
+
+  - changeSet:
+      id: 0016-usage-record
+      author: codex
+      changes:
+        - createTable:
+            tableName: usage_record
+            remarks: 归一化 usage 记录。
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_usage_record
+                    nullable: false
+              - column:
+                  name: request_id
+                  type: VARCHAR(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: distributed_key_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: protocol
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: request_path
+                  type: VARCHAR(256)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: model_group
+                  type: VARCHAR(256)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: provider_type
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: credential_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: is_stream
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: completeness
+                  type: VARCHAR(16)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: usage_source
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: raw_prompt_tokens
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: prompt_tokens
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: completion_tokens
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: reasoning_tokens
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: cache_hit_tokens
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: cache_write_tokens
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: upstream_cache_hit_tokens
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: upstream_cache_write_tokens
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: saved_input_tokens
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: cached_content_ref
+                  type: VARCHAR(512)
+              - column:
+                  name: total_tokens
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: native_usage_payload_json
+                  type: TEXT
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addUniqueConstraint:
+            tableName: usage_record
+            columnNames: request_id
+            constraintName: uk_usage_record_request_id
+        - createIndex:
+            tableName: usage_record
+            indexName: idx_usage_record_distributed_key_created
+            columns:
+              - column:
+                  name: distributed_key_id
+              - column:
+                  name: created_at
+        - createIndex:
+            tableName: usage_record
+            indexName: idx_usage_record_provider_created
+            columns:
+              - column:
+                  name: provider_type
+              - column:
+                  name: created_at
+        - createIndex:
+            tableName: usage_record
+            indexName: idx_usage_record_completeness_created
+            columns:
+              - column:
+                  name: completeness
+              - column:
+                  name: created_at
+
+  - changeSet:
+      id: 0016-audit-log
+      author: codex
+      changes:
+        - createTable:
+            tableName: audit_log
+            remarks: 后台操作与网关事件审计日志。
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_audit_log
+                    nullable: false
+              - column:
+                  name: request_id
+                  type: VARCHAR(64)
+              - column:
+                  name: audit_type
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: action
+                  type: VARCHAR(128)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: target_type
+                  type: VARCHAR(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: target_id
+                  type: VARCHAR(256)
+              - column:
+                  name: status
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: actor
+                  type: VARCHAR(128)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: path
+                  type: VARCHAR(512)
+              - column:
+                  name: detail_json
+                  type: TEXT
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: audit_log
+            indexName: idx_audit_log_type_created
+            columns:
+              - column:
+                  name: audit_type
+              - column:
+                  name: created_at
+        - createIndex:
+            tableName: audit_log
+            indexName: idx_audit_log_request_created
+            columns:
+              - column:
+                  name: request_id
+              - column:
+                  name: created_at
+        - createIndex:
+            tableName: audit_log
+            indexName: idx_audit_log_target_created
+            columns:
+              - column:
+                  name: target_type
+              - column:
+                  name: target_id
+              - column:
+                  name: created_at

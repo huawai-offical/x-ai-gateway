@@ -10,6 +10,7 @@ public record ChatExecutionResponse(
         String text,
         GatewayUsage usage,
         List<GatewayToolCall> toolCalls,
+        String finishReason,
         String reasoning
 ) {
     public ChatExecutionResponse(
@@ -19,6 +20,17 @@ public record ChatExecutionResponse(
             GatewayUsage usage,
             List<GatewayToolCall> toolCalls
     ) {
-        this(requestId, routeSelection, text, usage, toolCalls, null);
+        this(requestId, routeSelection, text, usage, toolCalls, null, null);
+    }
+
+    public ChatExecutionResponse(
+            String requestId,
+            RouteSelectionResult routeSelection,
+            String text,
+            GatewayUsage usage,
+            List<GatewayToolCall> toolCalls,
+            String finishReason
+    ) {
+        this(requestId, routeSelection, text, usage, toolCalls, finishReason, null);
     }
 }

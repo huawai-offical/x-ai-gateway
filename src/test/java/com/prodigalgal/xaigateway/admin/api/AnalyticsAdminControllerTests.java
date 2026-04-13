@@ -34,6 +34,9 @@ class AnalyticsAdminControllerTests {
                         12,
                         6,
                         2,
+                        5,
+                        4,
+                        1,
                         1800,
                         120,
                         1800,
@@ -41,6 +44,8 @@ class AnalyticsAdminControllerTests {
                         List.of(new AnalyticsOverviewResponse.BreakdownItem("openai", 7, 1200, 0, 1200)),
                         List.of(new AnalyticsOverviewResponse.BreakdownItem("PREFIX_AFFINITY", 9, 0, 0, 0)),
                         List.of(new AnalyticsOverviewResponse.BreakdownItem("gpt-4o", 7, 1200, 0, 1200)),
+                        List.of(new AnalyticsOverviewResponse.BreakdownItem("prompt_cache", 6, 1800, 120, 1800)),
+                        List.of(new AnalyticsOverviewResponse.CountBreakdownItem("FINAL", 4)),
                         List.of(new AnalyticsOverviewResponse.TimelineBucket(
                                 Instant.parse("2026-04-07T08:00:00Z"),
                                 4,
@@ -63,8 +68,11 @@ class AnalyticsAdminControllerTests {
                 .expectBody()
                 .jsonPath("$.bucketMinutes").isEqualTo(60)
                 .jsonPath("$.sampledRouteDecisionCount").isEqualTo(12)
+                .jsonPath("$.sampledUsageRecordCount").isEqualTo(5)
                 .jsonPath("$.providerBreakdown[0].key").isEqualTo("OPENAI_DIRECT")
                 .jsonPath("$.modelGroupBreakdown[0].savedInputTokens").isEqualTo(1200)
+                .jsonPath("$.cacheSourceBreakdown[0].key").isEqualTo("prompt_cache")
+                .jsonPath("$.usageCompletenessBreakdown[0].key").isEqualTo("FINAL")
                 .jsonPath("$.timeline[0].cacheHitTokens").isEqualTo(600);
     }
 }

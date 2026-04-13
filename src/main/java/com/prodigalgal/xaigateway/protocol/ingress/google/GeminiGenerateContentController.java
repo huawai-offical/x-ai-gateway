@@ -1,6 +1,5 @@
 package com.prodigalgal.xaigateway.protocol.ingress.google;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.admin.application.GatewayChatExecutionService;
@@ -9,9 +8,6 @@ import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthentication
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolDefinition;
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest.MessageInput;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionResponse;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionStreamChunk;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionStreamResponse;
 import java.util.ArrayList;
 import java.util.List;
 import jakarta.validation.Valid;
@@ -37,7 +33,7 @@ public class GeminiGenerateContentController {
 
     private final DistributedKeyAuthenticationService distributedKeyAuthenticationService;
     private final GatewayChatExecutionService gatewayChatExecutionService;
-    private final ObjectMapper objectMapper;
+    private final GeminiGenerateContentEncoder geminiGenerateContentEncoder;
 
     public GeminiGenerateContentController(
             DistributedKeyAuthenticationService distributedKeyAuthenticationService,
@@ -45,7 +41,7 @@ public class GeminiGenerateContentController {
             ObjectMapper objectMapper) {
         this.distributedKeyAuthenticationService = distributedKeyAuthenticationService;
         this.gatewayChatExecutionService = gatewayChatExecutionService;
-        this.objectMapper = objectMapper;
+        this.geminiGenerateContentEncoder = new GeminiGenerateContentEncoder(objectMapper);
     }
 
     @PostMapping("/{model}:generateContent")
@@ -56,8 +52,8 @@ public class GeminiGenerateContentController {
             @Valid @RequestBody GeminiGenerateContentRequest request) {
         AuthenticatedDistributedKey distributedKey = authenticate(headerApiKey, queryApiKey);
         ChatExecutionRequest executionRequest = toExecutionRequest(distributedKey, model, request, false);
-        ChatExecutionResponse response = gatewayChatExecutionService.execute(executionRequest);
-        return ResponseEntity.ok(GeminiGenerateContentResponse.from(response.text(), response.usage(), response.toolCalls()));
+        var response = gatewayChatExecutionService.executeGatewayResponse(executionRequest);
+        return ResponseEntity.ok(geminiGenerateContentEncoder.encode(response));
     }
 
     @PostMapping("/{model}:streamGenerateContent")
@@ -68,11 +64,8 @@ public class GeminiGenerateContentController {
             @Valid @RequestBody GeminiGenerateContentRequest request) {
         AuthenticatedDistributedKey distributedKey = authenticate(headerApiKey, queryApiKey);
         ChatExecutionRequest executionRequest = toExecutionRequest(distributedKey, model, request, true);
-        ChatExecutionStreamResponse streamResponse = gatewayChatExecutionService.executeStream(executionRequest);
-
-        Flux<String> body = Flux.concat(
-                streamResponse.chunks().flatMap(this::encodeChunk)
-        );
+        var streamResponse = gatewayChatExecutionService.executeGatewayStream(executionRequest);
+        Flux<String> body = geminiGenerateContentEncoder.encodeStream(streamResponse);
         return ResponseEntity.ok()
                 .contentType(MediaType.TEXT_EVENT_STREAM)
                 .body(body);
@@ -249,21 +242,4 @@ public class GeminiGenerateContentController {
         return List.copyOf(result);
     }
 
-    private Flux<String> encodeChunk(ChatExecutionStreamChunk chunk) {
-        if (chunk.textDelta() == null || chunk.textDelta().isBlank()) {
-            return Flux.empty();
-        }
-
-        GeminiGenerateContentResponse payload = GeminiGenerateContentResponse.from(
-                chunk.textDelta(),
-                chunk.usage() == null ? com.prodigalgal.xaigateway.gateway.core.usage.GatewayUsage.empty() : chunk.usage(),
-                java.util.List.of()
-        );
-
-        try {
-            return Flux.just("data: " + objectMapper.writeValueAsString(payload) + "\n\n");
-        } catch (JsonProcessingException exception) {
-            throw new IllegalStateException("无法序列化 Gemini stream 响应。", exception);
-        }
-    }
 }

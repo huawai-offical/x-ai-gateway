@@ -1,6 +1,6 @@
 # x-ai-gateway web
 
-`web/` 是 `x-ai-gateway` 的前端代码目录，当前已初始化为 `React + TypeScript + Vite` 工程，并固定使用 `Bun` 作为运行时与包管理器。
+`web/` 是 `x-ai-gateway` 的前端控制台代码目录，当前已经接入业务路由和多组后台页面，固定使用 `Bun` 作为运行时与包管理器。
 
 ## 技术栈
 
@@ -22,12 +22,41 @@ bun run preview
 
 ## 当前范围
 
-- 提供前端工程基础骨架
-- 提供最小页面、样式基线与脚本约定
-- 为后续管理控制台、运维指挥台和平台配置页预留扩展入口
+- DistributedKey / keys 页面
+- account pools / OAuth connect / account detail 页面
+- provider sites / capability matrix / translation debug 页面
+- ops / alerts / probes / logs 页面
+- error rules、install、backups、upgrades、rollbacks 页面
+- `typed-react-query` 与统一 API 请求封装
 
 ## 当前非目标
 
-- 还未接入真实后端 API
-- 还未引入业务路由、鉴权、状态管理或组件库
-- 还未开始实现具体控制台业务页面
+- 还没有完整鉴权流与登录态管理
+- 还没有浏览器级 E2E 自动化
+- 还没有做生产构建发布编排
+
+## 路由概览
+
+- `/keys`
+- `/account-pools`
+- `/accounts/connect/:provider`
+- `/network/proxies`
+- `/ops`
+- `/error-rules`
+- `/provider-sites`
+- `/capability-matrix`
+- `/translation-debug`
+- `/operations/install`
+- `/operations/backups`
+- `/operations/upgrades`
+- `/operations/rollbacks`
+
+## 常用命令
+
+```bash
+bun install
+bun run dev
+bun run test -- --run
+bun run check
+bun run build
+```

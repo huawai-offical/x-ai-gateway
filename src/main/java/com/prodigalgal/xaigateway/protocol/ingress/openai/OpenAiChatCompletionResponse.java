@@ -2,6 +2,8 @@ package com.prodigalgal.xaigateway.protocol.ingress.openai;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolCall;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayResponse;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageView;
 import com.prodigalgal.xaigateway.gateway.core.usage.GatewayUsage;
 import java.time.Instant;
 import java.util.List;
@@ -95,6 +97,21 @@ public record OpenAiChatCompletionResponse(
         );
     }
 
+    public static OpenAiChatCompletionResponse from(GatewayResponse response) {
+        return new OpenAiChatCompletionResponse(
+                "chatcmpl-" + Instant.now().toEpochMilli(),
+                "chat.completion",
+                Instant.now().getEpochSecond(),
+                response.routeSelection().publicModel(),
+                List.of(new Choice(
+                        0,
+                        new Message("assistant", response.outputText(), toToolCalls(response.toolCalls())),
+                        response.toolCalls() != null && !response.toolCalls().isEmpty() ? "tool_calls" : "stop"
+                )),
+                toUsage(response.usage())
+        );
+    }
+
     private static List<ToolCall> toToolCalls(List<GatewayToolCall> toolCalls) {
         if (toolCalls == null || toolCalls.isEmpty()) {
             return null;
@@ -171,6 +188,16 @@ public record OpenAiChatCompletionResponse(
                 Instant.now().getEpochSecond(),
                 model,
                 List.of(new ChunkChoice(0, new Delta(null, null, null), finishReason))
+        );
+    }
+
+    private static Usage toUsage(GatewayUsageView usage) {
+        return new Usage(
+                usage.promptTokens(),
+                usage.completionTokens(),
+                usage.totalTokens(),
+                new PromptTokensDetails(usage.cacheHitTokens()),
+                new CompletionTokensDetails(usage.reasoningTokens())
         );
     }
 }

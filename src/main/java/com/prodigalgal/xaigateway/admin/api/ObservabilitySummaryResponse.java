@@ -8,6 +8,9 @@ public record ObservabilitySummaryResponse(
         int sampledRouteDecisionCount,
         int sampledCacheHitCount,
         int sampledActiveUpstreamCacheReferenceCount,
+        int sampledUsageRecordCount,
+        int sampledFinalUsageRecordCount,
+        int sampledPartialUsageRecordCount,
         long totalCacheHitTokens,
         long totalCacheWriteTokens,
         long totalSavedInputTokens

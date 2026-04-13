@@ -29,3 +29,5 @@ databaseChangeLog:
       file: db/changelog/changes/db.changelog-0014-ollama-model-capability.yaml
   - include:
       file: db/changelog/changes/db.changelog-0015-credential-auth-kind.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0016-request-usage-audit.yaml

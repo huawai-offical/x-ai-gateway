@@ -7,6 +7,7 @@ public record GatewayChatRuntimeResult(
         String text,
         GatewayUsage usage,
         List<GatewayToolCall> toolCalls,
+        String finishReason,
         String reasoning
 ) {
     public GatewayChatRuntimeResult(
@@ -14,6 +15,15 @@ public record GatewayChatRuntimeResult(
             GatewayUsage usage,
             List<GatewayToolCall> toolCalls
     ) {
-        this(text, usage, toolCalls, null);
+        this(text, usage, toolCalls, null, null);
+    }
+
+    public GatewayChatRuntimeResult(
+            String text,
+            GatewayUsage usage,
+            List<GatewayToolCall> toolCalls,
+            String finishReason
+    ) {
+        this(text, usage, toolCalls, finishReason, null);
     }
 }

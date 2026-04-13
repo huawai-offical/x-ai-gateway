@@ -35,6 +35,9 @@ class DashboardQueryServiceTests {
                         12,
                         6,
                         2,
+                        5,
+                        4,
+                        1,
                         1800,
                         120,
                         1800,
@@ -42,6 +45,8 @@ class DashboardQueryServiceTests {
                         List.of(new AnalyticsOverviewResponse.BreakdownItem("openai", 7, 1200, 0, 1200)),
                         List.of(new AnalyticsOverviewResponse.BreakdownItem("PREFIX_AFFINITY", 9, 0, 0, 0)),
                         List.of(new AnalyticsOverviewResponse.BreakdownItem("gpt-4o", 7, 1200, 0, 1200)),
+                        List.of(new AnalyticsOverviewResponse.BreakdownItem("prompt_cache", 6, 1800, 120, 1800)),
+                        List.of(new AnalyticsOverviewResponse.CountBreakdownItem("FINAL", 4)),
                         List.of(new AnalyticsOverviewResponse.TimelineBucket(from, 4, 2, 600, 40, 600))
                 ));
         when(observabilityQueryService.listRouteDecisions(1L, ProviderType.OPENAI_DIRECT, from, to))
@@ -63,9 +68,12 @@ class DashboardQueryServiceTests {
         assertEquals(to, response.sampledTo());
         assertEquals(60, response.bucketMinutes());
         assertEquals(12, response.summary().routeDecisionCount());
+        assertEquals(5, response.summary().usageRecordCount());
         assertEquals(0.5, response.summary().cacheHitRatio());
         assertEquals(300.0, response.summary().averageSavedInputTokensPerHit());
         assertIterableEquals(List.of("OPENAI_DIRECT"), response.providerRanking().stream().map(AnalyticsOverviewResponse.BreakdownItem::key).toList());
+        assertIterableEquals(List.of("prompt_cache"), response.cacheSourceRanking().stream().map(AnalyticsOverviewResponse.BreakdownItem::key).toList());
+        assertEquals("FINAL", response.usageCompletenessBreakdown().get(0).key());
         assertEquals(5, response.credentialRanking().size());
         assertEquals("OPENAI_DIRECT#101", response.credentialRanking().get(0).displayKey());
         assertEquals(0, response.alerts().size());
@@ -95,6 +103,9 @@ class DashboardQueryServiceTests {
                         20,
                         2,
                         2,
+                        2,
+                        0,
+                        2,
                         0,
                         2000,
                         0,
@@ -102,6 +113,8 @@ class DashboardQueryServiceTests {
                         List.of(new AnalyticsOverviewResponse.BreakdownItem("openai", 20, 0, 2000, 0)),
                         List.of(new AnalyticsOverviewResponse.BreakdownItem("PREFIX_AFFINITY", 20, 0, 0, 0)),
                         List.of(new AnalyticsOverviewResponse.BreakdownItem("gpt-4o", 20, 0, 2000, 0)),
+                        List.of(new AnalyticsOverviewResponse.BreakdownItem("prompt_cache", 2, 0, 2000, 0)),
+                        List.of(new AnalyticsOverviewResponse.CountBreakdownItem("PARTIAL", 2)),
                         List.of()
                 ));
         when(observabilityQueryService.listRouteDecisions(1L, ProviderType.OPENAI_DIRECT, from, to))

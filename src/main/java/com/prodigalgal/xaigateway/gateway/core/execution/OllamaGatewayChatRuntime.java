@@ -61,6 +61,7 @@ public class OllamaGatewayChatRuntime implements GatewayChatRuntime {
                 extractText(response),
                 new GatewayUsage(promptTokens, promptTokens, completionTokens, 0, 0, 0, 0, 0, null, promptTokens + completionTokens, response),
                 extractToolCalls(response),
+                firstNonBlank(response.path("done_reason").asText(null), response.path("stop_reason").asText(null), "stop"),
                 extractReasoning(response)
         );
     }

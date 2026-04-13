@@ -62,6 +62,9 @@ public class DashboardQueryService {
         long routeDecisionCount = analyticsOverview.sampledRouteDecisionCount();
         long cacheHitCount = analyticsOverview.sampledCacheHitCount();
         long activeReferenceCount = analyticsOverview.sampledActiveCacheReferenceCount();
+        long usageRecordCount = analyticsOverview.sampledUsageRecordCount();
+        long finalUsageRecordCount = analyticsOverview.sampledFinalUsageRecordCount();
+        long partialUsageRecordCount = analyticsOverview.sampledPartialUsageRecordCount();
         long totalSavedInputTokens = analyticsOverview.totalSavedInputTokens();
         double cacheHitRatio = ratio(cacheHitCount, routeDecisionCount);
         double averageSavedInputTokensPerHit = ratio(totalSavedInputTokens, cacheHitCount);
@@ -78,6 +81,9 @@ public class DashboardQueryService {
                         routeDecisionCount,
                         cacheHitCount,
                         activeReferenceCount,
+                        usageRecordCount,
+                        finalUsageRecordCount,
+                        partialUsageRecordCount,
                         analyticsOverview.totalCacheHitTokens(),
                         analyticsOverview.totalCacheWriteTokens(),
                         totalSavedInputTokens,
@@ -88,6 +94,8 @@ public class DashboardQueryService {
                 analyticsOverview.protocolBreakdown(),
                 analyticsOverview.modelGroupBreakdown(),
                 analyticsOverview.selectionSourceBreakdown(),
+                analyticsOverview.cacheSourceBreakdown(),
+                analyticsOverview.usageCompletenessBreakdown(),
                 credentialRanking,
                 buildAlerts(
                         routeDecisionCount,

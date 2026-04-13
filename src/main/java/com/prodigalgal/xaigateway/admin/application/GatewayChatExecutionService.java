@@ -27,6 +27,13 @@ import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestFeatureServ
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlan;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlanCompiler;
 import com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityService;
+import com.prodigalgal.xaigateway.gateway.core.observability.GatewayRequestLifecycleService;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayResponse;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayResponseMapper;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamResponse;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageCompleteness;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageSource;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageView;
 import com.prodigalgal.xaigateway.gateway.core.routing.GatewayRouteSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionRequest;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
@@ -39,8 +46,11 @@ import com.prodigalgal.xaigateway.provider.adapter.ProviderExecutionSupportServi
 import com.prodigalgal.xaigateway.provider.adapter.anthropic.AnthropicChatModelFactory;
 import com.prodigalgal.xaigateway.provider.adapter.gemini.GeminiChatModelFactory;
 import com.prodigalgal.xaigateway.provider.adapter.openai.OpenAiChatModelFactory;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import org.springframework.ai.anthropic.AnthropicChatModel;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.chat.messages.Message;
@@ -58,8 +68,8 @@ import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.stereotype.Service;
 import org.springframework.util.MimeTypeUtils;
-import org.springframework.transaction.annotation.Transactional;
 import java.net.URI;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.SignalType;
 
@@ -72,6 +82,7 @@ public class GatewayChatExecutionService {
     private final UpstreamCredentialRepository upstreamCredentialRepository;
     private final CredentialCryptoService credentialCryptoService;
     private final GatewayObservabilityService gatewayObservabilityService;
+    private final GatewayRequestLifecycleService gatewayRequestLifecycleService;
     private final DistributedKeyGovernanceService distributedKeyGovernanceService;
     private final DistributedKeyQueryService distributedKeyQueryService;
     private final AccountSelectionService accountSelectionService;
@@ -83,6 +94,7 @@ public class GatewayChatExecutionService {
     private final AnthropicChatModelFactory anthropicChatModelFactory;
     private final GeminiChatModelFactory geminiChatModelFactory;
     private final List<GatewayChatRuntime> gatewayChatRuntimes;
+    private final GatewayResponseMapper gatewayResponseMapper;
 
     public GatewayChatExecutionService(
             GatewayRouteSelectionService gatewayRouteSelectionService,
@@ -90,6 +102,7 @@ public class GatewayChatExecutionService {
             UpstreamCredentialRepository upstreamCredentialRepository,
             CredentialCryptoService credentialCryptoService,
             GatewayObservabilityService gatewayObservabilityService,
+            GatewayRequestLifecycleService gatewayRequestLifecycleService,
             DistributedKeyGovernanceService distributedKeyGovernanceService,
             DistributedKeyQueryService distributedKeyQueryService,
             AccountSelectionService accountSelectionService,
@@ -100,12 +113,14 @@ public class GatewayChatExecutionService {
             OpenAiChatModelFactory openAiChatModelFactory,
             AnthropicChatModelFactory anthropicChatModelFactory,
             GeminiChatModelFactory geminiChatModelFactory,
-            List<GatewayChatRuntime> gatewayChatRuntimes) {
+            List<GatewayChatRuntime> gatewayChatRuntimes,
+            GatewayResponseMapper gatewayResponseMapper) {
         this.gatewayRouteSelectionService = gatewayRouteSelectionService;
         this.providerExecutionSupportService = providerExecutionSupportService;
         this.upstreamCredentialRepository = upstreamCredentialRepository;
         this.credentialCryptoService = credentialCryptoService;
         this.gatewayObservabilityService = gatewayObservabilityService;
+        this.gatewayRequestLifecycleService = gatewayRequestLifecycleService;
         this.distributedKeyGovernanceService = distributedKeyGovernanceService;
         this.distributedKeyQueryService = distributedKeyQueryService;
         this.accountSelectionService = accountSelectionService;
@@ -117,6 +132,7 @@ public class GatewayChatExecutionService {
         this.anthropicChatModelFactory = anthropicChatModelFactory;
         this.geminiChatModelFactory = geminiChatModelFactory;
         this.gatewayChatRuntimes = gatewayChatRuntimes;
+        this.gatewayResponseMapper = gatewayResponseMapper;
     }
 
     public AdminChatExecuteResponse execute(AdminChatExecuteRequest request) {
@@ -142,6 +158,7 @@ public class GatewayChatExecutionService {
 
     public ChatExecutionResponse execute(ChatExecutionRequest request) {
         String requestId = gatewayObservabilityService.nextRequestId();
+        Instant startedAt = Instant.now();
         JsonNode routeBody = buildRouteBody(request);
         RouteSelectionResult selectionResult = gatewayRouteSelectionService.select(new RouteSelectionRequest(
                 request.distributedKeyPrefix(),
@@ -160,6 +177,7 @@ public class GatewayChatExecutionService {
                 semantics,
                 routeBody
         );
+        gatewayRequestLifecycleService.startRequest(requestId, selectionResult, request, false, startedAt);
 
         UpstreamCredentialEntity credential = getRequiredCredential(selectionResult.selectedCandidate().candidate().credentialId());
         ResolvedCredentialMaterial credentialMaterial = credentialMaterialResolver.resolve(selectionResult, credential);
@@ -174,12 +192,27 @@ public class GatewayChatExecutionService {
                     executionPlan
             ));
             gatewayRouteSelectionService.recordSuccessfulSelection(selectionResult);
-            gatewayObservabilityService.recordCacheUsage(
+            GatewayUsageView usageView = gatewayResponseMapper.toUsageView(
+                    result.usage(),
+                    GatewayUsageCompleteness.FINAL,
+                    GatewayUsageSource.DIRECT_RESPONSE
+            );
+            if (result.usage() != null && !result.usage().isEmpty()) {
+                gatewayObservabilityService.recordCacheUsage(
+                        requestId,
+                        selectionResult,
+                        result.usage(),
+                        cacheKind(usageView),
+                        usageView.cachedContentRef()
+                );
+            }
+            gatewayRequestLifecycleService.completeRequest(
                     requestId,
                     selectionResult,
-                    result.usage(),
-                    "prompt_cache",
-                    null
+                    request,
+                    false,
+                    usageView,
+                    startedAt
             );
             return new ChatExecutionResponse(
                     requestId,
@@ -187,10 +220,20 @@ public class GatewayChatExecutionService {
                     result.text(),
                     result.usage(),
                     result.toolCalls(),
+                    result.finishReason(),
                     result.reasoning()
             );
         } catch (RuntimeException exception) {
             gatewayRouteSelectionService.invalidateSelection(selectionResult);
+            gatewayRequestLifecycleService.failRequest(
+                    requestId,
+                    selectionResult,
+                    request,
+                    false,
+                    exception,
+                    GatewayUsageView.empty(),
+                    startedAt
+            );
             throw exception;
         } finally {
             distributedKeyGovernanceService.releaseConcurrency(selectionResult.governanceReservationKey());
@@ -199,6 +242,7 @@ public class GatewayChatExecutionService {
 
     public ChatExecutionStreamResponse executeStream(ChatExecutionRequest request) {
         String requestId = gatewayObservabilityService.nextRequestId();
+        Instant startedAt = Instant.now();
         JsonNode routeBody = buildRouteBody(request);
         RouteSelectionResult selectionResult = gatewayRouteSelectionService.select(new RouteSelectionRequest(
                 request.distributedKeyPrefix(),
@@ -217,11 +261,14 @@ public class GatewayChatExecutionService {
                 semantics,
                 routeBody
         );
+        gatewayRequestLifecycleService.startRequest(requestId, selectionResult, request, true, startedAt);
 
         UpstreamCredentialEntity credential = getRequiredCredential(selectionResult.selectedCandidate().candidate().credentialId());
         ResolvedCredentialMaterial credentialMaterial = credentialMaterialResolver.resolve(selectionResult, credential);
 
         GatewayChatRuntime runtime = resolveRuntime(selectionResult.selectedCandidate().candidate());
+        AtomicReference<GatewayUsage> lastVisibleUsage = new AtomicReference<>(GatewayUsage.empty());
+        AtomicBoolean terminalRecorded = new AtomicBoolean(false);
         Flux<ChatExecutionStreamChunk> chunks = runtime.executeStream(new GatewayChatRuntimeContext(
                         selectionResult,
                         credential,
@@ -229,22 +276,116 @@ public class GatewayChatExecutionService {
                         request,
                         executionPlan
                 ))
-                .map(chunk -> {
-                    gatewayObservabilityService.recordCacheUsage(
+                .doOnNext(chunk -> {
+                    if (chunk.usage() != null && !chunk.usage().isEmpty()) {
+                        lastVisibleUsage.set(chunk.usage());
+                    }
+                    if (chunk.terminal()) {
+                        GatewayUsageView usageView = terminalUsageView(chunk.usage(), lastVisibleUsage.get());
+                        recordTerminalUsage(requestId, selectionResult, request, startedAt, usageView, chunk.usage(), lastVisibleUsage.get());
+                        terminalRecorded.set(true);
+                    }
+                })
+                .doOnComplete(() -> {
+                    gatewayRouteSelectionService.recordSuccessfulSelection(selectionResult);
+                    if (!terminalRecorded.get()) {
+                        GatewayUsageView usageView = terminalUsageView(null, lastVisibleUsage.get());
+                        recordTerminalUsage(requestId, selectionResult, request, startedAt, usageView, null, lastVisibleUsage.get());
+                    }
+                })
+                .doOnError(error -> {
+                    gatewayRouteSelectionService.invalidateSelection(selectionResult);
+                    gatewayRequestLifecycleService.failRequest(
                             requestId,
                             selectionResult,
-                            chunk.usage(),
-                            "prompt_cache",
-                            null
+                            request,
+                            true,
+                            error,
+                            terminalUsageView(null, lastVisibleUsage.get()),
+                            startedAt
                     );
-                    return chunk;
                 })
-                .doOnComplete(() -> gatewayRouteSelectionService.recordSuccessfulSelection(selectionResult))
-                .doOnError(error -> gatewayRouteSelectionService.invalidateSelection(selectionResult))
-                .doOnCancel(() -> gatewayRouteSelectionService.invalidateSelection(selectionResult))
+                .doOnCancel(() -> {
+                    gatewayRouteSelectionService.invalidateSelection(selectionResult);
+                    gatewayRequestLifecycleService.cancelRequest(
+                            requestId,
+                            selectionResult,
+                            request,
+                            true,
+                            terminalUsageView(null, lastVisibleUsage.get()),
+                            startedAt
+                    );
+                })
                 .doFinally(signalType -> distributedKeyGovernanceService.releaseConcurrency(selectionResult.governanceReservationKey()));
 
         return new ChatExecutionStreamResponse(requestId, selectionResult, chunks);
+    }
+
+    public GatewayResponse executeGatewayResponse(ChatExecutionRequest request) {
+        return gatewayResponseMapper.toGatewayResponse(execute(request));
+    }
+
+    public GatewayStreamResponse executeGatewayStream(ChatExecutionRequest request) {
+        return gatewayResponseMapper.toGatewayStreamResponse(executeStream(request));
+    }
+
+    private void recordTerminalUsage(
+            String requestId,
+            RouteSelectionResult selectionResult,
+            ChatExecutionRequest request,
+            Instant startedAt,
+            GatewayUsageView usageView,
+            GatewayUsage terminalUsage,
+            GatewayUsage lastVisibleUsage) {
+        GatewayUsage usageForLog = terminalUsage != null && !terminalUsage.isEmpty() ? terminalUsage : lastVisibleUsage;
+        if (usageForLog != null && !usageForLog.isEmpty()) {
+            gatewayObservabilityService.recordCacheUsage(
+                    requestId,
+                    selectionResult,
+                    usageForLog,
+                    cacheKind(usageView),
+                    usageView.cachedContentRef()
+            );
+        }
+        gatewayRequestLifecycleService.completeRequest(
+                requestId,
+                selectionResult,
+                request,
+                true,
+                usageView,
+                startedAt
+        );
+    }
+
+    private GatewayUsageView terminalUsageView(GatewayUsage terminalUsage, GatewayUsage lastVisibleUsage) {
+        if (terminalUsage != null && !terminalUsage.isEmpty()) {
+            return gatewayResponseMapper.toUsageView(
+                    terminalUsage,
+                    GatewayUsageCompleteness.FINAL,
+                    GatewayUsageSource.PROVIDER_FINAL
+            );
+        }
+        if (lastVisibleUsage != null && !lastVisibleUsage.isEmpty()) {
+            return gatewayResponseMapper.toUsageView(
+                    lastVisibleUsage,
+                    GatewayUsageCompleteness.PARTIAL,
+                    GatewayUsageSource.LAST_VISIBLE
+            );
+        }
+        return GatewayUsageView.empty();
+    }
+
+    private String cacheKind(GatewayUsageView usageView) {
+        if (usageView == null || !usageView.present()) {
+            return "none";
+        }
+        if (usageView.cachedContentRef() != null && !usageView.cachedContentRef().isBlank()) {
+            return "cached_content";
+        }
+        if (usageView.cacheHitTokens() > 0 || usageView.cacheWriteTokens() > 0) {
+            return "prompt_cache";
+        }
+        return "none";
     }
 
     private GatewayChatRuntime resolveRuntime(com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView candidate) {

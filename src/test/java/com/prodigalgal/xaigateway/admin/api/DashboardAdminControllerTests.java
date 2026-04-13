@@ -37,6 +37,9 @@ class DashboardAdminControllerTests {
                                 12,
                                 6,
                                 2,
+                                5,
+                                4,
+                                1,
                                 1800,
                                 120,
                                 1800,
@@ -47,6 +50,8 @@ class DashboardAdminControllerTests {
                         List.of(new AnalyticsOverviewResponse.BreakdownItem("openai", 7, 1200, 0, 1200)),
                         List.of(new AnalyticsOverviewResponse.BreakdownItem("gpt-4o", 7, 1200, 0, 1200)),
                         List.of(new AnalyticsOverviewResponse.BreakdownItem("PREFIX_AFFINITY", 9, 0, 0, 0)),
+                        List.of(new AnalyticsOverviewResponse.BreakdownItem("prompt_cache", 6, 1800, 120, 1800)),
+                        List.of(new AnalyticsOverviewResponse.CountBreakdownItem("FINAL", 4)),
                         List.of(new DashboardOverviewResponse.CredentialActivityItem(
                                 101L,
                                 "OPENAI_DIRECT#101",
@@ -154,8 +159,10 @@ class DashboardAdminControllerTests {
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.summary.routeDecisionCount").isEqualTo(12)
+                .jsonPath("$.summary.usageRecordCount").isEqualTo(5)
                 .jsonPath("$.summary.cacheHitRatio").isEqualTo(0.5)
                 .jsonPath("$.providerRanking[0].key").isEqualTo("OPENAI_DIRECT")
+                .jsonPath("$.cacheSourceRanking[0].key").isEqualTo("prompt_cache")
                 .jsonPath("$.credentialRanking[0].displayKey").isEqualTo("OPENAI_DIRECT#101")
                 .jsonPath("$.alerts[0].code").isEqualTo("UPSTREAM_CACHE_REFERENCE_EXPIRING")
                 .jsonPath("$.alerts[0].affectedEntities[0]").isEqualTo("cached-content-1@gpt-4o")

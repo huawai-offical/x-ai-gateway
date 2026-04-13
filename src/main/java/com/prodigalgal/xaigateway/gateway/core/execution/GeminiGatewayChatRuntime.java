@@ -6,6 +6,7 @@ import com.prodigalgal.xaigateway.provider.adapter.PreparedChatExecution;
 import com.prodigalgal.xaigateway.provider.adapter.ProviderExecutionSupportService;
 import com.prodigalgal.xaigateway.provider.adapter.gemini.GeminiChatModelFactory;
 import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.metadata.ChatGenerationMetadata;
 import org.springframework.ai.google.genai.GoogleGenAiChatModel;
 import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
 import org.springframework.stereotype.Service;
@@ -57,7 +58,8 @@ public class GeminiGatewayChatRuntime implements GatewayChatRuntime {
                     providerExecutionSupportService.normalizeUsage(context.selectionResult(), response.getMetadata().getUsage()),
                     response.getResult().getOutput().getToolCalls().stream()
                             .map(toolCall -> new GatewayToolCall(toolCall.id(), toolCall.type(), toolCall.name(), toolCall.arguments()))
-                            .toList()
+                            .toList(),
+                    finishReason(response)
             );
         } finally {
             close(model);
@@ -85,15 +87,26 @@ public class GeminiGatewayChatRuntime implements GatewayChatRuntime {
         return model.stream(gatewayChatPromptBuilder.buildPrompt(prepared.options(), context.request()))
                 .map(response -> new ChatExecutionStreamChunk(
                         response.getResult().getOutput().getText(),
-                        null,
+                        finishReason(response),
                         providerExecutionSupportService.normalizeUsage(context.selectionResult(), response.getMetadata().getUsage()),
-                        false,
+                        isTerminal(response),
                         response.getResult().getOutput().getToolCalls().stream()
                                 .map(toolCall -> new GatewayToolCall(toolCall.id(), toolCall.type(), toolCall.name(), toolCall.arguments()))
                                 .toList()
                 ))
-                .concatWithValues(new ChatExecutionStreamChunk(null, "stop", com.prodigalgal.xaigateway.gateway.core.usage.GatewayUsage.empty(), true))
                 .doFinally(signalType -> close(model));
+    }
+
+    private boolean isTerminal(ChatResponse response) {
+        return finishReason(response) != null && !finishReason(response).isBlank();
+    }
+
+    private String finishReason(ChatResponse response) {
+        if (response == null || response.getResult() == null) {
+            return null;
+        }
+        ChatGenerationMetadata metadata = response.getResult().getMetadata();
+        return metadata == null ? null : metadata.getFinishReason();
     }
 
     private void close(Object model) {

@@ -86,7 +86,7 @@ public class GatewayObservabilityService {
         entity.setCacheKind(cacheKind);
         entity.setCacheHitTokens(usage.cacheHitTokens());
         entity.setCacheWriteTokens(usage.cacheWriteTokens());
-        entity.setSavedInputTokens(usage.cacheHitTokens());
+        entity.setSavedInputTokens(usage.savedInputTokens());
         entity.setCachedContentRef(cachedContentRef);
         cacheHitLogRepository.save(entity);
     }

@@ -4,11 +4,16 @@ import com.prodigalgal.xaigateway.admin.application.GatewayChatExecutionService;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthenticationService;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionResponse;
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionStreamChunk;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionStreamResponse;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolCall;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayFinishReason;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayResponse;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamEvent;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamEventType;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamResponse;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageCompleteness;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageSource;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageView;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionSource;
@@ -44,14 +49,8 @@ class AnthropicMessagesControllerTests {
     void shouldExecuteMinimalAnthropicMessage() {
         Mockito.when(distributedKeyAuthenticationService.authenticateRawToken("sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.execute(Mockito.<ChatExecutionRequest>any()))
-                .thenReturn(new ChatExecutionResponse(
-                        "req-anthropic-1",
-                        selectionResult(),
-                        "anthropic back",
-                        new GatewayUsage(900, 900, 200, 0, 300, 120, 300, 120, null, 1520, null),
-                        List.of()
-                ));
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<ChatExecutionRequest>any()))
+                .thenReturn(gatewayResponse("req-anthropic-1", "anthropic back", new GatewayUsage(900, 900, 200, 0, 300, 120, 300, 120, null, 1520, null), List.of(), GatewayFinishReason.END_TURN));
 
         webTestClient.post()
                 .uri("/v1/messages")
@@ -80,10 +79,9 @@ class AnthropicMessagesControllerTests {
     void shouldReturnToolUseBlocks() {
         Mockito.when(distributedKeyAuthenticationService.authenticateRawToken("sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.execute(Mockito.<ChatExecutionRequest>any()))
-                .thenReturn(new ChatExecutionResponse(
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<ChatExecutionRequest>any()))
+                .thenReturn(gatewayResponse(
                         "req-anthropic-tool-1",
-                        selectionResult(),
                         "",
                         GatewayUsage.empty(),
                         List.of(new GatewayToolCall(
@@ -91,7 +89,8 @@ class AnthropicMessagesControllerTests {
                                 "tool_use",
                                 "lookup_weather",
                                 "{\"city\":\"Shanghai\"}"
-                        ))
+                        )),
+                        GatewayFinishReason.TOOL_CALLS
                 ));
 
         webTestClient.post()
@@ -127,14 +126,8 @@ class AnthropicMessagesControllerTests {
     void shouldAcceptAnthropicImageBlocks() {
         Mockito.when(distributedKeyAuthenticationService.authenticateRawToken("sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.execute(Mockito.<ChatExecutionRequest>any()))
-                .thenReturn(new ChatExecutionResponse(
-                        "req-anthropic-image-1",
-                        selectionResult(),
-                        "image processed",
-                        GatewayUsage.empty(),
-                        List.of()
-                ));
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<ChatExecutionRequest>any()))
+                .thenReturn(gatewayResponse("req-anthropic-image-1", "image processed", GatewayUsage.empty(), List.of(), GatewayFinishReason.END_TURN));
 
         webTestClient.post()
                 .uri("/v1/messages")
@@ -165,14 +158,8 @@ class AnthropicMessagesControllerTests {
     void shouldAcceptAnthropicDocumentBlocks() {
         Mockito.when(distributedKeyAuthenticationService.authenticateRawToken("sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.execute(Mockito.<ChatExecutionRequest>any()))
-                .thenReturn(new ChatExecutionResponse(
-                        "req-anthropic-doc-1",
-                        selectionResult(),
-                        "document processed",
-                        GatewayUsage.empty(),
-                        List.of()
-                ));
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<ChatExecutionRequest>any()))
+                .thenReturn(gatewayResponse("req-anthropic-doc-1", "document processed", GatewayUsage.empty(), List.of(), GatewayFinishReason.END_TURN));
 
         webTestClient.post()
                 .uri("/v1/messages")
@@ -203,14 +190,8 @@ class AnthropicMessagesControllerTests {
     void shouldAcceptAnthropicGatewayFileIdDocumentBlocks() {
         Mockito.when(distributedKeyAuthenticationService.authenticateRawToken("sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.execute(Mockito.<ChatExecutionRequest>any()))
-                .thenReturn(new ChatExecutionResponse(
-                        "req-anthropic-fileid-1",
-                        selectionResult(),
-                        "gateway document processed",
-                        GatewayUsage.empty(),
-                        List.of()
-                ));
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<ChatExecutionRequest>any()))
+                .thenReturn(gatewayResponse("req-anthropic-fileid-1", "gateway document processed", GatewayUsage.empty(), List.of(), GatewayFinishReason.END_TURN));
 
         webTestClient.post()
                 .uri("/v1/messages")
@@ -240,14 +221,8 @@ class AnthropicMessagesControllerTests {
     void shouldAcceptAnthropicDocumentOnlyMessage() {
         Mockito.when(distributedKeyAuthenticationService.authenticateRawToken("sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.execute(Mockito.<ChatExecutionRequest>any()))
-                .thenReturn(new ChatExecutionResponse(
-                        "req-anthropic-doc-only-1",
-                        selectionResult(),
-                        "document only processed",
-                        GatewayUsage.empty(),
-                        List.of()
-                ));
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<ChatExecutionRequest>any()))
+                .thenReturn(gatewayResponse("req-anthropic-doc-only-1", "document only processed", GatewayUsage.empty(), List.of(), GatewayFinishReason.END_TURN));
 
         webTestClient.post()
                 .uri("/v1/messages")
@@ -277,13 +252,13 @@ class AnthropicMessagesControllerTests {
     void shouldExecuteMinimalAnthropicStream() {
         Mockito.when(distributedKeyAuthenticationService.authenticateRawToken("sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.executeStream(Mockito.<ChatExecutionRequest>any()))
-                .thenReturn(new ChatExecutionStreamResponse(
+        Mockito.when(gatewayChatExecutionService.executeGatewayStream(Mockito.<ChatExecutionRequest>any()))
+                .thenReturn(new GatewayStreamResponse(
                         "req-anthropic-stream-1",
                         selectionResult(),
                         Flux.just(
-                                new ChatExecutionStreamChunk("hello", null, GatewayUsage.empty(), false),
-                                new ChatExecutionStreamChunk(null, "end_turn", GatewayUsage.empty(), true)
+                                textEvent("hello"),
+                                completedEvent(GatewayFinishReason.END_TURN)
                         )
                 ));
 
@@ -344,6 +319,73 @@ class AnthropicMessagesControllerTests {
                 RouteSelectionSource.PREFIX_AFFINITY,
                 routeCandidateView,
                 List.of(routeCandidateView)
+        );
+    }
+
+    private GatewayResponse gatewayResponse(
+            String requestId,
+            String text,
+            GatewayUsage usage,
+            List<GatewayToolCall> toolCalls,
+            GatewayFinishReason finishReason) {
+        return new GatewayResponse(
+                requestId,
+                selectionResult(),
+                text,
+                usageView(usage),
+                toolCalls,
+                null,
+                finishReason,
+                null
+        );
+    }
+
+    private GatewayUsageView usageView(GatewayUsage usage) {
+        return new GatewayUsageView(
+                usage.rawPromptTokens(),
+                usage.promptTokens(),
+                usage.completionTokens(),
+                usage.reasoningTokens(),
+                usage.cacheHitTokens(),
+                usage.cacheWriteTokens(),
+                usage.upstreamCacheHitTokens(),
+                usage.upstreamCacheWriteTokens(),
+                usage.savedInputTokens(),
+                usage.cachedContentRef(),
+                usage.totalTokens(),
+                GatewayUsageCompleteness.FINAL,
+                GatewayUsageSource.DIRECT_RESPONSE,
+                usage.nativeUsagePayload()
+        );
+    }
+
+    private GatewayStreamEvent textEvent(String delta) {
+        return new GatewayStreamEvent(
+                GatewayStreamEventType.TEXT_DELTA,
+                delta,
+                null,
+                List.of(),
+                GatewayUsageView.empty(),
+                false,
+                null,
+                null,
+                null,
+                null
+        );
+    }
+
+    private GatewayStreamEvent completedEvent(GatewayFinishReason finishReason) {
+        return new GatewayStreamEvent(
+                GatewayStreamEventType.COMPLETED,
+                null,
+                null,
+                List.of(),
+                GatewayUsageView.empty(),
+                true,
+                finishReason,
+                "hello",
+                null,
+                null
         );
     }
 }

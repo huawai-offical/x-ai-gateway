@@ -1,6 +1,5 @@
 package com.prodigalgal.xaigateway.protocol.ingress.openai;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
@@ -8,9 +7,6 @@ import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthentication
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolDefinition;
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest.MessageInput;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionResponse;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionStreamChunk;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionStreamResponse;
 import com.prodigalgal.xaigateway.admin.application.GatewayChatExecutionService;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
@@ -34,6 +30,7 @@ public class OpenAiChatCompletionsController {
     private final DistributedKeyAuthenticationService distributedKeyAuthenticationService;
     private final GatewayChatExecutionService gatewayChatExecutionService;
     private final ObjectMapper objectMapper;
+    private final OpenAiChatCompletionEncoder openAiChatCompletionEncoder;
 
     public OpenAiChatCompletionsController(
             DistributedKeyAuthenticationService distributedKeyAuthenticationService,
@@ -42,6 +39,7 @@ public class OpenAiChatCompletionsController {
         this.distributedKeyAuthenticationService = distributedKeyAuthenticationService;
         this.gatewayChatExecutionService = gatewayChatExecutionService;
         this.objectMapper = objectMapper;
+        this.openAiChatCompletionEncoder = new OpenAiChatCompletionEncoder(objectMapper);
     }
 
     @PostMapping
@@ -67,25 +65,15 @@ public class OpenAiChatCompletionsController {
         );
 
         if (Boolean.TRUE.equals(request.stream())) {
-            ChatExecutionStreamResponse streamResponse = gatewayChatExecutionService.executeStream(executionRequest);
-            Flux<String> body = Flux.concat(
-                    Flux.just(encode(OpenAiChatCompletionResponse.roleChunk(streamResponse.routeSelection().resolvedModelKey()))),
-                    streamResponse.chunks().flatMap(chunk -> encodeChunk(streamResponse, chunk)),
-                    Flux.just("data: [DONE]\n\n")
-            );
+            var streamResponse = gatewayChatExecutionService.executeGatewayStream(executionRequest);
+            Flux<String> body = openAiChatCompletionEncoder.encodeStream(streamResponse);
             return ResponseEntity.ok()
                     .contentType(MediaType.TEXT_EVENT_STREAM)
                     .body(body);
         }
 
-        ChatExecutionResponse response = gatewayChatExecutionService.execute(executionRequest);
-
-        return ResponseEntity.ok(OpenAiChatCompletionResponse.from(
-                response.routeSelection().resolvedModelKey(),
-                response.text(),
-                response.usage(),
-                response.toolCalls()
-        ));
+        var response = gatewayChatExecutionService.executeGatewayResponse(executionRequest);
+        return ResponseEntity.ok(openAiChatCompletionEncoder.encode(response));
     }
 
     private List<MessageInput> toMessages(List<OpenAiChatCompletionRequest.Message> messages) {
@@ -147,37 +135,6 @@ public class OpenAiChatCompletionsController {
             metadata.put("reasoning_effort", request.reasoningEffort());
         }
         return metadata.isEmpty() ? null : metadata;
-    }
-
-    private Flux<String> encodeChunk(ChatExecutionStreamResponse streamResponse, ChatExecutionStreamChunk chunk) {
-        List<String> events = new ArrayList<>();
-        if (chunk.toolCalls() != null && !chunk.toolCalls().isEmpty()) {
-            events.add(encode(OpenAiChatCompletionResponse.toolCallChunk(
-                    streamResponse.routeSelection().resolvedModelKey(),
-                    chunk.toolCalls()
-            )));
-        }
-        if (chunk.textDelta() != null && !chunk.textDelta().isBlank()) {
-            events.add(encode(OpenAiChatCompletionResponse.contentChunk(
-                    streamResponse.routeSelection().resolvedModelKey(),
-                    chunk.textDelta()
-            )));
-        }
-        if (chunk.terminal()) {
-            events.add(encode(OpenAiChatCompletionResponse.finishChunk(
-                    streamResponse.routeSelection().resolvedModelKey(),
-                    chunk.finishReason() == null ? "stop" : chunk.finishReason()
-            )));
-        }
-        return events.isEmpty() ? Flux.empty() : Flux.fromIterable(events);
-    }
-
-    private String encode(Object payload) {
-        try {
-            return "data: " + objectMapper.writeValueAsString(payload) + "\n\n";
-        } catch (JsonProcessingException exception) {
-            throw new IllegalStateException("无法序列化 OpenAI stream 响应。", exception);
-        }
     }
 
     private ParsedMessageContent parseMessageContent(com.fasterxml.jackson.databind.JsonNode contentNode) {

@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolCall;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayResponse;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageView;
 import com.prodigalgal.xaigateway.gateway.core.usage.GatewayUsage;
 import java.time.Instant;
 import java.util.List;
@@ -60,6 +62,24 @@ public record AnthropicMessagesResponse(
                         usage.completionTokens(),
                         usage.cacheWriteTokens(),
                         usage.cacheHitTokens()
+                )
+        );
+    }
+
+    public static AnthropicMessagesResponse from(GatewayResponse response) {
+        return new AnthropicMessagesResponse(
+                "msg_" + Instant.now().toEpochMilli(),
+                "message",
+                "assistant",
+                response.routeSelection().publicModel(),
+                toContentBlocks(response.outputText(), response.toolCalls()),
+                response.toolCalls() != null && !response.toolCalls().isEmpty() ? "tool_use" : "end_turn",
+                null,
+                new Usage(
+                        response.usage().promptTokens(),
+                        response.usage().completionTokens(),
+                        response.usage().cacheWriteTokens(),
+                        response.usage().cacheHitTokens()
                 )
         );
     }
@@ -194,6 +214,19 @@ public record AnthropicMessagesResponse(
     }
 
     public static MessageDelta messageDelta(GatewayUsage usage, String stopReason) {
+        return new MessageDelta(
+                "message_delta",
+                new MessageDeltaContent(stopReason, null),
+                new Usage(
+                        usage.promptTokens(),
+                        usage.completionTokens(),
+                        usage.cacheWriteTokens(),
+                        usage.cacheHitTokens()
+                )
+        );
+    }
+
+    public static MessageDelta messageDelta(GatewayUsageView usage, String stopReason) {
         return new MessageDelta(
                 "message_delta",
                 new MessageDeltaContent(stopReason, null),
