@@ -36,7 +36,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Flux;
 
 @WebFluxTest(controllers = OpenAiResponsesController.class)
-@Import(PermitAllSecurityTestConfig.class)
+@Import({PermitAllSecurityTestConfig.class, OpenAiResponsesRequestMapper.class})
 class OpenAiResponsesControllerTests {
 
     @Autowired
@@ -454,6 +454,33 @@ class OpenAiResponsesControllerTests {
                 .expectBody()
                 .jsonPath("$.object").isEqualTo("response.deleted")
                 .jsonPath("$.deleted").isEqualTo(true);
+    }
+
+    @Test
+    void shouldRejectFunctionCallOutputWithoutCallId() {
+        Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+
+        webTestClient.post()
+                .uri("/v1/responses")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "model":"writer-fast",
+                          "input":[
+                            {
+                              "type":"function_call_output",
+                              "output":"Shanghai is sunny"
+                            }
+                          ]
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo("INVALID_ARGUMENT")
+                .jsonPath("$.message").isEqualTo("function_call_output 缺少 call_id。");
     }
 
     private RouteSelectionResult selectionResult() {

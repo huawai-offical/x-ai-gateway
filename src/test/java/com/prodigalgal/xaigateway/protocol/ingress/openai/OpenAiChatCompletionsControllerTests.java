@@ -34,7 +34,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Flux;
 
 @WebFluxTest(controllers = OpenAiChatCompletionsController.class)
-@Import(PermitAllSecurityTestConfig.class)
+@Import({PermitAllSecurityTestConfig.class, OpenAiChatCompletionRequestMapper.class})
 class OpenAiChatCompletionsControllerTests {
 
     @Autowired
@@ -345,6 +345,30 @@ class OpenAiChatCompletionsControllerTests {
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.choices[0].message.content").isEqualTo("image only processed");
+    }
+
+    @Test
+    void shouldRejectOpenAiCompletionWithoutUserMessage() {
+        Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+
+        webTestClient.post()
+                .uri("/v1/chat/completions")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "model": "gpt-4o",
+                          "messages": [
+                            {"role":"system","content":"you are helpful"}
+                          ]
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo("INVALID_ARGUMENT")
+                .jsonPath("$.message").isEqualTo("至少需要一条 user 消息。");
     }
 
     private RouteSelectionResult selectionResult() {

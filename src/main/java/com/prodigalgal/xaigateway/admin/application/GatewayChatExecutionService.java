@@ -35,10 +35,15 @@ import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageCompleteness
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageSource;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageView;
 import com.prodigalgal.xaigateway.gateway.core.routing.GatewayRouteSelectionService;
+import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateEvaluation;
+import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateView;
+import com.prodigalgal.xaigateway.gateway.core.routing.RouteExecutionAttempt;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionRequest;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
+import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionSource;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.usage.GatewayUsage;
+import com.prodigalgal.xaigateway.infra.config.GatewayProperties;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import com.prodigalgal.xaigateway.provider.adapter.PreparedChatExecution;
@@ -69,6 +74,7 @@ import org.springframework.beans.factory.DisposableBean;
 import org.springframework.stereotype.Service;
 import org.springframework.util.MimeTypeUtils;
 import java.net.URI;
+import java.util.ArrayList;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.SignalType;
@@ -95,6 +101,7 @@ public class GatewayChatExecutionService {
     private final GeminiChatModelFactory geminiChatModelFactory;
     private final List<GatewayChatRuntime> gatewayChatRuntimes;
     private final GatewayResponseMapper gatewayResponseMapper;
+    private final GatewayProperties gatewayProperties;
 
     public GatewayChatExecutionService(
             GatewayRouteSelectionService gatewayRouteSelectionService,
@@ -114,7 +121,8 @@ public class GatewayChatExecutionService {
             AnthropicChatModelFactory anthropicChatModelFactory,
             GeminiChatModelFactory geminiChatModelFactory,
             List<GatewayChatRuntime> gatewayChatRuntimes,
-            GatewayResponseMapper gatewayResponseMapper) {
+            GatewayResponseMapper gatewayResponseMapper,
+            GatewayProperties gatewayProperties) {
         this.gatewayRouteSelectionService = gatewayRouteSelectionService;
         this.providerExecutionSupportService = providerExecutionSupportService;
         this.upstreamCredentialRepository = upstreamCredentialRepository;
@@ -133,6 +141,7 @@ public class GatewayChatExecutionService {
         this.geminiChatModelFactory = geminiChatModelFactory;
         this.gatewayChatRuntimes = gatewayChatRuntimes;
         this.gatewayResponseMapper = gatewayResponseMapper;
+        this.gatewayProperties = gatewayProperties;
     }
 
     public AdminChatExecuteResponse execute(AdminChatExecuteRequest request) {
@@ -169,71 +178,112 @@ public class GatewayChatExecutionService {
                 GatewayClientFamily.GENERIC_OPENAI,
                 true
         ));
-        gatewayObservabilityService.recordRouteDecision(requestId, selectionResult);
         GatewayRequestSemantics semantics = gatewayRequestFeatureService.describe(request.requestPath(), routeBody);
-        TranslationExecutionPlan executionPlan = translationExecutionPlanCompiler.compileSelected(
-                selectionResult,
-                request.requestPath(),
-                semantics,
-                routeBody
-        );
         gatewayRequestLifecycleService.startRequest(requestId, selectionResult, request, false, startedAt);
 
-        UpstreamCredentialEntity credential = getRequiredCredential(selectionResult.selectedCandidate().candidate().credentialId());
-        ResolvedCredentialMaterial credentialMaterial = credentialMaterialResolver.resolve(selectionResult, credential);
-
         try {
-            GatewayChatRuntime runtime = resolveRuntime(selectionResult.selectedCandidate().candidate());
-            GatewayChatRuntimeResult result = runtime.execute(new GatewayChatRuntimeContext(
-                    selectionResult,
-                    credential,
-                    credentialMaterial,
-                    request,
-                    executionPlan
-            ));
-            gatewayRouteSelectionService.recordSuccessfulSelection(selectionResult);
-            GatewayUsageView usageView = gatewayResponseMapper.toUsageView(
-                    result.usage(),
-                    GatewayUsageCompleteness.FINAL,
-                    GatewayUsageSource.DIRECT_RESPONSE
-            );
-            if (result.usage() != null && !result.usage().isEmpty()) {
-                gatewayObservabilityService.recordCacheUsage(
-                        requestId,
-                        selectionResult,
-                        result.usage(),
-                        cacheKind(usageView),
-                        usageView.cachedContentRef()
+            List<RouteExecutionAttempt> attempts = new ArrayList<>();
+            int maxAttempts = Math.min(selectionResult.candidates().size(), gatewayProperties.getRouting().getMaxFallbackAttempts());
+            RuntimeException lastException = null;
+
+            for (int index = 0; index < maxAttempts; index++) {
+                RouteCandidateView candidate = selectionResult.candidates().get(index);
+                RouteSelectionResult candidateSelection = selectionForCandidate(selectionResult, candidate, attempts);
+                TranslationExecutionPlan executionPlan = translationExecutionPlanCompiler.compileSelected(
+                        candidateSelection,
+                        request.requestPath(),
+                        semantics,
+                        routeBody
                 );
+                UpstreamCredentialEntity credential = getRequiredCredential(candidate.candidate().credentialId());
+                ResolvedCredentialMaterial credentialMaterial = credentialMaterialResolver.resolve(candidateSelection, credential);
+                try {
+                    GatewayChatRuntime runtime = resolveRuntime(candidate.candidate());
+                    GatewayChatRuntimeResult result = runtime.execute(new GatewayChatRuntimeContext(
+                            candidateSelection,
+                            credential,
+                            credentialMaterial,
+                            request,
+                            executionPlan
+                    ));
+                    if (isEmptyChatResult(result)) {
+                        throw new IllegalStateException("上游响应为空。");
+                    }
+
+                    attempts.add(new RouteExecutionAttempt(
+                            index + 1,
+                            candidate.candidate().credentialId(),
+                            candidate.candidate().providerType().name(),
+                            "SUCCEEDED",
+                            candidateSelection.selectionSource().name()
+                    ));
+                    RouteSelectionResult finalSelection = candidateSelection.withAttempts(List.copyOf(attempts));
+                    gatewayRouteSelectionService.recordSuccessfulSelection(finalSelection);
+                    gatewayObservabilityService.recordRouteDecision(requestId, finalSelection);
+
+                    GatewayUsageView usageView = gatewayResponseMapper.toUsageView(
+                            result.usage(),
+                            GatewayUsageCompleteness.FINAL,
+                            GatewayUsageSource.DIRECT_RESPONSE
+                    );
+                    if (result.usage() != null && !result.usage().isEmpty()) {
+                        gatewayObservabilityService.recordCacheUsage(
+                                requestId,
+                                finalSelection,
+                                result.usage(),
+                                cacheKind(usageView),
+                                usageView.cachedContentRef()
+                        );
+                    }
+                    gatewayRequestLifecycleService.completeRequest(
+                            requestId,
+                            finalSelection,
+                            request,
+                            false,
+                            usageView,
+                            startedAt
+                    );
+                    return new ChatExecutionResponse(
+                            requestId,
+                            finalSelection,
+                            result.text(),
+                            result.usage(),
+                            result.toolCalls(),
+                            result.finishReason(),
+                            result.reasoning()
+                    );
+                } catch (RuntimeException exception) {
+                    attempts.add(new RouteExecutionAttempt(
+                            index + 1,
+                            candidate.candidate().credentialId(),
+                            candidate.candidate().providerType().name(),
+                            "FAILED_BEFORE_FIRST_BYTE",
+                            fallbackDetail(exception)
+                    ));
+                    gatewayRouteSelectionService.invalidateSelection(candidateSelection);
+                    gatewayRouteSelectionService.markCredentialCooldown(candidate.candidate().credentialId(), fallbackDetail(exception));
+                    lastException = exception;
+                    if (!shouldFallback(exception) || index == maxAttempts - 1) {
+                        RouteSelectionResult failedSelection = candidateSelection.withAttempts(List.copyOf(attempts));
+                        gatewayObservabilityService.recordRouteDecision(requestId, failedSelection);
+                        gatewayRequestLifecycleService.failRequest(
+                                requestId,
+                                failedSelection,
+                                request,
+                                false,
+                                exception,
+                                GatewayUsageView.empty(),
+                                startedAt
+                        );
+                        throw exception;
+                    }
+                }
             }
-            gatewayRequestLifecycleService.completeRequest(
-                    requestId,
-                    selectionResult,
-                    request,
-                    false,
-                    usageView,
-                    startedAt
-            );
-            return new ChatExecutionResponse(
-                    requestId,
-                    selectionResult,
-                    result.text(),
-                    result.usage(),
-                    result.toolCalls(),
-                    result.finishReason(),
-                    result.reasoning()
-            );
+            if (lastException != null) {
+                throw lastException;
+            }
+            throw new IllegalStateException("当前 provider 候选没有可用执行尝试。");
         } catch (RuntimeException exception) {
-            gatewayRouteSelectionService.invalidateSelection(selectionResult);
-            gatewayRequestLifecycleService.failRequest(
-                    requestId,
-                    selectionResult,
-                    request,
-                    false,
-                    exception,
-                    GatewayUsageView.empty(),
-                    startedAt
-            );
             throw exception;
         } finally {
             distributedKeyGovernanceService.releaseConcurrency(selectionResult.governanceReservationKey());
@@ -253,51 +303,51 @@ public class GatewayChatExecutionService {
                 GatewayClientFamily.GENERIC_OPENAI,
                 true
         ));
-        gatewayObservabilityService.recordRouteDecision(requestId, selectionResult);
         GatewayRequestSemantics semantics = gatewayRequestFeatureService.describe(request.requestPath(), routeBody);
-        TranslationExecutionPlan executionPlan = translationExecutionPlanCompiler.compileSelected(
-                selectionResult,
-                request.requestPath(),
-                semantics,
-                routeBody
-        );
         gatewayRequestLifecycleService.startRequest(requestId, selectionResult, request, true, startedAt);
-
-        UpstreamCredentialEntity credential = getRequiredCredential(selectionResult.selectedCandidate().candidate().credentialId());
-        ResolvedCredentialMaterial credentialMaterial = credentialMaterialResolver.resolve(selectionResult, credential);
-
-        GatewayChatRuntime runtime = resolveRuntime(selectionResult.selectedCandidate().candidate());
         AtomicReference<GatewayUsage> lastVisibleUsage = new AtomicReference<>(GatewayUsage.empty());
         AtomicBoolean terminalRecorded = new AtomicBoolean(false);
-        Flux<ChatExecutionStreamChunk> chunks = runtime.executeStream(new GatewayChatRuntimeContext(
+        AtomicReference<RouteSelectionResult> finalSelectionRef = new AtomicReference<>(selectionResult);
+        List<RouteExecutionAttempt> attempts = new java.util.concurrent.CopyOnWriteArrayList<>();
+        int maxAttempts = Math.min(selectionResult.candidates().size(), gatewayProperties.getRouting().getMaxFallbackAttempts());
+        Flux<ChatExecutionStreamChunk> chunks = streamAttempt(
+                        requestId,
                         selectionResult,
-                        credential,
-                        credentialMaterial,
                         request,
-                        executionPlan
-                ))
+                        routeBody,
+                        semantics,
+                        0,
+                        maxAttempts,
+                        attempts,
+                        finalSelectionRef
+                )
                 .doOnNext(chunk -> {
                     if (chunk.usage() != null && !chunk.usage().isEmpty()) {
                         lastVisibleUsage.set(chunk.usage());
                     }
                     if (chunk.terminal()) {
                         GatewayUsageView usageView = terminalUsageView(chunk.usage(), lastVisibleUsage.get());
-                        recordTerminalUsage(requestId, selectionResult, request, startedAt, usageView, chunk.usage(), lastVisibleUsage.get());
+                        RouteSelectionResult finalSelection = finalSelectionRef.get().withAttempts(List.copyOf(attempts));
+                        gatewayObservabilityService.recordRouteDecision(requestId, finalSelection);
+                        recordTerminalUsage(requestId, finalSelection, request, startedAt, usageView, chunk.usage(), lastVisibleUsage.get());
                         terminalRecorded.set(true);
                     }
                 })
                 .doOnComplete(() -> {
-                    gatewayRouteSelectionService.recordSuccessfulSelection(selectionResult);
                     if (!terminalRecorded.get()) {
                         GatewayUsageView usageView = terminalUsageView(null, lastVisibleUsage.get());
-                        recordTerminalUsage(requestId, selectionResult, request, startedAt, usageView, null, lastVisibleUsage.get());
+                        RouteSelectionResult finalSelection = finalSelectionRef.get().withAttempts(List.copyOf(attempts));
+                        gatewayObservabilityService.recordRouteDecision(requestId, finalSelection);
+                        recordTerminalUsage(requestId, finalSelection, request, startedAt, usageView, null, lastVisibleUsage.get());
                     }
                 })
                 .doOnError(error -> {
-                    gatewayRouteSelectionService.invalidateSelection(selectionResult);
+                    RouteSelectionResult finalSelection = finalSelectionRef.get().withAttempts(List.copyOf(attempts));
+                    gatewayObservabilityService.recordRouteDecision(requestId, finalSelection);
+                    gatewayRouteSelectionService.invalidateSelection(finalSelection);
                     gatewayRequestLifecycleService.failRequest(
                             requestId,
-                            selectionResult,
+                            finalSelection,
                             request,
                             true,
                             error,
@@ -306,10 +356,12 @@ public class GatewayChatExecutionService {
                     );
                 })
                 .doOnCancel(() -> {
-                    gatewayRouteSelectionService.invalidateSelection(selectionResult);
+                    RouteSelectionResult finalSelection = finalSelectionRef.get().withAttempts(List.copyOf(attempts));
+                    gatewayObservabilityService.recordRouteDecision(requestId, finalSelection);
+                    gatewayRouteSelectionService.invalidateSelection(finalSelection);
                     gatewayRequestLifecycleService.cancelRequest(
                             requestId,
-                            selectionResult,
+                            finalSelection,
                             request,
                             true,
                             terminalUsageView(null, lastVisibleUsage.get()),
@@ -327,6 +379,103 @@ public class GatewayChatExecutionService {
 
     public GatewayStreamResponse executeGatewayStream(ChatExecutionRequest request) {
         return gatewayResponseMapper.toGatewayStreamResponse(executeStream(request));
+    }
+
+    private Flux<ChatExecutionStreamChunk> streamAttempt(
+            String requestId,
+            RouteSelectionResult baseSelection,
+            ChatExecutionRequest request,
+            JsonNode routeBody,
+            GatewayRequestSemantics semantics,
+            int candidateIndex,
+            int maxAttempts,
+            List<RouteExecutionAttempt> attempts,
+            AtomicReference<RouteSelectionResult> finalSelectionRef) {
+        RouteCandidateView candidate = baseSelection.candidates().get(candidateIndex);
+        RouteSelectionResult candidateSelection = selectionForCandidate(baseSelection, candidate, attempts);
+        finalSelectionRef.set(candidateSelection);
+
+        UpstreamCredentialEntity credential = getRequiredCredential(candidate.candidate().credentialId());
+        ResolvedCredentialMaterial credentialMaterial = credentialMaterialResolver.resolve(candidateSelection, credential);
+        TranslationExecutionPlan executionPlan = translationExecutionPlanCompiler.compileSelected(
+                candidateSelection,
+                request.requestPath(),
+                semantics,
+                routeBody
+        );
+        GatewayChatRuntime runtime = resolveRuntime(candidate.candidate());
+        AtomicBoolean firstOutputCommitted = new AtomicBoolean(false);
+        AtomicBoolean successRecorded = new AtomicBoolean(false);
+
+        return runtime.executeStream(new GatewayChatRuntimeContext(
+                        candidateSelection,
+                        credential,
+                        credentialMaterial,
+                        request,
+                        executionPlan
+                ))
+                .doOnNext(chunk -> {
+                    if (isVisibleStreamChunk(chunk)) {
+                        firstOutputCommitted.set(true);
+                    }
+                    if (chunk.terminal() && successRecorded.compareAndSet(false, true)) {
+                        attempts.add(new RouteExecutionAttempt(
+                                candidateIndex + 1,
+                                candidate.candidate().credentialId(),
+                                candidate.candidate().providerType().name(),
+                                "SUCCEEDED",
+                                candidateSelection.selectionSource().name()
+                        ));
+                        RouteSelectionResult finalSelection = candidateSelection.withAttempts(List.copyOf(attempts));
+                        finalSelectionRef.set(finalSelection);
+                        gatewayRouteSelectionService.recordSuccessfulSelection(finalSelection);
+                    }
+                })
+                .doOnComplete(() -> {
+                    if (successRecorded.compareAndSet(false, true)) {
+                        attempts.add(new RouteExecutionAttempt(
+                                candidateIndex + 1,
+                                candidate.candidate().credentialId(),
+                                candidate.candidate().providerType().name(),
+                                "SUCCEEDED",
+                                candidateSelection.selectionSource().name()
+                        ));
+                        RouteSelectionResult finalSelection = candidateSelection.withAttempts(List.copyOf(attempts));
+                        finalSelectionRef.set(finalSelection);
+                        gatewayRouteSelectionService.recordSuccessfulSelection(finalSelection);
+                    }
+                })
+                .onErrorResume(error -> {
+                    String outcome = firstOutputCommitted.get() ? "FAILED_AFTER_FIRST_BYTE" : "FAILED_BEFORE_FIRST_BYTE";
+                    attempts.add(new RouteExecutionAttempt(
+                            candidateIndex + 1,
+                            candidate.candidate().credentialId(),
+                            candidate.candidate().providerType().name(),
+                            outcome,
+                            fallbackDetail(error)
+                    ));
+                    RouteSelectionResult failedSelection = candidateSelection.withAttempts(List.copyOf(attempts));
+                    finalSelectionRef.set(failedSelection);
+                    gatewayRouteSelectionService.invalidateSelection(candidateSelection);
+                    gatewayRouteSelectionService.markCredentialCooldown(candidate.candidate().credentialId(), fallbackDetail(error));
+                    if (!firstOutputCommitted.get()
+                            && shouldFallback(error)
+                            && candidateIndex + 1 < maxAttempts
+                            && candidateIndex + 1 < baseSelection.candidates().size()) {
+                        return streamAttempt(
+                                requestId,
+                                baseSelection,
+                                request,
+                                routeBody,
+                                semantics,
+                                candidateIndex + 1,
+                                maxAttempts,
+                                attempts,
+                                finalSelectionRef
+                        );
+                    }
+                    return Flux.error(error);
+                });
     }
 
     private void recordTerminalUsage(
@@ -386,6 +535,60 @@ public class GatewayChatExecutionService {
             return "prompt_cache";
         }
         return "none";
+    }
+
+    private RouteSelectionResult selectionForCandidate(
+            RouteSelectionResult selectionResult,
+            RouteCandidateView candidate,
+            List<RouteExecutionAttempt> attempts) {
+        RouteSelectionSource source = selectionResult.candidateEvaluations().stream()
+                .filter(item -> item.candidate().candidate().credentialId().equals(candidate.candidate().credentialId()))
+                .map(RouteCandidateEvaluation::selectionSource)
+                .findFirst()
+                .orElse(RouteSelectionSource.WEIGHTED_HASH);
+        return selectionResult.withSelectedCandidate(candidate, source).withAttempts(List.copyOf(attempts));
+    }
+
+    private boolean shouldFallback(Throwable throwable) {
+        if (throwable instanceof com.prodigalgal.xaigateway.gateway.core.auth.GatewayUnauthorizedException) {
+            return false;
+        }
+        if (throwable instanceof IllegalArgumentException) {
+            return false;
+        }
+        if (throwable instanceof com.prodigalgal.xaigateway.gateway.core.error.GatewayRuleMatchedException matched) {
+            return matched.getStatus() == 429 || matched.getStatus() >= 500;
+        }
+        if (throwable instanceof org.springframework.web.reactive.function.client.WebClientResponseException responseException) {
+            return responseException.getStatusCode().value() == 429 || responseException.getStatusCode().is5xxServerError();
+        }
+        return true;
+    }
+
+    private String fallbackDetail(Throwable throwable) {
+        return throwable == null || throwable.getMessage() == null || throwable.getMessage().isBlank()
+                ? throwable == null ? "fallback" : throwable.getClass().getSimpleName()
+                : throwable.getMessage();
+    }
+
+    private boolean isEmptyChatResult(GatewayChatRuntimeResult result) {
+        if (result == null) {
+            return true;
+        }
+        boolean hasText = result.text() != null && !result.text().isBlank();
+        boolean hasReasoning = result.reasoning() != null && !result.reasoning().isBlank();
+        boolean hasToolCalls = result.toolCalls() != null && !result.toolCalls().isEmpty();
+        return !hasText && !hasReasoning && !hasToolCalls;
+    }
+
+    private boolean isVisibleStreamChunk(ChatExecutionStreamChunk chunk) {
+        if (chunk == null) {
+            return false;
+        }
+        return (chunk.textDelta() != null && !chunk.textDelta().isBlank())
+                || (chunk.reasoningDelta() != null && !chunk.reasoningDelta().isBlank())
+                || (chunk.toolCalls() != null && !chunk.toolCalls().isEmpty())
+                || chunk.terminal();
     }
 
     private GatewayChatRuntime resolveRuntime(com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView candidate) {

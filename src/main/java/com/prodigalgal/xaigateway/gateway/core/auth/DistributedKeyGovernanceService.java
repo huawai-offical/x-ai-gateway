@@ -1,7 +1,6 @@
 package com.prodigalgal.xaigateway.gateway.core.auth;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -11,13 +10,13 @@ import java.util.List;
 @Service
 public class DistributedKeyGovernanceService {
 
-    private final StringRedisTemplate stringRedisTemplate;
+    private final RateLimitStore rateLimitStore;
     private final ObjectMapper objectMapper;
 
     public DistributedKeyGovernanceService(
-            StringRedisTemplate stringRedisTemplate,
+            RateLimitStore rateLimitStore,
             ObjectMapper objectMapper) {
-        this.stringRedisTemplate = stringRedisTemplate;
+        this.rateLimitStore = rateLimitStore;
         this.objectMapper = objectMapper;
     }
 
@@ -70,8 +69,7 @@ public class DistributedKeyGovernanceService {
                     blockers.add("当前 DistributedKey 已超过并发限制。");
                 }
             } else {
-                String currentValue = stringRedisTemplate.opsForValue().get(concurrencyKey(distributedKey.id()));
-                long current = currentValue == null ? 0L : Long.parseLong(currentValue);
+                long current = rateLimitStore.get(concurrencyKey(distributedKey.id()));
                 if (current >= distributedKey.concurrencyLimit()) {
                     blockers.add("当前 DistributedKey 并发已满。");
                 }
@@ -85,7 +83,7 @@ public class DistributedKeyGovernanceService {
         if (reservationKey == null) {
             return;
         }
-        stringRedisTemplate.opsForValue().decrement(reservationKey);
+        rateLimitStore.decrement(reservationKey);
     }
 
     private long estimateTokens(Object requestBody) {
@@ -103,14 +101,9 @@ public class DistributedKeyGovernanceService {
 
     private long incrementWithinWindow(String key, int windowSeconds, long amount) {
         if (amount <= 0) {
-            String currentValue = stringRedisTemplate.opsForValue().get(key);
-            return currentValue == null ? 0L : Long.parseLong(currentValue);
+            return rateLimitStore.get(key);
         }
-        Long current = stringRedisTemplate.opsForValue().increment(key, amount);
-        if (Boolean.FALSE.equals(stringRedisTemplate.expire(key, Duration.ofSeconds(windowSeconds)))) {
-            // ignore expire failure in local mode
-        }
-        return current == null ? 0L : current;
+        return rateLimitStore.increment(key, amount, Duration.ofSeconds(windowSeconds));
     }
 
     private String budgetKey(Long distributedKeyId) {

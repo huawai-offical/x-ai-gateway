@@ -49,7 +49,9 @@ public class RoutingPreviewController {
                 result.selectionSource(),
                 result.selectedCandidate(),
                 result.candidates().size(),
-                result.candidates()
+                result.candidates(),
+                result.candidateEvaluations(),
+                result.attempts()
         );
     }
 }

@@ -13,11 +13,18 @@ import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestFeatureServ
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlan;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlanCompiler;
+import com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityService;
 import com.prodigalgal.xaigateway.gateway.core.routing.GatewayRouteSelectionService;
+import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateEvaluation;
+import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateView;
+import com.prodigalgal.xaigateway.gateway.core.routing.RouteExecutionAttempt;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionRequest;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
+import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionSource;
+import com.prodigalgal.xaigateway.infra.config.GatewayProperties;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -41,6 +48,8 @@ public class GatewayResourceExecutionService {
     private final GatewayRequestFeatureService gatewayRequestFeatureService;
     private final TranslationExecutionPlanCompiler translationExecutionPlanCompiler;
     private final List<GatewayResourceExecutor> gatewayResourceExecutors;
+    private final GatewayObservabilityService gatewayObservabilityService;
+    private final GatewayProperties gatewayProperties;
 
     @Autowired
     public GatewayResourceExecutionService(
@@ -52,7 +61,9 @@ public class GatewayResourceExecutionService {
             CredentialMaterialResolver credentialMaterialResolver,
             GatewayRequestFeatureService gatewayRequestFeatureService,
             TranslationExecutionPlanCompiler translationExecutionPlanCompiler,
-            List<GatewayResourceExecutor> gatewayResourceExecutors) {
+            List<GatewayResourceExecutor> gatewayResourceExecutors,
+            GatewayObservabilityService gatewayObservabilityService,
+            GatewayProperties gatewayProperties) {
         this.gatewayRouteSelectionService = gatewayRouteSelectionService;
         this.upstreamCredentialRepository = upstreamCredentialRepository;
         this.credentialCryptoService = credentialCryptoService;
@@ -62,6 +73,34 @@ public class GatewayResourceExecutionService {
         this.gatewayRequestFeatureService = gatewayRequestFeatureService;
         this.translationExecutionPlanCompiler = translationExecutionPlanCompiler;
         this.gatewayResourceExecutors = gatewayResourceExecutors;
+        this.gatewayObservabilityService = gatewayObservabilityService;
+        this.gatewayProperties = gatewayProperties;
+    }
+
+    public GatewayResourceExecutionService(
+            GatewayRouteSelectionService gatewayRouteSelectionService,
+            UpstreamCredentialRepository upstreamCredentialRepository,
+            CredentialCryptoService credentialCryptoService,
+            DistributedKeyGovernanceService distributedKeyGovernanceService,
+            AccountSelectionService accountSelectionService,
+            GatewayRequestFeatureService gatewayRequestFeatureService,
+            TranslationExecutionPlanCompiler translationExecutionPlanCompiler,
+            List<GatewayResourceExecutor> gatewayResourceExecutors,
+            GatewayObservabilityService gatewayObservabilityService,
+            GatewayProperties gatewayProperties) {
+        this(
+                gatewayRouteSelectionService,
+                upstreamCredentialRepository,
+                credentialCryptoService,
+                distributedKeyGovernanceService,
+                accountSelectionService,
+                new CredentialMaterialResolver(accountSelectionService, credentialCryptoService, new com.fasterxml.jackson.databind.ObjectMapper()),
+                gatewayRequestFeatureService,
+                translationExecutionPlanCompiler,
+                gatewayResourceExecutors,
+                gatewayObservabilityService,
+                gatewayProperties
+        );
     }
 
     public GatewayResourceExecutionService(
@@ -79,10 +118,20 @@ public class GatewayResourceExecutionService {
                 credentialCryptoService,
                 distributedKeyGovernanceService,
                 accountSelectionService,
-                new CredentialMaterialResolver(accountSelectionService, credentialCryptoService, new com.fasterxml.jackson.databind.ObjectMapper()),
                 gatewayRequestFeatureService,
                 translationExecutionPlanCompiler,
-                gatewayResourceExecutors
+                gatewayResourceExecutors,
+                new GatewayObservabilityService(null, null, null, new com.fasterxml.jackson.databind.ObjectMapper()) {
+                    @Override
+                    public String nextRequestId() {
+                        return "test-request";
+                    }
+
+                    @Override
+                    public void recordRouteDecision(String requestId, RouteSelectionResult selectionResult) {
+                    }
+                },
+                new GatewayProperties()
         );
     }
 
@@ -93,14 +142,64 @@ public class GatewayResourceExecutionService {
             String defaultModel) {
         ObjectNode payload = requireObjectPayload(requestBody, defaultModel);
         RouteSelectionResult selectionResult = select(distributedKeyPrefix, requestPath, payload.path("model").asText(), payload);
-        GatewayResourceExecutionContext context = prepareContext(selectionResult, requestPath, payload);
+        String requestId = gatewayObservabilityService.nextRequestId();
         try {
-            ResponseEntity<JsonNode> response = resolveExecutor(context).executeJson(context, payload, defaultModel);
-            recordRouteOutcome(selectionResult, response.getStatusCode().value());
-            return response;
-        } catch (RuntimeException exception) {
-            gatewayRouteSelectionService.invalidateSelection(selectionResult);
-            throw exception;
+            List<RouteExecutionAttempt> attempts = new ArrayList<>();
+            int maxAttempts = Math.min(selectionResult.candidates().size(), gatewayProperties.getRouting().getMaxFallbackAttempts());
+            RuntimeException lastException = null;
+            for (int index = 0; index < maxAttempts; index++) {
+                RouteSelectionResult candidateSelection = selectionForCandidate(selectionResult, selectionResult.candidates().get(index), attempts);
+                GatewayResourceExecutionContext context = prepareContext(candidateSelection, requestPath, payload);
+                try {
+                    ResponseEntity<JsonNode> response = resolveExecutor(context).executeJson(context, payload, defaultModel);
+                    if (shouldFallback(response.getStatusCode().value(), response.getBody())) {
+                        attempts.add(new RouteExecutionAttempt(
+                                index + 1,
+                                candidateSelection.selectedCandidate().candidate().credentialId(),
+                                candidateSelection.selectedCandidate().candidate().providerType().name(),
+                                "FAILED_BEFORE_FIRST_BYTE",
+                                "status=" + response.getStatusCode().value()
+                        ));
+                        gatewayRouteSelectionService.invalidateSelection(candidateSelection);
+                        gatewayRouteSelectionService.markCredentialCooldown(candidateSelection.selectedCandidate().candidate().credentialId(), "status=" + response.getStatusCode().value());
+                        if (index == maxAttempts - 1) {
+                            gatewayObservabilityService.recordRouteDecision(requestId, candidateSelection.withAttempts(List.copyOf(attempts)));
+                            return response;
+                        }
+                        continue;
+                    }
+                    attempts.add(new RouteExecutionAttempt(
+                            index + 1,
+                            candidateSelection.selectedCandidate().candidate().credentialId(),
+                            candidateSelection.selectedCandidate().candidate().providerType().name(),
+                            "SUCCEEDED",
+                            candidateSelection.selectionSource().name()
+                    ));
+                    RouteSelectionResult finalSelection = candidateSelection.withAttempts(List.copyOf(attempts));
+                    gatewayRouteSelectionService.recordSuccessfulSelection(finalSelection);
+                    gatewayObservabilityService.recordRouteDecision(requestId, finalSelection);
+                    return response;
+                } catch (RuntimeException exception) {
+                    attempts.add(new RouteExecutionAttempt(
+                            index + 1,
+                            candidateSelection.selectedCandidate().candidate().credentialId(),
+                            candidateSelection.selectedCandidate().candidate().providerType().name(),
+                            "FAILED_BEFORE_FIRST_BYTE",
+                            exception.getMessage()
+                    ));
+                    gatewayRouteSelectionService.invalidateSelection(candidateSelection);
+                    gatewayRouteSelectionService.markCredentialCooldown(candidateSelection.selectedCandidate().candidate().credentialId(), exception.getMessage());
+                    lastException = exception;
+                    if (!shouldFallback(exception) || index == maxAttempts - 1) {
+                        gatewayObservabilityService.recordRouteDecision(requestId, candidateSelection.withAttempts(List.copyOf(attempts)));
+                        throw exception;
+                    }
+                }
+            }
+            if (lastException != null) {
+                throw lastException;
+            }
+            throw new IllegalStateException("当前资源请求没有可用候选。");
         } finally {
             distributedKeyGovernanceService.releaseConcurrency(selectionResult.governanceReservationKey());
         }
@@ -120,14 +219,64 @@ public class GatewayResourceExecutionService {
             String defaultModel) {
         ObjectNode payload = requireObjectPayload(requestBody, defaultModel);
         RouteSelectionResult selectionResult = select(distributedKeyPrefix, requestPath, payload.path("model").asText(), payload);
-        GatewayResourceExecutionContext context = prepareContext(selectionResult, requestPath, payload);
+        String requestId = gatewayObservabilityService.nextRequestId();
         try {
-            ResponseEntity<byte[]> response = resolveExecutor(context).executeBinary(context, payload, defaultModel);
-            recordRouteOutcome(selectionResult, response.getStatusCode().value());
-            return response;
-        } catch (RuntimeException exception) {
-            gatewayRouteSelectionService.invalidateSelection(selectionResult);
-            throw exception;
+            List<RouteExecutionAttempt> attempts = new ArrayList<>();
+            int maxAttempts = Math.min(selectionResult.candidates().size(), gatewayProperties.getRouting().getMaxFallbackAttempts());
+            RuntimeException lastException = null;
+            for (int index = 0; index < maxAttempts; index++) {
+                RouteSelectionResult candidateSelection = selectionForCandidate(selectionResult, selectionResult.candidates().get(index), attempts);
+                GatewayResourceExecutionContext context = prepareContext(candidateSelection, requestPath, payload);
+                try {
+                    ResponseEntity<byte[]> response = resolveExecutor(context).executeBinary(context, payload, defaultModel);
+                    if (shouldFallback(response.getStatusCode().value(), response.getBody())) {
+                        attempts.add(new RouteExecutionAttempt(
+                                index + 1,
+                                candidateSelection.selectedCandidate().candidate().credentialId(),
+                                candidateSelection.selectedCandidate().candidate().providerType().name(),
+                                "FAILED_BEFORE_FIRST_BYTE",
+                                "status=" + response.getStatusCode().value()
+                        ));
+                        gatewayRouteSelectionService.invalidateSelection(candidateSelection);
+                        gatewayRouteSelectionService.markCredentialCooldown(candidateSelection.selectedCandidate().candidate().credentialId(), "status=" + response.getStatusCode().value());
+                        if (index == maxAttempts - 1) {
+                            gatewayObservabilityService.recordRouteDecision(requestId, candidateSelection.withAttempts(List.copyOf(attempts)));
+                            return response;
+                        }
+                        continue;
+                    }
+                    attempts.add(new RouteExecutionAttempt(
+                            index + 1,
+                            candidateSelection.selectedCandidate().candidate().credentialId(),
+                            candidateSelection.selectedCandidate().candidate().providerType().name(),
+                            "SUCCEEDED",
+                            candidateSelection.selectionSource().name()
+                    ));
+                    RouteSelectionResult finalSelection = candidateSelection.withAttempts(List.copyOf(attempts));
+                    gatewayRouteSelectionService.recordSuccessfulSelection(finalSelection);
+                    gatewayObservabilityService.recordRouteDecision(requestId, finalSelection);
+                    return response;
+                } catch (RuntimeException exception) {
+                    attempts.add(new RouteExecutionAttempt(
+                            index + 1,
+                            candidateSelection.selectedCandidate().candidate().credentialId(),
+                            candidateSelection.selectedCandidate().candidate().providerType().name(),
+                            "FAILED_BEFORE_FIRST_BYTE",
+                            exception.getMessage()
+                    ));
+                    gatewayRouteSelectionService.invalidateSelection(candidateSelection);
+                    gatewayRouteSelectionService.markCredentialCooldown(candidateSelection.selectedCandidate().candidate().credentialId(), exception.getMessage());
+                    lastException = exception;
+                    if (!shouldFallback(exception) || index == maxAttempts - 1) {
+                        gatewayObservabilityService.recordRouteDecision(requestId, candidateSelection.withAttempts(List.copyOf(attempts)));
+                        throw exception;
+                    }
+                }
+            }
+            if (lastException != null) {
+                throw lastException;
+            }
+            throw new IllegalStateException("当前资源请求没有可用候选。");
         } finally {
             distributedKeyGovernanceService.releaseConcurrency(selectionResult.governanceReservationKey());
         }
@@ -143,10 +292,21 @@ public class GatewayResourceExecutionService {
         routePayload.put("model", requestedModel);
         formFields.forEach(routePayload::put);
         RouteSelectionResult selectionResult = select(distributedKeyPrefix, requestPath, requestedModel, routePayload);
-        GatewayResourceExecutionContext context = prepareContext(selectionResult, requestPath, routePayload);
-        return resolveExecutor(context).executeMultipart(context, requestedModel, formFields, files)
-                .doOnNext(response -> recordRouteOutcome(selectionResult, response.getStatusCode().value()))
-                .doOnError(error -> gatewayRouteSelectionService.invalidateSelection(selectionResult))
+        String requestId = gatewayObservabilityService.nextRequestId();
+        List<RouteExecutionAttempt> attempts = new java.util.concurrent.CopyOnWriteArrayList<>();
+        int maxAttempts = Math.min(selectionResult.candidates().size(), gatewayProperties.getRouting().getMaxFallbackAttempts());
+        return executeMultipartAttempt(
+                requestId,
+                selectionResult,
+                requestPath,
+                requestedModel,
+                routePayload,
+                formFields,
+                files,
+                0,
+                maxAttempts,
+                attempts
+        )
                 .doFinally(signalType -> distributedKeyGovernanceService.releaseConcurrency(selectionResult.governanceReservationKey()));
     }
 
@@ -164,6 +324,91 @@ public class GatewayResourceExecutionService {
                 GatewayClientFamily.GENERIC_OPENAI,
                 true
         ));
+    }
+
+    private Mono<ResponseEntity<JsonNode>> executeMultipartAttempt(
+            String requestId,
+            RouteSelectionResult baseSelection,
+            String requestPath,
+            String requestedModel,
+            JsonNode routePayload,
+            Map<String, String> formFields,
+            Map<String, FilePart> files,
+            int candidateIndex,
+            int maxAttempts,
+            List<RouteExecutionAttempt> attempts) {
+        RouteSelectionResult candidateSelection = selectionForCandidate(baseSelection, baseSelection.candidates().get(candidateIndex), attempts);
+        GatewayResourceExecutionContext context = prepareContext(candidateSelection, requestPath, routePayload);
+        return resolveExecutor(context).executeMultipart(context, requestedModel, formFields, files)
+                .flatMap(response -> {
+                    if (shouldFallback(response.getStatusCode().value(), response.getBody())) {
+                        attempts.add(new RouteExecutionAttempt(
+                                candidateIndex + 1,
+                                candidateSelection.selectedCandidate().candidate().credentialId(),
+                                candidateSelection.selectedCandidate().candidate().providerType().name(),
+                                "FAILED_BEFORE_FIRST_BYTE",
+                                "status=" + response.getStatusCode().value()
+                        ));
+                        gatewayRouteSelectionService.invalidateSelection(candidateSelection);
+                        gatewayRouteSelectionService.markCredentialCooldown(candidateSelection.selectedCandidate().candidate().credentialId(), "status=" + response.getStatusCode().value());
+                        if (candidateIndex + 1 < maxAttempts && candidateIndex + 1 < baseSelection.candidates().size()) {
+                            return executeMultipartAttempt(
+                                    requestId,
+                                    baseSelection,
+                                    requestPath,
+                                    requestedModel,
+                                    routePayload,
+                                    formFields,
+                                    files,
+                                    candidateIndex + 1,
+                                    maxAttempts,
+                                    attempts
+                            );
+                        }
+                        gatewayObservabilityService.recordRouteDecision(requestId, candidateSelection.withAttempts(List.copyOf(attempts)));
+                    } else {
+                        attempts.add(new RouteExecutionAttempt(
+                                candidateIndex + 1,
+                                candidateSelection.selectedCandidate().candidate().credentialId(),
+                                candidateSelection.selectedCandidate().candidate().providerType().name(),
+                                "SUCCEEDED",
+                                candidateSelection.selectionSource().name()
+                        ));
+                        RouteSelectionResult finalSelection = candidateSelection.withAttempts(List.copyOf(attempts));
+                        gatewayRouteSelectionService.recordSuccessfulSelection(finalSelection);
+                        gatewayObservabilityService.recordRouteDecision(requestId, finalSelection);
+                    }
+                    return Mono.just(response);
+                })
+                .onErrorResume(error -> {
+                    attempts.add(new RouteExecutionAttempt(
+                            candidateIndex + 1,
+                            candidateSelection.selectedCandidate().candidate().credentialId(),
+                            candidateSelection.selectedCandidate().candidate().providerType().name(),
+                            "FAILED_BEFORE_FIRST_BYTE",
+                            error.getMessage()
+                    ));
+                    gatewayRouteSelectionService.invalidateSelection(candidateSelection);
+                    gatewayRouteSelectionService.markCredentialCooldown(candidateSelection.selectedCandidate().candidate().credentialId(), error.getMessage());
+                    if (shouldFallback(error)
+                            && candidateIndex + 1 < maxAttempts
+                            && candidateIndex + 1 < baseSelection.candidates().size()) {
+                        return executeMultipartAttempt(
+                                requestId,
+                                baseSelection,
+                                requestPath,
+                                requestedModel,
+                                routePayload,
+                                formFields,
+                                files,
+                                candidateIndex + 1,
+                                maxAttempts,
+                                attempts
+                        );
+                    }
+                    gatewayObservabilityService.recordRouteDecision(requestId, candidateSelection.withAttempts(List.copyOf(attempts)));
+                    return Mono.error(error);
+                });
     }
 
     private GatewayResourceExecutionContext prepareContext(RouteSelectionResult selectionResult, String requestPath, JsonNode requestBody) {
@@ -216,5 +461,37 @@ public class GatewayResourceExecutionService {
         if (statusCode == 429 || statusCode >= 500) {
             gatewayRouteSelectionService.invalidateSelection(selectionResult);
         }
+    }
+
+    private RouteSelectionResult selectionForCandidate(
+            RouteSelectionResult selectionResult,
+            RouteCandidateView candidate,
+            List<RouteExecutionAttempt> attempts) {
+        RouteSelectionSource source = selectionResult.candidateEvaluations().stream()
+                .filter(item -> item.candidate().candidate().credentialId().equals(candidate.candidate().credentialId()))
+                .map(RouteCandidateEvaluation::selectionSource)
+                .findFirst()
+                .orElse(RouteSelectionSource.WEIGHTED_HASH);
+        return selectionResult.withSelectedCandidate(candidate, source).withAttempts(List.copyOf(attempts));
+    }
+
+    private boolean shouldFallback(Throwable throwable) {
+        if (throwable instanceof com.prodigalgal.xaigateway.gateway.core.auth.GatewayUnauthorizedException) {
+            return false;
+        }
+        if (throwable instanceof IllegalArgumentException) {
+            return false;
+        }
+        if (throwable instanceof com.prodigalgal.xaigateway.gateway.core.error.GatewayRuleMatchedException matched) {
+            return matched.getStatus() == 429 || matched.getStatus() >= 500;
+        }
+        if (throwable instanceof org.springframework.web.reactive.function.client.WebClientResponseException responseException) {
+            return responseException.getStatusCode().value() == 429 || responseException.getStatusCode().is5xxServerError();
+        }
+        return true;
+    }
+
+    private boolean shouldFallback(int statusCode, Object body) {
+        return statusCode == 429 || statusCode >= 500 || body == null;
     }
 }

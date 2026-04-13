@@ -41,6 +41,7 @@ public class GatewayProperties {
 
         private boolean interopPlanEnabled = true;
         private boolean routeDecisionLoggingEnabled = true;
+        private int maxFallbackAttempts = 3;
 
         public boolean isInteropPlanEnabled() {
             return interopPlanEnabled;
@@ -57,6 +58,14 @@ public class GatewayProperties {
         public void setRouteDecisionLoggingEnabled(boolean routeDecisionLoggingEnabled) {
             this.routeDecisionLoggingEnabled = routeDecisionLoggingEnabled;
         }
+
+        public int getMaxFallbackAttempts() {
+            return maxFallbackAttempts;
+        }
+
+        public void setMaxFallbackAttempts(int maxFallbackAttempts) {
+            this.maxFallbackAttempts = maxFallbackAttempts;
+        }
     }
 
     public static class Cache {
@@ -66,6 +75,9 @@ public class GatewayProperties {
         private boolean prefixAffinityEnabled = true;
         private boolean fingerprintAffinityEnabled = true;
         private Duration affinityTtl = Duration.ofMinutes(30);
+        private Duration authTtl = Duration.ofMinutes(10);
+        private Duration routeTtl = Duration.ofMinutes(2);
+        private Duration healthCooldownTtl = Duration.ofMinutes(5);
         private int fingerprintMaxPrefixTokens = 1024;
         private String keyPrefix = "xag";
 
@@ -107,6 +119,30 @@ public class GatewayProperties {
 
         public void setAffinityTtl(Duration affinityTtl) {
             this.affinityTtl = affinityTtl;
+        }
+
+        public Duration getAuthTtl() {
+            return authTtl;
+        }
+
+        public void setAuthTtl(Duration authTtl) {
+            this.authTtl = authTtl;
+        }
+
+        public Duration getRouteTtl() {
+            return routeTtl;
+        }
+
+        public void setRouteTtl(Duration routeTtl) {
+            this.routeTtl = routeTtl;
+        }
+
+        public Duration getHealthCooldownTtl() {
+            return healthCooldownTtl;
+        }
+
+        public void setHealthCooldownTtl(Duration healthCooldownTtl) {
+            this.healthCooldownTtl = healthCooldownTtl;
         }
 
         public int getFingerprintMaxPrefixTokens() {

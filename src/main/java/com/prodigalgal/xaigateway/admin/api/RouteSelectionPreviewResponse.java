@@ -1,6 +1,8 @@
 package com.prodigalgal.xaigateway.admin.api;
 
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
+import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateEvaluation;
+import com.prodigalgal.xaigateway.gateway.core.routing.RouteExecutionAttempt;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionSource;
 import java.util.List;
@@ -20,6 +22,8 @@ public record RouteSelectionPreviewResponse(
         RouteSelectionSource selectionSource,
         RouteCandidateView selectedCandidate,
         int candidateCount,
-        List<RouteCandidateView> candidates
+        List<RouteCandidateView> candidates,
+        List<RouteCandidateEvaluation> candidateEvaluations,
+        List<RouteExecutionAttempt> attempts
 ) {
 }

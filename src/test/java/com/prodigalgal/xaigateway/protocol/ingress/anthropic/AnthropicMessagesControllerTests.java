@@ -33,7 +33,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Flux;
 
 @WebFluxTest(controllers = AnthropicMessagesController.class)
-@Import(PermitAllSecurityTestConfig.class)
+@Import({PermitAllSecurityTestConfig.class, AnthropicMessagesRequestMapper.class})
 class AnthropicMessagesControllerTests {
 
     @Autowired
@@ -286,6 +286,31 @@ class AnthropicMessagesControllerTests {
         org.junit.jupiter.api.Assertions.assertTrue(joined.contains("message_start"));
         org.junit.jupiter.api.Assertions.assertTrue(joined.contains("content_block_delta"));
         org.junit.jupiter.api.Assertions.assertTrue(joined.contains("message_stop"));
+    }
+
+    @Test
+    void shouldRejectAnthropicMessageWithoutUserPayload() {
+        Mockito.when(distributedKeyAuthenticationService.authenticateRawToken("sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+
+        webTestClient.post()
+                .uri("/v1/messages")
+                .header("x-api-key", "sk-gw-test.secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "model": "claude-sonnet-4",
+                          "messages": [
+                            {"role":"assistant","content":"hello"}
+                          ],
+                          "maxTokens": 256
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo("INVALID_ARGUMENT")
+                .jsonPath("$.message").isEqualTo("至少需要一条 user 消息。");
     }
 
     private RouteSelectionResult selectionResult() {

@@ -10,6 +10,7 @@ import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestFeatureServ
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlan;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlanCompiler;
+import com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityService;
 import com.prodigalgal.xaigateway.gateway.core.routing.GatewayRouteSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
@@ -145,6 +146,69 @@ class GatewayResourceExecutionServiceTests {
         ));
     }
 
+    @Test
+    void shouldFallbackToNextResourceCandidateBeforeResponseIsCommitted() {
+        GatewayRouteSelectionService gatewayRouteSelectionService = Mockito.mock(GatewayRouteSelectionService.class);
+        UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        CredentialCryptoService credentialCryptoService = Mockito.mock(CredentialCryptoService.class);
+        DistributedKeyGovernanceService distributedKeyGovernanceService = Mockito.mock(DistributedKeyGovernanceService.class);
+        AccountSelectionService accountSelectionService = Mockito.mock(AccountSelectionService.class);
+        GatewayRequestFeatureService gatewayRequestFeatureService = Mockito.mock(GatewayRequestFeatureService.class);
+        TranslationExecutionPlanCompiler translationExecutionPlanCompiler = Mockito.mock(TranslationExecutionPlanCompiler.class);
+        GatewayResourceExecutor embeddingsExecutor = Mockito.mock(GatewayResourceExecutor.class);
+        GatewayObservabilityService gatewayObservabilityService = Mockito.mock(GatewayObservabilityService.class);
+        GatewayResourceExecutionService service = new GatewayResourceExecutionService(
+                gatewayRouteSelectionService,
+                upstreamCredentialRepository,
+                credentialCryptoService,
+                distributedKeyGovernanceService,
+                accountSelectionService,
+                gatewayRequestFeatureService,
+                translationExecutionPlanCompiler,
+                List.of(embeddingsExecutor),
+                gatewayObservabilityService,
+                new com.prodigalgal.xaigateway.infra.config.GatewayProperties()
+        );
+
+        RouteSelectionResult selectionResult = selectionResultWithFallbackCandidates();
+        UpstreamCredentialEntity firstCredential = credential(101L, ProviderType.GEMINI_DIRECT);
+        UpstreamCredentialEntity secondCredential = credential(202L, ProviderType.GEMINI_DIRECT);
+        ObjectNode requestBody = new ObjectMapper().createObjectNode();
+        requestBody.put("model", "text-embedding-004");
+        requestBody.put("input", "hello");
+
+        Mockito.when(gatewayObservabilityService.nextRequestId()).thenReturn("req-resource-1");
+        Mockito.when(gatewayRouteSelectionService.select(any())).thenReturn(selectionResult);
+        Mockito.when(upstreamCredentialRepository.findById(101L)).thenReturn(Optional.of(firstCredential));
+        Mockito.when(upstreamCredentialRepository.findById(202L)).thenReturn(Optional.of(secondCredential));
+        Mockito.when(credentialCryptoService.decrypt("cipher")).thenReturn("api-key");
+        Mockito.when(accountSelectionService.resolveActiveAccount(anyLong(), any(), any(), anyInt())).thenReturn(Optional.empty());
+        Mockito.when(gatewayRequestFeatureService.describe(eq("/v1/embeddings"), any()))
+                .thenReturn(new GatewayRequestSemantics(
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType.EMBEDDING,
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation.EMBEDDING_CREATE,
+                        List.of(com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature.EMBEDDINGS),
+                        true
+                ));
+        Mockito.when(translationExecutionPlanCompiler.compileSelected(any(), eq("/v1/embeddings"), any(), any()))
+                .thenReturn(Mockito.mock(TranslationExecutionPlan.class));
+        Mockito.when(embeddingsExecutor.supports(eq("/v1/embeddings"), any())).thenReturn(true);
+        Mockito.when(embeddingsExecutor.executeJson(any(), any(), eq("text-embedding-004")))
+                .thenReturn(ResponseEntity.status(503).body(null))
+                .thenReturn(ResponseEntity.ok(new ObjectMapper().createObjectNode().put("object", "list")));
+
+        ResponseEntity<com.fasterxml.jackson.databind.JsonNode> response = service.executeJson(
+                "sk-gw-test",
+                "/v1/embeddings",
+                requestBody,
+                "text-embedding-004"
+        );
+
+        assertEquals(200, response.getStatusCode().value());
+        Mockito.verify(gatewayRouteSelectionService).markCredentialCooldown(eq(101L), eq("status=503"));
+        Mockito.verify(embeddingsExecutor, Mockito.times(2)).executeJson(any(), any(), eq("text-embedding-004"));
+    }
+
     private RouteSelectionResult selectionResult(ProviderType providerType, UpstreamSiteKind siteKind) {
         CatalogCandidateView candidate = new CatalogCandidateView(
                 101L,
@@ -183,6 +247,79 @@ class GatewayResourceExecutionServiceTests {
                 RouteSelectionSource.WEIGHTED_HASH,
                 routeCandidateView,
                 List.of(routeCandidateView)
+        );
+    }
+
+    private RouteSelectionResult selectionResultWithFallbackCandidates() {
+        CatalogCandidateView first = new CatalogCandidateView(
+                101L,
+                "candidate-a",
+                ProviderType.GEMINI_DIRECT,
+                1L,
+                ProviderFamily.GEMINI,
+                UpstreamSiteKind.GEMINI_DIRECT,
+                AuthStrategy.BEARER,
+                PathStrategy.OPENAI_V1,
+                ErrorSchemaStrategy.OPENAI_ERROR,
+                "https://example.com",
+                "model-a",
+                "model-a",
+                List.of("openai"),
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                ReasoningTransport.OPENAI_CHAT,
+                com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel.NATIVE
+        );
+        CatalogCandidateView second = new CatalogCandidateView(
+                202L,
+                "candidate-b",
+                ProviderType.GEMINI_DIRECT,
+                1L,
+                ProviderFamily.GEMINI,
+                UpstreamSiteKind.GEMINI_DIRECT,
+                AuthStrategy.BEARER,
+                PathStrategy.OPENAI_V1,
+                ErrorSchemaStrategy.OPENAI_ERROR,
+                "https://example.com",
+                "model-a",
+                "model-a",
+                List.of("openai"),
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                ReasoningTransport.OPENAI_CHAT,
+                com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel.NATIVE
+        );
+        RouteCandidateView firstView = new RouteCandidateView(first, 11L, 10, 100, "NATIVE", 3);
+        RouteCandidateView secondView = new RouteCandidateView(second, 12L, 10, 90, "NATIVE", 3);
+        return new RouteSelectionResult(
+                1L,
+                "sk-gw-test",
+                "model-a",
+                "model-a",
+                "model-a",
+                "openai",
+                "prefix",
+                "fingerprint",
+                "model-a",
+                com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily.GENERIC_OPENAI,
+                List.of(),
+                null,
+                RouteSelectionSource.WEIGHTED_HASH,
+                firstView,
+                List.of(firstView, secondView),
+                List.of(
+                        new com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateEvaluation(firstView, true, "HEALTHY", null, false, RouteSelectionSource.WEIGHTED_HASH, 100d, List.of(), List.of()),
+                        new com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateEvaluation(secondView, true, "HEALTHY", null, false, RouteSelectionSource.WEIGHTED_HASH, 90d, List.of(), List.of())
+                ),
+                List.of()
         );
     }
 

@@ -33,7 +33,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Flux;
 
 @WebFluxTest(controllers = GeminiGenerateContentController.class)
-@Import(PermitAllSecurityTestConfig.class)
+@Import({PermitAllSecurityTestConfig.class, GeminiGenerateContentRequestMapper.class})
 class GeminiGenerateContentControllerTests {
 
     @Autowired
@@ -284,6 +284,32 @@ class GeminiGenerateContentControllerTests {
         String joined = String.join("", body);
         org.junit.jupiter.api.Assertions.assertTrue(joined.contains("gemini back") || joined.contains("hello"));
         org.junit.jupiter.api.Assertions.assertTrue(joined.contains("usageMetadata"));
+    }
+
+    @Test
+    void shouldRejectGeminiRequestWithoutUserPayload() {
+        Mockito.when(distributedKeyAuthenticationService.authenticateRawToken("sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+
+        webTestClient.post()
+                .uri("/v1beta/models/gemini-2.5-pro:generateContent")
+                .header("x-goog-api-key", "sk-gw-test.secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "contents": [
+                            {
+                              "role":"model",
+                              "parts":[{"text":"hello"}]
+                            }
+                          ]
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo("INVALID_ARGUMENT")
+                .jsonPath("$.message").isEqualTo("至少需要一条带 text 的 user content。");
     }
 
     private RouteSelectionResult selectionResult() {

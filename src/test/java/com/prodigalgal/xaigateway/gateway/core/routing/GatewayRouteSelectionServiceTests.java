@@ -27,6 +27,7 @@ import com.prodigalgal.xaigateway.gateway.core.shared.ReasoningTransport;
 import com.prodigalgal.xaigateway.infra.config.GatewayProperties;
 import com.prodigalgal.xaigateway.infra.persistence.repository.NetworkProxyRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -35,6 +36,7 @@ import org.mockito.Mockito;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -52,6 +54,8 @@ class GatewayRouteSelectionServiceTests {
         AccountSelectionService accountSelectionService = Mockito.mock(AccountSelectionService.class);
         GatewayRequestFeatureService gatewayRequestFeatureService = Mockito.mock(GatewayRequestFeatureService.class);
         SiteCapabilityTruthService siteCapabilityTruthService = Mockito.mock(SiteCapabilityTruthService.class);
+        RouteCacheStore routeCacheStore = Mockito.mock(RouteCacheStore.class);
+        HealthStateStore healthStateStore = Mockito.mock(HealthStateStore.class);
 
         GatewayProperties properties = new GatewayProperties();
         PromptFingerprintService promptFingerprintService = new PromptFingerprintService(new ObjectMapper(), properties);
@@ -66,7 +70,9 @@ class GatewayRouteSelectionServiceTests {
                 networkProxyRepository,
                 accountSelectionService,
                 gatewayRequestFeatureService,
-                siteCapabilityTruthService
+                siteCapabilityTruthService,
+                routeCacheStore,
+                healthStateStore
         );
 
         DistributedKeyView keyView = new DistributedKeyView(
@@ -146,6 +152,9 @@ class GatewayRouteSelectionServiceTests {
                         List.of(),
                         List.of()
                 ));
+        when(routeCacheStore.get(Mockito.anyLong(), Mockito.anyString(), Mockito.anyString(), Mockito.anyString(), Mockito.any()))
+                .thenReturn(Optional.empty());
+        when(healthStateStore.getCredentialState(101L)).thenReturn(Optional.empty());
         when(affinityCacheService.getPrefixAffinity(eq(1L), eq("OPENAI_DIRECT"), eq("gpt-4o"), anyString()))
                 .thenReturn("101");
 
@@ -163,5 +172,206 @@ class GatewayRouteSelectionServiceTests {
         assertEquals(101L, result.selectedCandidate().candidate().credentialId());
         assertNotNull(result.prefixHash());
         assertNotNull(result.fingerprint());
+        assertEquals("HEALTHY", result.candidateEvaluations().get(0).healthState());
+    }
+
+    @Test
+    void shouldBlockCandidateWhenCooldownIsActive() {
+        DistributedKeyQueryService distributedKeyQueryService = Mockito.mock(DistributedKeyQueryService.class);
+        ModelCatalogQueryService modelCatalogQueryService = Mockito.mock(ModelCatalogQueryService.class);
+        AffinityCacheService affinityCacheService = Mockito.mock(AffinityCacheService.class);
+        DistributedKeyGovernanceService distributedKeyGovernanceService = Mockito.mock(DistributedKeyGovernanceService.class);
+        UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        NetworkProxyRepository networkProxyRepository = Mockito.mock(NetworkProxyRepository.class);
+        AccountSelectionService accountSelectionService = Mockito.mock(AccountSelectionService.class);
+        GatewayRequestFeatureService gatewayRequestFeatureService = Mockito.mock(GatewayRequestFeatureService.class);
+        SiteCapabilityTruthService siteCapabilityTruthService = Mockito.mock(SiteCapabilityTruthService.class);
+        RouteCacheStore routeCacheStore = Mockito.mock(RouteCacheStore.class);
+        HealthStateStore healthStateStore = Mockito.mock(HealthStateStore.class);
+
+        GatewayProperties properties = new GatewayProperties();
+        PromptFingerprintService promptFingerprintService = new PromptFingerprintService(new ObjectMapper(), properties);
+
+        GatewayRouteSelectionService service = new GatewayRouteSelectionService(
+                distributedKeyQueryService,
+                modelCatalogQueryService,
+                promptFingerprintService,
+                affinityCacheService,
+                distributedKeyGovernanceService,
+                upstreamCredentialRepository,
+                networkProxyRepository,
+                accountSelectionService,
+                gatewayRequestFeatureService,
+                siteCapabilityTruthService,
+                routeCacheStore,
+                healthStateStore
+        );
+
+        DistributedKeyView keyView = new DistributedKeyView(
+                1L,
+                "test-key",
+                "sk-gw-test",
+                "sk-gw-test...masked",
+                List.of("openai"),
+                List.of(),
+                List.of(new DistributedCredentialBindingView(
+                        11L,
+                        101L,
+                        "openai-primary",
+                        ProviderType.OPENAI_DIRECT,
+                        "https://api.openai.com",
+                        10,
+                        100
+                ))
+        );
+        CatalogCandidateView candidate = new CatalogCandidateView(
+                101L,
+                "openai-primary",
+                ProviderType.OPENAI_DIRECT,
+                "https://api.openai.com",
+                "gpt-4o",
+                "gpt-4o",
+                List.of("openai"),
+                true,
+                false,
+                true,
+                true,
+                true,
+                true,
+                ReasoningTransport.OPENAI_CHAT
+        );
+
+        when(distributedKeyQueryService.findActiveByKeyPrefix("sk-gw-test")).thenReturn(Optional.of(keyView));
+        when(distributedKeyGovernanceService.evaluate(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.anyBoolean()))
+                .thenReturn(new DistributedKeyGovernanceService.GovernanceDecision(List.of(), List.of(), 1L, 1000L, null));
+        when(accountSelectionService.hasHealthyAccountBinding(1L, ProviderType.OPENAI_DIRECT, GatewayClientFamily.GENERIC_OPENAI))
+                .thenReturn(true);
+        when(upstreamCredentialRepository.findById(101L)).thenReturn(Optional.of(new com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity() {{
+            setProviderType(ProviderType.OPENAI_DIRECT);
+            setBaseUrl("https://api.openai.com");
+        }}));
+        when(modelCatalogQueryService.resolveRequestedModel("gpt-4o", "openai"))
+                .thenReturn(Optional.of(new ResolvedModelView(
+                        "gpt-4o",
+                        "gpt-4o",
+                        "gpt-4o",
+                        false,
+                        List.of(candidate)
+                )));
+        when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.any()))
+                .thenReturn(new GatewayRequestSemantics(
+                        TranslationResourceType.CHAT,
+                        TranslationOperation.CHAT_COMPLETION,
+                        List.of(InteropFeature.CHAT_TEXT),
+                        true
+                ));
+        when(siteCapabilityTruthService.resolve(Mockito.any(), Mockito.any()))
+                .thenReturn(new CapabilityResolutionReport(
+                        Map.of("chat_text", new CapabilityResolution(
+                                InteropFeature.CHAT_TEXT,
+                                InteropCapabilityLevel.NATIVE,
+                                InteropCapabilityLevel.NATIVE,
+                                InteropCapabilityLevel.NATIVE,
+                                InteropCapabilityLevel.NATIVE,
+                                List.of(),
+                                List.of()
+                        )),
+                        InteropCapabilityLevel.NATIVE,
+                        InteropCapabilityLevel.NATIVE,
+                        InteropCapabilityLevel.NATIVE,
+                        ExecutionKind.NATIVE,
+                        "direct_upstream_execution",
+                        List.of(),
+                        List.of()
+                ));
+        when(routeCacheStore.get(Mockito.anyLong(), Mockito.anyString(), Mockito.anyString(), Mockito.anyString(), Mockito.any()))
+                .thenReturn(Optional.empty());
+        when(healthStateStore.getCredentialState(101L))
+                .thenReturn(Optional.of(new CredentialHealthState("COOLDOWN", "status=503", Instant.now().plusSeconds(300))));
+
+        assertThrows(IllegalArgumentException.class, () -> service.select(new RouteSelectionRequest(
+                "sk-gw-test",
+                "openai",
+                "/v1/chat/completions",
+                "gpt-4o",
+                Map.of("messages", List.of(Map.of("role", "user", "content", "hello"))),
+                GatewayClientFamily.GENERIC_OPENAI,
+                false
+        )));
+    }
+
+    @Test
+    void shouldNotBypassGovernanceWhenRouteCacheHits() throws Exception {
+        DistributedKeyQueryService distributedKeyQueryService = Mockito.mock(DistributedKeyQueryService.class);
+        ModelCatalogQueryService modelCatalogQueryService = Mockito.mock(ModelCatalogQueryService.class);
+        AffinityCacheService affinityCacheService = Mockito.mock(AffinityCacheService.class);
+        DistributedKeyGovernanceService distributedKeyGovernanceService = Mockito.mock(DistributedKeyGovernanceService.class);
+        UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        NetworkProxyRepository networkProxyRepository = Mockito.mock(NetworkProxyRepository.class);
+        AccountSelectionService accountSelectionService = Mockito.mock(AccountSelectionService.class);
+        GatewayRequestFeatureService gatewayRequestFeatureService = Mockito.mock(GatewayRequestFeatureService.class);
+        SiteCapabilityTruthService siteCapabilityTruthService = Mockito.mock(SiteCapabilityTruthService.class);
+        RouteCacheStore routeCacheStore = Mockito.mock(RouteCacheStore.class);
+        HealthStateStore healthStateStore = Mockito.mock(HealthStateStore.class);
+
+        GatewayProperties properties = new GatewayProperties();
+        PromptFingerprintService promptFingerprintService = new PromptFingerprintService(new ObjectMapper(), properties);
+        GatewayRouteSelectionService service = new GatewayRouteSelectionService(
+                distributedKeyQueryService,
+                modelCatalogQueryService,
+                promptFingerprintService,
+                affinityCacheService,
+                distributedKeyGovernanceService,
+                upstreamCredentialRepository,
+                networkProxyRepository,
+                accountSelectionService,
+                gatewayRequestFeatureService,
+                siteCapabilityTruthService,
+                routeCacheStore,
+                healthStateStore
+        );
+
+        DistributedKeyView keyView = new DistributedKeyView(
+                1L, "test-key", "sk-gw-test", "masked", List.of("openai"), List.of(), List.of()
+        );
+        CatalogCandidateView candidate = new CatalogCandidateView(
+                101L, "candidate", ProviderType.OPENAI_DIRECT, "https://api.openai.com", "gpt-4o", "gpt-4o",
+                List.of("openai"), true, true, true, true, true, true, ReasoningTransport.OPENAI_CHAT
+        );
+        RouteCandidateView routeCandidateView = new RouteCandidateView(candidate, 11L, 10, 100, "NATIVE", 3);
+        RouteCandidateEvaluation evaluation = new RouteCandidateEvaluation(
+                routeCandidateView,
+                true,
+                "STATIC_READY",
+                null,
+                false,
+                RouteSelectionSource.WEIGHTED_HASH,
+                0d,
+                List.of(),
+                List.of()
+        );
+
+        when(distributedKeyQueryService.findActiveByKeyPrefix("sk-gw-test")).thenReturn(Optional.of(keyView));
+        when(distributedKeyGovernanceService.evaluate(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.anyBoolean()))
+                .thenReturn(new DistributedKeyGovernanceService.GovernanceDecision(List.of("当前 DistributedKey 已超过 RPM 限制。"), List.of(), 1L, 1000L, null));
+        when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.any()))
+                .thenReturn(new GatewayRequestSemantics(
+                        TranslationResourceType.CHAT,
+                        TranslationOperation.CHAT_COMPLETION,
+                        List.of(InteropFeature.CHAT_TEXT),
+                        true
+                ));
+        when(routeCacheStore.get(Mockito.anyLong(), Mockito.anyString(), Mockito.anyString(), Mockito.anyString(), Mockito.any()))
+                .thenReturn(Optional.of(new RoutePlanSnapshot("gpt-4o", "gpt-4o", "gpt-4o", List.of(evaluation))));
+
+        assertThrows(IllegalArgumentException.class, () -> service.select(new RouteSelectionRequest(
+                "sk-gw-test",
+                "openai",
+                "/v1/chat/completions",
+                "gpt-4o",
+                Map.of("messages", List.of(Map.of("role", "user", "content", "hello"))),
+                GatewayClientFamily.GENERIC_OPENAI,
+                true
+        )));
     }
 }

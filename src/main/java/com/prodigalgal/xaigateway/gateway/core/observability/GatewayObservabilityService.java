@@ -2,7 +2,9 @@ package com.prodigalgal.xaigateway.gateway.core.observability;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateEvaluation;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateView;
+import com.prodigalgal.xaigateway.gateway.core.routing.RouteExecutionAttempt;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
 import com.prodigalgal.xaigateway.gateway.core.usage.GatewayUsage;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
@@ -143,7 +145,8 @@ public class GatewayObservabilityService {
     private String serializeCandidates(RouteSelectionResult selectionResult) {
         Map<String, Object> root = new LinkedHashMap<>();
         root.put("selectionSource", selectionResult.selectionSource().name());
-        root.put("candidates", selectionResult.candidates().stream().map(this::candidateSummary).toList());
+        root.put("candidates", selectionResult.candidateEvaluations().stream().map(this::candidateSummary).toList());
+        root.put("attempts", selectionResult.attempts().stream().map(this::attemptSummary).toList());
         try {
             return objectMapper.writeValueAsString(root);
         } catch (JsonProcessingException exception) {
@@ -151,13 +154,33 @@ public class GatewayObservabilityService {
         }
     }
 
-    private Map<String, Object> candidateSummary(RouteCandidateView candidate) {
+    private Map<String, Object> candidateSummary(RouteCandidateEvaluation candidate) {
         Map<String, Object> map = new LinkedHashMap<>();
-        map.put("credentialId", candidate.candidate().credentialId());
-        map.put("providerType", candidate.candidate().providerType().name());
-        map.put("modelKey", candidate.candidate().modelKey());
-        map.put("bindingPriority", candidate.bindingPriority());
-        map.put("bindingWeight", candidate.bindingWeight());
+        RouteCandidateView candidateView = candidate.candidate();
+        map.put("credentialId", candidateView.candidate().credentialId());
+        map.put("providerType", candidateView.candidate().providerType().name());
+        map.put("modelKey", candidateView.candidate().modelKey());
+        map.put("bindingPriority", candidateView.bindingPriority());
+        map.put("bindingWeight", candidateView.bindingWeight());
+        map.put("capabilityLevel", candidateView.capabilityLevel());
+        map.put("healthState", candidate.healthState());
+        map.put("cooldownUntil", candidate.cooldownUntil());
+        map.put("affinityMatched", candidate.affinityMatched());
+        map.put("selectionSource", candidate.selectionSource().name());
+        map.put("eligible", candidate.eligible());
+        map.put("totalScore", candidate.totalScore());
+        map.put("scoreBreakdown", candidate.scoreBreakdown());
+        map.put("exclusionReasons", candidate.exclusionReasons());
+        return map;
+    }
+
+    private Map<String, Object> attemptSummary(RouteExecutionAttempt attempt) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("attempt", attempt.attempt());
+        map.put("credentialId", attempt.credentialId());
+        map.put("providerType", attempt.providerType());
+        map.put("outcome", attempt.outcome());
+        map.put("detail", attempt.detail());
         return map;
     }
 }
