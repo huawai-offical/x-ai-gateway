@@ -1,5 +1,6 @@
 package com.prodigalgal.xaigateway.admin.api;
 
+import com.prodigalgal.xaigateway.gateway.core.interop.CapabilityResolutionView;
 import com.prodigalgal.xaigateway.gateway.core.shared.AuthStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ErrorSchemaStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ModelAddressingStrategy;
@@ -8,6 +9,7 @@ import com.prodigalgal.xaigateway.gateway.core.shared.ProviderFamily;
 import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 public record ProviderSiteResponse(
         Long id,
@@ -25,6 +27,13 @@ public record ProviderSiteResponse(
         String healthState,
         String blockedReason,
         List<String> supportedProtocols,
+        String compatibilitySurface,
+        List<String> credentialRequirements,
+        String streamTransport,
+        String fallbackStrategy,
+        int cooldownCredentialCount,
+        Instant cooldownUntil,
+        Map<String, CapabilityResolutionView> features,
         int modelCount,
         Instant refreshedAt,
         Instant createdAt,

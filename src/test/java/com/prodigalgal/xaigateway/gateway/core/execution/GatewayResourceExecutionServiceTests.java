@@ -6,6 +6,10 @@ import com.prodigalgal.xaigateway.admin.application.CredentialCryptoService;
 import com.prodigalgal.xaigateway.gateway.core.account.AccountSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyGovernanceService;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
+import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestFeatureService;
+import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlan;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlanCompiler;
 import com.prodigalgal.xaigateway.gateway.core.routing.GatewayRouteSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
@@ -41,6 +45,8 @@ class GatewayResourceExecutionServiceTests {
         CredentialCryptoService credentialCryptoService = Mockito.mock(CredentialCryptoService.class);
         DistributedKeyGovernanceService distributedKeyGovernanceService = Mockito.mock(DistributedKeyGovernanceService.class);
         AccountSelectionService accountSelectionService = Mockito.mock(AccountSelectionService.class);
+        GatewayRequestFeatureService gatewayRequestFeatureService = Mockito.mock(GatewayRequestFeatureService.class);
+        TranslationExecutionPlanCompiler translationExecutionPlanCompiler = Mockito.mock(TranslationExecutionPlanCompiler.class);
         GatewayResourceExecutor embeddingsExecutor = Mockito.mock(GatewayResourceExecutor.class);
         GatewayResourceExecutor fallbackExecutor = Mockito.mock(GatewayResourceExecutor.class);
 
@@ -50,6 +56,8 @@ class GatewayResourceExecutionServiceTests {
                 credentialCryptoService,
                 distributedKeyGovernanceService,
                 accountSelectionService,
+                gatewayRequestFeatureService,
+                translationExecutionPlanCompiler,
                 List.of(embeddingsExecutor, fallbackExecutor)
         );
 
@@ -63,6 +71,15 @@ class GatewayResourceExecutionServiceTests {
         Mockito.when(upstreamCredentialRepository.findById(101L)).thenReturn(Optional.of(credential));
         Mockito.when(credentialCryptoService.decrypt("cipher")).thenReturn("api-key");
         Mockito.when(accountSelectionService.resolveActiveAccount(anyLong(), any(), any(), anyInt())).thenReturn(Optional.empty());
+        Mockito.when(gatewayRequestFeatureService.describe(eq("/v1/embeddings"), any()))
+                .thenReturn(new GatewayRequestSemantics(
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType.EMBEDDING,
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation.EMBEDDING_CREATE,
+                        List.of(com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature.EMBEDDINGS),
+                        true
+                ));
+        Mockito.when(translationExecutionPlanCompiler.compileSelected(any(), eq("/v1/embeddings"), any(), any()))
+                .thenReturn(Mockito.mock(TranslationExecutionPlan.class));
         Mockito.when(embeddingsExecutor.supports(eq("/v1/embeddings"), any())).thenReturn(true);
         Mockito.when(embeddingsExecutor.executeJson(any(), any(), eq("text-embedding-004")))
                 .thenReturn(ResponseEntity.ok(new ObjectMapper().createObjectNode().put("object", "list")));
@@ -85,6 +102,8 @@ class GatewayResourceExecutionServiceTests {
         CredentialCryptoService credentialCryptoService = Mockito.mock(CredentialCryptoService.class);
         DistributedKeyGovernanceService distributedKeyGovernanceService = Mockito.mock(DistributedKeyGovernanceService.class);
         AccountSelectionService accountSelectionService = Mockito.mock(AccountSelectionService.class);
+        GatewayRequestFeatureService gatewayRequestFeatureService = Mockito.mock(GatewayRequestFeatureService.class);
+        TranslationExecutionPlanCompiler translationExecutionPlanCompiler = Mockito.mock(TranslationExecutionPlanCompiler.class);
         GatewayResourceExecutor unsupportedExecutor = Mockito.mock(GatewayResourceExecutor.class);
 
         GatewayResourceExecutionService service = new GatewayResourceExecutionService(
@@ -93,6 +112,8 @@ class GatewayResourceExecutionServiceTests {
                 credentialCryptoService,
                 distributedKeyGovernanceService,
                 accountSelectionService,
+                gatewayRequestFeatureService,
+                translationExecutionPlanCompiler,
                 List.of(unsupportedExecutor)
         );
 
@@ -105,6 +126,15 @@ class GatewayResourceExecutionServiceTests {
         Mockito.when(upstreamCredentialRepository.findById(101L)).thenReturn(Optional.of(credential));
         Mockito.when(credentialCryptoService.decrypt("cipher")).thenReturn("api-key");
         Mockito.when(accountSelectionService.resolveActiveAccount(anyLong(), any(), any(), anyInt())).thenReturn(Optional.empty());
+        Mockito.when(gatewayRequestFeatureService.describe(eq("/v1/moderations"), any()))
+                .thenReturn(new GatewayRequestSemantics(
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType.MODERATION,
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation.MODERATION_CREATE,
+                        List.of(com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature.MODERATION),
+                        true
+                ));
+        Mockito.when(translationExecutionPlanCompiler.compileSelected(any(), eq("/v1/moderations"), any(), any()))
+                .thenReturn(Mockito.mock(TranslationExecutionPlan.class));
         Mockito.when(unsupportedExecutor.supports(eq("/v1/moderations"), any())).thenReturn(false);
 
         assertThrows(IllegalArgumentException.class, () -> service.executeJson(

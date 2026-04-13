@@ -1,14 +1,18 @@
 package com.prodigalgal.xaigateway.gateway.core.interop;
 
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
-import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
 import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind;
+import com.prodigalgal.xaigateway.gateway.core.shared.ProviderFamily;
+import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
 import com.prodigalgal.xaigateway.gateway.core.site.UpstreamSitePolicyService;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SiteCapabilitySnapshotEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamSiteProfileEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.SiteCapabilitySnapshotRepository;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -16,22 +20,176 @@ public class SiteCapabilityTruthService {
 
     private final UpstreamSitePolicyService upstreamSitePolicyService;
     private final SiteCapabilitySnapshotRepository siteCapabilitySnapshotRepository;
+    private final ExecutionSupportMatrixService executionSupportMatrixService;
 
     public SiteCapabilityTruthService(
             UpstreamSitePolicyService upstreamSitePolicyService,
             SiteCapabilitySnapshotRepository siteCapabilitySnapshotRepository) {
+        this(upstreamSitePolicyService, siteCapabilitySnapshotRepository, new ExecutionSupportMatrixService());
+    }
+
+    @Autowired
+    public SiteCapabilityTruthService(
+            UpstreamSitePolicyService upstreamSitePolicyService,
+            SiteCapabilitySnapshotRepository siteCapabilitySnapshotRepository,
+            ExecutionSupportMatrixService executionSupportMatrixService) {
         this.upstreamSitePolicyService = upstreamSitePolicyService;
         this.siteCapabilitySnapshotRepository = siteCapabilitySnapshotRepository;
+        this.executionSupportMatrixService = executionSupportMatrixService;
     }
 
     public InteropCapabilityLevel capabilityLevel(CatalogCandidateView candidate, InteropFeature feature) {
-        if (candidate == null || candidate.siteKind() == null) {
+        if (candidate == null || feature == null) {
             return InteropCapabilityLevel.UNSUPPORTED;
         }
+        return resolve(
+                candidate,
+                new GatewayRequestSemantics(
+                        TranslationResourceType.UNKNOWN,
+                        TranslationOperation.UNKNOWN,
+                        List.of(feature),
+                        true
+                )
+        ).overallEffectiveLevel();
+    }
+
+    public boolean supportsFeature(
+            UpstreamSiteProfileEntity siteProfile,
+            SiteCapabilitySnapshotEntity snapshot,
+            InteropFeature feature) {
+        return resolve(siteProfile, snapshot, feature).effectiveLevel() != InteropCapabilityLevel.UNSUPPORTED;
+    }
+
+    public CapabilityResolution resolve(
+            UpstreamSiteProfileEntity siteProfile,
+            SiteCapabilitySnapshotEntity snapshot,
+            InteropFeature feature) {
+        if (siteProfile == null || feature == null) {
+            return unsupportedResolution(feature, "未找到站点档案。");
+        }
+        InteropCapabilityLevel declaredLevel = declaredLevel(siteProfile.getSiteKind(), snapshot, true, true, true, true, true, feature);
+        InteropCapabilityLevel implementedLevel = siteLevelImplementedLevel(siteProfile.getSiteKind(), feature);
+        InteropCapabilityLevel effectiveLevel = minimumLevel(declaredLevel, implementedLevel);
+
+        java.util.ArrayList<String> blockedReasons = new java.util.ArrayList<>();
+        java.util.ArrayList<String> lossReasons = new java.util.ArrayList<>();
+        if (effectiveLevel == InteropCapabilityLevel.UNSUPPORTED) {
+            if (declaredLevel == InteropCapabilityLevel.UNSUPPORTED) {
+                blockedReasons.add(feature.wireName() + " 当前站点声明不支持。");
+            }
+            if (implementedLevel == InteropCapabilityLevel.UNSUPPORTED) {
+                blockedReasons.add(feature.wireName() + " 当前实现尚未落地。");
+            }
+        } else if (effectiveLevel == InteropCapabilityLevel.EMULATED) {
+            lossReasons.add(feature.wireName() + " 以 emulated 执行。");
+        } else if (effectiveLevel == InteropCapabilityLevel.LOSSY) {
+            lossReasons.add(feature.wireName() + " 以 lossy 执行。");
+        }
+
+        return new CapabilityResolution(
+                feature,
+                declaredLevel,
+                InteropCapabilityLevel.NATIVE,
+                implementedLevel,
+                effectiveLevel,
+                List.copyOf(blockedReasons),
+                List.copyOf(lossReasons)
+        );
+    }
+
+    public CapabilityResolutionReport resolve(
+            CatalogCandidateView candidate,
+            GatewayRequestSemantics semantics) {
+        if (candidate == null) {
+            return new CapabilityResolutionReport(
+                    Map.of(),
+                    InteropCapabilityLevel.UNSUPPORTED,
+                    InteropCapabilityLevel.UNSUPPORTED,
+                    InteropCapabilityLevel.UNSUPPORTED,
+                    ExecutionKind.BLOCKED,
+                    "blocked",
+                    List.of("未命中可用候选。"),
+                    List.of()
+            );
+        }
+        if (semantics == null || semantics.requiredFeatures() == null || semantics.requiredFeatures().isEmpty()) {
+            return new CapabilityResolutionReport(
+                    Map.of(),
+                    InteropCapabilityLevel.NATIVE,
+                    InteropCapabilityLevel.NATIVE,
+                    InteropCapabilityLevel.NATIVE,
+                    ExecutionKind.NATIVE,
+                    upstreamObjectMode(TranslationResourceType.UNKNOWN, ExecutionKind.NATIVE),
+                    List.of(),
+                    List.of()
+            );
+        }
+
         SiteCapabilitySnapshotEntity snapshot = candidate.siteProfileId() == null
                 ? null
                 : siteCapabilitySnapshotRepository.findBySiteProfile_Id(candidate.siteProfileId()).orElse(null);
-        return capabilityLevel(
+        Map<String, CapabilityResolution> featureResolutions = new LinkedHashMap<>();
+        java.util.ArrayList<String> blockedReasons = new java.util.ArrayList<>();
+        java.util.ArrayList<String> lossReasons = new java.util.ArrayList<>();
+        InteropCapabilityLevel overallDeclaredLevel = InteropCapabilityLevel.NATIVE;
+        InteropCapabilityLevel overallImplementedLevel = InteropCapabilityLevel.NATIVE;
+        InteropCapabilityLevel overallEffectiveLevel = InteropCapabilityLevel.NATIVE;
+
+        for (InteropFeature feature : semantics.requiredFeatures()) {
+            CapabilityResolution resolution = resolve(candidate, snapshot, semantics, feature);
+            featureResolutions.put(feature.wireName(), resolution);
+            overallDeclaredLevel = minimumLevel(overallDeclaredLevel, resolution.declaredLevel());
+            overallImplementedLevel = minimumLevel(overallImplementedLevel, resolution.implementedLevel());
+            overallEffectiveLevel = minimumLevel(overallEffectiveLevel, resolution.effectiveLevel());
+            blockedReasons.addAll(resolution.blockedReasons());
+            lossReasons.addAll(resolution.lossReasons());
+        }
+
+        ExecutionKind executionKind = !blockedReasons.isEmpty()
+                ? ExecutionKind.BLOCKED
+                : overallEffectiveLevel == InteropCapabilityLevel.NATIVE
+                ? ExecutionKind.NATIVE
+                : overallEffectiveLevel == InteropCapabilityLevel.EMULATED
+                ? ExecutionKind.EMULATED
+                : ExecutionKind.TRANSLATED;
+
+        return new CapabilityResolutionReport(
+                Map.copyOf(featureResolutions),
+                overallDeclaredLevel,
+                overallImplementedLevel,
+                overallEffectiveLevel,
+                executionKind,
+                upstreamObjectMode(semantics.resourceType(), executionKind),
+                List.copyOf(blockedReasons),
+                List.copyOf(lossReasons)
+        );
+    }
+
+    public FeatureCompatibilityReport evaluate(
+            CatalogCandidateView candidate,
+            GatewayRequestSemantics semantics) {
+        CapabilityResolutionReport report = resolve(candidate, semantics);
+        Map<String, InteropCapabilityLevel> featureLevels = new LinkedHashMap<>();
+        report.featureResolutions().forEach((key, value) -> featureLevels.put(key, value.effectiveLevel()));
+        return new FeatureCompatibilityReport(
+                Map.copyOf(featureLevels),
+                report.overallEffectiveLevel(),
+                report.lossReasons(),
+                report.blockedReasons(),
+                report.executionKind(),
+                report.upstreamObjectMode()
+        );
+    }
+
+    private CapabilityResolution resolve(
+            CatalogCandidateView candidate,
+            SiteCapabilitySnapshotEntity snapshot,
+            GatewayRequestSemantics semantics,
+            InteropFeature feature) {
+        if (candidate == null || feature == null) {
+            return unsupportedResolution(feature, "未命中可用候选。");
+        }
+        InteropCapabilityLevel declaredLevel = declaredLevel(
                 candidate.siteKind(),
                 snapshot,
                 candidate.supportsChat(),
@@ -41,107 +199,126 @@ public class SiteCapabilityTruthService {
                 candidate.supportsThinking(),
                 feature
         );
-    }
+        InteropCapabilityLevel modelLevel = modelLevel(candidate, feature);
+        InteropCapabilityLevel implementedLevel = executionSupportMatrixService.implementedLevel(candidate, semantics, feature);
+        InteropCapabilityLevel effectiveLevel = minimumLevel(minimumLevel(declaredLevel, modelLevel), implementedLevel);
 
-    public boolean supportsFeature(
-            UpstreamSiteProfileEntity siteProfile,
-            SiteCapabilitySnapshotEntity snapshot,
-            InteropFeature feature) {
-        if (siteProfile == null) {
-            return false;
-        }
-        return capabilityLevel(siteProfile.getSiteKind(), snapshot, true, true, true, true, true, feature)
-                != InteropCapabilityLevel.UNSUPPORTED;
-    }
-
-    public TranslationExecutionPlan buildExecutionPlan(
-            RouteSelectionResult selectionResult,
-            String requestPath,
-            List<InteropFeature> requiredFeatures,
-            List<String> lossReasons,
-            List<String> blockedReasons) {
-        String resourceType = resourceType(requestPath);
-        String operation = operation(requestPath);
-        if (selectionResult == null) {
-            return new TranslationExecutionPlan(
-                    false,
-                    resourceType,
-                    operation,
-                    null,
-                    null,
-                    ExecutionKind.BLOCKED,
-                    InteropCapabilityLevel.UNSUPPORTED,
-                    "blocked",
-                    List.copyOf(lossReasons),
-                    List.copyOf(blockedReasons),
-                    null,
-                    null,
-                    null,
-                    java.util.Map.of(),
-                    java.util.Map.of()
-            );
+        java.util.ArrayList<String> blockedReasons = new java.util.ArrayList<>();
+        java.util.ArrayList<String> lossReasons = new java.util.ArrayList<>();
+        if (effectiveLevel == InteropCapabilityLevel.UNSUPPORTED) {
+            if (declaredLevel == InteropCapabilityLevel.UNSUPPORTED) {
+                blockedReasons.add(feature.wireName() + " 当前站点声明不支持。");
+            }
+            if (modelLevel == InteropCapabilityLevel.UNSUPPORTED) {
+                blockedReasons.add(feature.wireName() + " 当前模型不支持。");
+            }
+            if (implementedLevel == InteropCapabilityLevel.UNSUPPORTED) {
+                blockedReasons.add(feature.wireName() + " 当前实现尚未落地。");
+            }
+        } else if (effectiveLevel == InteropCapabilityLevel.EMULATED) {
+            lossReasons.add(feature.wireName() + " 以 emulated 执行。");
+        } else if (effectiveLevel == InteropCapabilityLevel.LOSSY) {
+            lossReasons.add(feature.wireName() + " 以 lossy 执行。");
         }
 
-        CatalogCandidateView candidate = selectionResult.selectedCandidate().candidate();
-        InteropCapabilityLevel level = aggregateCapabilityLevel(candidate, requiredFeatures);
-        ExecutionKind executionKind = !blockedReasons.isEmpty()
-                ? ExecutionKind.BLOCKED
-                : level == InteropCapabilityLevel.NATIVE
-                ? ExecutionKind.NATIVE
-                : level == InteropCapabilityLevel.EMULATED
-                ? ExecutionKind.EMULATED
-                : ExecutionKind.TRANSLATED;
-
-        return new TranslationExecutionPlan(
-                blockedReasons.isEmpty(),
-                resourceType,
-                operation,
-                candidate.providerFamily(),
-                candidate.siteProfileId(),
-                executionKind,
-                level,
-                upstreamObjectMode(resourceType, executionKind),
-                List.copyOf(lossReasons),
+        return new CapabilityResolution(
+                feature,
+                declaredLevel,
+                modelLevel,
+                implementedLevel,
+                effectiveLevel,
                 List.copyOf(blockedReasons),
-                candidate.authStrategy(),
-                candidate.pathStrategy(),
-                candidate.errorSchemaStrategy(),
-                java.util.Map.of(
-                        "protocol", selectionResult.protocol(),
-                        "requestedModel", selectionResult.requestedModel(),
-                        "resolvedModelKey", selectionResult.resolvedModelKey()
-                ),
-                java.util.Map.of(
-                        "publicModel", selectionResult.publicModel(),
-                        "selectionSource", selectionResult.selectionSource().name()
-                )
+                List.copyOf(lossReasons)
         );
     }
 
-    private InteropCapabilityLevel aggregateCapabilityLevel(
-            CatalogCandidateView candidate,
-            List<InteropFeature> requiredFeatures) {
-        if (requiredFeatures == null || requiredFeatures.isEmpty()) {
-            return InteropCapabilityLevel.NATIVE;
+    private InteropCapabilityLevel modelLevel(CatalogCandidateView candidate, InteropFeature feature) {
+        if (candidate == null || feature == null) {
+            return InteropCapabilityLevel.UNSUPPORTED;
         }
-        InteropCapabilityLevel level = InteropCapabilityLevel.NATIVE;
-        for (InteropFeature feature : requiredFeatures) {
-            InteropCapabilityLevel featureLevel = capabilityLevel(candidate, feature);
-            if (featureLevel == InteropCapabilityLevel.UNSUPPORTED) {
-                return InteropCapabilityLevel.UNSUPPORTED;
-            }
-            if (featureLevel == InteropCapabilityLevel.LOSSY) {
-                level = InteropCapabilityLevel.LOSSY;
-                continue;
-            }
-            if (featureLevel == InteropCapabilityLevel.EMULATED && level == InteropCapabilityLevel.NATIVE) {
-                level = InteropCapabilityLevel.EMULATED;
-            }
-        }
-        return level;
+        return switch (feature) {
+            case CHAT_TEXT -> candidate.supportsChat() ? InteropCapabilityLevel.NATIVE : InteropCapabilityLevel.UNSUPPORTED;
+            case TOOLS -> candidate.supportsTools() ? InteropCapabilityLevel.NATIVE : InteropCapabilityLevel.UNSUPPORTED;
+            case IMAGE_INPUT -> candidate.supportsImageInput() ? InteropCapabilityLevel.NATIVE : InteropCapabilityLevel.UNSUPPORTED;
+            case EMBEDDINGS -> candidate.supportsEmbeddings() ? InteropCapabilityLevel.NATIVE : InteropCapabilityLevel.UNSUPPORTED;
+            case REASONING -> candidate.supportsThinking() ? InteropCapabilityLevel.NATIVE : InteropCapabilityLevel.UNSUPPORTED;
+            default -> InteropCapabilityLevel.NATIVE;
+        };
     }
 
-    private InteropCapabilityLevel capabilityLevel(
+    private InteropCapabilityLevel siteLevelImplementedLevel(UpstreamSiteKind siteKind, InteropFeature feature) {
+        CatalogCandidateView candidate = new CatalogCandidateView(
+                -1L,
+                "site",
+                providerTypeFor(siteKind),
+                null,
+                providerFamilyFor(siteKind),
+                siteKind,
+                null,
+                null,
+                null,
+                null,
+                "site",
+                "site",
+                List.of(),
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                null,
+                InteropCapabilityLevel.NATIVE
+        );
+        return executionSupportMatrixService.implementedLevel(
+                candidate,
+                new GatewayRequestSemantics(TranslationResourceType.UNKNOWN, TranslationOperation.UNKNOWN, List.of(feature), true),
+                feature
+        );
+    }
+
+    private CapabilityResolution unsupportedResolution(InteropFeature feature, String reason) {
+        return new CapabilityResolution(
+                feature,
+                InteropCapabilityLevel.UNSUPPORTED,
+                InteropCapabilityLevel.UNSUPPORTED,
+                InteropCapabilityLevel.UNSUPPORTED,
+                InteropCapabilityLevel.UNSUPPORTED,
+                List.of(reason),
+                List.of()
+        );
+    }
+
+    private InteropCapabilityLevel minimumLevel(InteropCapabilityLevel left, InteropCapabilityLevel right) {
+        if (left == InteropCapabilityLevel.UNSUPPORTED || right == InteropCapabilityLevel.UNSUPPORTED) {
+            return InteropCapabilityLevel.UNSUPPORTED;
+        }
+        if (left == InteropCapabilityLevel.LOSSY || right == InteropCapabilityLevel.LOSSY) {
+            return InteropCapabilityLevel.LOSSY;
+        }
+        if (left == InteropCapabilityLevel.EMULATED || right == InteropCapabilityLevel.EMULATED) {
+            return InteropCapabilityLevel.EMULATED;
+        }
+        return InteropCapabilityLevel.NATIVE;
+    }
+
+    private ProviderFamily providerFamilyFor(UpstreamSiteKind siteKind) {
+        return upstreamSitePolicyService.policy(siteKind).providerFamily();
+    }
+
+    private ProviderType providerTypeFor(UpstreamSiteKind siteKind) {
+        return switch (siteKind) {
+            case OPENAI_DIRECT, AZURE_OPENAI -> ProviderType.OPENAI_DIRECT;
+            case DEEPSEEK, GROK, MISTRAL, COHERE, TOGETHER, FIREWORKS, OPENROUTER, OPENAI_COMPATIBLE_GENERIC -> ProviderType.OPENAI_COMPATIBLE;
+            case ANTHROPIC_DIRECT -> ProviderType.ANTHROPIC_DIRECT;
+            case GEMINI_DIRECT, VERTEX_AI -> ProviderType.GEMINI_DIRECT;
+            case OLLAMA_DIRECT -> ProviderType.OLLAMA_DIRECT;
+        };
+    }
+
+    private InteropCapabilityLevel declaredLevel(
             UpstreamSiteKind siteKind,
             SiteCapabilitySnapshotEntity snapshot,
             boolean supportsChat,
@@ -163,13 +340,13 @@ public class SiteCapabilityTruthService {
             case IMAGE_INPUT -> switch (siteKind) {
                 case OLLAMA_DIRECT -> supportsImageInput ? InteropCapabilityLevel.NATIVE : InteropCapabilityLevel.UNSUPPORTED;
                 case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, GROK, MISTRAL, TOGETHER, FIREWORKS,
-                        OPENROUTER, ANTHROPIC_DIRECT, GEMINI_DIRECT -> InteropCapabilityLevel.NATIVE;
+                        OPENROUTER, ANTHROPIC_DIRECT, GEMINI_DIRECT, VERTEX_AI -> InteropCapabilityLevel.NATIVE;
                 case AZURE_OPENAI -> InteropCapabilityLevel.LOSSY;
                 default -> InteropCapabilityLevel.UNSUPPORTED;
             };
             case FILE_INPUT -> switch (siteKind) {
                 case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, GROK, MISTRAL, TOGETHER, FIREWORKS,
-                        OPENROUTER, GEMINI_DIRECT -> InteropCapabilityLevel.NATIVE;
+                        OPENROUTER, GEMINI_DIRECT, VERTEX_AI -> InteropCapabilityLevel.NATIVE;
                 case ANTHROPIC_DIRECT -> InteropCapabilityLevel.EMULATED;
                 default -> InteropCapabilityLevel.UNSUPPORTED;
             };
@@ -228,116 +405,48 @@ public class SiteCapabilityTruthService {
     private boolean supportsUpstreamEmbeddings(UpstreamSiteKind siteKind) {
         return switch (siteKind) {
             case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, GROK, MISTRAL, TOGETHER, FIREWORKS,
-                    OPENROUTER, GEMINI_DIRECT, AZURE_OPENAI -> true;
+                    OPENROUTER, COHERE, GEMINI_DIRECT, AZURE_OPENAI -> true;
             default -> false;
         };
     }
 
     private boolean supportsUpstreamAudio(UpstreamSiteKind siteKind) {
-        return supportsOpenAiPassthroughResources(siteKind);
+        return supportsOpenAiStyleResources(siteKind);
     }
 
     private boolean supportsUpstreamImages(UpstreamSiteKind siteKind) {
-        return supportsOpenAiPassthroughResources(siteKind);
+        return supportsOpenAiStyleResources(siteKind);
     }
 
     private boolean supportsUpstreamModeration(UpstreamSiteKind siteKind) {
-        return supportsOpenAiPassthroughResources(siteKind);
+        return supportsOpenAiStyleResources(siteKind);
     }
 
-    private boolean supportsOpenAiPassthroughResources(UpstreamSiteKind siteKind) {
+    private boolean supportsOpenAiStyleResources(UpstreamSiteKind siteKind) {
         return switch (siteKind) {
-            case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, GROK, MISTRAL, TOGETHER, FIREWORKS, OPENROUTER -> true;
+            case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, GROK, MISTRAL, COHERE, TOGETHER, FIREWORKS, OPENROUTER -> true;
             default -> false;
         };
     }
 
     private boolean supportsUpstreamFileObjects(UpstreamSiteKind siteKind) {
-        return siteKind == UpstreamSiteKind.OPENAI_DIRECT
-                || siteKind == UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC
-                || siteKind == UpstreamSiteKind.OPENROUTER
-                || siteKind == UpstreamSiteKind.TOGETHER
-                || siteKind == UpstreamSiteKind.FIREWORKS
-                || siteKind == UpstreamSiteKind.DEEPSEEK
-                || siteKind == UpstreamSiteKind.GROK
-                || siteKind == UpstreamSiteKind.MISTRAL;
+        return switch (siteKind) {
+            case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, OPENROUTER, TOGETHER, FIREWORKS, DEEPSEEK, GROK, MISTRAL, COHERE -> true;
+            default -> false;
+        };
     }
 
     private boolean supportsUpstreamAsyncObjects(UpstreamSiteKind siteKind) {
         return siteKind == UpstreamSiteKind.OPENAI_DIRECT;
     }
 
-    private String resourceType(String requestPath) {
-        if (requestPath == null || requestPath.isBlank()) {
-            return "unknown";
-        }
-        if (requestPath.startsWith("/v1/chat/completions")) {
-            return "chat";
-        }
-        if (requestPath.startsWith("/v1/responses")) {
-            return "response";
-        }
-        if (requestPath.startsWith("/v1/embeddings")) {
-            return "embedding";
-        }
-        if (requestPath.startsWith("/v1/audio")) {
-            return "audio";
-        }
-        if (requestPath.startsWith("/v1/images")) {
-            return "image";
-        }
-        if (requestPath.startsWith("/v1/moderations")) {
-            return "moderation";
-        }
-        if (requestPath.startsWith("/v1/files")) {
-            return "file";
-        }
-        if (requestPath.startsWith("/v1/uploads")) {
-            return "upload";
-        }
-        if (requestPath.startsWith("/v1/batches")) {
-            return "batch";
-        }
-        if (requestPath.startsWith("/v1/fine_tuning/jobs")) {
-            return "tuning";
-        }
-        if (requestPath.startsWith("/v1/realtime")) {
-            return "realtime";
-        }
-        return "unknown";
-    }
-
-    private String operation(String requestPath) {
-        if (requestPath == null || requestPath.isBlank()) {
-            return "unknown";
-        }
-        return switch (requestPath) {
-            case "/v1/chat/completions" -> "chat_completion";
-            case "/v1/responses" -> "response_create";
-            case "/v1/embeddings" -> "embedding_create";
-            case "/v1/audio/transcriptions" -> "audio_transcription";
-            case "/v1/audio/translations" -> "audio_translation";
-            case "/v1/audio/speech" -> "audio_speech";
-            case "/v1/images/generations" -> "image_generation";
-            case "/v1/images/edits" -> "image_edit";
-            case "/v1/images/variations" -> "image_variation";
-            case "/v1/moderations" -> "moderation_create";
-            case "/v1/files" -> "file_create";
-            case "/v1/uploads" -> "upload_create";
-            case "/v1/batches" -> "batch_create";
-            case "/v1/fine_tuning/jobs" -> "tuning_create";
-            case "/v1/realtime/client_secrets" -> "realtime_client_secret_create";
-            default -> requestPath.replace('/', '_');
-        };
-    }
-
-    private String upstreamObjectMode(String resourceType, ExecutionKind executionKind) {
+    private String upstreamObjectMode(TranslationResourceType resourceType, ExecutionKind executionKind) {
         if (executionKind == ExecutionKind.BLOCKED) {
             return "blocked";
         }
         return switch (resourceType) {
-            case "file", "upload", "batch", "tuning", "realtime", "response" -> "upstream_object_with_local_lineage";
-            case "chat", "embedding", "audio", "image", "moderation" -> executionKind == ExecutionKind.NATIVE
+            case FILE, UPLOAD, BATCH, TUNING, REALTIME, RESPONSE -> "upstream_object_with_local_lineage";
+            case CHAT, EMBEDDING, AUDIO, IMAGE, MODERATION -> executionKind == ExecutionKind.NATIVE
                     ? "direct_upstream_execution"
                     : "translated_execution";
             default -> "direct_upstream_execution";

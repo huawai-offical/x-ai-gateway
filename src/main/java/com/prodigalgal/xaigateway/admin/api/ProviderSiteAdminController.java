@@ -46,6 +46,13 @@ public class ProviderSiteAdminController {
         return providerSiteAdminService.refreshCapabilities(id);
     }
 
+    @PostMapping("/refresh-capabilities")
+    public List<ProviderSiteResponse> refreshCapabilities(@RequestBody(required = false) ProviderSiteRefreshRequest request) {
+        return providerSiteAdminService.refreshCapabilities(
+                request == null ? null : request.siteProfileIds()
+        );
+    }
+
     @GetMapping("/{id}/capabilities")
     public List<SiteModelCapabilityResponse> capabilities(@PathVariable Long id) {
         return providerSiteAdminService.listCapabilities(id);

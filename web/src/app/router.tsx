@@ -48,6 +48,7 @@ export const router = createBrowserRouter([
       { path: 'ops/logs', element: <OpsLogsPage /> },
       { path: 'error-rules', element: <ErrorRulesPage /> },
       { path: 'provider-sites', element: <ProviderSitesPage /> },
+      { path: 'provider-sites/new', element: <ProviderSiteDetailPage /> },
       { path: 'provider-sites/:id', element: <ProviderSiteDetailPage /> },
       { path: 'capability-matrix', element: <CapabilityMatrixPage /> },
       { path: 'translation-debug', element: <TranslationDebugPage /> },

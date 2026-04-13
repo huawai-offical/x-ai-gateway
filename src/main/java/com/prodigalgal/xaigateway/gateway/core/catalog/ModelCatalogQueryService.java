@@ -5,9 +5,14 @@ import com.prodigalgal.xaigateway.gateway.core.alias.ModelAliasRuleView;
 import com.prodigalgal.xaigateway.gateway.core.alias.ModelAliasView;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedCredentialBindingView;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyView;
+import com.prodigalgal.xaigateway.gateway.core.interop.CapabilityResolutionReport;
+import com.prodigalgal.xaigateway.gateway.core.interop.CapabilityResolutionView;
+import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature;
 import com.prodigalgal.xaigateway.gateway.core.interop.SiteCapabilityTruthService;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
 import com.prodigalgal.xaigateway.gateway.core.shared.ModelIdNormalizer;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SiteModelCapabilityEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
@@ -90,6 +95,8 @@ public class ModelCatalogQueryService {
             if (!isModelAllowed(distributedKey, candidate.modelKey())) {
                 continue;
             }
+            CapabilityResolutionReport chatResolution = featureResolution(candidate, InteropFeature.CHAT_TEXT, TranslationResourceType.CHAT, TranslationOperation.CHAT_COMPLETION);
+            CapabilityResolutionReport embeddingsResolution = featureResolution(candidate, InteropFeature.EMBEDDINGS, TranslationResourceType.EMBEDDING, TranslationOperation.EMBEDDING_CREATE);
             models.putIfAbsent(candidate.modelKey(), new GatewayPublicModelView(
                     candidate.modelKey(),
                     candidate.modelKey(),
@@ -98,8 +105,12 @@ public class ModelCatalogQueryService {
                     candidate.providerFamily(),
                     candidate.siteKind(),
                     actualCapabilityLevel(candidate),
-                    siteCapabilityTruthService.capabilityLevel(candidate, InteropFeature.CHAT_TEXT) != InteropCapabilityLevel.UNSUPPORTED,
-                    siteCapabilityTruthService.capabilityLevel(candidate, InteropFeature.EMBEDDINGS) != InteropCapabilityLevel.UNSUPPORTED
+                    chatResolution.overallEffectiveLevel() != InteropCapabilityLevel.UNSUPPORTED,
+                    embeddingsResolution.overallEffectiveLevel() != InteropCapabilityLevel.UNSUPPORTED,
+                    java.util.Map.of(
+                            InteropFeature.CHAT_TEXT.wireName(), CapabilityResolutionView.from(chatResolution.featureResolutions().get(InteropFeature.CHAT_TEXT.wireName())),
+                            InteropFeature.EMBEDDINGS.wireName(), CapabilityResolutionView.from(embeddingsResolution.featureResolutions().get(InteropFeature.EMBEDDINGS.wireName()))
+                    )
             ));
         }
 
@@ -131,9 +142,19 @@ public class ModelCatalogQueryService {
                         representative == null ? null : representative.siteKind(),
                         representative == null ? InteropCapabilityLevel.EMULATED : actualCapabilityLevel(representative),
                         representative != null
-                                && siteCapabilityTruthService.capabilityLevel(representative, InteropFeature.CHAT_TEXT) != InteropCapabilityLevel.UNSUPPORTED,
+                                && featureResolution(representative, InteropFeature.CHAT_TEXT, TranslationResourceType.CHAT, TranslationOperation.CHAT_COMPLETION)
+                                .overallEffectiveLevel() != InteropCapabilityLevel.UNSUPPORTED,
                         representative != null
-                                && siteCapabilityTruthService.capabilityLevel(representative, InteropFeature.EMBEDDINGS) != InteropCapabilityLevel.UNSUPPORTED
+                                && featureResolution(representative, InteropFeature.EMBEDDINGS, TranslationResourceType.EMBEDDING, TranslationOperation.EMBEDDING_CREATE)
+                                .overallEffectiveLevel() != InteropCapabilityLevel.UNSUPPORTED,
+                        representative == null ? java.util.Map.of() : java.util.Map.of(
+                                InteropFeature.CHAT_TEXT.wireName(),
+                                CapabilityResolutionView.from(featureResolution(representative, InteropFeature.CHAT_TEXT, TranslationResourceType.CHAT, TranslationOperation.CHAT_COMPLETION)
+                                        .featureResolutions().get(InteropFeature.CHAT_TEXT.wireName())),
+                                InteropFeature.EMBEDDINGS.wireName(),
+                                CapabilityResolutionView.from(featureResolution(representative, InteropFeature.EMBEDDINGS, TranslationResourceType.EMBEDDING, TranslationOperation.EMBEDDING_CREATE)
+                                        .featureResolutions().get(InteropFeature.EMBEDDINGS.wireName()))
+                        )
                 ));
             }
         }
@@ -274,8 +295,10 @@ public class ModelCatalogQueryService {
     }
 
     private InteropCapabilityLevel actualCapabilityLevel(CatalogCandidateView candidate) {
-        InteropCapabilityLevel chatLevel = siteCapabilityTruthService.capabilityLevel(candidate, InteropFeature.CHAT_TEXT);
-        InteropCapabilityLevel embeddingsLevel = siteCapabilityTruthService.capabilityLevel(candidate, InteropFeature.EMBEDDINGS);
+        InteropCapabilityLevel chatLevel = featureResolution(candidate, InteropFeature.CHAT_TEXT, TranslationResourceType.CHAT, TranslationOperation.CHAT_COMPLETION)
+                .overallEffectiveLevel();
+        InteropCapabilityLevel embeddingsLevel = featureResolution(candidate, InteropFeature.EMBEDDINGS, TranslationResourceType.EMBEDDING, TranslationOperation.EMBEDDING_CREATE)
+                .overallEffectiveLevel();
         if (chatLevel == InteropCapabilityLevel.NATIVE || embeddingsLevel == InteropCapabilityLevel.NATIVE) {
             return InteropCapabilityLevel.NATIVE;
         }
@@ -286,5 +309,16 @@ public class ModelCatalogQueryService {
             return InteropCapabilityLevel.EMULATED;
         }
         return InteropCapabilityLevel.UNSUPPORTED;
+    }
+
+    private CapabilityResolutionReport featureResolution(
+            CatalogCandidateView candidate,
+            InteropFeature feature,
+            TranslationResourceType resourceType,
+            TranslationOperation operation) {
+        return siteCapabilityTruthService.resolve(
+                candidate,
+                new GatewayRequestSemantics(resourceType, operation, List.of(feature), true)
+        );
     }
 }

@@ -9,58 +9,182 @@ import org.springframework.stereotype.Service;
 @Service
 public class GatewayRequestFeatureService {
 
-    public List<InteropFeature> detectRequiredFeatures(String requestPath, JsonNode body) {
+    public GatewayRequestSemantics describe(String requestPath, JsonNode body) {
         Set<InteropFeature> features = new LinkedHashSet<>();
         if ("/v1/chat/completions".equals(requestPath)) {
             features.add(InteropFeature.CHAT_TEXT);
             collectChatFeatures(features, body);
-            return List.copyOf(features);
+            return new GatewayRequestSemantics(
+                    TranslationResourceType.CHAT,
+                    TranslationOperation.CHAT_COMPLETION,
+                    List.copyOf(features),
+                    true
+            );
         }
         if ("/v1/responses".equals(requestPath)) {
             features.add(InteropFeature.RESPONSE_OBJECT);
             collectResponsesFeatures(features, body);
-            return List.copyOf(features);
+            return new GatewayRequestSemantics(
+                    TranslationResourceType.RESPONSE,
+                    TranslationOperation.RESPONSE_CREATE,
+                    List.copyOf(features),
+                    true
+            );
         }
         if ("/v1/embeddings".equals(requestPath)) {
-            return List.of(InteropFeature.EMBEDDINGS);
+            return new GatewayRequestSemantics(
+                    TranslationResourceType.EMBEDDING,
+                    TranslationOperation.EMBEDDING_CREATE,
+                    List.of(InteropFeature.EMBEDDINGS),
+                    true
+            );
         }
         if ("/v1/files".equals(requestPath)) {
-            return List.of(InteropFeature.FILE_OBJECT);
+            return new GatewayRequestSemantics(
+                    TranslationResourceType.FILE,
+                    TranslationOperation.FILE_CREATE,
+                    List.of(InteropFeature.FILE_OBJECT),
+                    false
+            );
         }
         if ("/v1/audio/transcriptions".equals(requestPath)) {
-            return List.of(InteropFeature.AUDIO_TRANSCRIPTION);
+            return new GatewayRequestSemantics(
+                    TranslationResourceType.AUDIO,
+                    TranslationOperation.AUDIO_TRANSCRIPTION,
+                    List.of(InteropFeature.AUDIO_TRANSCRIPTION),
+                    true
+            );
         }
         if ("/v1/audio/translations".equals(requestPath)) {
-            return List.of(InteropFeature.AUDIO_TRANSLATION);
+            return new GatewayRequestSemantics(
+                    TranslationResourceType.AUDIO,
+                    TranslationOperation.AUDIO_TRANSLATION,
+                    List.of(InteropFeature.AUDIO_TRANSLATION),
+                    true
+            );
         }
         if ("/v1/audio/speech".equals(requestPath)) {
-            return List.of(InteropFeature.AUDIO_SPEECH);
+            return new GatewayRequestSemantics(
+                    TranslationResourceType.AUDIO,
+                    TranslationOperation.AUDIO_SPEECH,
+                    List.of(InteropFeature.AUDIO_SPEECH),
+                    true
+            );
         }
         if ("/v1/images/generations".equals(requestPath)) {
-            return List.of(InteropFeature.IMAGE_GENERATION);
+            return new GatewayRequestSemantics(
+                    TranslationResourceType.IMAGE,
+                    TranslationOperation.IMAGE_GENERATION,
+                    List.of(InteropFeature.IMAGE_GENERATION),
+                    true
+            );
         }
         if ("/v1/images/edits".equals(requestPath)) {
-            return List.of(InteropFeature.IMAGE_EDIT);
+            return new GatewayRequestSemantics(
+                    TranslationResourceType.IMAGE,
+                    TranslationOperation.IMAGE_EDIT,
+                    List.of(InteropFeature.IMAGE_EDIT),
+                    true
+            );
         }
         if ("/v1/images/variations".equals(requestPath)) {
-            return List.of(InteropFeature.IMAGE_VARIATION);
+            return new GatewayRequestSemantics(
+                    TranslationResourceType.IMAGE,
+                    TranslationOperation.IMAGE_VARIATION,
+                    List.of(InteropFeature.IMAGE_VARIATION),
+                    true
+            );
         }
         if ("/v1/moderations".equals(requestPath)) {
-            return List.of(InteropFeature.MODERATION);
+            return new GatewayRequestSemantics(
+                    TranslationResourceType.MODERATION,
+                    TranslationOperation.MODERATION_CREATE,
+                    List.of(InteropFeature.MODERATION),
+                    true
+            );
         }
-        if (requestPath != null && requestPath.startsWith("/v1/uploads")) {
-            return List.of(InteropFeature.UPLOAD_CREATE);
+        if ("/v1/uploads".equals(requestPath)) {
+            return new GatewayRequestSemantics(
+                    TranslationResourceType.UPLOAD,
+                    TranslationOperation.UPLOAD_CREATE,
+                    List.of(InteropFeature.UPLOAD_CREATE),
+                    false
+            );
         }
-        if (requestPath != null && requestPath.startsWith("/v1/batches")) {
-            return List.of(InteropFeature.BATCH_CREATE);
+        if (requestPath != null && requestPath.matches("^/v1/uploads/[^/]+/parts$")) {
+            return new GatewayRequestSemantics(
+                    TranslationResourceType.UPLOAD,
+                    TranslationOperation.UPLOAD_PART_ADD,
+                    List.of(InteropFeature.UPLOAD_CREATE),
+                    false
+            );
         }
-        if (requestPath != null && requestPath.startsWith("/v1/fine_tuning/jobs")) {
-            return List.of(InteropFeature.TUNING_CREATE);
+        if (requestPath != null && requestPath.matches("^/v1/uploads/[^/]+/complete$")) {
+            return new GatewayRequestSemantics(
+                    TranslationResourceType.UPLOAD,
+                    TranslationOperation.UPLOAD_COMPLETE,
+                    List.of(InteropFeature.UPLOAD_CREATE),
+                    false
+            );
         }
-        if (requestPath != null && requestPath.startsWith("/v1/realtime/client_secrets")) {
-            return List.of(InteropFeature.REALTIME_CLIENT_SECRET);
+        if (requestPath != null && requestPath.matches("^/v1/uploads/[^/]+/cancel$")) {
+            return new GatewayRequestSemantics(
+                    TranslationResourceType.UPLOAD,
+                    TranslationOperation.UPLOAD_CANCEL,
+                    List.of(InteropFeature.UPLOAD_CREATE),
+                    false
+            );
         }
-        return List.of(InteropFeature.CHAT_TEXT);
+        if ("/v1/batches".equals(requestPath)) {
+            return new GatewayRequestSemantics(
+                    TranslationResourceType.BATCH,
+                    TranslationOperation.BATCH_CREATE,
+                    List.of(InteropFeature.BATCH_CREATE),
+                    false
+            );
+        }
+        if (requestPath != null && requestPath.matches("^/v1/batches/[^/]+/cancel$")) {
+            return new GatewayRequestSemantics(
+                    TranslationResourceType.BATCH,
+                    TranslationOperation.BATCH_CANCEL,
+                    List.of(InteropFeature.BATCH_CREATE),
+                    false
+            );
+        }
+        if ("/v1/fine_tuning/jobs".equals(requestPath)) {
+            return new GatewayRequestSemantics(
+                    TranslationResourceType.TUNING,
+                    TranslationOperation.TUNING_CREATE,
+                    List.of(InteropFeature.TUNING_CREATE),
+                    false
+            );
+        }
+        if (requestPath != null && requestPath.matches("^/v1/fine_tuning/jobs/[^/]+/cancel$")) {
+            return new GatewayRequestSemantics(
+                    TranslationResourceType.TUNING,
+                    TranslationOperation.TUNING_CANCEL,
+                    List.of(InteropFeature.TUNING_CREATE),
+                    false
+            );
+        }
+        if ("/v1/realtime/client_secrets".equals(requestPath)) {
+            return new GatewayRequestSemantics(
+                    TranslationResourceType.REALTIME,
+                    TranslationOperation.REALTIME_CLIENT_SECRET_CREATE,
+                    List.of(InteropFeature.REALTIME_CLIENT_SECRET),
+                    false
+            );
+        }
+        return new GatewayRequestSemantics(
+                TranslationResourceType.UNKNOWN,
+                TranslationOperation.UNKNOWN,
+                List.of(InteropFeature.CHAT_TEXT),
+                true
+        );
+    }
+
+    public List<InteropFeature> detectRequiredFeatures(String requestPath, JsonNode body) {
+        return describe(requestPath, body).requiredFeatures();
     }
 
     private void collectChatFeatures(Set<InteropFeature> features, JsonNode body) {

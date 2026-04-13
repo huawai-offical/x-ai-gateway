@@ -44,7 +44,12 @@ public class GeminiGatewayChatRuntime implements GatewayChatRuntime {
                 baseOptions,
                 context.request().tools()
         );
-        GoogleGenAiChatModel model = geminiChatModelFactory.create(context.credential().getBaseUrl(), context.apiKey(), prepared.options());
+        GoogleGenAiChatModel model = geminiChatModelFactory.create(
+                context.selectionResult().selectedCandidate().candidate().siteKind(),
+                context.credential().getBaseUrl(),
+                context.credentialMaterial(),
+                prepared.options()
+        );
         try {
             ChatResponse response = model.call(gatewayChatPromptBuilder.buildPrompt(prepared.options(), context.request()));
             return new GatewayChatRuntimeResult(
@@ -71,7 +76,12 @@ public class GeminiGatewayChatRuntime implements GatewayChatRuntime {
                 baseOptions,
                 context.request().tools()
         );
-        GoogleGenAiChatModel model = geminiChatModelFactory.create(context.credential().getBaseUrl(), context.apiKey(), prepared.options());
+        GoogleGenAiChatModel model = geminiChatModelFactory.create(
+                context.selectionResult().selectedCandidate().candidate().siteKind(),
+                context.credential().getBaseUrl(),
+                context.credentialMaterial(),
+                prepared.options()
+        );
         return model.stream(gatewayChatPromptBuilder.buildPrompt(prepared.options(), context.request()))
                 .map(response -> new ChatExecutionStreamChunk(
                         response.getResult().getOutput().getText(),

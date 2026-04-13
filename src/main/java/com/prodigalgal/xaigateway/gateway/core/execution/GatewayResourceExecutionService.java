@@ -7,6 +7,12 @@ import com.prodigalgal.xaigateway.admin.application.CredentialCryptoService;
 import com.prodigalgal.xaigateway.gateway.core.account.AccountSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyGovernanceService;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
+import com.prodigalgal.xaigateway.gateway.core.credential.CredentialMaterialResolver;
+import com.prodigalgal.xaigateway.gateway.core.credential.ResolvedCredentialMaterial;
+import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestFeatureService;
+import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlan;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlanCompiler;
 import com.prodigalgal.xaigateway.gateway.core.routing.GatewayRouteSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionRequest;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
@@ -15,6 +21,7 @@ import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentia
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.stereotype.Service;
@@ -30,7 +37,32 @@ public class GatewayResourceExecutionService {
     private final CredentialCryptoService credentialCryptoService;
     private final DistributedKeyGovernanceService distributedKeyGovernanceService;
     private final AccountSelectionService accountSelectionService;
+    private final CredentialMaterialResolver credentialMaterialResolver;
+    private final GatewayRequestFeatureService gatewayRequestFeatureService;
+    private final TranslationExecutionPlanCompiler translationExecutionPlanCompiler;
     private final List<GatewayResourceExecutor> gatewayResourceExecutors;
+
+    @Autowired
+    public GatewayResourceExecutionService(
+            GatewayRouteSelectionService gatewayRouteSelectionService,
+            UpstreamCredentialRepository upstreamCredentialRepository,
+            CredentialCryptoService credentialCryptoService,
+            DistributedKeyGovernanceService distributedKeyGovernanceService,
+            AccountSelectionService accountSelectionService,
+            CredentialMaterialResolver credentialMaterialResolver,
+            GatewayRequestFeatureService gatewayRequestFeatureService,
+            TranslationExecutionPlanCompiler translationExecutionPlanCompiler,
+            List<GatewayResourceExecutor> gatewayResourceExecutors) {
+        this.gatewayRouteSelectionService = gatewayRouteSelectionService;
+        this.upstreamCredentialRepository = upstreamCredentialRepository;
+        this.credentialCryptoService = credentialCryptoService;
+        this.distributedKeyGovernanceService = distributedKeyGovernanceService;
+        this.accountSelectionService = accountSelectionService;
+        this.credentialMaterialResolver = credentialMaterialResolver;
+        this.gatewayRequestFeatureService = gatewayRequestFeatureService;
+        this.translationExecutionPlanCompiler = translationExecutionPlanCompiler;
+        this.gatewayResourceExecutors = gatewayResourceExecutors;
+    }
 
     public GatewayResourceExecutionService(
             GatewayRouteSelectionService gatewayRouteSelectionService,
@@ -38,13 +70,20 @@ public class GatewayResourceExecutionService {
             CredentialCryptoService credentialCryptoService,
             DistributedKeyGovernanceService distributedKeyGovernanceService,
             AccountSelectionService accountSelectionService,
+            GatewayRequestFeatureService gatewayRequestFeatureService,
+            TranslationExecutionPlanCompiler translationExecutionPlanCompiler,
             List<GatewayResourceExecutor> gatewayResourceExecutors) {
-        this.gatewayRouteSelectionService = gatewayRouteSelectionService;
-        this.upstreamCredentialRepository = upstreamCredentialRepository;
-        this.credentialCryptoService = credentialCryptoService;
-        this.distributedKeyGovernanceService = distributedKeyGovernanceService;
-        this.accountSelectionService = accountSelectionService;
-        this.gatewayResourceExecutors = gatewayResourceExecutors;
+        this(
+                gatewayRouteSelectionService,
+                upstreamCredentialRepository,
+                credentialCryptoService,
+                distributedKeyGovernanceService,
+                accountSelectionService,
+                new CredentialMaterialResolver(accountSelectionService, credentialCryptoService, new com.fasterxml.jackson.databind.ObjectMapper()),
+                gatewayRequestFeatureService,
+                translationExecutionPlanCompiler,
+                gatewayResourceExecutors
+        );
     }
 
     public ResponseEntity<JsonNode> executeJson(
@@ -54,7 +93,7 @@ public class GatewayResourceExecutionService {
             String defaultModel) {
         ObjectNode payload = requireObjectPayload(requestBody, defaultModel);
         RouteSelectionResult selectionResult = select(distributedKeyPrefix, requestPath, payload.path("model").asText(), payload);
-        GatewayResourceExecutionContext context = prepareContext(selectionResult, requestPath);
+        GatewayResourceExecutionContext context = prepareContext(selectionResult, requestPath, payload);
         try {
             ResponseEntity<JsonNode> response = resolveExecutor(context).executeJson(context, payload, defaultModel);
             recordRouteOutcome(selectionResult, response.getStatusCode().value());
@@ -81,7 +120,7 @@ public class GatewayResourceExecutionService {
             String defaultModel) {
         ObjectNode payload = requireObjectPayload(requestBody, defaultModel);
         RouteSelectionResult selectionResult = select(distributedKeyPrefix, requestPath, payload.path("model").asText(), payload);
-        GatewayResourceExecutionContext context = prepareContext(selectionResult, requestPath);
+        GatewayResourceExecutionContext context = prepareContext(selectionResult, requestPath, payload);
         try {
             ResponseEntity<byte[]> response = resolveExecutor(context).executeBinary(context, payload, defaultModel);
             recordRouteOutcome(selectionResult, response.getStatusCode().value());
@@ -104,7 +143,7 @@ public class GatewayResourceExecutionService {
         routePayload.put("model", requestedModel);
         formFields.forEach(routePayload::put);
         RouteSelectionResult selectionResult = select(distributedKeyPrefix, requestPath, requestedModel, routePayload);
-        GatewayResourceExecutionContext context = prepareContext(selectionResult, requestPath);
+        GatewayResourceExecutionContext context = prepareContext(selectionResult, requestPath, routePayload);
         return resolveExecutor(context).executeMultipart(context, requestedModel, formFields, files)
                 .doOnNext(response -> recordRouteOutcome(selectionResult, response.getStatusCode().value()))
                 .doOnError(error -> gatewayRouteSelectionService.invalidateSelection(selectionResult))
@@ -127,16 +166,17 @@ public class GatewayResourceExecutionService {
         ));
     }
 
-    private GatewayResourceExecutionContext prepareContext(RouteSelectionResult selectionResult, String requestPath) {
+    private GatewayResourceExecutionContext prepareContext(RouteSelectionResult selectionResult, String requestPath, JsonNode requestBody) {
         UpstreamCredentialEntity credential = getRequiredCredential(selectionResult.selectedCandidate().candidate().credentialId());
-        String apiKey = accountSelectionService.resolveActiveAccount(
-                        selectionResult.distributedKeyId(),
-                        selectionResult.selectedCandidate().candidate().providerType(),
-                        selectionResult.clientFamily(),
-                        300)
-                .map(account -> credentialCryptoService.decrypt(account.getAccessTokenCiphertext()))
-                .orElseGet(() -> credentialCryptoService.decrypt(credential.getApiKeyCiphertext()));
-        return new GatewayResourceExecutionContext(selectionResult, credential, apiKey, requestPath);
+        ResolvedCredentialMaterial credentialMaterial = credentialMaterialResolver.resolve(selectionResult, credential);
+        GatewayRequestSemantics semantics = gatewayRequestFeatureService.describe(requestPath, null);
+        TranslationExecutionPlan executionPlan = translationExecutionPlanCompiler.compileSelected(
+                selectionResult,
+                requestPath,
+                semantics,
+                requestBody
+        );
+        return new GatewayResourceExecutionContext(selectionResult, credential, credentialMaterial, requestPath, executionPlan);
     }
 
     private GatewayResourceExecutor resolveExecutor(GatewayResourceExecutionContext context) {

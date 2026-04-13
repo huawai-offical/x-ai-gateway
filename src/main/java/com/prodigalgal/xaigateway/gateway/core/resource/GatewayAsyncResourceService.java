@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.prodigalgal.xaigateway.admin.application.CredentialCryptoService;
+import com.prodigalgal.xaigateway.gateway.core.credential.CredentialMaterialResolver;
+import com.prodigalgal.xaigateway.gateway.core.credential.ResolvedCredentialMaterial;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedCredentialBindingView;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyQueryService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyView;
@@ -30,6 +32,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.HttpEntity;
@@ -56,10 +59,41 @@ public class GatewayAsyncResourceService {
     private final GatewayFileRepository gatewayFileRepository;
     private final GatewayFileBindingRepository gatewayFileBindingRepository;
     private final CredentialCryptoService credentialCryptoService;
+    private final CredentialMaterialResolver credentialMaterialResolver;
     private final SiteCapabilityTruthService siteCapabilityTruthService;
     private final ObjectMapper objectMapper;
     private final Clock clock;
     private final WebClient.Builder webClientBuilder;
+
+    @Autowired
+    public GatewayAsyncResourceService(
+            GatewayAsyncResourceRepository gatewayAsyncResourceRepository,
+            DistributedKeyQueryService distributedKeyQueryService,
+            UpstreamCredentialRepository upstreamCredentialRepository,
+            UpstreamSiteProfileRepository upstreamSiteProfileRepository,
+            SiteCapabilitySnapshotRepository siteCapabilitySnapshotRepository,
+            GatewayFileRepository gatewayFileRepository,
+            GatewayFileBindingRepository gatewayFileBindingRepository,
+            CredentialCryptoService credentialCryptoService,
+            CredentialMaterialResolver credentialMaterialResolver,
+            SiteCapabilityTruthService siteCapabilityTruthService,
+            ObjectMapper objectMapper,
+            Clock clock,
+            WebClient.Builder webClientBuilder) {
+        this.gatewayAsyncResourceRepository = gatewayAsyncResourceRepository;
+        this.distributedKeyQueryService = distributedKeyQueryService;
+        this.upstreamCredentialRepository = upstreamCredentialRepository;
+        this.upstreamSiteProfileRepository = upstreamSiteProfileRepository;
+        this.siteCapabilitySnapshotRepository = siteCapabilitySnapshotRepository;
+        this.gatewayFileRepository = gatewayFileRepository;
+        this.gatewayFileBindingRepository = gatewayFileBindingRepository;
+        this.credentialCryptoService = credentialCryptoService;
+        this.credentialMaterialResolver = credentialMaterialResolver;
+        this.siteCapabilityTruthService = siteCapabilityTruthService;
+        this.objectMapper = objectMapper;
+        this.clock = clock;
+        this.webClientBuilder = webClientBuilder;
+    }
 
     public GatewayAsyncResourceService(
             GatewayAsyncResourceRepository gatewayAsyncResourceRepository,
@@ -74,18 +108,26 @@ public class GatewayAsyncResourceService {
             ObjectMapper objectMapper,
             Clock clock,
             WebClient.Builder webClientBuilder) {
-        this.gatewayAsyncResourceRepository = gatewayAsyncResourceRepository;
-        this.distributedKeyQueryService = distributedKeyQueryService;
-        this.upstreamCredentialRepository = upstreamCredentialRepository;
-        this.upstreamSiteProfileRepository = upstreamSiteProfileRepository;
-        this.siteCapabilitySnapshotRepository = siteCapabilitySnapshotRepository;
-        this.gatewayFileRepository = gatewayFileRepository;
-        this.gatewayFileBindingRepository = gatewayFileBindingRepository;
-        this.credentialCryptoService = credentialCryptoService;
-        this.siteCapabilityTruthService = siteCapabilityTruthService;
-        this.objectMapper = objectMapper;
-        this.clock = clock;
-        this.webClientBuilder = webClientBuilder;
+        this(
+                gatewayAsyncResourceRepository,
+                distributedKeyQueryService,
+                upstreamCredentialRepository,
+                upstreamSiteProfileRepository,
+                siteCapabilitySnapshotRepository,
+                gatewayFileRepository,
+                gatewayFileBindingRepository,
+                credentialCryptoService,
+                new CredentialMaterialResolver(new com.prodigalgal.xaigateway.gateway.core.account.AccountSelectionService(
+                        null,
+                        null,
+                        null,
+                        null
+                ), credentialCryptoService, objectMapper),
+                siteCapabilityTruthService,
+                objectMapper,
+                clock,
+                webClientBuilder
+        );
     }
 
     public JsonNode storeResponse(Long distributedKeyId, String requestModel, JsonNode requestPayload, JsonNode responsePayload) {
@@ -407,15 +449,15 @@ public class GatewayAsyncResourceService {
             UpstreamCredentialEntity credential,
             UpstreamSiteProfileEntity siteProfile,
             String requestPath) {
-        String apiKey = credentialCryptoService.decrypt(credential.getApiKeyCiphertext());
+        ResolvedCredentialMaterial credentialMaterial = credentialMaterialResolver.resolveStored(credential);
         WebClient.Builder builder = webClientBuilder.clone().baseUrl(credential.getBaseUrl().replaceAll("/+$", ""));
         String path = resolvePath(credential.getBaseUrl(), requestPath);
         if (siteProfile.getAuthStrategy() == AuthStrategy.BEARER) {
-            builder.defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey);
+            builder.defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + credentialMaterial.secret());
         } else if (siteProfile.getAuthStrategy() == AuthStrategy.API_KEY_HEADER) {
-            builder.defaultHeader("x-api-key", apiKey);
+            builder.defaultHeader("x-api-key", credentialMaterial.secret());
         } else if (siteProfile.getAuthStrategy() == AuthStrategy.AZURE_API_KEY) {
-            builder.defaultHeader("api-key", apiKey);
+            builder.defaultHeader("api-key", credentialMaterial.secret());
         } else {
             throw new IllegalArgumentException("当前站点鉴权策略不支持异步资源编排。");
         }

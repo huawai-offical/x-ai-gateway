@@ -5,8 +5,13 @@ import com.prodigalgal.xaigateway.gateway.core.alias.ModelAliasRuleView;
 import com.prodigalgal.xaigateway.gateway.core.alias.ModelAliasView;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedCredentialBindingView;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyView;
+import com.prodigalgal.xaigateway.gateway.core.interop.CapabilityResolution;
+import com.prodigalgal.xaigateway.gateway.core.interop.CapabilityResolutionReport;
+import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
+import com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature;
 import com.prodigalgal.xaigateway.gateway.core.interop.SiteCapabilityTruthService;
+import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind;
 import com.prodigalgal.xaigateway.gateway.core.shared.AuthStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ErrorSchemaStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.PathStrategy;
@@ -38,8 +43,8 @@ class ModelCatalogQueryServiceTests {
         UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
         ModelAliasQueryService modelAliasQueryService = Mockito.mock(ModelAliasQueryService.class);
         SiteCapabilityTruthService siteCapabilityTruthService = Mockito.mock(SiteCapabilityTruthService.class);
-        Mockito.when(siteCapabilityTruthService.capabilityLevel(Mockito.any(), Mockito.any()))
-                .thenReturn(InteropCapabilityLevel.NATIVE);
+        Mockito.when(siteCapabilityTruthService.resolve(Mockito.any(), Mockito.any()))
+                .thenReturn(nativeResolutionReport());
         ModelCatalogQueryService service = new ModelCatalogQueryService(
                 siteModelCapabilityRepository,
                 upstreamCredentialRepository,
@@ -104,8 +109,8 @@ class ModelCatalogQueryServiceTests {
         UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
         ModelAliasQueryService modelAliasQueryService = Mockito.mock(ModelAliasQueryService.class);
         SiteCapabilityTruthService siteCapabilityTruthService = Mockito.mock(SiteCapabilityTruthService.class);
-        Mockito.when(siteCapabilityTruthService.capabilityLevel(Mockito.any(), Mockito.any()))
-                .thenReturn(InteropCapabilityLevel.NATIVE);
+        Mockito.when(siteCapabilityTruthService.resolve(Mockito.any(), Mockito.any()))
+                .thenReturn(nativeResolutionReport());
         ModelCatalogQueryService service = new ModelCatalogQueryService(
                 siteModelCapabilityRepository,
                 upstreamCredentialRepository,
@@ -140,8 +145,8 @@ class ModelCatalogQueryServiceTests {
         UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
         ModelAliasQueryService modelAliasQueryService = Mockito.mock(ModelAliasQueryService.class);
         SiteCapabilityTruthService siteCapabilityTruthService = Mockito.mock(SiteCapabilityTruthService.class);
-        Mockito.when(siteCapabilityTruthService.capabilityLevel(Mockito.any(), Mockito.any()))
-                .thenReturn(InteropCapabilityLevel.NATIVE);
+        Mockito.when(siteCapabilityTruthService.resolve(Mockito.any(), Mockito.any()))
+                .thenReturn(nativeResolutionReport());
         ModelCatalogQueryService service = new ModelCatalogQueryService(
                 siteModelCapabilityRepository,
                 upstreamCredentialRepository,
@@ -235,5 +240,27 @@ class ModelCatalogQueryServiceTests {
 
     private void setId(UpstreamCredentialEntity credential, Long id) {
         org.springframework.test.util.ReflectionTestUtils.setField(credential, "id", id);
+    }
+
+    private CapabilityResolutionReport nativeResolutionReport() {
+        CapabilityResolution resolution = new CapabilityResolution(
+                InteropFeature.CHAT_TEXT,
+                InteropCapabilityLevel.NATIVE,
+                InteropCapabilityLevel.NATIVE,
+                InteropCapabilityLevel.NATIVE,
+                InteropCapabilityLevel.NATIVE,
+                List.of(),
+                List.of()
+        );
+        return new CapabilityResolutionReport(
+                java.util.Map.of(InteropFeature.CHAT_TEXT.wireName(), resolution),
+                InteropCapabilityLevel.NATIVE,
+                InteropCapabilityLevel.NATIVE,
+                InteropCapabilityLevel.NATIVE,
+                ExecutionKind.NATIVE,
+                "direct_upstream_execution",
+                List.of(),
+                List.of()
+        );
     }
 }

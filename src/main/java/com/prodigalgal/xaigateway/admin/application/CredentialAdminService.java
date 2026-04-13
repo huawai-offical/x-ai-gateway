@@ -6,10 +6,13 @@ import com.prodigalgal.xaigateway.admin.api.CredentialModelRefreshResponse;
 import com.prodigalgal.xaigateway.admin.api.CredentialRequest;
 import com.prodigalgal.xaigateway.admin.api.CredentialResponse;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CredentialModelDiscoveryService;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,16 +25,19 @@ public class CredentialAdminService {
     private final CredentialCryptoService credentialCryptoService;
     private final CredentialModelDiscoveryService credentialModelDiscoveryService;
     private final ProviderSiteRegistryService providerSiteRegistryService;
+    private final ObjectMapper objectMapper;
 
     public CredentialAdminService(
             UpstreamCredentialRepository upstreamCredentialRepository,
             CredentialCryptoService credentialCryptoService,
             CredentialModelDiscoveryService credentialModelDiscoveryService,
-            ProviderSiteRegistryService providerSiteRegistryService) {
+            ProviderSiteRegistryService providerSiteRegistryService,
+            ObjectMapper objectMapper) {
         this.upstreamCredentialRepository = upstreamCredentialRepository;
         this.credentialCryptoService = credentialCryptoService;
         this.credentialModelDiscoveryService = credentialModelDiscoveryService;
         this.providerSiteRegistryService = providerSiteRegistryService;
+        this.objectMapper = objectMapper;
     }
 
     @Transactional(readOnly = true)
@@ -43,9 +49,10 @@ public class CredentialAdminService {
     }
 
     public CredentialResponse create(CredentialRequest request) {
-        String fingerprint = credentialCryptoService.fingerprint(request.apiKey().trim());
+        String secret = requireSecret(request.resolvedSecret());
+        String fingerprint = credentialCryptoService.fingerprint(secret);
         if (upstreamCredentialRepository.findByApiKeyFingerprintAndDeletedFalse(fingerprint).isPresent()) {
-            throw new IllegalArgumentException("已存在相同的上游 API key。");
+            throw new IllegalArgumentException("已存在相同的上游凭证密钥。");
         }
 
         UpstreamCredentialEntity entity = new UpstreamCredentialEntity();
@@ -78,7 +85,9 @@ public class CredentialAdminService {
                 credentialModelDiscoveryService.probe(
                         request.providerType(),
                         request.baseUrl().trim(),
-                        request.apiKey().trim()
+                        request.resolvedAuthKind(),
+                        requireSecret(request.resolvedSecret()),
+                        request.resolvedCredentialMetadata()
                 );
         List<String> sampleModels = probe.models().stream()
                 .map(model -> model.modelName())
@@ -115,11 +124,14 @@ public class CredentialAdminService {
     }
 
     private void apply(UpstreamCredentialEntity entity, CredentialRequest request) {
+        String secret = requireSecret(request.resolvedSecret());
         entity.setCredentialName(request.credentialName().trim());
         entity.setProviderType(request.providerType());
         entity.setBaseUrl(request.baseUrl().trim());
-        entity.setApiKeyCiphertext(credentialCryptoService.encrypt(request.apiKey().trim()));
-        entity.setApiKeyFingerprint(credentialCryptoService.fingerprint(request.apiKey().trim()));
+        entity.setAuthKind(request.resolvedAuthKind());
+        entity.setApiKeyCiphertext(credentialCryptoService.encrypt(secret));
+        entity.setApiKeyFingerprint(credentialCryptoService.fingerprint(secret));
+        entity.setCredentialMetadataJson(writeMetadata(request.resolvedCredentialMetadata()));
         entity.setActive(request.active() == null || request.active());
         entity.setProxyId(request.proxyId());
         entity.setTlsFingerprintProfileId(request.tlsFingerprintProfileId());
@@ -136,7 +148,9 @@ public class CredentialAdminService {
                 entity.getCredentialName(),
                 entity.getProviderType(),
                 entity.getBaseUrl(),
+                entity.getAuthKind(),
                 entity.getApiKeyFingerprint(),
+                readMetadata(entity.getCredentialMetadataJson()),
                 entity.isActive(),
                 entity.getCooldownUntil(),
                 entity.getLastErrorCode(),
@@ -149,5 +163,32 @@ public class CredentialAdminService {
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
         );
+    }
+
+    private String requireSecret(String secret) {
+        if (secret == null || secret.isBlank()) {
+            throw new IllegalArgumentException("凭证 secret 不能为空。");
+        }
+        return secret.trim();
+    }
+
+    private String writeMetadata(Map<String, Object> metadata) {
+        try {
+            return metadata == null || metadata.isEmpty() ? null : objectMapper.writeValueAsString(metadata);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalArgumentException("无法序列化凭证 metadata。", exception);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> readMetadata(String metadataJson) {
+        if (metadataJson == null || metadataJson.isBlank()) {
+            return Map.of();
+        }
+        try {
+            return objectMapper.readValue(metadataJson, Map.class);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalArgumentException("无法解析凭证 metadata。", exception);
+        }
     }
 }

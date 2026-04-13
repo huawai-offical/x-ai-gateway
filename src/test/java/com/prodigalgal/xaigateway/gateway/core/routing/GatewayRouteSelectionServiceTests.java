@@ -12,8 +12,16 @@ import com.prodigalgal.xaigateway.gateway.core.cache.PromptFingerprintService;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.catalog.ModelCatalogQueryService;
 import com.prodigalgal.xaigateway.gateway.core.catalog.ResolvedModelView;
+import com.prodigalgal.xaigateway.gateway.core.interop.CapabilityResolution;
+import com.prodigalgal.xaigateway.gateway.core.interop.CapabilityResolutionReport;
+import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics;
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestFeatureService;
+import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
+import com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
 import com.prodigalgal.xaigateway.gateway.core.interop.SiteCapabilityTruthService;
+import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.shared.ReasoningTransport;
 import com.prodigalgal.xaigateway.infra.config.GatewayProperties;
@@ -112,10 +120,32 @@ class GatewayRouteSelectionServiceTests {
                         false,
                         List.of(candidate)
                 )));
-        when(gatewayRequestFeatureService.detectRequiredFeatures(Mockito.anyString(), Mockito.any()))
-                .thenReturn(List.of(com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature.CHAT_TEXT));
-        when(siteCapabilityTruthService.capabilityLevel(Mockito.any(), Mockito.any()))
-                .thenReturn(com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel.NATIVE);
+        when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.any()))
+                .thenReturn(new GatewayRequestSemantics(
+                        TranslationResourceType.CHAT,
+                        TranslationOperation.CHAT_COMPLETION,
+                        List.of(com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature.CHAT_TEXT),
+                        true
+                ));
+        when(siteCapabilityTruthService.resolve(Mockito.any(), Mockito.any()))
+                .thenReturn(new CapabilityResolutionReport(
+                        Map.of("chat_text", new CapabilityResolution(
+                                InteropFeature.CHAT_TEXT,
+                                InteropCapabilityLevel.NATIVE,
+                                InteropCapabilityLevel.NATIVE,
+                                InteropCapabilityLevel.NATIVE,
+                                InteropCapabilityLevel.NATIVE,
+                                List.of(),
+                                List.of()
+                        )),
+                        InteropCapabilityLevel.NATIVE,
+                        InteropCapabilityLevel.NATIVE,
+                        InteropCapabilityLevel.NATIVE,
+                        ExecutionKind.NATIVE,
+                        "direct_upstream_execution",
+                        List.of(),
+                        List.of()
+                ));
         when(affinityCacheService.getPrefixAffinity(eq(1L), eq("OPENAI_DIRECT"), eq("gpt-4o"), anyString()))
                 .thenReturn("101");
 

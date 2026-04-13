@@ -203,13 +203,34 @@ public class UpstreamSitePolicyService {
                     "translation-layer",
                     null
             );
-            case COHERE, VERTEX_AI -> new SitePolicy(
-                    siteKind == UpstreamSiteKind.COHERE ? ProviderFamily.OPENAI : ProviderFamily.GEMINI,
-                    AuthStrategy.UNSUPPORTED,
-                    PathStrategy.UNSUPPORTED,
-                    ModelAddressingStrategy.UNSUPPORTED,
-                    ErrorSchemaStrategy.UNSUPPORTED,
-                    List.of(),
+            case COHERE -> new SitePolicy(
+                    ProviderFamily.OPENAI,
+                    AuthStrategy.BEARER,
+                    PathStrategy.OPENAI_V1,
+                    ModelAddressingStrategy.MODEL_NAME,
+                    ErrorSchemaStrategy.OPENAI_ERROR,
+                    List.of("openai"),
+                    false,
+                    true,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    "sse",
+                    "compatibility-api",
+                    null
+            );
+            case VERTEX_AI -> new SitePolicy(
+                    ProviderFamily.GEMINI,
+                    AuthStrategy.BEARER,
+                    PathStrategy.GEMINI_V1BETA_MODELS,
+                    ModelAddressingStrategy.MODEL_NAME,
+                    ErrorSchemaStrategy.GEMINI_ERROR,
+                    List.of("google_native"),
                     false,
                     false,
                     false,
@@ -220,9 +241,9 @@ public class UpstreamSitePolicyService {
                     false,
                     false,
                     false,
-                    "none",
-                    "blocked",
-                    "blocked by auth/path gap"
+                    "sse",
+                    "vertex-google-native",
+                    null
             );
         };
     }
@@ -239,12 +260,12 @@ public class UpstreamSitePolicyService {
                     ? InteropCapabilityLevel.UNSUPPORTED
                     : InteropCapabilityLevel.NATIVE;
             case IMAGE_INPUT -> switch (siteKind) {
-                case ANTHROPIC_DIRECT, GEMINI_DIRECT, OPENAI_DIRECT, AZURE_OPENAI -> InteropCapabilityLevel.NATIVE;
+                case ANTHROPIC_DIRECT, GEMINI_DIRECT, VERTEX_AI, OPENAI_DIRECT, AZURE_OPENAI -> InteropCapabilityLevel.NATIVE;
                 case OLLAMA_DIRECT -> InteropCapabilityLevel.UNSUPPORTED;
                 default -> InteropCapabilityLevel.EMULATED;
             };
             case FILE_INPUT -> switch (siteKind) {
-                case GEMINI_DIRECT, OPENAI_DIRECT, AZURE_OPENAI -> InteropCapabilityLevel.NATIVE;
+                case GEMINI_DIRECT, VERTEX_AI, OPENAI_DIRECT, AZURE_OPENAI -> InteropCapabilityLevel.NATIVE;
                 case ANTHROPIC_DIRECT -> InteropCapabilityLevel.EMULATED;
                 default -> InteropCapabilityLevel.UNSUPPORTED;
             };

@@ -17,6 +17,8 @@ public interface UpstreamCredentialRepository extends JpaRepository<UpstreamCred
 
     List<UpstreamCredentialEntity> findAllBySiteProfileIdAndDeletedFalseOrderByCreatedAtDesc(Long siteProfileId);
 
+    List<UpstreamCredentialEntity> findAllBySiteProfileIdAndDeletedFalseAndActiveTrueOrderByCreatedAtDesc(Long siteProfileId);
+
     List<UpstreamCredentialEntity> findAllBySiteProfileIdInAndDeletedFalseAndActiveTrue(Collection<Long> siteProfileIds);
 
     Optional<UpstreamCredentialEntity> findByApiKeyFingerprintAndDeletedFalse(String apiKeyFingerprint);

@@ -5,21 +5,27 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.prodigalgal.xaigateway.admin.api.AdminChatExecuteRequest;
 import com.prodigalgal.xaigateway.admin.api.AdminChatExecuteResponse;
+import com.prodigalgal.xaigateway.gateway.core.account.AccountSelectionService;
+import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyGovernanceService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyQueryService;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
-import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyGovernanceService;
-import com.prodigalgal.xaigateway.gateway.core.account.AccountSelectionService;
+import com.prodigalgal.xaigateway.gateway.core.credential.CredentialMaterialResolver;
+import com.prodigalgal.xaigateway.gateway.core.credential.ResolvedCredentialMaterial;
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest;
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionResponse;
+import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionStreamChunk;
+import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionStreamResponse;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayChatRuntime;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayChatRuntimeContext;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayChatRuntimeResult;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionStreamChunk;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionStreamResponse;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolCall;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolDefinition;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileResource;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileService;
+import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics;
+import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestFeatureService;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlan;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlanCompiler;
 import com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityService;
 import com.prodigalgal.xaigateway.gateway.core.routing.GatewayRouteSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionRequest;
@@ -69,7 +75,10 @@ public class GatewayChatExecutionService {
     private final DistributedKeyGovernanceService distributedKeyGovernanceService;
     private final DistributedKeyQueryService distributedKeyQueryService;
     private final AccountSelectionService accountSelectionService;
+    private final CredentialMaterialResolver credentialMaterialResolver;
     private final GatewayFileService gatewayFileService;
+    private final GatewayRequestFeatureService gatewayRequestFeatureService;
+    private final TranslationExecutionPlanCompiler translationExecutionPlanCompiler;
     private final OpenAiChatModelFactory openAiChatModelFactory;
     private final AnthropicChatModelFactory anthropicChatModelFactory;
     private final GeminiChatModelFactory geminiChatModelFactory;
@@ -84,7 +93,10 @@ public class GatewayChatExecutionService {
             DistributedKeyGovernanceService distributedKeyGovernanceService,
             DistributedKeyQueryService distributedKeyQueryService,
             AccountSelectionService accountSelectionService,
+            CredentialMaterialResolver credentialMaterialResolver,
             GatewayFileService gatewayFileService,
+            GatewayRequestFeatureService gatewayRequestFeatureService,
+            TranslationExecutionPlanCompiler translationExecutionPlanCompiler,
             OpenAiChatModelFactory openAiChatModelFactory,
             AnthropicChatModelFactory anthropicChatModelFactory,
             GeminiChatModelFactory geminiChatModelFactory,
@@ -97,7 +109,10 @@ public class GatewayChatExecutionService {
         this.distributedKeyGovernanceService = distributedKeyGovernanceService;
         this.distributedKeyQueryService = distributedKeyQueryService;
         this.accountSelectionService = accountSelectionService;
+        this.credentialMaterialResolver = credentialMaterialResolver;
         this.gatewayFileService = gatewayFileService;
+        this.gatewayRequestFeatureService = gatewayRequestFeatureService;
+        this.translationExecutionPlanCompiler = translationExecutionPlanCompiler;
         this.openAiChatModelFactory = openAiChatModelFactory;
         this.anthropicChatModelFactory = anthropicChatModelFactory;
         this.geminiChatModelFactory = geminiChatModelFactory;
@@ -127,33 +142,36 @@ public class GatewayChatExecutionService {
 
     public ChatExecutionResponse execute(ChatExecutionRequest request) {
         String requestId = gatewayObservabilityService.nextRequestId();
+        JsonNode routeBody = buildRouteBody(request);
         RouteSelectionResult selectionResult = gatewayRouteSelectionService.select(new RouteSelectionRequest(
                 request.distributedKeyPrefix(),
                 request.protocol(),
                 request.requestPath(),
                 request.requestedModel(),
-                buildRouteBody(request),
+                routeBody,
                 GatewayClientFamily.GENERIC_OPENAI,
                 true
         ));
         gatewayObservabilityService.recordRouteDecision(requestId, selectionResult);
+        GatewayRequestSemantics semantics = gatewayRequestFeatureService.describe(request.requestPath(), routeBody);
+        TranslationExecutionPlan executionPlan = translationExecutionPlanCompiler.compileSelected(
+                selectionResult,
+                request.requestPath(),
+                semantics,
+                routeBody
+        );
 
         UpstreamCredentialEntity credential = getRequiredCredential(selectionResult.selectedCandidate().candidate().credentialId());
-        String apiKey = accountSelectionService.resolveActiveAccount(
-                        selectionResult.distributedKeyId(),
-                        selectionResult.selectedCandidate().candidate().providerType(),
-                        selectionResult.clientFamily(),
-                        300)
-                .map(account -> credentialCryptoService.decrypt(account.getAccessTokenCiphertext()))
-                .orElseGet(() -> credentialCryptoService.decrypt(credential.getApiKeyCiphertext()));
+        ResolvedCredentialMaterial credentialMaterial = credentialMaterialResolver.resolve(selectionResult, credential);
 
         try {
             GatewayChatRuntime runtime = resolveRuntime(selectionResult.selectedCandidate().candidate());
             GatewayChatRuntimeResult result = runtime.execute(new GatewayChatRuntimeContext(
                     selectionResult,
                     credential,
-                    apiKey,
-                    request
+                    credentialMaterial,
+                    request,
+                    executionPlan
             ));
             gatewayRouteSelectionService.recordSuccessfulSelection(selectionResult);
             gatewayObservabilityService.recordCacheUsage(
@@ -181,32 +199,35 @@ public class GatewayChatExecutionService {
 
     public ChatExecutionStreamResponse executeStream(ChatExecutionRequest request) {
         String requestId = gatewayObservabilityService.nextRequestId();
+        JsonNode routeBody = buildRouteBody(request);
         RouteSelectionResult selectionResult = gatewayRouteSelectionService.select(new RouteSelectionRequest(
                 request.distributedKeyPrefix(),
                 request.protocol(),
                 request.requestPath(),
                 request.requestedModel(),
-                buildRouteBody(request),
+                routeBody,
                 GatewayClientFamily.GENERIC_OPENAI,
                 true
         ));
         gatewayObservabilityService.recordRouteDecision(requestId, selectionResult);
+        GatewayRequestSemantics semantics = gatewayRequestFeatureService.describe(request.requestPath(), routeBody);
+        TranslationExecutionPlan executionPlan = translationExecutionPlanCompiler.compileSelected(
+                selectionResult,
+                request.requestPath(),
+                semantics,
+                routeBody
+        );
 
         UpstreamCredentialEntity credential = getRequiredCredential(selectionResult.selectedCandidate().candidate().credentialId());
-        String apiKey = accountSelectionService.resolveActiveAccount(
-                        selectionResult.distributedKeyId(),
-                        selectionResult.selectedCandidate().candidate().providerType(),
-                        selectionResult.clientFamily(),
-                        300)
-                .map(account -> credentialCryptoService.decrypt(account.getAccessTokenCiphertext()))
-                .orElseGet(() -> credentialCryptoService.decrypt(credential.getApiKeyCiphertext()));
+        ResolvedCredentialMaterial credentialMaterial = credentialMaterialResolver.resolve(selectionResult, credential);
 
         GatewayChatRuntime runtime = resolveRuntime(selectionResult.selectedCandidate().candidate());
         Flux<ChatExecutionStreamChunk> chunks = runtime.executeStream(new GatewayChatRuntimeContext(
                         selectionResult,
                         credential,
-                        apiKey,
-                        request
+                        credentialMaterial,
+                        request,
+                        executionPlan
                 ))
                 .map(chunk -> {
                     gatewayObservabilityService.recordCacheUsage(

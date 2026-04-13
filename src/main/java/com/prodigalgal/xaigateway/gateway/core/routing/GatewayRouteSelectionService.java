@@ -12,9 +12,10 @@ import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.catalog.ModelCatalogQueryService;
 import com.prodigalgal.xaigateway.gateway.core.catalog.ResolvedModelView;
 import com.prodigalgal.xaigateway.gateway.core.account.AccountSelectionService;
+import com.prodigalgal.xaigateway.gateway.core.interop.CapabilityResolutionReport;
+import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics;
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestFeatureService;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
-import com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature;
 import com.prodigalgal.xaigateway.gateway.core.interop.SiteCapabilityTruthService;
 import com.prodigalgal.xaigateway.gateway.core.shared.ModelIdNormalizer;
 import com.prodigalgal.xaigateway.infra.persistence.repository.NetworkProxyRepository;
@@ -113,17 +114,24 @@ public class GatewayRouteSelectionService {
         if (networkFilteredCandidates.isEmpty()) {
             throw new IllegalArgumentException("当前 provider 候选均被网络治理策略阻断。");
         }
-        List<InteropFeature> requiredFeatures = gatewayRequestFeatureService.detectRequiredFeatures(
+        GatewayRequestSemantics semantics = gatewayRequestFeatureService.describe(
                 request.requestPath(),
                 request.requestBody() instanceof com.fasterxml.jackson.databind.JsonNode jsonNode ? jsonNode : null
         );
-        List<RouteCandidateView> featureCompatibleCandidates = networkFilteredCandidates.stream()
-                .filter(candidate -> supportsRequiredFeatures(candidate, requiredFeatures))
+        List<CandidateResolution> featureCompatibleCandidates = networkFilteredCandidates.stream()
+                .map(candidate -> new CandidateResolution(candidate, siteCapabilityTruthService.resolve(candidate.candidate(), semantics)))
+                .filter(item -> supportsRequiredFeatures(item.report()))
                 .toList();
         if (featureCompatibleCandidates.isEmpty()) {
             throw new IllegalArgumentException("当前 provider 候选无法满足请求特征。");
         }
+        int bestRank = featureCompatibleCandidates.stream()
+                .mapToInt(item -> capabilityRank(item.report().overallEffectiveLevel()))
+                .max()
+                .orElse(0);
         List<RouteCandidateView> candidates = featureCompatibleCandidates.stream()
+                .filter(item -> capabilityRank(item.report().overallEffectiveLevel()) == bestRank)
+                .map(CandidateResolution::candidate)
                 .filter(candidate -> hasHealthyAccountIfBound(distributedKey.id(), candidate.candidate().providerType(), clientFamily))
                 .toList();
         if (candidates.isEmpty()) {
@@ -343,19 +351,32 @@ public class GatewayRouteSelectionService {
         return accountSelectionService.hasHealthyAccountBinding(distributedKeyId, providerType, clientFamily);
     }
 
-    private boolean supportsRequiredFeatures(RouteCandidateView candidate, List<InteropFeature> requiredFeatures) {
-        if (candidate.candidate().capabilityLevel() == InteropCapabilityLevel.UNSUPPORTED) {
+    private boolean supportsRequiredFeatures(CapabilityResolutionReport report) {
+        if (report == null) {
             return false;
         }
-        for (InteropFeature feature : requiredFeatures) {
-            if (siteCapabilityTruthService.capabilityLevel(candidate.candidate(), feature) == InteropCapabilityLevel.UNSUPPORTED) {
-                return false;
-            }
+        return report.blockedReasons().isEmpty() && report.overallEffectiveLevel() != InteropCapabilityLevel.UNSUPPORTED;
+    }
+
+    private int capabilityRank(InteropCapabilityLevel level) {
+        if (level == null) {
+            return 0;
         }
-        return true;
+        return switch (level) {
+            case NATIVE -> 3;
+            case EMULATED -> 2;
+            case LOSSY -> 1;
+            case UNSUPPORTED -> 0;
+        };
     }
 
     private String normalize(String protocol) {
         return protocol == null ? "openai" : protocol.trim().toLowerCase();
+    }
+
+    private record CandidateResolution(
+            RouteCandidateView candidate,
+            CapabilityResolutionReport report
+    ) {
     }
 }

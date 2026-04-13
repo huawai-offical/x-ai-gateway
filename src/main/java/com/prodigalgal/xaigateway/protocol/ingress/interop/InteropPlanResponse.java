@@ -1,5 +1,8 @@
 package com.prodigalgal.xaigateway.protocol.ingress.interop;
 
+import com.prodigalgal.xaigateway.gateway.core.interop.CapabilityResolutionView;
+import com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlan;
 import com.prodigalgal.xaigateway.gateway.core.shared.AuthStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ErrorSchemaStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind;
@@ -14,6 +17,8 @@ public record InteropPlanResponse(
         String protocol,
         String requestPath,
         String requestedModel,
+        String publicModel,
+        String resolvedModelKey,
         String degradationPolicy,
         List<String> requiredFeatures,
         List<String> blockers,
@@ -23,7 +28,11 @@ public record InteropPlanResponse(
         ProviderFamily providerFamily,
         Long siteProfileId,
         ExecutionKind executionKind,
+        String overallDeclaredLevel,
+        String overallImplementedLevel,
+        String overallEffectiveLevel,
         String capabilityLevel,
+        Map<String, CapabilityResolutionView> featureResolutions,
         String upstreamObjectMode,
         AuthStrategy authStrategy,
         PathStrategy pathStrategy,
@@ -52,6 +61,8 @@ public record InteropPlanResponse(
                 protocol,
                 requestPath,
                 requestedModel,
+                null,
+                null,
                 degradationPolicy,
                 requiredFeatures,
                 blockers,
@@ -65,10 +76,56 @@ public record InteropPlanResponse(
                 null,
                 null,
                 null,
+                Map.of(),
+                null,
+                null,
+                null,
                 null,
                 selectionResult,
                 summary,
                 debug
         );
+    }
+
+    public static InteropPlanResponse from(
+            TranslationExecutionPlan plan,
+            String degradationPolicy,
+            RouteSelectionResult selectionResult,
+            Map<String, Object> summary,
+            Map<String, Object> debug
+    ) {
+        return new InteropPlanResponse(
+                plan.executable(),
+                plan.protocol(),
+                plan.requestPath(),
+                plan.requestedModel(),
+                plan.publicModel(),
+                plan.resolvedModelKey(),
+                degradationPolicy,
+                plan.requiredFeatures().stream().map(InteropFeature::wireName).toList(),
+                plan.blockedReasons(),
+                plan.lossReasons(),
+                plan.resourceType().wireName(),
+                plan.operation().wireName(),
+                plan.providerFamily(),
+                plan.siteProfileId(),
+                plan.executionKind(),
+                wire(plan.overallDeclaredLevel()),
+                wire(plan.overallImplementedLevel()),
+                wire(plan.overallEffectiveLevel()),
+                wire(plan.capabilityLevel()),
+                plan.featureResolutions(),
+                plan.upstreamObjectMode(),
+                plan.authStrategy(),
+                plan.pathStrategy(),
+                plan.errorSchemaStrategy(),
+                selectionResult,
+                summary,
+                debug
+        );
+    }
+
+    private static String wire(com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel level) {
+        return level == null ? null : level.name().toLowerCase();
     }
 }

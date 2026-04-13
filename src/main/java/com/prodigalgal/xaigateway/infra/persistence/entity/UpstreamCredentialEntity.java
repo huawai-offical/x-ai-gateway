@@ -1,5 +1,6 @@
 package com.prodigalgal.xaigateway.infra.persistence.entity;
 
+import com.prodigalgal.xaigateway.gateway.core.credential.CredentialAuthKind;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -57,6 +58,15 @@ public class UpstreamCredentialEntity {
     @Column(name = "api_key_fingerprint", nullable = false, length = 128)
     @Comment("API key 指纹，用于查重和审计。")
     private String apiKeyFingerprint;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "auth_kind", nullable = false, length = 32)
+    @Comment("凭证认证材料类型。")
+    private CredentialAuthKind authKind = CredentialAuthKind.API_KEY;
+
+    @Column(name = "credential_metadata_json", columnDefinition = "text")
+    @Comment("凭证附加 metadata，例如 Vertex project/location。")
+    private String credentialMetadataJson;
 
     @Column(name = "is_active", nullable = false)
     @Comment("是否启用。")
@@ -150,6 +160,22 @@ public class UpstreamCredentialEntity {
 
     public void setApiKeyFingerprint(String apiKeyFingerprint) {
         this.apiKeyFingerprint = apiKeyFingerprint;
+    }
+
+    public CredentialAuthKind getAuthKind() {
+        return authKind;
+    }
+
+    public void setAuthKind(CredentialAuthKind authKind) {
+        this.authKind = authKind;
+    }
+
+    public String getCredentialMetadataJson() {
+        return credentialMetadataJson;
+    }
+
+    public void setCredentialMetadataJson(String credentialMetadataJson) {
+        this.credentialMetadataJson = credentialMetadataJson;
     }
 
     public boolean isActive() {

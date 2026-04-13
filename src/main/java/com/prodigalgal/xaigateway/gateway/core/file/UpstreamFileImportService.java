@@ -3,6 +3,7 @@ package com.prodigalgal.xaigateway.gateway.core.file;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.admin.application.CredentialCryptoService;
+import com.prodigalgal.xaigateway.gateway.core.credential.CredentialMaterialResolver;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayFileBindingEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayFileEntity;
@@ -31,6 +32,7 @@ public class UpstreamFileImportService {
     private final GatewayFileBindingRepository gatewayFileBindingRepository;
     private final UpstreamCredentialRepository upstreamCredentialRepository;
     private final CredentialCryptoService credentialCryptoService;
+    private final CredentialMaterialResolver credentialMaterialResolver;
     private final GatewayFileService gatewayFileService;
     private final WebClient.Builder webClientBuilder;
     private final ObjectMapper objectMapper;
@@ -40,6 +42,7 @@ public class UpstreamFileImportService {
             GatewayFileBindingRepository gatewayFileBindingRepository,
             UpstreamCredentialRepository upstreamCredentialRepository,
             CredentialCryptoService credentialCryptoService,
+            CredentialMaterialResolver credentialMaterialResolver,
             GatewayFileService gatewayFileService,
             WebClient.Builder webClientBuilder,
             ObjectMapper objectMapper) {
@@ -47,6 +50,7 @@ public class UpstreamFileImportService {
         this.gatewayFileBindingRepository = gatewayFileBindingRepository;
         this.upstreamCredentialRepository = upstreamCredentialRepository;
         this.credentialCryptoService = credentialCryptoService;
+        this.credentialMaterialResolver = credentialMaterialResolver;
         this.gatewayFileService = gatewayFileService;
         this.webClientBuilder = webClientBuilder;
         this.objectMapper = objectMapper;
@@ -119,11 +123,11 @@ public class UpstreamFileImportService {
 
         requireSupportedProvider(binding.getProviderType());
         UpstreamCredentialEntity credential = getRequiredCredential(binding.getCredentialId(), binding.getProviderType());
-        String apiKey = credentialCryptoService.decrypt(credential.getApiKeyCiphertext());
+        String secret = credentialMaterialResolver.resolveStored(credential).secret();
 
         WebClient client = webClientBuilder.clone()
                 .baseUrl(normalizeBaseUrl(credential.getBaseUrl()))
-                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
+                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + secret)
                 .build();
 
         JsonNode metadata = client.get()

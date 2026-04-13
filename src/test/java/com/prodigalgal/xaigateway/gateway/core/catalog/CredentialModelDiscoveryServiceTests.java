@@ -2,6 +2,7 @@ package com.prodigalgal.xaigateway.gateway.core.catalog;
 
 import com.prodigalgal.xaigateway.admin.application.CredentialCryptoService;
 import com.prodigalgal.xaigateway.admin.application.ProviderSiteRegistryService;
+import com.prodigalgal.xaigateway.gateway.core.credential.CredentialAuthKind;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.shared.ReasoningTransport;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
@@ -105,5 +106,81 @@ class CredentialModelDiscoveryServiceTests {
         assertTrue(model.supportsTools());
         assertTrue(model.supportsThinking());
         assertEquals(ReasoningTransport.OLLAMA_THINKING, model.reasoningTransport());
+    }
+
+    @Test
+    void shouldDiscoverCohereCompatibilityModelsViaOpenAiCompatibleSurface() {
+        ExchangeFunction exchangeFunction = request -> {
+            assertEquals("/compatibility/v1/models", request.url().getPath());
+            assertEquals("Bearer cohere-secret", request.headers().getFirst(HttpHeaders.AUTHORIZATION));
+            return Mono.just(ClientResponse.create(HttpStatus.OK)
+                    .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                    .body("""
+                            {
+                              "data": [
+                                {"id":"command-a-03-2025"},
+                                {"id":"embed-v4.0"}
+                              ]
+                            }
+                            """)
+                    .build());
+        };
+
+        CredentialModelDiscoveryService service = new CredentialModelDiscoveryService(
+                Mockito.mock(UpstreamCredentialRepository.class),
+                Mockito.mock(CredentialCryptoService.class),
+                Mockito.mock(ProviderSiteRegistryService.class),
+                WebClient.builder().exchangeFunction(exchangeFunction)
+        );
+
+        CredentialModelDiscoveryService.CredentialConnectivityProbe probe = service.probe(
+                ProviderType.OPENAI_COMPATIBLE,
+                "https://api.cohere.ai/compatibility/v1",
+                CredentialAuthKind.API_KEY,
+                "cohere-secret",
+                java.util.Map.of()
+        );
+
+        assertEquals(2, probe.models().size());
+        assertTrue(probe.models().stream().anyMatch(model -> model.modelName().equals("command-a-03-2025")));
+        assertTrue(probe.models().stream().anyMatch(DiscoveredModelDefinition::supportsEmbeddings));
+    }
+
+    @Test
+    void shouldDiscoverVertexModelsViaBearerCredentialAndMetadata() {
+        ExchangeFunction exchangeFunction = request -> {
+            assertEquals("/v1beta1/publishers/google/models", request.url().getPath());
+            assertEquals("Bearer ya29.vertex-token", request.headers().getFirst(HttpHeaders.AUTHORIZATION));
+            return Mono.just(ClientResponse.create(HttpStatus.OK)
+                    .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                    .body("""
+                            {
+                              "publisherModels": [
+                                {"name":"publishers/google/models/gemini-2.5-pro"},
+                                {"name":"publishers/google/models/text-embedding-004"}
+                              ]
+                            }
+                            """)
+                    .build());
+        };
+
+        CredentialModelDiscoveryService service = new CredentialModelDiscoveryService(
+                Mockito.mock(UpstreamCredentialRepository.class),
+                Mockito.mock(CredentialCryptoService.class),
+                Mockito.mock(ProviderSiteRegistryService.class),
+                WebClient.builder().exchangeFunction(exchangeFunction)
+        );
+
+        CredentialModelDiscoveryService.CredentialConnectivityProbe probe = service.probe(
+                ProviderType.GEMINI_DIRECT,
+                "https://aiplatform.googleapis.com/v1/projects/demo/locations/us-central1/endpoints/openapi",
+                CredentialAuthKind.GOOGLE_ACCESS_TOKEN,
+                "ya29.vertex-token",
+                java.util.Map.of("projectId", "demo", "location", "us-central1")
+        );
+
+        assertEquals(2, probe.models().size());
+        assertTrue(probe.models().stream().anyMatch(model -> model.modelName().equals("gemini-2.5-pro")));
+        assertTrue(probe.models().stream().allMatch(model -> model.supportedProtocols().contains("google_native")));
     }
 }

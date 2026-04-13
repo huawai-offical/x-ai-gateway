@@ -1,6 +1,7 @@
 package com.prodigalgal.xaigateway.admin.api;
 
 import com.prodigalgal.xaigateway.admin.application.ProviderSiteAdminService;
+import com.prodigalgal.xaigateway.gateway.core.interop.CapabilityResolutionView;
 import com.prodigalgal.xaigateway.gateway.core.shared.AuthStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ErrorSchemaStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ModelAddressingStrategy;
@@ -15,6 +16,7 @@ import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
@@ -56,6 +58,16 @@ class ProviderSiteAdminControllerTests {
                         "READY",
                         null,
                         List.of("openai", "responses"),
+                        "openai",
+                        List.of("api_key"),
+                        "sse",
+                        "provider-native",
+                        1,
+                        Instant.parse("2026-04-13T03:00:00Z"),
+                        java.util.Map.of(
+                                "response_object",
+                                new CapabilityResolutionView("emulated", "emulated", "emulated", List.of(), List.of())
+                        ),
                         true,
                         true,
                         true,
@@ -75,7 +87,29 @@ class ProviderSiteAdminControllerTests {
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$[0].supportsResponses").isEqualTo(true)
+                .jsonPath("$[0].streamTransport").isEqualTo("sse")
+                .jsonPath("$[0].fallbackStrategy").isEqualTo("provider-native")
+                .jsonPath("$[0].cooldownCredentialCount").isEqualTo(1)
+                .jsonPath("$[0].features.response_object.effectiveLevel").isEqualTo("emulated")
                 .jsonPath("$[0].supportsRealtime").isEqualTo(true);
+    }
+
+    @Test
+    void shouldRefreshSelectedProviderSites() {
+        Mockito.when(providerSiteAdminService.refreshCapabilities(List.of(1L, 2L)))
+                .thenReturn(List.of(sampleSite()));
+
+        webTestClient.post()
+                .uri("/admin/provider-sites/refresh-capabilities")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {"siteProfileIds":[1,2]}
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$[0].profileCode").isEqualTo("site:openai_direct")
+                .jsonPath("$[0].cooldownCredentialCount").isEqualTo(1);
     }
 
     private ProviderSiteResponse sampleSite() {
@@ -95,6 +129,16 @@ class ProviderSiteAdminControllerTests {
                 "READY",
                 null,
                 List.of("openai", "responses"),
+                "openai",
+                List.of("api_key"),
+                "sse",
+                "provider-native",
+                1,
+                Instant.parse("2026-04-13T03:00:00Z"),
+                java.util.Map.of(
+                        "response_object",
+                        new CapabilityResolutionView("emulated", "emulated", "emulated", List.of(), List.of())
+                ),
                 2,
                 Instant.now(),
                 Instant.now(),

@@ -2,13 +2,7 @@ package com.prodigalgal.xaigateway.gateway.core.interop;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
-import com.prodigalgal.xaigateway.gateway.core.routing.GatewayRouteSelectionService;
-import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
-import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionSource;
-import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
-import com.prodigalgal.xaigateway.gateway.core.shared.ReasoningTransport;
 import com.prodigalgal.xaigateway.protocol.ingress.interop.InteropPlanRequest;
 import com.prodigalgal.xaigateway.protocol.ingress.interop.InteropPlanResponse;
 import java.util.List;
@@ -20,19 +14,77 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GatewayInteropPlanServiceTests {
 
-    private final GatewayRouteSelectionService gatewayRouteSelectionService = Mockito.mock(GatewayRouteSelectionService.class);
-    private final SiteCapabilityTruthService siteCapabilityTruthService = Mockito.mock(SiteCapabilityTruthService.class);
-    private final GatewayRequestFeatureService gatewayRequestFeatureService = Mockito.mock(GatewayRequestFeatureService.class);
+    private final TranslationExecutionPlanCompiler translationExecutionPlanCompiler = Mockito.mock(TranslationExecutionPlanCompiler.class);
     private final GatewayInteropPlanService gatewayInteropPlanService =
-            new GatewayInteropPlanService(gatewayRouteSelectionService, new ObjectMapper(), null, siteCapabilityTruthService, gatewayRequestFeatureService);
+            new GatewayInteropPlanService(null, translationExecutionPlanCompiler);
 
     @Test
     void shouldBlockWhenDegradationPolicyDoesNotAllowSelectedCapability() {
-        Mockito.when(gatewayRouteSelectionService.select(Mockito.any()))
-                .thenReturn(selectionResult(ProviderType.ANTHROPIC_DIRECT));
-
         ObjectNode body = new ObjectMapper().createObjectNode();
         body.put("model", "claude-3-7-sonnet");
+        Mockito.when(translationExecutionPlanCompiler.compilePreview(
+                        Mockito.eq("sk-gw-test"),
+                        Mockito.eq("openai"),
+                        Mockito.eq("/v1/responses"),
+                        Mockito.isNull(),
+                        Mockito.eq(GatewayDegradationPolicy.STRICT),
+                        Mockito.any(),
+                        Mockito.eq(body)
+                ))
+                .thenReturn(new TranslationExecutionPlanCompilation(
+                        new TranslationExecutionPlan(
+                                false,
+                                "openai",
+                                "/v1/responses",
+                                "claude-3-7-sonnet",
+                                "claude-3-7-sonnet",
+                                "claude-3-7-sonnet",
+                                com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily.GENERIC_OPENAI,
+                                TranslationResourceType.RESPONSE,
+                                TranslationOperation.RESPONSE_CREATE,
+                                List.of(InteropFeature.RESPONSE_OBJECT),
+                                java.util.Map.of("response_object", InteropCapabilityLevel.EMULATED),
+                                null,
+                                null,
+                                null,
+                                com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind.BLOCKED,
+                                InteropCapabilityLevel.EMULATED,
+                                "blocked",
+                                List.of("response_object 以 emulated 执行。"),
+                                List.of("当前策略不允许 emulated 执行。"),
+                                null,
+                                null,
+                                null,
+                                new TranslationExecutionRequestMapping(
+                                        "openai",
+                                        "/v1/responses",
+                                        "claude-3-7-sonnet",
+                                        "claude-3-7-sonnet",
+                                        "claude-3-7-sonnet",
+                                        com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily.GENERIC_OPENAI,
+                                        List.of(InteropFeature.RESPONSE_OBJECT),
+                                        java.util.Map.of("response_object", InteropCapabilityLevel.EMULATED)
+                                ),
+                                new TranslationExecutionResponseMapping(
+                                        null,
+                                        null,
+                                        null,
+                                        com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind.BLOCKED,
+                                        InteropCapabilityLevel.EMULATED,
+                                        "blocked",
+                                        null,
+                                        null,
+                                        null
+                                )
+                        ),
+                        null,
+                        new GatewayRequestSemantics(
+                                TranslationResourceType.RESPONSE,
+                                TranslationOperation.RESPONSE_CREATE,
+                                List.of(InteropFeature.RESPONSE_OBJECT),
+                                true
+                        )
+                ));
         InteropPlanRequest request = new InteropPlanRequest(
                 "openai",
                 "/v1/responses",
@@ -44,16 +96,76 @@ class GatewayInteropPlanServiceTests {
         InteropPlanResponse response = gatewayInteropPlanService.preview("sk-gw-test", request);
 
         assertFalse(response.executable());
-        assertTrue(response.blockers().stream().anyMatch(item -> item.contains("response_object")));
+        assertTrue(response.blockers().stream().anyMatch(item -> item.contains("emulated")));
     }
 
     @Test
     void shouldAllowNativeFeatureForOpenAiAudioTranscription() {
-        Mockito.when(gatewayRouteSelectionService.select(Mockito.any()))
-                .thenReturn(selectionResult(ProviderType.OPENAI_DIRECT));
-
         ObjectNode body = new ObjectMapper().createObjectNode();
         body.put("model", "gpt-4o-mini-transcribe");
+        Mockito.when(translationExecutionPlanCompiler.compilePreview(
+                        Mockito.eq("sk-gw-test"),
+                        Mockito.eq("openai"),
+                        Mockito.eq("/v1/audio/transcriptions"),
+                        Mockito.isNull(),
+                        Mockito.eq(GatewayDegradationPolicy.STRICT),
+                        Mockito.any(),
+                        Mockito.eq(body)
+                ))
+                .thenReturn(new TranslationExecutionPlanCompilation(
+                        new TranslationExecutionPlan(
+                                true,
+                                "openai",
+                                "/v1/audio/transcriptions",
+                                "gpt-4o-mini-transcribe",
+                                "gpt-4o-mini-transcribe",
+                                "gpt-4o-mini-transcribe",
+                                com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily.GENERIC_OPENAI,
+                                TranslationResourceType.AUDIO,
+                                TranslationOperation.AUDIO_TRANSCRIPTION,
+                                List.of(InteropFeature.AUDIO_TRANSCRIPTION),
+                                java.util.Map.of("audio_transcription", InteropCapabilityLevel.NATIVE),
+                                null,
+                                null,
+                                null,
+                                com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind.NATIVE,
+                                InteropCapabilityLevel.NATIVE,
+                                "direct_upstream_execution",
+                                List.of(),
+                                List.of(),
+                                null,
+                                null,
+                                null,
+                                new TranslationExecutionRequestMapping(
+                                        "openai",
+                                        "/v1/audio/transcriptions",
+                                        "gpt-4o-mini-transcribe",
+                                        "gpt-4o-mini-transcribe",
+                                        "gpt-4o-mini-transcribe",
+                                        com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily.GENERIC_OPENAI,
+                                        List.of(InteropFeature.AUDIO_TRANSCRIPTION),
+                                        java.util.Map.of("audio_transcription", InteropCapabilityLevel.NATIVE)
+                                ),
+                                new TranslationExecutionResponseMapping(
+                                        null,
+                                        null,
+                                        null,
+                                        com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind.NATIVE,
+                                        InteropCapabilityLevel.NATIVE,
+                                        "direct_upstream_execution",
+                                        null,
+                                        null,
+                                        null
+                                )
+                        ),
+                        null,
+                        new GatewayRequestSemantics(
+                                TranslationResourceType.AUDIO,
+                                TranslationOperation.AUDIO_TRANSCRIPTION,
+                                List.of(InteropFeature.AUDIO_TRANSCRIPTION),
+                                true
+                        )
+                ));
         InteropPlanRequest request = new InteropPlanRequest(
                 "openai",
                 "/v1/audio/transcriptions",
@@ -66,85 +178,5 @@ class GatewayInteropPlanServiceTests {
 
         assertTrue(response.executable());
         assertTrue(response.blockers().isEmpty());
-    }
-
-    private RouteSelectionResult selectionResult(ProviderType providerType) {
-        CatalogCandidateView candidate = new CatalogCandidateView(
-                101L,
-                "candidate",
-                providerType,
-                "https://example.com",
-                "model-a",
-                "model-a",
-                List.of("openai", "responses"),
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                ReasoningTransport.OPENAI_CHAT
-        );
-        RouteCandidateView routeCandidateView = new RouteCandidateView(candidate, 11L, 10, 100);
-        return new RouteSelectionResult(
-                1L,
-                "sk-gw-test",
-                "model-a",
-                "model-a",
-                "model-a",
-                "openai",
-                "prefix",
-                "fingerprint",
-                "model-a",
-                RouteSelectionSource.WEIGHTED_HASH,
-                routeCandidateView,
-                List.of(routeCandidateView)
-        );
-    }
-
-    GatewayInteropPlanServiceTests() {
-        Mockito.when(gatewayRequestFeatureService.detectRequiredFeatures(Mockito.anyString(), Mockito.any()))
-                .thenAnswer(invocation -> {
-                    String path = invocation.getArgument(0);
-                    if ("/v1/responses".equals(path)) {
-                        return List.of(InteropFeature.RESPONSE_OBJECT);
-                    }
-                    if ("/v1/audio/transcriptions".equals(path)) {
-                        return List.of(InteropFeature.AUDIO_TRANSCRIPTION);
-                    }
-                    return List.of(InteropFeature.CHAT_TEXT);
-                });
-        Mockito.when(siteCapabilityTruthService.capabilityLevel(Mockito.any(), Mockito.eq(InteropFeature.RESPONSE_OBJECT)))
-                .thenReturn(InteropCapabilityLevel.EMULATED);
-        Mockito.when(siteCapabilityTruthService.capabilityLevel(Mockito.any(), Mockito.eq(InteropFeature.AUDIO_TRANSCRIPTION)))
-                .thenReturn(InteropCapabilityLevel.NATIVE);
-        Mockito.when(siteCapabilityTruthService.capabilityLevel(Mockito.any(), Mockito.eq(InteropFeature.CHAT_TEXT)))
-                .thenReturn(InteropCapabilityLevel.NATIVE);
-        Mockito.when(siteCapabilityTruthService.buildExecutionPlan(Mockito.any(), Mockito.anyString(), Mockito.anyList(), Mockito.anyList(), Mockito.anyList()))
-                .thenAnswer(invocation -> {
-                    RouteSelectionResult selectionResult = invocation.getArgument(0);
-                    String requestPath = invocation.getArgument(1);
-                    @SuppressWarnings("unchecked")
-                    List<String> lossReasons = invocation.getArgument(3);
-                    @SuppressWarnings("unchecked")
-                    List<String> blockedReasons = invocation.getArgument(4);
-                    return new TranslationExecutionPlan(
-                            blockedReasons.isEmpty(),
-                            requestPath.startsWith("/v1/audio") ? "audio" : "response",
-                            requestPath.startsWith("/v1/audio") ? "audio_transcription" : "response_create",
-                            selectionResult.selectedCandidate().candidate().providerFamily(),
-                            selectionResult.selectedCandidate().candidate().siteProfileId(),
-                            blockedReasons.isEmpty() ? com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind.NATIVE : com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind.BLOCKED,
-                            blockedReasons.isEmpty() ? InteropCapabilityLevel.NATIVE : InteropCapabilityLevel.EMULATED,
-                            blockedReasons.isEmpty() ? "direct_upstream_execution" : "translated_execution",
-                            lossReasons,
-                            blockedReasons,
-                            selectionResult.selectedCandidate().candidate().authStrategy(),
-                            selectionResult.selectedCandidate().candidate().pathStrategy(),
-                            selectionResult.selectedCandidate().candidate().errorSchemaStrategy(),
-                            java.util.Map.of(),
-                            java.util.Map.of()
-                    );
-                });
     }
 }

@@ -4,6 +4,7 @@ import com.prodigalgal.xaigateway.admin.api.CapabilityMatrixRowResponse;
 import com.prodigalgal.xaigateway.admin.api.ProviderSiteRequest;
 import com.prodigalgal.xaigateway.admin.api.ProviderSiteResponse;
 import com.prodigalgal.xaigateway.admin.api.SiteModelCapabilityResponse;
+import com.prodigalgal.xaigateway.gateway.core.interop.CapabilityResolutionView;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CredentialModelDiscoveryService;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature;
 import com.prodigalgal.xaigateway.gateway.core.interop.SiteCapabilityTruthService;
@@ -15,8 +16,10 @@ import com.prodigalgal.xaigateway.infra.persistence.repository.SiteCapabilitySna
 import com.prodigalgal.xaigateway.infra.persistence.repository.SiteModelCapabilityRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamSiteProfileRepository;
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -76,16 +79,18 @@ public class ProviderSiteAdminService {
     }
 
     public ProviderSiteResponse refreshCapabilities(Long id) {
-        UpstreamSiteProfileEntity entity = getRequired(id);
-        List<UpstreamCredentialEntity> credentials = upstreamCredentialRepository.findAllBySiteProfileIdAndDeletedFalseOrderByCreatedAtDesc(id);
-        if (credentials.isEmpty()) {
-            providerSiteRegistryService.refreshCapabilities(entity, List.of());
-            return toResponse(entity);
-        }
-        for (UpstreamCredentialEntity credential : credentials) {
-            credentialModelDiscoveryService.refreshCredential(credential.getId());
-        }
-        return toResponse(entity);
+        return refreshCapabilitiesInternal(getRequired(id));
+    }
+
+    public List<ProviderSiteResponse> refreshCapabilities(List<Long> siteProfileIds) {
+        List<UpstreamSiteProfileEntity> sites = siteProfileIds == null || siteProfileIds.isEmpty()
+                ? upstreamSiteProfileRepository.findAllByActiveTrueOrderByDisplayNameAsc()
+                : siteProfileIds.stream()
+                        .map(this::getRequired)
+                        .toList();
+        return sites.stream()
+                .map(this::refreshCapabilitiesInternal)
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -121,6 +126,7 @@ public class ProviderSiteAdminService {
 
     private CapabilityMatrixRowResponse toCapabilityMatrixRow(UpstreamSiteProfileEntity entity) {
         SiteCapabilitySnapshotEntity snapshot = siteCapabilitySnapshotRepository.findBySiteProfile_Id(entity.getId()).orElse(null);
+        CooldownSummary cooldown = cooldownSummary(entity.getId());
         return new CapabilityMatrixRowResponse(
                 entity.getId(),
                 entity.getProfileCode(),
@@ -133,6 +139,13 @@ public class ProviderSiteAdminService {
                 snapshot == null ? "UNKNOWN" : snapshot.getHealthState(),
                 snapshot == null ? null : snapshot.getBlockedReason(),
                 snapshot == null ? List.of() : snapshot.getSupportedProtocols(),
+                compatibilitySurface(entity),
+                credentialRequirements(entity),
+                snapshot == null ? null : snapshot.getStreamTransport(),
+                snapshot == null ? null : snapshot.getFallbackStrategy(),
+                cooldown.credentialCount(),
+                cooldown.cooldownUntil(),
+                buildFeatureViews(entity, snapshot),
                 siteCapabilityTruthService.supportsFeature(entity, snapshot, InteropFeature.RESPONSE_OBJECT),
                 siteCapabilityTruthService.supportsFeature(entity, snapshot, InteropFeature.EMBEDDINGS),
                 siteCapabilityTruthService.supportsFeature(entity, snapshot, InteropFeature.AUDIO_TRANSCRIPTION),
@@ -149,6 +162,7 @@ public class ProviderSiteAdminService {
     private ProviderSiteResponse toResponse(UpstreamSiteProfileEntity entity) {
         SiteCapabilitySnapshotEntity snapshot = siteCapabilitySnapshotRepository.findBySiteProfile_Id(entity.getId()).orElse(null);
         int modelCount = siteModelCapabilityRepository.findAllBySiteProfile_IdOrderByModelKeyAsc(entity.getId()).size();
+        CooldownSummary cooldown = cooldownSummary(entity.getId());
         return new ProviderSiteResponse(
                 entity.getId(),
                 entity.getProfileCode(),
@@ -165,10 +179,52 @@ public class ProviderSiteAdminService {
                 snapshot == null ? "UNKNOWN" : snapshot.getHealthState(),
                 snapshot == null ? null : snapshot.getBlockedReason(),
                 snapshot == null ? List.of() : snapshot.getSupportedProtocols(),
+                compatibilitySurface(entity),
+                credentialRequirements(entity),
+                snapshot == null ? null : snapshot.getStreamTransport(),
+                snapshot == null ? null : snapshot.getFallbackStrategy(),
+                cooldown.credentialCount(),
+                cooldown.cooldownUntil(),
+                buildFeatureViews(entity, snapshot),
                 modelCount,
                 snapshot == null ? null : snapshot.getRefreshedAt(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
+        );
+    }
+
+    private String compatibilitySurface(UpstreamSiteProfileEntity entity) {
+        return switch (entity.getSiteKind()) {
+            case ANTHROPIC_DIRECT -> "anthropic_native";
+            case GEMINI_DIRECT, VERTEX_AI -> "google_native";
+            default -> "openai";
+        };
+    }
+
+    private List<String> credentialRequirements(UpstreamSiteProfileEntity entity) {
+        return switch (entity.getSiteKind()) {
+            case VERTEX_AI -> List.of("google_access_token", "projectId", "location");
+            case ANTHROPIC_DIRECT -> List.of("api_key_header");
+            case GEMINI_DIRECT -> List.of("api_key_query");
+            case AZURE_OPENAI -> List.of("azure_api_key");
+            default -> List.of("api_key");
+        };
+    }
+
+    private Map<String, CapabilityResolutionView> buildFeatureViews(
+            UpstreamSiteProfileEntity entity,
+            SiteCapabilitySnapshotEntity snapshot) {
+        return Map.of(
+                InteropFeature.RESPONSE_OBJECT.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.RESPONSE_OBJECT)),
+                InteropFeature.EMBEDDINGS.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.EMBEDDINGS)),
+                InteropFeature.AUDIO_TRANSCRIPTION.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.AUDIO_TRANSCRIPTION)),
+                InteropFeature.IMAGE_GENERATION.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.IMAGE_GENERATION)),
+                InteropFeature.MODERATION.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.MODERATION)),
+                InteropFeature.FILE_OBJECT.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.FILE_OBJECT)),
+                InteropFeature.UPLOAD_CREATE.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.UPLOAD_CREATE)),
+                InteropFeature.BATCH_CREATE.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.BATCH_CREATE)),
+                InteropFeature.TUNING_CREATE.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.TUNING_CREATE)),
+                InteropFeature.REALTIME_CLIENT_SECRET.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.REALTIME_CLIENT_SECRET))
         );
     }
 
@@ -193,5 +249,37 @@ public class ProviderSiteAdminService {
         entity.setBaseUrlPattern(request.baseUrlPattern() == null ? null : request.baseUrlPattern().trim());
         entity.setDescription(request.description() == null ? null : request.description().trim());
         entity.setActive(request.active() == null || request.active());
+    }
+
+    private ProviderSiteResponse refreshCapabilitiesInternal(UpstreamSiteProfileEntity entity) {
+        List<UpstreamCredentialEntity> credentials = upstreamCredentialRepository.findAllBySiteProfileIdAndDeletedFalseOrderByCreatedAtDesc(entity.getId());
+        if (credentials.isEmpty()) {
+            providerSiteRegistryService.refreshCapabilities(entity, List.of());
+            return toResponse(entity);
+        }
+        for (UpstreamCredentialEntity credential : credentials) {
+            credentialModelDiscoveryService.refreshCredential(credential.getId());
+        }
+        return toResponse(entity);
+    }
+
+    private CooldownSummary cooldownSummary(Long siteProfileId) {
+        Instant now = Instant.now();
+        List<UpstreamCredentialEntity> credentials =
+                upstreamCredentialRepository.findAllBySiteProfileIdAndDeletedFalseAndActiveTrueOrderByCreatedAtDesc(siteProfileId);
+        List<Instant> cooldowns = credentials.stream()
+                .map(UpstreamCredentialEntity::getCooldownUntil)
+                .filter(value -> value != null && value.isAfter(now))
+                .toList();
+        Instant maxCooldownUntil = cooldowns.stream()
+                .max(Comparator.naturalOrder())
+                .orElse(null);
+        return new CooldownSummary(cooldowns.size(), maxCooldownUntil);
+    }
+
+    private record CooldownSummary(
+            int credentialCount,
+            Instant cooldownUntil
+    ) {
     }
 }

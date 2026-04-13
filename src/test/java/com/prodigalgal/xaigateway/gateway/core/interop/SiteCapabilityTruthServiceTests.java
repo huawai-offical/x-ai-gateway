@@ -6,6 +6,7 @@ import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionSource;
 import com.prodigalgal.xaigateway.gateway.core.shared.AuthStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ErrorSchemaStrategy;
+import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind;
 import com.prodigalgal.xaigateway.gateway.core.shared.PathStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderFamily;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
@@ -67,34 +68,19 @@ class SiteCapabilityTruthServiceTests {
         SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
 
         CatalogCandidateView candidate = candidate(5L, ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC);
-        RouteCandidateView routeCandidateView = new RouteCandidateView(candidate, 11L, 10, 100);
-        RouteSelectionResult selectionResult = new RouteSelectionResult(
-                1L,
-                "sk-gw-test",
-                "omni-moderation-latest",
-                "omni-moderation-latest",
-                "omni-moderation-latest",
-                "openai",
-                "prefix",
-                "fingerprint",
-                "omni-moderation-latest",
-                RouteSelectionSource.WEIGHTED_HASH,
-                routeCandidateView,
-                List.of(routeCandidateView)
+        FeatureCompatibilityReport report = service.evaluate(
+                candidate,
+                new GatewayRequestSemantics(
+                        TranslationResourceType.MODERATION,
+                        TranslationOperation.MODERATION_CREATE,
+                        List.of(InteropFeature.MODERATION),
+                        true
+                )
         );
 
-        TranslationExecutionPlan plan = service.buildExecutionPlan(
-                selectionResult,
-                "/v1/moderations",
-                List.of(InteropFeature.MODERATION),
-                List.of(),
-                List.of("moderation 当前 provider 不支持。")
-        );
-
-        assertEquals("moderation", plan.resourceType());
-        assertEquals("moderation_create", plan.operation());
-        assertEquals("blocked", plan.upstreamObjectMode());
-        assertTrue(plan.blockedReasons().stream().anyMatch(item -> item.contains("moderation")));
+        assertEquals(ExecutionKind.BLOCKED, report.executionKind());
+        assertEquals("blocked", report.upstreamObjectMode());
+        assertTrue(report.blockedReasons().stream().anyMatch(item -> item.contains("moderation")));
     }
 
     @Test
@@ -160,6 +146,79 @@ class SiteCapabilityTruthServiceTests {
         assertEquals(InteropCapabilityLevel.UNSUPPORTED, service.capabilityLevel(blockedCandidate, InteropFeature.TOOLS));
         assertEquals(InteropCapabilityLevel.UNSUPPORTED, service.capabilityLevel(blockedCandidate, InteropFeature.IMAGE_INPUT));
         assertEquals(InteropCapabilityLevel.UNSUPPORTED, service.capabilityLevel(blockedCandidate, InteropFeature.FILE_INPUT));
+    }
+
+    @Test
+    void shouldTreatCohereChatAsNativeButModerationAsUnsupported() {
+        SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        Mockito.when(repository.findBySiteProfile_Id(7L)).thenReturn(Optional.of(snapshot(false, true, false, false, false, false, false, false, false, false)));
+        SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
+
+        CatalogCandidateView candidate = new CatalogCandidateView(
+                201L,
+                "cohere",
+                ProviderType.OPENAI_COMPATIBLE,
+                7L,
+                ProviderFamily.OPENAI,
+                UpstreamSiteKind.COHERE,
+                AuthStrategy.BEARER,
+                PathStrategy.OPENAI_V1,
+                ErrorSchemaStrategy.OPENAI_ERROR,
+                "https://api.cohere.ai/compatibility/v1",
+                "command-a-03-2025",
+                "command-a-03-2025",
+                List.of("openai"),
+                true,
+                true,
+                false,
+                true,
+                false,
+                false,
+                false,
+                false,
+                ReasoningTransport.NONE,
+                InteropCapabilityLevel.NATIVE
+        );
+
+        assertEquals(InteropCapabilityLevel.NATIVE, service.capabilityLevel(candidate, InteropFeature.CHAT_TEXT));
+        assertEquals(InteropCapabilityLevel.UNSUPPORTED, service.capabilityLevel(candidate, InteropFeature.MODERATION));
+    }
+
+    @Test
+    void shouldTreatVertexChatAsNativeButEmbeddingsAsUnsupported() {
+        SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        Mockito.when(repository.findBySiteProfile_Id(8L)).thenReturn(Optional.of(snapshot(false, false, false, false, false, false, false, false, false, false)));
+        SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
+
+        CatalogCandidateView candidate = new CatalogCandidateView(
+                202L,
+                "vertex",
+                ProviderType.GEMINI_DIRECT,
+                8L,
+                ProviderFamily.GEMINI,
+                UpstreamSiteKind.VERTEX_AI,
+                AuthStrategy.BEARER,
+                PathStrategy.GEMINI_V1BETA_MODELS,
+                ErrorSchemaStrategy.GEMINI_ERROR,
+                "https://aiplatform.googleapis.com/v1/projects/demo/locations/us-central1/endpoints/openapi",
+                "gemini-2.5-pro",
+                "gemini-2.5-pro",
+                List.of("google_native"),
+                true,
+                true,
+                true,
+                false,
+                false,
+                true,
+                true,
+                false,
+                ReasoningTransport.GEMINI_THOUGHTS,
+                InteropCapabilityLevel.NATIVE
+        );
+
+        assertEquals(InteropCapabilityLevel.NATIVE, service.capabilityLevel(candidate, InteropFeature.CHAT_TEXT));
+        assertEquals(InteropCapabilityLevel.NATIVE, service.capabilityLevel(candidate, InteropFeature.IMAGE_INPUT));
+        assertEquals(InteropCapabilityLevel.UNSUPPORTED, service.capabilityLevel(candidate, InteropFeature.EMBEDDINGS));
     }
 
     private CatalogCandidateView candidate(Long siteProfileId, ProviderType providerType, UpstreamSiteKind siteKind) {

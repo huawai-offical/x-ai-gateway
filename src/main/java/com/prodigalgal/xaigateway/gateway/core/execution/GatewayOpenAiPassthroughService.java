@@ -4,9 +4,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.prodigalgal.xaigateway.admin.application.CredentialCryptoService;
 import com.prodigalgal.xaigateway.admin.application.ErrorRuleService;
+import com.prodigalgal.xaigateway.gateway.core.account.AccountSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyGovernanceService;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
-import com.prodigalgal.xaigateway.gateway.core.account.AccountSelectionService;
+import com.prodigalgal.xaigateway.gateway.core.credential.CredentialAuthKind;
+import com.prodigalgal.xaigateway.gateway.core.credential.CredentialMaterialResolver;
+import com.prodigalgal.xaigateway.gateway.core.credential.ResolvedCredentialMaterial;
 import com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityService;
 import com.prodigalgal.xaigateway.gateway.core.routing.GatewayRouteSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionRequest;
@@ -48,6 +51,7 @@ public class GatewayOpenAiPassthroughService {
     private final GatewayObservabilityService gatewayObservabilityService;
     private final DistributedKeyGovernanceService distributedKeyGovernanceService;
     private final AccountSelectionService accountSelectionService;
+    private final CredentialMaterialResolver credentialMaterialResolver;
     private final ErrorRuleService errorRuleService;
     private final WebClient.Builder webClientBuilder;
 
@@ -58,6 +62,7 @@ public class GatewayOpenAiPassthroughService {
             GatewayObservabilityService gatewayObservabilityService,
             DistributedKeyGovernanceService distributedKeyGovernanceService,
             AccountSelectionService accountSelectionService,
+            CredentialMaterialResolver credentialMaterialResolver,
             ErrorRuleService errorRuleService,
             WebClient.Builder webClientBuilder) {
         this.gatewayRouteSelectionService = gatewayRouteSelectionService;
@@ -66,6 +71,7 @@ public class GatewayOpenAiPassthroughService {
         this.gatewayObservabilityService = gatewayObservabilityService;
         this.distributedKeyGovernanceService = distributedKeyGovernanceService;
         this.accountSelectionService = accountSelectionService;
+        this.credentialMaterialResolver = credentialMaterialResolver;
         this.errorRuleService = errorRuleService;
         this.webClientBuilder = webClientBuilder;
     }
@@ -199,7 +205,21 @@ public class GatewayOpenAiPassthroughService {
             UpstreamCredentialEntity credential,
             String apiKey,
             String requestPath) {
-        return buildSiteRequest(selectionResult, credential, apiKey, requestPath);
+        return buildSiteRequest(
+                selectionResult,
+                credential,
+                new ResolvedCredentialMaterial(
+                        credential.getId(),
+                        credential.getSiteProfileId(),
+                        CredentialAuthKind.API_KEY,
+                        apiKey,
+                        null,
+                        Map.of(),
+                        null,
+                        "legacy"
+                ),
+                requestPath
+        );
     }
 
     private Mono<MultiValueMap<String, HttpEntity<?>>> buildMultipartBody(
@@ -301,14 +321,8 @@ public class GatewayOpenAiPassthroughService {
         gatewayObservabilityService.recordRouteDecision(requestId, selectionResult);
 
         UpstreamCredentialEntity credential = getRequiredCredential(selectionResult.selectedCandidate().candidate().credentialId());
-        String apiKey = accountSelectionService.resolveActiveAccount(
-                        selectionResult.distributedKeyId(),
-                        selectionResult.selectedCandidate().candidate().providerType(),
-                        selectionResult.clientFamily(),
-                        300)
-                .map(account -> credentialCryptoService.decrypt(account.getAccessTokenCiphertext()))
-                .orElseGet(() -> credentialCryptoService.decrypt(credential.getApiKeyCiphertext()));
-        CatalogSiteRequest siteRequest = buildSiteRequest(selectionResult, credential, apiKey, requestPath);
+        ResolvedCredentialMaterial credentialMaterial = credentialMaterialResolver.resolve(selectionResult, credential);
+        CatalogSiteRequest siteRequest = buildSiteRequest(selectionResult, credential, credentialMaterial, requestPath);
         return new RouteExecutionContext(selectionResult, credential, siteRequest.client(), siteRequest.path(), requestPath);
     }
 
@@ -354,23 +368,23 @@ public class GatewayOpenAiPassthroughService {
     private CatalogSiteRequest buildSiteRequest(
             RouteSelectionResult selectionResult,
             UpstreamCredentialEntity credential,
-            String apiKey,
+            ResolvedCredentialMaterial credentialMaterial,
             String requestPath) {
         var candidate = selectionResult.selectedCandidate().candidate();
         WebClient.Builder builder = webClientBuilder.clone()
                 .baseUrl(normalizeBaseUrl(credential.getBaseUrl()));
         String path = resolvePath(credential.getBaseUrl(), requestPath);
         if (candidate.pathStrategy() == PathStrategy.AZURE_OPENAI_DEPLOYMENT) {
-            builder.defaultHeader("api-key", apiKey);
+            builder.defaultHeader("api-key", credentialMaterial.secret());
             path = resolveAzurePath(requestPath, selectionResult.resolvedModelKey());
         } else if (candidate.authStrategy() == AuthStrategy.BEARER) {
-            builder.defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey);
+            builder.defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + credentialMaterial.secret());
         } else if (candidate.authStrategy() == AuthStrategy.API_KEY_HEADER) {
-            builder.defaultHeader("x-api-key", apiKey);
+            builder.defaultHeader("x-api-key", credentialMaterial.secret());
         } else if (candidate.authStrategy() == AuthStrategy.API_KEY_QUERY) {
-            path = appendQuery(path, "key", apiKey);
+            path = appendQuery(path, "key", credentialMaterial.secret());
         } else if (candidate.authStrategy() == AuthStrategy.AZURE_API_KEY) {
-            builder.defaultHeader("api-key", apiKey);
+            builder.defaultHeader("api-key", credentialMaterial.secret());
         }
         return new CatalogSiteRequest(builder.build(), path);
     }

@@ -1,8 +1,10 @@
 package com.prodigalgal.xaigateway.gateway.core.catalog;
 
+import com.prodigalgal.xaigateway.gateway.core.interop.CapabilityResolutionView;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderFamily;
 import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
+import java.util.Map;
 
 public record GatewayPublicModelView(
         String publicModelId,
@@ -13,13 +15,14 @@ public record GatewayPublicModelView(
         UpstreamSiteKind siteKind,
         InteropCapabilityLevel capabilityLevel,
         boolean supportsChat,
-        boolean supportsEmbeddings
+        boolean supportsEmbeddings,
+        Map<String, CapabilityResolutionView> capabilities
 ) {
     public GatewayPublicModelView(
             String publicModelId,
             String resolvedModelKey,
             boolean alias
     ) {
-        this(publicModelId, resolvedModelKey, alias, null, null, null, InteropCapabilityLevel.NATIVE, true, false);
+        this(publicModelId, resolvedModelKey, alias, null, null, null, InteropCapabilityLevel.NATIVE, true, false, Map.of());
     }
 }

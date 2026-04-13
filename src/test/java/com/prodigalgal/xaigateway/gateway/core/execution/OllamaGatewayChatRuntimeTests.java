@@ -237,6 +237,6 @@ class OllamaGatewayChatRuntimeTests {
         UpstreamCredentialEntity credential = new UpstreamCredentialEntity();
         credential.setBaseUrl("http://localhost:11434");
         credential.setProviderType(ProviderType.OLLAMA_DIRECT);
-        return new GatewayChatRuntimeContext(selectionResult, credential, null, request);
+        return new GatewayChatRuntimeContext(selectionResult, credential, (String) null, request);
     }
 }

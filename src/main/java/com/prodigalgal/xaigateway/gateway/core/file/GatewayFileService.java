@@ -3,6 +3,8 @@ package com.prodigalgal.xaigateway.gateway.core.file;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.admin.application.CredentialCryptoService;
+import com.prodigalgal.xaigateway.gateway.core.credential.CredentialMaterialResolver;
+import com.prodigalgal.xaigateway.gateway.core.credential.ResolvedCredentialMaterial;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedCredentialBindingView;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyQueryService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyView;
@@ -34,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpEntity;
@@ -60,9 +63,38 @@ public class GatewayFileService {
     private final SiteCapabilitySnapshotRepository siteCapabilitySnapshotRepository;
     private final SiteCapabilityTruthService siteCapabilityTruthService;
     private final CredentialCryptoService credentialCryptoService;
+    private final CredentialMaterialResolver credentialMaterialResolver;
     private final GatewayProperties gatewayProperties;
     private final WebClient.Builder webClientBuilder;
     private final ObjectMapper objectMapper;
+
+    @Autowired
+    public GatewayFileService(
+            GatewayFileRepository gatewayFileRepository,
+            GatewayFileBindingRepository gatewayFileBindingRepository,
+            DistributedKeyQueryService distributedKeyQueryService,
+            UpstreamCredentialRepository upstreamCredentialRepository,
+            UpstreamSiteProfileRepository upstreamSiteProfileRepository,
+            SiteCapabilitySnapshotRepository siteCapabilitySnapshotRepository,
+            SiteCapabilityTruthService siteCapabilityTruthService,
+            CredentialCryptoService credentialCryptoService,
+            CredentialMaterialResolver credentialMaterialResolver,
+            GatewayProperties gatewayProperties,
+            WebClient.Builder webClientBuilder,
+            ObjectMapper objectMapper) {
+        this.gatewayFileRepository = gatewayFileRepository;
+        this.gatewayFileBindingRepository = gatewayFileBindingRepository;
+        this.distributedKeyQueryService = distributedKeyQueryService;
+        this.upstreamCredentialRepository = upstreamCredentialRepository;
+        this.upstreamSiteProfileRepository = upstreamSiteProfileRepository;
+        this.siteCapabilitySnapshotRepository = siteCapabilitySnapshotRepository;
+        this.siteCapabilityTruthService = siteCapabilityTruthService;
+        this.credentialCryptoService = credentialCryptoService;
+        this.credentialMaterialResolver = credentialMaterialResolver;
+        this.gatewayProperties = gatewayProperties;
+        this.webClientBuilder = webClientBuilder;
+        this.objectMapper = objectMapper;
+    }
 
     public GatewayFileService(
             GatewayFileRepository gatewayFileRepository,
@@ -76,17 +108,25 @@ public class GatewayFileService {
             GatewayProperties gatewayProperties,
             WebClient.Builder webClientBuilder,
             ObjectMapper objectMapper) {
-        this.gatewayFileRepository = gatewayFileRepository;
-        this.gatewayFileBindingRepository = gatewayFileBindingRepository;
-        this.distributedKeyQueryService = distributedKeyQueryService;
-        this.upstreamCredentialRepository = upstreamCredentialRepository;
-        this.upstreamSiteProfileRepository = upstreamSiteProfileRepository;
-        this.siteCapabilitySnapshotRepository = siteCapabilitySnapshotRepository;
-        this.siteCapabilityTruthService = siteCapabilityTruthService;
-        this.credentialCryptoService = credentialCryptoService;
-        this.gatewayProperties = gatewayProperties;
-        this.webClientBuilder = webClientBuilder;
-        this.objectMapper = objectMapper;
+        this(
+                gatewayFileRepository,
+                gatewayFileBindingRepository,
+                distributedKeyQueryService,
+                upstreamCredentialRepository,
+                upstreamSiteProfileRepository,
+                siteCapabilitySnapshotRepository,
+                siteCapabilityTruthService,
+                credentialCryptoService,
+                new CredentialMaterialResolver(new com.prodigalgal.xaigateway.gateway.core.account.AccountSelectionService(
+                        null,
+                        null,
+                        null,
+                        null
+                ), credentialCryptoService, objectMapper),
+                gatewayProperties,
+                webClientBuilder,
+                objectMapper
+        );
     }
 
     public Mono<GatewayFileResponse> createFile(Long distributedKeyId, FilePart filePart, String purpose) {
@@ -271,15 +311,15 @@ public class GatewayFileService {
             UpstreamCredentialEntity credential,
             UpstreamSiteProfileEntity siteProfile,
             String requestPath) {
-        String apiKey = credentialCryptoService.decrypt(credential.getApiKeyCiphertext());
+        ResolvedCredentialMaterial credentialMaterial = credentialMaterialResolver.resolveStored(credential);
         WebClient.Builder builder = webClientBuilder.clone().baseUrl(credential.getBaseUrl().replaceAll("/+$", ""));
         String path = resolvePath(credential.getBaseUrl(), requestPath);
         if (siteProfile.getAuthStrategy() == AuthStrategy.BEARER) {
-            builder.defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey);
+            builder.defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + credentialMaterial.secret());
         } else if (siteProfile.getAuthStrategy() == AuthStrategy.API_KEY_HEADER) {
-            builder.defaultHeader("x-api-key", apiKey);
+            builder.defaultHeader("x-api-key", credentialMaterial.secret());
         } else if (siteProfile.getAuthStrategy() == AuthStrategy.AZURE_API_KEY) {
-            builder.defaultHeader("api-key", apiKey);
+            builder.defaultHeader("api-key", credentialMaterial.secret());
         } else {
             throw new IllegalArgumentException("当前站点鉴权策略不支持 files 编排。");
         }

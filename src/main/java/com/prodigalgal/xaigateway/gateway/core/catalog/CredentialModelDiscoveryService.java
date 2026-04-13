@@ -1,11 +1,16 @@
 package com.prodigalgal.xaigateway.gateway.core.catalog;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.prodigalgal.xaigateway.admin.application.ProviderSiteRegistryService;
 import com.prodigalgal.xaigateway.admin.application.CredentialCryptoService;
+import com.prodigalgal.xaigateway.admin.application.ProviderSiteRegistryService;
+import com.prodigalgal.xaigateway.gateway.core.credential.CredentialAuthKind;
+import com.prodigalgal.xaigateway.gateway.core.credential.CredentialMaterialResolver;
+import com.prodigalgal.xaigateway.gateway.core.credential.ResolvedCredentialMaterial;
 import com.prodigalgal.xaigateway.gateway.core.shared.ModelIdNormalizer;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.shared.ReasoningTransport;
+import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
+import com.prodigalgal.xaigateway.gateway.core.site.UpstreamSitePolicyService;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import java.net.URI;
@@ -19,6 +24,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -36,6 +42,8 @@ public class CredentialModelDiscoveryService {
     private final UpstreamCredentialRepository upstreamCredentialRepository;
     private final CredentialCryptoService credentialCryptoService;
     private final ProviderSiteRegistryService providerSiteRegistryService;
+    private final UpstreamSitePolicyService upstreamSitePolicyService;
+    private final CredentialMaterialResolver credentialMaterialResolver;
     private final WebClient.Builder webClientBuilder;
 
     public CredentialModelDiscoveryService(
@@ -43,24 +51,66 @@ public class CredentialModelDiscoveryService {
             CredentialCryptoService credentialCryptoService,
             ProviderSiteRegistryService providerSiteRegistryService,
             WebClient.Builder webClientBuilder) {
+        this(
+                upstreamCredentialRepository,
+                credentialCryptoService,
+                providerSiteRegistryService,
+                new UpstreamSitePolicyService(),
+                new CredentialMaterialResolver(new com.prodigalgal.xaigateway.gateway.core.account.AccountSelectionService(
+                        null,
+                        null,
+                        null,
+                        null
+                ), credentialCryptoService, new com.fasterxml.jackson.databind.ObjectMapper()),
+                webClientBuilder
+        );
+    }
+
+    @Autowired
+    public CredentialModelDiscoveryService(
+            UpstreamCredentialRepository upstreamCredentialRepository,
+            CredentialCryptoService credentialCryptoService,
+            ProviderSiteRegistryService providerSiteRegistryService,
+            UpstreamSitePolicyService upstreamSitePolicyService,
+            CredentialMaterialResolver credentialMaterialResolver,
+            WebClient.Builder webClientBuilder) {
         this.upstreamCredentialRepository = upstreamCredentialRepository;
         this.credentialCryptoService = credentialCryptoService;
         this.providerSiteRegistryService = providerSiteRegistryService;
+        this.upstreamSitePolicyService = upstreamSitePolicyService;
+        this.credentialMaterialResolver = credentialMaterialResolver;
         this.webClientBuilder = webClientBuilder;
     }
 
     @Transactional(readOnly = true)
     public CredentialConnectivityProbe probe(ProviderType providerType, String baseUrl, String apiKey) {
+        return probe(providerType, baseUrl, CredentialAuthKind.API_KEY, apiKey, Map.of());
+    }
+
+    @Transactional(readOnly = true)
+    public CredentialConnectivityProbe probe(
+            ProviderType providerType,
+            String baseUrl,
+            CredentialAuthKind authKind,
+            String secret,
+            Map<String, Object> metadata) {
         Instant startedAt = Instant.now();
-        List<DiscoveredModelDefinition> models = discover(providerType, baseUrl, apiKey);
+        ResolvedCredentialMaterial credentialMaterial = credentialMaterialResolver.resolveTransient(
+                providerType,
+                baseUrl,
+                authKind,
+                secret,
+                metadata
+        );
+        List<DiscoveredModelDefinition> models = discover(providerType, baseUrl, credentialMaterial);
         long latency = Duration.between(startedAt, Instant.now()).toMillis();
         return new CredentialConnectivityProbe(providerType, baseUrl, latency, models);
     }
 
     public CredentialRefreshResult refreshCredential(Long credentialId) {
         UpstreamCredentialEntity credential = getRequiredCredential(credentialId);
-        String apiKey = credentialCryptoService.decrypt(credential.getApiKeyCiphertext());
-        List<DiscoveredModelDefinition> models = discover(credential.getProviderType(), credential.getBaseUrl(), apiKey);
+        ResolvedCredentialMaterial credentialMaterial = credentialMaterialResolver.resolveStored(credential);
+        List<DiscoveredModelDefinition> models = discover(credential.getProviderType(), credential.getBaseUrl(), credentialMaterial);
         if (credential.getSiteProfileId() == null) {
             credential.setSiteProfileId(providerSiteRegistryService.ensureSiteProfile(
                     credential.getProviderType(),
@@ -94,20 +144,28 @@ public class CredentialModelDiscoveryService {
         return credential.get();
     }
 
-    private List<DiscoveredModelDefinition> discover(ProviderType providerType, String baseUrl, String apiKey) {
+    private List<DiscoveredModelDefinition> discover(
+            ProviderType providerType,
+            String baseUrl,
+            ResolvedCredentialMaterial credentialMaterial) {
+        UpstreamSiteKind siteKind = upstreamSitePolicyService.inferSiteKind(providerType, baseUrl);
         return switch (providerType) {
-            case OPENAI_DIRECT, OPENAI_COMPATIBLE -> discoverOpenAiCompatible(baseUrl, apiKey);
-            case ANTHROPIC_DIRECT -> discoverAnthropic(baseUrl, apiKey);
-            case GEMINI_DIRECT -> discoverGemini(baseUrl, apiKey);
+            case OPENAI_DIRECT, OPENAI_COMPATIBLE -> discoverOpenAiCompatible(siteKind, baseUrl, credentialMaterial);
+            case ANTHROPIC_DIRECT -> discoverAnthropic(baseUrl, credentialMaterial.secret());
+            case GEMINI_DIRECT -> siteKind == UpstreamSiteKind.VERTEX_AI
+                    ? discoverVertex(baseUrl, credentialMaterial)
+                    : discoverGemini(baseUrl, credentialMaterial.secret());
             case OLLAMA_DIRECT -> discoverOllama(baseUrl);
         };
     }
 
-    private List<DiscoveredModelDefinition> discoverOpenAiCompatible(String baseUrl, String apiKey) {
-        JsonNode body = buildClient(baseUrl)
+    private List<DiscoveredModelDefinition> discoverOpenAiCompatible(
+            UpstreamSiteKind siteKind,
+            String baseUrl,
+            ResolvedCredentialMaterial credentialMaterial) {
+        JsonNode body = buildOpenAiCompatibleClient(baseUrl, siteKind, credentialMaterial)
                 .get()
-                .uri(resolveOpenAiModelsPath(baseUrl))
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
+                .uri(resolveOpenAiModelsPath(baseUrl, siteKind))
                 .retrieve()
                 .bodyToMono(JsonNode.class)
                 .timeout(DISCOVERY_TIMEOUT)
@@ -117,12 +175,12 @@ public class CredentialModelDiscoveryService {
                 .map(modelId -> new DiscoveredModelDefinition(
                         modelId,
                         ModelIdNormalizer.normalize(modelId),
-                        List.of("openai", "responses"),
-                        !modelId.toLowerCase(Locale.ROOT).contains("embedding"),
-                        !modelId.toLowerCase(Locale.ROOT).contains("embedding"),
-                        !modelId.toLowerCase(Locale.ROOT).contains("embedding"),
-                        modelId.toLowerCase(Locale.ROOT).contains("embedding"),
-                        !modelId.toLowerCase(Locale.ROOT).contains("embedding"),
+                        upstreamSitePolicyService.policy(siteKind).supportedProtocols(),
+                        !looksLikeEmbeddingModel(modelId),
+                        !looksLikeEmbeddingModel(modelId),
+                        !looksLikeEmbeddingModel(modelId),
+                        looksLikeEmbeddingModel(modelId),
+                        !looksLikeEmbeddingModel(modelId),
                         inferOpenAiThinking(modelId),
                         inferOpenAiThinking(modelId),
                         inferOpenAiThinking(modelId),
@@ -189,6 +247,56 @@ public class CredentialModelDiscoveryService {
                     chat,
                     chat,
                     embeddings,
+                    true,
+                    thinking,
+                    thinking,
+                    thinking,
+                    thinking ? ReasoningTransport.GEMINI_THOUGHTS : ReasoningTransport.NONE
+            ));
+        }
+        return result;
+    }
+
+    private List<DiscoveredModelDefinition> discoverVertex(
+            String baseUrl,
+            ResolvedCredentialMaterial credentialMaterial) {
+        String projectId = requireMetadata(credentialMaterial.projectId(), "projectId");
+        String location = requireMetadata(credentialMaterial.location(), "location");
+        JsonNode body = buildClient(resolveVertexDiscoveryBaseUrl(baseUrl, location))
+                .get()
+                .uri("/v1beta1/publishers/google/models")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + credentialMaterial.secret())
+                .accept(MediaType.APPLICATION_JSON)
+                .retrieve()
+                .bodyToMono(JsonNode.class)
+                .timeout(DISCOVERY_TIMEOUT)
+                .block();
+
+        JsonNode models = body == null || body.path("publisherModels").isMissingNode()
+                ? body == null ? null : body.path("models")
+                : body.path("publisherModels");
+        if (models == null || !models.isArray()) {
+            return List.of();
+        }
+
+        List<DiscoveredModelDefinition> result = new ArrayList<>();
+        for (JsonNode modelNode : models) {
+            String rawName = modelNode.path("name").asText();
+            String modelId = extractVertexModelId(rawName);
+            if (modelId == null || modelId.isBlank()) {
+                continue;
+            }
+            boolean embeddings = modelId.toLowerCase(Locale.ROOT).contains("embedding");
+            boolean chat = !embeddings;
+            boolean thinking = modelId.toLowerCase(Locale.ROOT).contains("2.5");
+            result.add(new DiscoveredModelDefinition(
+                    modelId,
+                    ModelIdNormalizer.normalize(modelId),
+                    List.of("google_native"),
+                    chat,
+                    chat,
+                    chat,
+                    false,
                     true,
                     thinking,
                     thinking,
@@ -268,7 +376,26 @@ public class CredentialModelDiscoveryService {
         return baseUrl.replaceAll("/+$", "");
     }
 
-    private String resolveOpenAiModelsPath(String baseUrl) {
+    private WebClient buildOpenAiCompatibleClient(
+            String baseUrl,
+            UpstreamSiteKind siteKind,
+            ResolvedCredentialMaterial credentialMaterial) {
+        WebClient.Builder builder = webClientBuilder.clone()
+                .baseUrl(normalizeBaseUrl(baseUrl));
+        switch (upstreamSitePolicyService.policy(siteKind).authStrategy()) {
+            case BEARER -> builder.defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + credentialMaterial.secret());
+            case API_KEY_HEADER -> builder.defaultHeader("x-api-key", credentialMaterial.secret());
+            case AZURE_API_KEY -> builder.defaultHeader("api-key", credentialMaterial.secret());
+            case API_KEY_QUERY, UNSUPPORTED -> {
+            }
+        }
+        return builder.build();
+    }
+
+    private String resolveOpenAiModelsPath(String baseUrl, UpstreamSiteKind siteKind) {
+        if (siteKind == UpstreamSiteKind.AZURE_OPENAI) {
+            return "/openai/models?api-version=2024-10-21";
+        }
         URI uri = URI.create(normalizeBaseUrl(baseUrl));
         return uri.getPath() != null && uri.getPath().endsWith("/v1") ? "/models" : "/v1/models";
     }
@@ -292,12 +419,44 @@ public class CredentialModelDiscoveryService {
                 || normalized.startsWith("gpt-5");
     }
 
+    private boolean looksLikeEmbeddingModel(String modelId) {
+        String normalized = modelId.toLowerCase(Locale.ROOT);
+        return normalized.contains("embedding")
+                || normalized.startsWith("embed-")
+                || normalized.startsWith("embed_")
+                || normalized.equals("embed");
+    }
+
     private boolean inferAnthropicThinking(String modelId) {
         String normalized = modelId.toLowerCase(Locale.ROOT);
         return normalized.contains("claude-3-7")
                 || normalized.contains("claude-4")
                 || normalized.contains("sonnet-4")
                 || normalized.contains("opus-4");
+    }
+
+    private String resolveVertexDiscoveryBaseUrl(String baseUrl, String location) {
+        String normalized = normalizeBaseUrl(baseUrl);
+        if (normalized.contains("://") && normalized.contains("aiplatform.googleapis.com")) {
+            URI uri = URI.create(normalized);
+            return uri.getScheme() + "://" + uri.getHost();
+        }
+        return "https://" + location + "-aiplatform.googleapis.com";
+    }
+
+    private String extractVertexModelId(String rawName) {
+        if (rawName == null || rawName.isBlank()) {
+            return null;
+        }
+        int index = rawName.lastIndexOf('/');
+        return index >= 0 ? rawName.substring(index + 1) : rawName;
+    }
+
+    private String requireMetadata(String value, String key) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("Vertex 凭证缺少必需 metadata：" + key);
+        }
+        return value;
     }
 
     private OllamaModelCapability inferOllamaModelCapability(String modelId, Set<String> capabilities) {
