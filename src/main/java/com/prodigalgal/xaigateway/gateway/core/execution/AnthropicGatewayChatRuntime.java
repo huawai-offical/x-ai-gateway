@@ -1,10 +1,17 @@
 package com.prodigalgal.xaigateway.gateway.core.execution;
 
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResponse;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEvent;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEventType;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolCall;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalUsage;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.provider.adapter.PreparedChatExecution;
 import com.prodigalgal.xaigateway.provider.adapter.ProviderExecutionSupportService;
 import com.prodigalgal.xaigateway.provider.adapter.anthropic.AnthropicChatModelFactory;
+import java.util.List;
 import org.springframework.ai.anthropic.AnthropicChatModel;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.chat.model.ChatResponse;
@@ -34,28 +41,32 @@ public class AnthropicGatewayChatRuntime implements GatewayChatRuntime {
     }
 
     @Override
-    public GatewayChatRuntimeResult execute(GatewayChatRuntimeContext context) {
+    public CanonicalResponse execute(GatewayChatRuntimeContext context) {
+        CanonicalRequest request = context.canonicalRequest();
         AnthropicChatOptions baseOptions = AnthropicChatOptions.builder()
                 .model(context.selectionResult().resolvedModelKey())
-                .temperature(context.request().temperature())
-                .maxTokens(context.request().maxTokens())
+                .temperature(request.temperature())
+                .maxTokens(request.maxTokens())
                 .build();
         PreparedChatExecution<AnthropicChatOptions> prepared = providerExecutionSupportService.prepareAnthropic(
                 context.selectionResult(),
                 baseOptions,
-                context.request().tools(),
-                context.request().toolChoice()
+                toGatewayTools(request),
+                request.toolChoice()
         );
         AnthropicChatModel model = anthropicChatModelFactory.create(context.credential().getBaseUrl(), context.apiKey(), prepared.options());
         try {
-            ChatResponse response = model.call(gatewayChatPromptBuilder.buildPrompt(prepared.options(), context.request()));
-            return new GatewayChatRuntimeResult(
+            ChatResponse response = model.call(gatewayChatPromptBuilder.buildPrompt(prepared.options(), request));
+            return new CanonicalResponse(
+                    null,
+                    context.selectionResult().publicModel(),
                     response.getResult().getOutput().getText(),
-                    providerExecutionSupportService.normalizeUsage(context.selectionResult(), response.getMetadata().getUsage()),
+                    null,
                     response.getResult().getOutput().getToolCalls().stream()
-                            .map(toolCall -> new GatewayToolCall(toolCall.id(), toolCall.type(), toolCall.name(), toolCall.arguments()))
+                            .map(toolCall -> new CanonicalToolCall(toolCall.id(), toolCall.type(), toolCall.name(), toolCall.arguments()))
                             .toList(),
-                    finishReason(response)
+                    toUsage(providerExecutionSupportService.normalizeUsage(context.selectionResult(), response.getMetadata().getUsage())),
+                    com.prodigalgal.xaigateway.gateway.core.response.GatewayFinishReason.fromRaw(finishReason(response))
             );
         } finally {
             close(model);
@@ -63,30 +74,62 @@ public class AnthropicGatewayChatRuntime implements GatewayChatRuntime {
     }
 
     @Override
-    public Flux<ChatExecutionStreamChunk> executeStream(GatewayChatRuntimeContext context) {
+    public Flux<CanonicalStreamEvent> executeStream(GatewayChatRuntimeContext context) {
+        CanonicalRequest request = context.canonicalRequest();
         AnthropicChatOptions baseOptions = AnthropicChatOptions.builder()
                 .model(context.selectionResult().resolvedModelKey())
-                .temperature(context.request().temperature())
-                .maxTokens(context.request().maxTokens())
+                .temperature(request.temperature())
+                .maxTokens(request.maxTokens())
                 .build();
         PreparedChatExecution<AnthropicChatOptions> prepared = providerExecutionSupportService.prepareAnthropic(
                 context.selectionResult(),
                 baseOptions,
-                context.request().tools(),
-                context.request().toolChoice()
+                toGatewayTools(request),
+                request.toolChoice()
         );
         AnthropicChatModel model = anthropicChatModelFactory.create(context.credential().getBaseUrl(), context.apiKey(), prepared.options());
-        return model.stream(gatewayChatPromptBuilder.buildPrompt(prepared.options(), context.request()))
-                .map(response -> new ChatExecutionStreamChunk(
+        return model.stream(gatewayChatPromptBuilder.buildPrompt(prepared.options(), request))
+                .map(response -> new CanonicalStreamEvent(
+                        isTerminal(response) ? CanonicalStreamEventType.COMPLETED
+                                : !response.getResult().getOutput().getToolCalls().isEmpty()
+                                ? CanonicalStreamEventType.TOOL_CALLS
+                                : CanonicalStreamEventType.TEXT_DELTA,
                         response.getResult().getOutput().getText(),
-                        finishReason(response),
-                        providerExecutionSupportService.normalizeUsage(context.selectionResult(), response.getMetadata().getUsage()),
-                        isTerminal(response),
+                        null,
                         response.getResult().getOutput().getToolCalls().stream()
-                                .map(toolCall -> new GatewayToolCall(toolCall.id(), toolCall.type(), toolCall.name(), toolCall.arguments()))
-                                .toList()
+                                .map(toolCall -> new CanonicalToolCall(toolCall.id(), toolCall.type(), toolCall.name(), toolCall.arguments()))
+                                .toList(),
+                        toUsage(providerExecutionSupportService.normalizeUsage(context.selectionResult(), response.getMetadata().getUsage())),
+                        isTerminal(response),
+                        com.prodigalgal.xaigateway.gateway.core.response.GatewayFinishReason.fromRaw(finishReason(response)),
+                        isTerminal(response) ? response.getResult().getOutput().getText() : null,
+                        null
                 ))
                 .doFinally(signalType -> close(model));
+    }
+
+    private List<GatewayToolDefinition> toGatewayTools(CanonicalRequest request) {
+        if (request.tools() == null || request.tools().isEmpty()) {
+            return List.of();
+        }
+        return request.tools().stream()
+                .map(tool -> new GatewayToolDefinition(tool.name(), tool.description(), tool.inputSchema(), tool.strict()))
+                .toList();
+    }
+
+    private CanonicalUsage toUsage(com.prodigalgal.xaigateway.gateway.core.usage.GatewayUsage usage) {
+        if (usage == null || usage.isEmpty()) {
+            return CanonicalUsage.empty();
+        }
+        return new CanonicalUsage(
+                true,
+                usage.promptTokens(),
+                usage.completionTokens(),
+                usage.totalTokens(),
+                usage.cacheHitTokens(),
+                usage.cacheWriteTokens(),
+                usage.reasoningTokens()
+        );
     }
 
     private boolean isTerminal(ChatResponse response) {

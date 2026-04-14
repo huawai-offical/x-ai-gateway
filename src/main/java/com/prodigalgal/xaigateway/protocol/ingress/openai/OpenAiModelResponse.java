@@ -3,7 +3,9 @@ package com.prodigalgal.xaigateway.protocol.ingress.openai;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
 import com.prodigalgal.xaigateway.gateway.core.catalog.GatewayPublicModelView;
+import com.prodigalgal.xaigateway.gateway.core.catalog.SurfaceCapabilityView;
 import java.time.Instant;
+import java.util.Map;
 
 public record OpenAiModelResponse(
         String id,
@@ -20,7 +22,8 @@ public record OpenAiModelResponse(
         @JsonProperty("supports_chat")
         boolean supportsChat,
         @JsonProperty("supports_embeddings")
-        boolean supportsEmbeddings
+        boolean supportsEmbeddings,
+        Map<String, SurfaceCapabilityView> surfaces
 ) {
 
     public static OpenAiModelResponse from(GatewayPublicModelView model) {
@@ -33,7 +36,8 @@ public record OpenAiModelResponse(
                 model.siteKind() == null ? null : model.siteKind().name().toLowerCase(),
                 (model.capabilityLevel() == null ? InteropCapabilityLevel.NATIVE : model.capabilityLevel()).name().toLowerCase(),
                 model.supportsChat(),
-                model.supportsEmbeddings()
+                model.supportsEmbeddings(),
+                model.surfaces()
         );
     }
 }

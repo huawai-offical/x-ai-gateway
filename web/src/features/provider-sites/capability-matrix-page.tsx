@@ -3,11 +3,8 @@ import { Link } from 'react-router-dom'
 import { apiRequest } from '../../lib/api'
 import { useTypedQuery } from '../../lib/typed-react-query'
 import {
-  type CapabilityResolution,
-  featureLabel,
   formatInstant,
   matchesResolutionFilter,
-  resolutionTone,
   type CapabilityMatrixRow,
 } from './types'
 
@@ -22,7 +19,14 @@ export function CapabilityMatrixPage() {
   const rows = query.data ?? []
   const filteredRows = rows.filter((item: CapabilityMatrixRow) => {
     if (compatibilitySurface !== 'all' && item.compatibilitySurface !== compatibilitySurface) return false
-    if (!matchesResolutionFilter(item.features, resolutionFilter)) return false
+    const featureMap = Object.values(item.surfaces).reduce<Record<string, { effectiveLevel?: string | null; blockedReasons: string[]; lossReasons: string[] }>>((acc, surface) => {
+      surface.requiredFeatures.forEach((feature) => {
+        const resolution = surface.featureResolutions[feature]
+        if (resolution) acc[feature] = resolution
+      })
+      return acc
+    }, {})
+    if (!matchesResolutionFilter(featureMap, resolutionFilter)) return false
     return true
   })
 
@@ -69,14 +73,14 @@ export function CapabilityMatrixPage() {
               <span>cooldown: {item.cooldownCredentialCount} / {formatInstant(item.cooldownUntil)}</span>
               {item.blockedReason ? <span>{item.blockedReason}</span> : null}
               <div className="feature-list">
-                {(Object.entries(item.features) as Array<[string, CapabilityResolution]>).map(([feature, resolution]) => (
+                {Object.entries(item.surfaces).map(([surfaceKey, surface]) => (
                   <Link
-                    key={feature}
-                    className={`feature-badge ${resolutionTone(resolution)}`}
-                    to={`/provider-sites/${item.siteProfileId}?feature=${feature}`}
+                    key={surfaceKey}
+                    className={`feature-badge ${surface.overallCapabilityLevel?.toLowerCase() ?? 'native'}`}
+                    to={`/provider-sites/${item.siteProfileId}?surface=${surfaceKey}`}
                   >
-                    {featureLabel(feature)}
-                    <small>{resolution.declaredLevel ?? '-'}/{resolution.implementedLevel ?? '-'}/{resolution.effectiveLevel ?? '-'}</small>
+                    {surface.operation}
+                    <small>{surface.executionCapabilityLevel ?? '-'}/{surface.renderCapabilityLevel ?? '-'}/{surface.overallCapabilityLevel ?? '-'}</small>
                   </Link>
                 ))}
               </div>

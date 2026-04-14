@@ -2,6 +2,8 @@ package com.prodigalgal.xaigateway.gateway.core.interop;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlanCompilation;
 import com.prodigalgal.xaigateway.admin.application.ErrorRuleService;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
 import com.prodigalgal.xaigateway.gateway.core.routing.GatewayRouteSelectionService;
@@ -56,7 +58,7 @@ public class GatewayInteropPlanService {
         GatewayClientFamily clientFamily = request.clientFamily() == null
                 ? GatewayClientFamily.GENERIC_OPENAI
                 : GatewayClientFamily.from(request.clientFamily());
-        TranslationExecutionPlanCompilation compilation = translationExecutionPlanCompiler.compilePreview(
+        CanonicalExecutionPlanCompilation compilation = translationExecutionPlanCompiler.compilePreview(
                 distributedKeyPrefix,
                 protocol,
                 requestPath,
@@ -65,26 +67,26 @@ public class GatewayInteropPlanService {
                 clientFamily,
                 request.body()
         );
-        TranslationExecutionPlan executionPlan = compilation.plan();
+        CanonicalExecutionPlan executionPlan = compilation.canonicalPlan();
 
         Map<String, Object> summary = new LinkedHashMap<>();
         summary.put("executable", executionPlan.executable());
-        summary.put("protocol", executionPlan.protocol());
+        summary.put("protocol", executionPlan.ingressProtocol().name().toLowerCase(Locale.ROOT));
         summary.put("requestPath", executionPlan.requestPath());
         summary.put("requestedModel", executionPlan.requestedModel());
         summary.put("resourceType", executionPlan.resourceType().wireName());
         summary.put("operation", executionPlan.operation().wireName());
         summary.put("degradationPolicy", degradationPolicy.name().toLowerCase(Locale.ROOT));
         summary.put("requiredFeatures", executionPlan.requiredFeatures().stream().map(InteropFeature::wireName).toList());
-        summary.put("blockerCount", executionPlan.blockedReasons().size());
-        summary.put("degradationCount", executionPlan.lossReasons().size());
+        summary.put("blockerCount", executionPlan.blockers().size());
+        summary.put("degradationCount", executionPlan.degradations().size());
         summary.put("renderCapabilityLevel", executionPlan.renderCapabilityLevel() == null
                 ? null
                 : executionPlan.renderCapabilityLevel().name().toLowerCase(Locale.ROOT));
 
         Map<String, Object> debug = new LinkedHashMap<>();
         debug.put("featureLevels", executionPlan.featureLevels());
-        debug.put("canonicalExecutionPlan", executionPlan.canonicalExecutionPlan());
+        debug.put("canonicalExecutionPlan", executionPlan);
         if (compilation.selectionResult() != null) {
             debug.put("distributedKeyId", compilation.selectionResult().distributedKeyId());
             debug.put("publicModel", compilation.selectionResult().publicModel());
@@ -99,20 +101,14 @@ public class GatewayInteropPlanService {
             if (errorRuleService != null) {
                 debug.put("potentialErrorRules", errorRuleService.potentialMatches(
                         compilation.selectionResult().selectedCandidate().candidate().providerType().name(),
-                        executionPlan.protocol(),
+                        executionPlan.ingressProtocol().name().toLowerCase(Locale.ROOT),
                         executionPlan.requestedModel(),
                         executionPlan.requestPath()
                 ));
             }
         }
 
-        return InteropPlanResponse.from(
-                executionPlan,
-                degradationPolicy.name().toLowerCase(Locale.ROOT),
-                compilation.selectionResult(),
-                summary,
-                debug
-        );
+        return InteropPlanResponse.from(executionPlan, compilation.selectionResult(), summary, debug);
     }
 
     private String normalizeProtocol(String protocol) {

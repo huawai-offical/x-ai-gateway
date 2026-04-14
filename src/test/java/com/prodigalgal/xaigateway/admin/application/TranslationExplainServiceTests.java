@@ -2,16 +2,16 @@ package com.prodigalgal.xaigateway.admin.application;
 
 import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.admin.api.TranslationExplainRequest;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlanCompilation;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayDegradationPolicy;
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature;
-import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlan;
-import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlanCompilation;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlanCompiler;
-import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionRequestMapping;
-import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionResponseMapping;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
 import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind;
@@ -29,31 +29,23 @@ class TranslationExplainServiceTests {
     void shouldReturnCompilerPlanDirectly() {
         TranslationExecutionPlanCompiler compiler = Mockito.mock(TranslationExecutionPlanCompiler.class);
         TranslationExplainService service = new TranslationExplainService(compiler);
-        TranslationExecutionPlan plan = new TranslationExecutionPlan(
+        CanonicalExecutionPlan plan = new CanonicalExecutionPlan(
                 true,
-                "openai",
+                CanonicalIngressProtocol.OPENAI,
                 "/v1/chat/completions",
                 "gpt-4o",
                 "gpt-4o",
                 "gpt-4o",
-                GatewayClientFamily.GENERIC_OPENAI,
                 TranslationResourceType.CHAT,
                 TranslationOperation.CHAT_COMPLETION,
-                List.of(InteropFeature.CHAT_TEXT),
-                Map.of("chat_text", InteropCapabilityLevel.NATIVE),
-                null,
-                null,
-                null,
                 ExecutionKind.NATIVE,
                 InteropCapabilityLevel.NATIVE,
-                "direct_upstream_execution",
+                InteropCapabilityLevel.NATIVE,
+                InteropCapabilityLevel.NATIVE,
+                List.of(InteropFeature.CHAT_TEXT),
+                Map.of("chat_text", InteropCapabilityLevel.NATIVE),
                 List.of(),
-                List.of(),
-                null,
-                null,
-                null,
-                new TranslationExecutionRequestMapping("openai", "/v1/chat/completions", "gpt-4o", "gpt-4o", "gpt-4o", GatewayClientFamily.GENERIC_OPENAI, List.of(InteropFeature.CHAT_TEXT), Map.of("chat_text", InteropCapabilityLevel.NATIVE)),
-                new TranslationExecutionResponseMapping(null, null, null, ExecutionKind.NATIVE, InteropCapabilityLevel.NATIVE, "direct_upstream_execution", null, null, null)
+                List.of()
         );
         Mockito.when(compiler.compilePreview(
                         Mockito.eq("sk-gw-test"),
@@ -64,13 +56,14 @@ class TranslationExplainServiceTests {
                         Mockito.eq(GatewayClientFamily.GENERIC_OPENAI),
                         Mockito.any()
                 ))
-                .thenReturn(new TranslationExecutionPlanCompilation(
+                .thenReturn(new CanonicalExecutionPlanCompilation(
                         plan,
                         null,
-                        new GatewayRequestSemantics(TranslationResourceType.CHAT, TranslationOperation.CHAT_COMPLETION, List.of(InteropFeature.CHAT_TEXT), true)
+                        new GatewayRequestSemantics(TranslationResourceType.CHAT, TranslationOperation.CHAT_COMPLETION, List.of(InteropFeature.CHAT_TEXT), true),
+                        new CanonicalRequest("sk-gw-test", CanonicalIngressProtocol.OPENAI, "/v1/chat/completions", "gpt-4o", List.of(), List.of(), null, null, null, null, null)
                 ));
 
-        TranslationExecutionPlan result = service.explain(new TranslationExplainRequest(
+        CanonicalExecutionPlan result = service.explain(new TranslationExplainRequest(
                 "sk-gw-test",
                 "openai",
                 "/v1/chat/completions",
@@ -80,6 +73,6 @@ class TranslationExplainServiceTests {
         ));
 
         assertSame(plan, result);
-        assertEquals("openai", result.canonicalExecutionPlan().ingressProtocol().name().toLowerCase());
+        assertEquals("openai", result.ingressProtocol().name().toLowerCase());
     }
 }

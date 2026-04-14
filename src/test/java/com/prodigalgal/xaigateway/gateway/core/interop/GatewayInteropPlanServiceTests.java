@@ -2,6 +2,10 @@ package com.prodigalgal.xaigateway.gateway.core.interop;
 
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlanCompilation;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
 import com.prodigalgal.xaigateway.protocol.ingress.interop.InteropPlanRequest;
 import com.prodigalgal.xaigateway.protocol.ingress.interop.InteropPlanResponse;
@@ -31,51 +35,24 @@ class GatewayInteropPlanServiceTests {
                         Mockito.any(),
                         Mockito.eq(body)
                 ))
-                .thenReturn(new TranslationExecutionPlanCompilation(
-                        new TranslationExecutionPlan(
+                .thenReturn(new CanonicalExecutionPlanCompilation(
+                        new CanonicalExecutionPlan(
                                 false,
-                                "openai",
+                                CanonicalIngressProtocol.OPENAI,
                                 "/v1/responses",
                                 "claude-3-7-sonnet",
                                 "claude-3-7-sonnet",
                                 "claude-3-7-sonnet",
-                                com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily.GENERIC_OPENAI,
                                 TranslationResourceType.RESPONSE,
                                 TranslationOperation.RESPONSE_CREATE,
-                                List.of(InteropFeature.RESPONSE_OBJECT),
-                                java.util.Map.of("response_object", InteropCapabilityLevel.EMULATED),
-                                null,
-                                null,
-                                null,
                                 com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind.BLOCKED,
                                 InteropCapabilityLevel.EMULATED,
-                                "blocked",
+                                InteropCapabilityLevel.EMULATED,
+                                InteropCapabilityLevel.EMULATED,
+                                List.of(InteropFeature.RESPONSE_OBJECT),
+                                java.util.Map.of("response_object", InteropCapabilityLevel.EMULATED),
                                 List.of("response_object 以 emulated 执行。"),
-                                List.of("当前策略不允许 emulated 执行。"),
-                                null,
-                                null,
-                                null,
-                                new TranslationExecutionRequestMapping(
-                                        "openai",
-                                        "/v1/responses",
-                                        "claude-3-7-sonnet",
-                                        "claude-3-7-sonnet",
-                                        "claude-3-7-sonnet",
-                                        com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily.GENERIC_OPENAI,
-                                        List.of(InteropFeature.RESPONSE_OBJECT),
-                                        java.util.Map.of("response_object", InteropCapabilityLevel.EMULATED)
-                                ),
-                                new TranslationExecutionResponseMapping(
-                                        null,
-                                        null,
-                                        null,
-                                        com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind.BLOCKED,
-                                        InteropCapabilityLevel.EMULATED,
-                                        "blocked",
-                                        null,
-                                        null,
-                                        null
-                                )
+                                List.of("当前策略不允许 emulated 执行。")
                         ),
                         null,
                         new GatewayRequestSemantics(
@@ -83,7 +60,8 @@ class GatewayInteropPlanServiceTests {
                                 TranslationOperation.RESPONSE_CREATE,
                                 List.of(InteropFeature.RESPONSE_OBJECT),
                                 true
-                        )
+                        ),
+                        new CanonicalRequest("sk-gw-test", CanonicalIngressProtocol.OPENAI, "/v1/responses", "claude-3-7-sonnet", List.of(), List.of(), null, null, null, null, body)
                 ));
         InteropPlanRequest request = new InteropPlanRequest(
                 "openai",
@@ -95,8 +73,8 @@ class GatewayInteropPlanServiceTests {
 
         InteropPlanResponse response = gatewayInteropPlanService.preview("sk-gw-test", request);
 
-        assertFalse(response.executable());
-        assertTrue(response.blockers().stream().anyMatch(item -> item.contains("emulated")));
+        assertFalse(response.plan().executable());
+        assertTrue(response.plan().blockers().stream().anyMatch(item -> item.contains("emulated")));
     }
 
     @Test
@@ -112,51 +90,24 @@ class GatewayInteropPlanServiceTests {
                         Mockito.any(),
                         Mockito.eq(body)
                 ))
-                .thenReturn(new TranslationExecutionPlanCompilation(
-                        new TranslationExecutionPlan(
+                .thenReturn(new CanonicalExecutionPlanCompilation(
+                        new CanonicalExecutionPlan(
                                 true,
-                                "openai",
+                                CanonicalIngressProtocol.OPENAI,
                                 "/v1/audio/transcriptions",
                                 "gpt-4o-mini-transcribe",
                                 "gpt-4o-mini-transcribe",
                                 "gpt-4o-mini-transcribe",
-                                com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily.GENERIC_OPENAI,
                                 TranslationResourceType.AUDIO,
                                 TranslationOperation.AUDIO_TRANSCRIPTION,
-                                List.of(InteropFeature.AUDIO_TRANSCRIPTION),
-                                java.util.Map.of("audio_transcription", InteropCapabilityLevel.NATIVE),
-                                null,
-                                null,
-                                null,
                                 com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind.NATIVE,
                                 InteropCapabilityLevel.NATIVE,
-                                "direct_upstream_execution",
+                                InteropCapabilityLevel.NATIVE,
+                                InteropCapabilityLevel.NATIVE,
+                                List.of(InteropFeature.AUDIO_TRANSCRIPTION),
+                                java.util.Map.of("audio_transcription", InteropCapabilityLevel.NATIVE),
                                 List.of(),
-                                List.of(),
-                                null,
-                                null,
-                                null,
-                                new TranslationExecutionRequestMapping(
-                                        "openai",
-                                        "/v1/audio/transcriptions",
-                                        "gpt-4o-mini-transcribe",
-                                        "gpt-4o-mini-transcribe",
-                                        "gpt-4o-mini-transcribe",
-                                        com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily.GENERIC_OPENAI,
-                                        List.of(InteropFeature.AUDIO_TRANSCRIPTION),
-                                        java.util.Map.of("audio_transcription", InteropCapabilityLevel.NATIVE)
-                                ),
-                                new TranslationExecutionResponseMapping(
-                                        null,
-                                        null,
-                                        null,
-                                        com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind.NATIVE,
-                                        InteropCapabilityLevel.NATIVE,
-                                        "direct_upstream_execution",
-                                        null,
-                                        null,
-                                        null
-                                )
+                                List.of()
                         ),
                         null,
                         new GatewayRequestSemantics(
@@ -164,7 +115,8 @@ class GatewayInteropPlanServiceTests {
                                 TranslationOperation.AUDIO_TRANSCRIPTION,
                                 List.of(InteropFeature.AUDIO_TRANSCRIPTION),
                                 true
-                        )
+                        ),
+                        new CanonicalRequest("sk-gw-test", CanonicalIngressProtocol.OPENAI, "/v1/audio/transcriptions", "gpt-4o-mini-transcribe", List.of(), List.of(), null, null, null, null, body)
                 ));
         InteropPlanRequest request = new InteropPlanRequest(
                 "openai",
@@ -176,7 +128,7 @@ class GatewayInteropPlanServiceTests {
 
         InteropPlanResponse response = gatewayInteropPlanService.preview("sk-gw-test", request);
 
-        assertTrue(response.executable());
-        assertTrue(response.blockers().isEmpty());
+        assertTrue(response.plan().executable());
+        assertTrue(response.plan().blockers().isEmpty());
     }
 }

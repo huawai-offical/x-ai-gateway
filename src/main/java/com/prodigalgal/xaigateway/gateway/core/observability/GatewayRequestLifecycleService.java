@@ -2,7 +2,7 @@ package com.prodigalgal.xaigateway.gateway.core.observability;
 
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageCompleteness;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageView;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
@@ -46,7 +46,7 @@ public class GatewayRequestLifecycleService {
     public void startRequest(
             String requestId,
             RouteSelectionResult selectionResult,
-            ChatExecutionRequest request,
+            CanonicalRequest request,
             boolean stream,
             Instant startedAt) {
         RequestLogEntity entity = new RequestLogEntity();
@@ -73,7 +73,7 @@ public class GatewayRequestLifecycleService {
     public void completeRequest(
             String requestId,
             RouteSelectionResult selectionResult,
-            ChatExecutionRequest request,
+            CanonicalRequest request,
             boolean stream,
             GatewayUsageView usage,
             Instant startedAt) {
@@ -83,7 +83,7 @@ public class GatewayRequestLifecycleService {
     public void failRequest(
             String requestId,
             RouteSelectionResult selectionResult,
-            ChatExecutionRequest request,
+            CanonicalRequest request,
             boolean stream,
             Throwable error,
             GatewayUsageView usage,
@@ -115,7 +115,7 @@ public class GatewayRequestLifecycleService {
     public void cancelRequest(
             String requestId,
             RouteSelectionResult selectionResult,
-            ChatExecutionRequest request,
+            CanonicalRequest request,
             boolean stream,
             GatewayUsageView usage,
             Instant startedAt) {
@@ -145,7 +145,7 @@ public class GatewayRequestLifecycleService {
     private void finishRequest(
             String requestId,
             RouteSelectionResult selectionResult,
-            ChatExecutionRequest request,
+            CanonicalRequest request,
             boolean stream,
             GatewayRequestStatus status,
             String errorCode,
@@ -174,7 +174,7 @@ public class GatewayRequestLifecycleService {
     private void saveUsageRecord(
             String requestId,
             RouteSelectionResult selectionResult,
-            ChatExecutionRequest request,
+            CanonicalRequest request,
             boolean stream,
             GatewayUsageView usage) {
         if (usage == null || !usage.present()) {

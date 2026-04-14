@@ -4,11 +4,8 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { apiRequest } from '../../lib/api'
 import { useTypedMutation, useTypedQuery } from '../../lib/typed-react-query'
 import {
-  type CapabilityResolution,
-  featureLabel,
   formatInstant,
   modelSupportsFeature,
-  resolutionTone,
   SITE_KIND_OPTIONS,
   type ProviderSite,
   type ProviderSiteDraft,
@@ -33,7 +30,7 @@ export function ProviderSiteDetailPage() {
 
   const isCreateMode = params.id === 'new'
   const id = Number(params.id)
-  const selectedFeature = searchParams.get('feature')
+  const selectedSurface = searchParams.get('surface')
 
   const detailQuery = useTypedQuery<ProviderSite>({
     queryKey: ['provider-site', id],
@@ -80,10 +77,10 @@ export function ProviderSiteDetailPage() {
 
   const current = detailQuery.data
   const form = draft ?? (current ? toDraft(current) : DEFAULT_DRAFT)
-  const filteredCapabilities = (capabilitiesQuery.data ?? []).filter((item: SiteModelCapability) => modelSupportsFeature(item, selectedFeature))
-  const featureEntries = Object.entries(current?.features ?? {}) as Array<[string, CapabilityResolution]>
+  const filteredCapabilities = (capabilitiesQuery.data ?? []).filter((item: SiteModelCapability) => modelSupportsFeature(item, selectedSurface))
+  const surfaceEntries = Object.entries(current?.surfaces ?? {})
   const debugRequestedModel = filteredCapabilities[0]?.modelKey ?? capabilitiesQuery.data?.[0]?.modelKey ?? ''
-  const debugRequestPath = selectedFeature === 'response_object' ? '/v1/responses' : '/v1/chat/completions'
+  const debugRequestPath = selectedSurface === 'response_create' ? '/v1/responses' : '/v1/chat/completions'
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault()
@@ -91,12 +88,12 @@ export function ProviderSiteDetailPage() {
     saveMutation.mutate()
   }
 
-  const handleFeatureSelect = (feature: string) => {
+  const handleSurfaceSelect = (surface: string) => {
     const next = new URLSearchParams(searchParams)
-    if (next.get('feature') === feature) {
-      next.delete('feature')
+    if (next.get('surface') === surface) {
+      next.delete('surface')
     } else {
-      next.set('feature', feature)
+      next.set('surface', surface)
     }
     setSearchParams(next)
   }
@@ -207,31 +204,31 @@ export function ProviderSiteDetailPage() {
 
           <div className="panel panel-wide">
             <div className="panel-head">
-              <p className="panel-kicker">Feature resolution</p>
-              <h3>特征解析</h3>
+              <p className="panel-kicker">Surface capability</p>
+              <h3>Surface 能力</h3>
             </div>
             <div className="feature-list">
-              {featureEntries.map(([feature, resolution]) => (
+              {surfaceEntries.map(([surfaceKey, surface]) => (
                 <button
-                  key={feature}
+                  key={surfaceKey}
                   type="button"
-                  className={`feature-badge ${resolutionTone(resolution)}${selectedFeature === feature ? ' active' : ''}`}
-                  onClick={() => handleFeatureSelect(feature)}
+                  className={`feature-badge ${(surface.overallCapabilityLevel ?? 'NATIVE').toLowerCase()}${selectedSurface === surfaceKey ? ' active' : ''}`}
+                  onClick={() => handleSurfaceSelect(surfaceKey)}
                 >
-                  {featureLabel(feature)}
-                  <small>{resolution.declaredLevel ?? '-'}/{resolution.implementedLevel ?? '-'}/{resolution.effectiveLevel ?? '-'}</small>
+                  {surface.operation}
+                  <small>{surface.executionCapabilityLevel ?? '-'}/{surface.renderCapabilityLevel ?? '-'}/{surface.overallCapabilityLevel ?? '-'}</small>
                 </button>
               ))}
             </div>
             <div className="card-list">
-              {featureEntries.map(([feature, resolution]) => (
-                <div key={feature} className={`detail-card${selectedFeature === feature ? ' is-selected' : ''}`}>
-                  <strong>{featureLabel(feature)}</strong>
-                  <span>declared: {resolution.declaredLevel ?? '-'}</span>
-                  <span>implemented: {resolution.implementedLevel ?? '-'}</span>
-                  <span>effective: {resolution.effectiveLevel ?? '-'}</span>
-                  {resolution.blockedReasons.length ? <span>{resolution.blockedReasons.join('；')}</span> : null}
-                  {resolution.lossReasons.length ? <span>{resolution.lossReasons.join('；')}</span> : null}
+              {surfaceEntries.map(([surfaceKey, surface]) => (
+                <div key={surfaceKey} className={`detail-card${selectedSurface === surfaceKey ? ' is-selected' : ''}`}>
+                  <strong>{surface.operation}</strong>
+                  <span>resource: {surface.resourceType}</span>
+                  <span>execution: {surface.executionCapabilityLevel ?? '-'}</span>
+                  <span>render: {surface.renderCapabilityLevel ?? '-'}</span>
+                  <span>overall: {surface.overallCapabilityLevel ?? '-'}</span>
+                  <span>requiredFeatures: {surface.requiredFeatures.join(', ') || '无'}</span>
                 </div>
               ))}
             </div>
@@ -240,7 +237,7 @@ export function ProviderSiteDetailPage() {
           <div className="panel">
             <div className="panel-head">
               <p className="panel-kicker">Model capabilities</p>
-              <h3>{selectedFeature ? `模型能力 · ${featureLabel(selectedFeature)}` : '模型能力'}</h3>
+              <h3>{selectedSurface ? `模型能力 · ${selectedSurface}` : '模型能力'}</h3>
             </div>
             <div className="card-list">
               {filteredCapabilities.map((item: SiteModelCapability) => (
@@ -248,13 +245,9 @@ export function ProviderSiteDetailPage() {
                   <strong>{item.modelName}</strong>
                   <span>{item.modelKey}</span>
                   <span>{item.capabilityLevel}</span>
-                  <span>chat: {String(item.supportsChat)}</span>
-                  <span>tools: {String(item.supportsTools)}</span>
-                  <span>image_input: {String(item.supportsImageInput)}</span>
-                  <span>embeddings: {String(item.supportsEmbeddings)}</span>
-                  <span>thinking: {String(item.supportsThinking)}</span>
-                  <span>transport: {item.reasoningTransport ?? '-'}</span>
-                  <span>{item.supportedProtocols.join(', ')}</span>
+                  {Object.entries(item.surfaces).map(([surfaceKey, surface]) => (
+                    <span key={surfaceKey}>{surface.operation}: {surface.executionCapabilityLevel ?? '-'}/{surface.renderCapabilityLevel ?? '-'}/{surface.overallCapabilityLevel ?? '-'}</span>
+                  ))}
                 </div>
               ))}
               {!filteredCapabilities.length ? <p className="empty-state">当前特征下暂无模型级细分记录。</p> : null}

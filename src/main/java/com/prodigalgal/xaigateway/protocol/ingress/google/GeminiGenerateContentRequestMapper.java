@@ -26,15 +26,7 @@ public class GeminiGenerateContentRequestMapper {
         this.objectMapper = objectMapper;
     }
 
-    public ChatExecutionRequest toExecutionRequest(
-            AuthenticatedDistributedKey distributedKey,
-            String model,
-            GeminiGenerateContentRequest request,
-            boolean stream) {
-        return canonicalChatExecutionRequestAdapter.toExecutionRequest(toCanonicalRequest(distributedKey, model, request, stream));
-    }
-
-    private CanonicalRequest toCanonicalRequest(
+    public CanonicalRequest toCanonicalRequest(
             AuthenticatedDistributedKey distributedKey,
             String model,
             GeminiGenerateContentRequest request,
@@ -64,6 +56,14 @@ public class GeminiGenerateContentRequestMapper {
                 null,
                 objectMapper.valueToTree(request)
         );
+    }
+
+    public ChatExecutionRequest toExecutionRequest(
+            AuthenticatedDistributedKey distributedKey,
+            String model,
+            GeminiGenerateContentRequest request,
+            boolean stream) {
+        return canonicalChatExecutionRequestAdapter.toExecutionRequest(toCanonicalRequest(distributedKey, model, request, stream));
     }
 
     private List<CanonicalMessage> toMessages(JsonNode systemInstruction, JsonNode contents) {

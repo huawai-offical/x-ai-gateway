@@ -1,12 +1,9 @@
 import { type FormEvent, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { apiRequest } from '../../lib/api'
 import { useTypedMutation } from '../../lib/typed-react-query'
 import {
-  type CapabilityResolution,
-  featureLabel,
   isChatLikePath,
-  resolutionTone,
   type AdminChatExecuteResponse,
   type TranslationPlan,
 } from './types'
@@ -122,11 +119,6 @@ export function TranslationDebugPage() {
             <button type="button" onClick={handleExecute} disabled={!canExecute || executeMutation.isPending}>
               执行 Chat 调试
             </button>
-            {explainResult?.siteProfileId ? (
-              <Link className="action-link" to={`/provider-sites/${explainResult.siteProfileId}`}>
-                跳转到站点详情
-              </Link>
-            ) : null}
           </div>
           {!canExecute ? <p className="empty-state">当前 requestPath 不属于 chat / responses，仅支持 explain。</p> : null}
           {inputError ? <p className="empty-state">{inputError}</p> : null}
@@ -142,41 +134,28 @@ export function TranslationDebugPage() {
           <div className="card-list">
             <div className="detail-card">
               <strong>{String(explainResult.executable)}</strong>
-              <span>{explainResult.providerFamily ?? '-'}</span>
               <span>{explainResult.executionKind ?? '-'}</span>
-              <span>selection: {explainResult.selectionSource ?? '-'}</span>
-              <span>siteProfileId: {explainResult.siteProfileId ?? '-'}</span>
-              <span>declared / implemented / effective: {explainResult.overallDeclaredLevel ?? '-'} / {explainResult.overallImplementedLevel ?? '-'} / {explainResult.overallEffectiveLevel ?? '-'}</span>
-              <span>auth / path / error: {explainResult.authStrategy ?? '-'} / {explainResult.pathStrategy ?? '-'} / {explainResult.errorSchemaStrategy ?? '-'}</span>
-              <span>upstreamObjectMode: {explainResult.upstreamObjectMode ?? '-'}</span>
-            </div>
-            <div className="feature-list">
-              {(Object.entries(explainResult.featureResolutions ?? {}) as Array<[string, CapabilityResolution]>).map(([feature, resolution]) => (
-                <button key={feature} type="button" className={`feature-badge ${resolutionTone(resolution)}`}>
-                  {featureLabel(feature)}
-                  <small>{resolution.declaredLevel ?? '-'}/{resolution.implementedLevel ?? '-'}/{resolution.effectiveLevel ?? '-'}</small>
-                </button>
-              ))}
+              <span>protocol: {explainResult.ingressProtocol ?? '-'}</span>
+              <span>resource / operation: {explainResult.resourceType ?? '-'} / {explainResult.operation ?? '-'}</span>
+              <span>execution / render / overall: {explainResult.executionCapabilityLevel ?? '-'} / {explainResult.renderCapabilityLevel ?? '-'} / {explainResult.overallCapabilityLevel ?? '-'}</span>
+              <span>resolvedModel: {explainResult.resolvedModel ?? '-'}</span>
             </div>
             <div className="detail-grid">
-              {explainResult.lossReasons.length ? (
+              {explainResult.degradations.length ? (
                 <div className="detail-card">
-                  <strong>lossReasons</strong>
-                  <span>{explainResult.lossReasons.join('；')}</span>
+                  <strong>degradations</strong>
+                  <span>{explainResult.degradations.join('；')}</span>
                 </div>
               ) : null}
-              {explainResult.blockedReasons.length ? (
+              {explainResult.blockers.length ? (
                 <div className="detail-card">
-                  <strong>blockedReasons</strong>
-                  <span>{explainResult.blockedReasons.join('；')}</span>
+                  <strong>blockers</strong>
+                  <span>{explainResult.blockers.join('；')}</span>
                 </div>
               ) : null}
             </div>
             <div className="code-block">
-              <pre>{JSON.stringify(explainResult.requestMapping, null, 2)}</pre>
-            </div>
-            <div className="code-block">
-              <pre>{JSON.stringify(explainResult.responseMapping, null, 2)}</pre>
+              <pre>{JSON.stringify(explainResult, null, 2)}</pre>
             </div>
           </div>
         ) : (

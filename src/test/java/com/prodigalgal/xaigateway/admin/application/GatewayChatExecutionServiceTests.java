@@ -5,17 +5,24 @@ import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyGovernanceServ
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyView;
 import com.prodigalgal.xaigateway.gateway.core.account.AccountSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlanCompilation;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResponse;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEvent;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEventType;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolCall;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalUsage;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
 import com.prodigalgal.xaigateway.gateway.core.credential.CredentialMaterialResolver;
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest;
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionResponse;
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionStreamChunk;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayChatRuntime;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayChatRuntimeContext;
-import com.prodigalgal.xaigateway.gateway.core.execution.GatewayChatRuntimeResult;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayChatPromptBuilder;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileResource;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileService;
-import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlan;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlanCompiler;
 import com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityService;
 import com.prodigalgal.xaigateway.gateway.core.observability.GatewayRequestLifecycleService;
@@ -122,15 +129,23 @@ class GatewayChatExecutionServiceTests {
             }
 
             @Override
-            public GatewayChatRuntimeResult execute(GatewayChatRuntimeContext context) {
+            public CanonicalResponse execute(GatewayChatRuntimeContext context) {
                 if (context.selectionResult().selectedCandidate().candidate().credentialId().equals(101L)) {
                     throw new IllegalStateException("upstream 503");
                 }
-                return new GatewayChatRuntimeResult("fallback ok", GatewayUsage.empty(), List.of(), "stop");
+                return new CanonicalResponse(
+                        null,
+                        context.selectionResult().publicModel(),
+                        "fallback ok",
+                        null,
+                        List.of(),
+                        CanonicalUsage.empty(),
+                        com.prodigalgal.xaigateway.gateway.core.response.GatewayFinishReason.STOP
+                );
             }
 
             @Override
-            public reactor.core.publisher.Flux<ChatExecutionStreamChunk> executeStream(GatewayChatRuntimeContext context) {
+            public reactor.core.publisher.Flux<CanonicalStreamEvent> executeStream(GatewayChatRuntimeContext context) {
                 return reactor.core.publisher.Flux.empty();
             }
         };
@@ -171,8 +186,8 @@ class GatewayChatExecutionServiceTests {
 
         Mockito.when(gatewayObservabilityService.nextRequestId()).thenReturn("req-chat-1");
         Mockito.when(routeSelectionService.select(Mockito.any())).thenReturn(selectionResultWithFallbackCandidates());
-        Mockito.when(translationExecutionPlanCompiler.compileSelected(Mockito.any(), Mockito.anyString(), Mockito.any(), Mockito.any()))
-                .thenReturn(Mockito.mock(TranslationExecutionPlan.class));
+        Mockito.when(translationExecutionPlanCompiler.compileSelected(Mockito.any(), Mockito.any(CanonicalRequest.class), Mockito.any(), Mockito.any()))
+                .thenReturn(canonicalCompilation("openai", "/v1/chat/completions", "gpt-4o"));
         Mockito.when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.any()))
                 .thenReturn(new com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics(
                         com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType.CHAT,
@@ -227,18 +242,18 @@ class GatewayChatExecutionServiceTests {
             }
 
             @Override
-            public GatewayChatRuntimeResult execute(GatewayChatRuntimeContext context) {
+            public CanonicalResponse execute(GatewayChatRuntimeContext context) {
                 return null;
             }
 
             @Override
-            public reactor.core.publisher.Flux<ChatExecutionStreamChunk> executeStream(GatewayChatRuntimeContext context) {
+            public reactor.core.publisher.Flux<CanonicalStreamEvent> executeStream(GatewayChatRuntimeContext context) {
                 if (context.selectionResult().selectedCandidate().candidate().credentialId().equals(101L)) {
                     return reactor.core.publisher.Flux.error(new IllegalStateException("stream upstream 503"));
                 }
                 return reactor.core.publisher.Flux.just(
-                        new ChatExecutionStreamChunk("hello", null, GatewayUsage.empty(), false),
-                        new ChatExecutionStreamChunk(null, "stop", GatewayUsage.empty(), true)
+                        new CanonicalStreamEvent(CanonicalStreamEventType.TEXT_DELTA, "hello", null, List.of(), CanonicalUsage.empty(), false, null, null, null),
+                        new CanonicalStreamEvent(CanonicalStreamEventType.COMPLETED, null, null, List.of(), CanonicalUsage.empty(), true, com.prodigalgal.xaigateway.gateway.core.response.GatewayFinishReason.STOP, "hello", null)
                 );
             }
         };
@@ -279,8 +294,8 @@ class GatewayChatExecutionServiceTests {
 
         Mockito.when(gatewayObservabilityService.nextRequestId()).thenReturn("req-chat-stream-1");
         Mockito.when(routeSelectionService.select(Mockito.any())).thenReturn(selectionResultWithFallbackCandidates());
-        Mockito.when(translationExecutionPlanCompiler.compileSelected(Mockito.any(), Mockito.anyString(), Mockito.any(), Mockito.any()))
-                .thenReturn(Mockito.mock(TranslationExecutionPlan.class));
+        Mockito.when(translationExecutionPlanCompiler.compileSelected(Mockito.any(), Mockito.any(CanonicalRequest.class), Mockito.any(), Mockito.any()))
+                .thenReturn(canonicalCompilation("openai", "/v1/chat/completions", "gpt-4o"));
         Mockito.when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.any()))
                 .thenReturn(new com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics(
                         com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType.CHAT,
@@ -377,5 +392,36 @@ class GatewayChatExecutionServiceTests {
         entity.setBaseUrl("https://api.openai.com");
         entity.setApiKeyCiphertext("cipher");
         return entity;
+    }
+
+    private CanonicalExecutionPlanCompilation canonicalCompilation(String protocol, String requestPath, String model) {
+        return new CanonicalExecutionPlanCompilation(
+                new CanonicalExecutionPlan(
+                        true,
+                        CanonicalIngressProtocol.from(protocol),
+                        requestPath,
+                        model,
+                        model,
+                        model,
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType.CHAT,
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation.CHAT_COMPLETION,
+                        com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind.NATIVE,
+                        com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel.NATIVE,
+                        com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel.NATIVE,
+                        com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel.NATIVE,
+                        List.of(com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature.CHAT_TEXT),
+                        java.util.Map.of("chat_text", com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel.NATIVE),
+                        List.of(),
+                        List.of()
+                ),
+                null,
+                new com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics(
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType.CHAT,
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation.CHAT_COMPLETION,
+                        List.of(com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature.CHAT_TEXT),
+                        true
+                ),
+                new CanonicalRequest("sk-gw-test", CanonicalIngressProtocol.from(protocol), requestPath, model, List.of(), List.of(), null, null, null, null, null)
+        );
     }
 }

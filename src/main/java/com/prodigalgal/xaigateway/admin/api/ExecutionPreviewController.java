@@ -1,9 +1,12 @@
 package com.prodigalgal.xaigateway.admin.api;
 
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlanCompilation;
 import com.prodigalgal.xaigateway.gateway.core.routing.GatewayRouteSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionRequest;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
+import com.prodigalgal.xaigateway.gateway.core.interop.GatewayDegradationPolicy;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlanCompiler;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.provider.adapter.PreparedChatExecution;
 import com.prodigalgal.xaigateway.provider.adapter.ProviderExecutionSupportService;
@@ -25,12 +28,15 @@ public class ExecutionPreviewController {
 
     private final GatewayRouteSelectionService gatewayRouteSelectionService;
     private final ProviderExecutionSupportService providerExecutionSupportService;
+    private final TranslationExecutionPlanCompiler translationExecutionPlanCompiler;
 
     public ExecutionPreviewController(
             GatewayRouteSelectionService gatewayRouteSelectionService,
-            ProviderExecutionSupportService providerExecutionSupportService) {
+            ProviderExecutionSupportService providerExecutionSupportService,
+            TranslationExecutionPlanCompiler translationExecutionPlanCompiler) {
         this.gatewayRouteSelectionService = gatewayRouteSelectionService;
         this.providerExecutionSupportService = providerExecutionSupportService;
+        this.translationExecutionPlanCompiler = translationExecutionPlanCompiler;
     }
 
     @PostMapping("/preview")
@@ -44,17 +50,26 @@ public class ExecutionPreviewController {
                 GatewayClientFamily.GENERIC_OPENAI,
                 false
         ));
+        CanonicalExecutionPlanCompilation compilation = translationExecutionPlanCompiler.compilePreview(
+                request.distributedKeyPrefix(),
+                request.protocol(),
+                request.requestPath(),
+                request.requestedModel(),
+                GatewayDegradationPolicy.ALLOW_LOSSY,
+                GatewayClientFamily.GENERIC_OPENAI,
+                request.requestBody()
+        );
 
         ProviderType providerType = selectionResult.selectedCandidate().candidate().providerType();
         return switch (providerType) {
-            case OPENAI_DIRECT, OPENAI_COMPATIBLE -> previewOpenAi(selectionResult);
-            case ANTHROPIC_DIRECT -> previewAnthropic(selectionResult);
-            case GEMINI_DIRECT -> previewGemini(selectionResult);
-            case OLLAMA_DIRECT -> new ExecutionPreviewResponse(providerType, selectionResult, Map.of());
+            case OPENAI_DIRECT, OPENAI_COMPATIBLE -> previewOpenAi(selectionResult, compilation);
+            case ANTHROPIC_DIRECT -> previewAnthropic(selectionResult, compilation);
+            case GEMINI_DIRECT -> previewGemini(selectionResult, compilation);
+            case OLLAMA_DIRECT -> new ExecutionPreviewResponse(selectionResult, compilation.canonicalRequest(), compilation.canonicalPlan(), selectionResult.selectedCandidate(), Map.of());
         };
     }
 
-    private ExecutionPreviewResponse previewOpenAi(RouteSelectionResult selectionResult) {
+    private ExecutionPreviewResponse previewOpenAi(RouteSelectionResult selectionResult, CanonicalExecutionPlanCompilation compilation) {
         PreparedChatExecution<OpenAiChatOptions> prepared = providerExecutionSupportService.prepareOpenAi(
                 selectionResult,
                 OpenAiChatOptions.builder().model(selectionResult.resolvedModelKey()).build(),
@@ -65,10 +80,10 @@ public class ExecutionPreviewController {
         options.put("model", prepared.options().getModel());
         options.put("promptCacheKey", prepared.options().getPromptCacheKey());
         options.put("metadata", prepared.options().getMetadata());
-        return new ExecutionPreviewResponse(prepared.providerType(), selectionResult, options);
+        return new ExecutionPreviewResponse(selectionResult, compilation.canonicalRequest(), compilation.canonicalPlan(), selectionResult.selectedCandidate(), options);
     }
 
-    private ExecutionPreviewResponse previewAnthropic(RouteSelectionResult selectionResult) {
+    private ExecutionPreviewResponse previewAnthropic(RouteSelectionResult selectionResult, CanonicalExecutionPlanCompilation compilation) {
         PreparedChatExecution<AnthropicChatOptions> prepared = providerExecutionSupportService.prepareAnthropic(
                 selectionResult,
                 AnthropicChatOptions.builder().model(selectionResult.resolvedModelKey()).build()
@@ -77,10 +92,10 @@ public class ExecutionPreviewController {
         options.put("model", prepared.options().getModel());
         options.put("cacheOptions", prepared.options().getCacheOptions());
         options.put("metadata", prepared.options().getMetadata());
-        return new ExecutionPreviewResponse(prepared.providerType(), selectionResult, options);
+        return new ExecutionPreviewResponse(selectionResult, compilation.canonicalRequest(), compilation.canonicalPlan(), selectionResult.selectedCandidate(), options);
     }
 
-    private ExecutionPreviewResponse previewGemini(RouteSelectionResult selectionResult) {
+    private ExecutionPreviewResponse previewGemini(RouteSelectionResult selectionResult, CanonicalExecutionPlanCompilation compilation) {
         PreparedChatExecution<GoogleGenAiChatOptions> prepared = providerExecutionSupportService.prepareGemini(
                 selectionResult,
                 GoogleGenAiChatOptions.builder().model(selectionResult.resolvedModelKey()).build()
@@ -92,6 +107,6 @@ public class ExecutionPreviewController {
         options.put("autoCacheThreshold", prepared.options().getAutoCacheThreshold());
         options.put("autoCacheTtl", prepared.options().getAutoCacheTtl());
         options.put("labels", prepared.options().getLabels());
-        return new ExecutionPreviewResponse(prepared.providerType(), selectionResult, options);
+        return new ExecutionPreviewResponse(selectionResult, compilation.canonicalRequest(), compilation.canonicalPlan(), selectionResult.selectedCandidate(), options);
     }
 }

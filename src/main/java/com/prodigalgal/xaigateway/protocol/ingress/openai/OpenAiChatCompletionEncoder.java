@@ -2,6 +2,8 @@ package com.prodigalgal.xaigateway.protocol.ingress.openai;
 
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionResult;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionStreamResult;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalGatewayResponseMapper;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEvent;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEventType;
@@ -25,6 +27,10 @@ public class OpenAiChatCompletionEncoder {
         return OpenAiChatCompletionResponse.fromCanonical(canonicalGatewayResponseMapper.toCanonicalResponse(response));
     }
 
+    public OpenAiChatCompletionResponse encode(CanonicalExecutionResult response) {
+        return OpenAiChatCompletionResponse.fromCanonical(response.response());
+    }
+
     public Flux<String> encodeStream(GatewayStreamResponse response) {
         return Flux.concat(
                 Flux.just(encode(OpenAiChatCompletionResponse.roleChunk(response.routeSelection().publicModel()))),
@@ -33,23 +39,35 @@ public class OpenAiChatCompletionEncoder {
         );
     }
 
+    public Flux<String> encodeStream(CanonicalExecutionStreamResult response) {
+        return Flux.concat(
+                Flux.just(encode(OpenAiChatCompletionResponse.roleChunk(response.routeSelection().publicModel()))),
+                response.events().concatMap(event -> encodeEvent(response.routeSelection().publicModel(), event)),
+                Flux.just("data: [DONE]\n\n")
+        );
+    }
+
     private Flux<String> encodeEvent(GatewayStreamResponse response, com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamEvent event) {
         CanonicalStreamEvent canonicalEvent = canonicalGatewayResponseMapper.toCanonicalStreamEvent(event);
+        return encodeEvent(response.routeSelection().publicModel(), canonicalEvent);
+    }
+
+    private Flux<String> encodeEvent(String publicModel, CanonicalStreamEvent canonicalEvent) {
         if (canonicalEvent.type() == CanonicalStreamEventType.TEXT_DELTA && canonicalEvent.textDelta() != null && !canonicalEvent.textDelta().isBlank()) {
             return Flux.just(encode(OpenAiChatCompletionResponse.contentChunk(
-                    response.routeSelection().publicModel(),
+                    publicModel,
                     canonicalEvent.textDelta()
             )));
         }
         if (canonicalEvent.type() == CanonicalStreamEventType.TOOL_CALLS && canonicalEvent.toolCalls() != null && !canonicalEvent.toolCalls().isEmpty()) {
             return Flux.just(encode(OpenAiChatCompletionResponse.toolCallChunkCanonical(
-                    response.routeSelection().publicModel(),
+                    publicModel,
                     canonicalEvent.toolCalls()
             )));
         }
         if (canonicalEvent.type() == CanonicalStreamEventType.COMPLETED) {
             return Flux.just(encode(OpenAiChatCompletionResponse.finishChunk(
-                    response.routeSelection().publicModel(),
+                    publicModel,
                     toFinishReason(canonicalEvent.finishReason())
             )));
         }

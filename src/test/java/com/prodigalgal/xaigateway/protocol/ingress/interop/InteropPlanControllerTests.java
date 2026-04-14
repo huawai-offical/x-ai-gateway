@@ -2,7 +2,13 @@ package com.prodigalgal.xaigateway.protocol.ingress.interop;
 
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayTokenAuthenticationResolver;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayInteropPlanService;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
+import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
+import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind;
 import com.prodigalgal.xaigateway.testsupport.PermitAllSecurityTestConfig;
 import java.util.List;
 import java.util.Map;
@@ -35,16 +41,24 @@ class InteropPlanControllerTests {
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
         Mockito.when(gatewayInteropPlanService.preview(Mockito.eq("sk-gw-test"), Mockito.any()))
                 .thenReturn(new InteropPlanResponse(
-                        true,
-                        "openai",
-                        "/v1/audio/transcriptions",
-                        "gpt-4o-mini-transcribe",
-                        "allow_emulated",
-                        List.of("audio_transcription"),
-                        List.of(),
-                        List.of(),
-                        "audio",
-                        "audio_transcription",
+                        new CanonicalExecutionPlan(
+                                true,
+                                CanonicalIngressProtocol.OPENAI,
+                                "/v1/audio/transcriptions",
+                                "gpt-4o-mini-transcribe",
+                                "gpt-4o-mini-transcribe",
+                                "gpt-4o-mini-transcribe",
+                                TranslationResourceType.AUDIO,
+                                TranslationOperation.AUDIO_TRANSCRIPTION,
+                                ExecutionKind.NATIVE,
+                                InteropCapabilityLevel.NATIVE,
+                                InteropCapabilityLevel.NATIVE,
+                                InteropCapabilityLevel.NATIVE,
+                                List.of(com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature.AUDIO_TRANSCRIPTION),
+                                Map.of("audio_transcription", InteropCapabilityLevel.NATIVE),
+                                List.of(),
+                                List.of()
+                        ),
                         null,
                         Map.of("executable", true),
                         Map.of("featureLevels", Map.of("audio_transcription", "native"))
@@ -66,8 +80,8 @@ class InteropPlanControllerTests {
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
-                .jsonPath("$.executable").isEqualTo(true)
-                .jsonPath("$.requiredFeatures[0]").isEqualTo("audio_transcription")
-                .jsonPath("$.degradationPolicy").isEqualTo("allow_emulated");
+                .jsonPath("$.plan.executable").isEqualTo(true)
+                .jsonPath("$.plan.requiredFeatures[0]").isEqualTo("AUDIO_TRANSCRIPTION")
+                .jsonPath("$.summary.executable").isEqualTo(true);
     }
 }

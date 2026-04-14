@@ -2,6 +2,8 @@ package com.prodigalgal.xaigateway.protocol.ingress.anthropic;
 
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionResult;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionStreamResult;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalGatewayResponseMapper;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEvent;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEventType;
@@ -25,6 +27,10 @@ public class AnthropicMessagesEncoder {
         return AnthropicMessagesResponse.fromCanonical(canonicalGatewayResponseMapper.toCanonicalResponse(response));
     }
 
+    public AnthropicMessagesResponse encode(CanonicalExecutionResult response) {
+        return AnthropicMessagesResponse.fromCanonical(response.response());
+    }
+
     public Flux<String> encodeStream(GatewayStreamResponse response) {
         return Flux.concat(
                 Flux.just(encode("message_start", AnthropicMessagesResponse.messageStart(
@@ -37,8 +43,24 @@ public class AnthropicMessagesEncoder {
         );
     }
 
+    public Flux<String> encodeStream(CanonicalExecutionStreamResult response) {
+        return Flux.concat(
+                Flux.just(encode("message_start", AnthropicMessagesResponse.messageStart(
+                        response.routeSelection().publicModel(),
+                        com.prodigalgal.xaigateway.gateway.core.usage.GatewayUsage.empty()
+                ))),
+                Flux.just(encode("content_block_start", AnthropicMessagesResponse.contentBlockStart())),
+                response.events().concatMap(this::encodeCanonicalEvent),
+                Flux.just(encode("content_block_stop", AnthropicMessagesResponse.contentBlockStop()))
+        );
+    }
+
     private Flux<String> encodeEvent(com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamEvent event) {
         CanonicalStreamEvent canonicalEvent = canonicalGatewayResponseMapper.toCanonicalStreamEvent(event);
+        return encodeCanonicalEvent(canonicalEvent);
+    }
+
+    private Flux<String> encodeCanonicalEvent(CanonicalStreamEvent canonicalEvent) {
         if (canonicalEvent.type() == CanonicalStreamEventType.TEXT_DELTA && canonicalEvent.textDelta() != null && !canonicalEvent.textDelta().isBlank()) {
             return Flux.just(encode("content_block_delta", AnthropicMessagesResponse.contentBlockDelta(canonicalEvent.textDelta())));
         }

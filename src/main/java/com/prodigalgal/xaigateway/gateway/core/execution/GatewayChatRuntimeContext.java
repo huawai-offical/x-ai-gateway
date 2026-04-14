@@ -1,8 +1,11 @@
 package com.prodigalgal.xaigateway.gateway.core.execution;
 
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalChatMapper;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalChatExecutionRequestAdapter;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
 import com.prodigalgal.xaigateway.gateway.core.credential.CredentialAuthKind;
 import com.prodigalgal.xaigateway.gateway.core.credential.ResolvedCredentialMaterial;
-import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlan;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
 import java.util.Map;
@@ -11,8 +14,8 @@ public record GatewayChatRuntimeContext(
         RouteSelectionResult selectionResult,
         UpstreamCredentialEntity credential,
         ResolvedCredentialMaterial credentialMaterial,
-        ChatExecutionRequest request,
-        TranslationExecutionPlan executionPlan
+        CanonicalRequest canonicalRequest,
+        CanonicalExecutionPlan canonicalExecutionPlan
 ) {
     public GatewayChatRuntimeContext(
             RouteSelectionResult selectionResult,
@@ -20,7 +23,13 @@ public record GatewayChatRuntimeContext(
             String apiKey,
             ChatExecutionRequest request
     ) {
-        this(selectionResult, credential, legacyMaterial(credential, apiKey), request, null);
+        this(
+                selectionResult,
+                credential,
+                legacyMaterial(credential, apiKey),
+                new CanonicalChatMapper(new tools.jackson.databind.ObjectMapper()).toCanonicalRequest(request),
+                null
+        );
     }
 
     public GatewayChatRuntimeContext(
@@ -29,7 +38,13 @@ public record GatewayChatRuntimeContext(
             ResolvedCredentialMaterial credentialMaterial,
             ChatExecutionRequest request
     ) {
-        this(selectionResult, credential, credentialMaterial, request, null);
+        this(
+                selectionResult,
+                credential,
+                credentialMaterial,
+                new CanonicalChatMapper(new tools.jackson.databind.ObjectMapper()).toCanonicalRequest(request),
+                null
+        );
     }
 
     public String apiKey() {
@@ -38,6 +53,10 @@ public record GatewayChatRuntimeContext(
 
     public CredentialAuthKind authKind() {
         return credentialMaterial == null ? CredentialAuthKind.API_KEY : credentialMaterial.authKind();
+    }
+
+    public ChatExecutionRequest request() {
+        return new CanonicalChatExecutionRequestAdapter().toExecutionRequest(canonicalRequest);
     }
 
     private static ResolvedCredentialMaterial legacyMaterial(UpstreamCredentialEntity credential, String secret) {

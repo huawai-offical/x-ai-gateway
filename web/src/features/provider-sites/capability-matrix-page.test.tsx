@@ -38,6 +38,25 @@ apiRequest.mockImplementation(async () => [
         lossReasons: [],
       },
     },
+    surfaces: {
+      response_create: {
+        resourceType: 'RESPONSE',
+        operation: 'RESPONSE_CREATE',
+        executionCapabilityLevel: 'EMULATED',
+        renderCapabilityLevel: 'EMULATED',
+        overallCapabilityLevel: 'EMULATED',
+        requiredFeatures: ['response_object'],
+        featureResolutions: {
+          response_object: {
+            declaredLevel: 'EMULATED',
+            implementedLevel: 'EMULATED',
+            effectiveLevel: 'EMULATED',
+            blockedReasons: [],
+            lossReasons: [],
+          },
+        },
+      },
+    },
     supportsResponses: true,
     supportsEmbeddings: true,
     supportsAudio: false,
@@ -74,6 +93,25 @@ apiRequest.mockImplementation(async () => [
         effectiveLevel: 'UNSUPPORTED',
         blockedReasons: ['missing metadata'],
         lossReasons: [],
+      },
+    },
+    surfaces: {
+      response_create: {
+        resourceType: 'RESPONSE',
+        operation: 'RESPONSE_CREATE',
+        executionCapabilityLevel: 'UNSUPPORTED',
+        renderCapabilityLevel: 'EMULATED',
+        overallCapabilityLevel: 'UNSUPPORTED',
+        requiredFeatures: ['response_object'],
+        featureResolutions: {
+          response_object: {
+            declaredLevel: 'UNSUPPORTED',
+            implementedLevel: 'UNSUPPORTED',
+            effectiveLevel: 'UNSUPPORTED',
+            blockedReasons: ['missing metadata'],
+            lossReasons: [],
+          },
+        },
       },
     },
     supportsResponses: false,
@@ -115,6 +153,6 @@ describe('CapabilityMatrixPage', () => {
 
     expect(screen.queryByText('OPENAI_DIRECT')).not.toBeInTheDocument()
     expect(screen.getByText('VERTEX_AI')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Responses/ })).toHaveAttribute('href', '/provider-sites/2?feature=response_object')
+    expect(screen.getByRole('link', { name: /RESPONSE_CREATE/ })).toHaveAttribute('href', '/provider-sites/2?surface=response_create')
   })
 })

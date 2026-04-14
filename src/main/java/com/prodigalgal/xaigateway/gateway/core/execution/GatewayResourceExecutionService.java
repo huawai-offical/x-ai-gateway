@@ -415,13 +415,19 @@ public class GatewayResourceExecutionService {
         UpstreamCredentialEntity credential = getRequiredCredential(selectionResult.selectedCandidate().candidate().credentialId());
         ResolvedCredentialMaterial credentialMaterial = credentialMaterialResolver.resolve(selectionResult, credential);
         GatewayRequestSemantics semantics = gatewayRequestFeatureService.describe(requestPath, null);
-        TranslationExecutionPlan executionPlan = translationExecutionPlanCompiler.compileSelected(
+        var executionPlanCompilation = translationExecutionPlanCompiler.compileSelected(
                 selectionResult,
                 requestPath,
                 semantics,
                 requestBody
         );
-        return new GatewayResourceExecutionContext(selectionResult, credential, credentialMaterial, requestPath, executionPlan);
+        return new GatewayResourceExecutionContext(
+                selectionResult,
+                credential,
+                credentialMaterial,
+                requestPath,
+                executionPlanCompilation.canonicalPlan()
+        );
     }
 
     private GatewayResourceExecutor resolveExecutor(GatewayResourceExecutionContext context) {

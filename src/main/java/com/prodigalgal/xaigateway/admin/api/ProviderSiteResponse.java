@@ -1,6 +1,7 @@
 package com.prodigalgal.xaigateway.admin.api;
 
 import com.prodigalgal.xaigateway.gateway.core.interop.CapabilityResolutionView;
+import com.prodigalgal.xaigateway.gateway.core.catalog.SurfaceCapabilityView;
 import com.prodigalgal.xaigateway.gateway.core.shared.AuthStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ErrorSchemaStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ModelAddressingStrategy;
@@ -34,6 +35,7 @@ public record ProviderSiteResponse(
         int cooldownCredentialCount,
         Instant cooldownUntil,
         Map<String, CapabilityResolutionView> features,
+        Map<String, SurfaceCapabilityView> surfaces,
         int modelCount,
         Instant refreshedAt,
         Instant createdAt,

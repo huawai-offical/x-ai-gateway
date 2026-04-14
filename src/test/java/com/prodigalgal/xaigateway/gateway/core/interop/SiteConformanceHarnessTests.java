@@ -7,6 +7,8 @@ import tools.jackson.databind.node.ObjectNode;
 import com.prodigalgal.xaigateway.admin.api.TranslationExplainRequest;
 import com.prodigalgal.xaigateway.admin.application.ErrorRuleService;
 import com.prodigalgal.xaigateway.admin.application.TranslationExplainService;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlanCompilation;
 import com.prodigalgal.xaigateway.gateway.core.alias.ModelAliasQueryService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedCredentialBindingView;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyView;
@@ -80,7 +82,7 @@ class SiteConformanceHarnessTests {
                 truthService
         );
 
-        TranslationExecutionPlanCompilation preview = compiler.compilePreview(
+        CanonicalExecutionPlanCompilation preview = compiler.compilePreview(
                 "sk-gw-test",
                 fixture.protocol(),
                 fixture.requestPath(),
@@ -89,12 +91,12 @@ class SiteConformanceHarnessTests {
                 com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily.GENERIC_OPENAI,
                 requestBody(fixture)
         );
-        assertEquals(fixture.expectedExecutable(), preview.plan().executable(), fixture.name());
-        assertEquals(fixture.expectedEffectiveLevel(), preview.plan().overallEffectiveLevel().name(), fixture.name());
-        assertEquals(fixture.expectedExecutionKind(), preview.plan().executionKind().name(), fixture.name());
+        assertEquals(fixture.expectedExecutable(), preview.canonicalPlan().executable(), fixture.name());
+        assertEquals(fixture.expectedEffectiveLevel(), preview.canonicalPlan().overallCapabilityLevel().name(), fixture.name());
+        assertEquals(fixture.expectedExecutionKind(), preview.canonicalPlan().executionKind().name(), fixture.name());
 
         TranslationExplainService explainService = new TranslationExplainService(compiler);
-        TranslationExecutionPlan explainPlan = explainService.explain(new TranslationExplainRequest(
+        CanonicalExecutionPlan explainPlan = explainService.explain(new TranslationExplainRequest(
                 "sk-gw-test",
                 fixture.protocol(),
                 fixture.requestPath(),
@@ -102,8 +104,8 @@ class SiteConformanceHarnessTests {
                 "allow_lossy",
                 requestBody(fixture)
         ));
-        assertEquals(preview.plan().executionKind(), explainPlan.executionKind(), fixture.name());
-        assertEquals(preview.plan().overallEffectiveLevel(), explainPlan.overallEffectiveLevel(), fixture.name());
+        assertEquals(preview.canonicalPlan().executionKind(), explainPlan.executionKind(), fixture.name());
+        assertEquals(preview.canonicalPlan().overallCapabilityLevel(), explainPlan.overallCapabilityLevel(), fixture.name());
 
         GatewayInteropPlanService interopPlanService = new GatewayInteropPlanService(
                 Mockito.mock(ErrorRuleService.class),
@@ -116,9 +118,9 @@ class SiteConformanceHarnessTests {
                 "allow_lossy",
                 requestBody(fixture)
         ));
-        assertEquals(fixture.expectedExecutable(), interopPlanResponse.executable(), fixture.name());
-        assertEquals(fixture.expectedEffectiveLevel().toLowerCase(), interopPlanResponse.overallEffectiveLevel(), fixture.name());
-        assertEquals(fixture.expectedExecutionKind(), interopPlanResponse.executionKind().name(), fixture.name());
+        assertEquals(fixture.expectedExecutable(), interopPlanResponse.plan().executable(), fixture.name());
+        assertEquals(fixture.expectedEffectiveLevel(), interopPlanResponse.plan().overallCapabilityLevel().name(), fixture.name());
+        assertEquals(fixture.expectedExecutionKind(), interopPlanResponse.plan().executionKind().name(), fixture.name());
 
         SiteModelCapabilityRepository siteModelCapabilityRepository = Mockito.mock(SiteModelCapabilityRepository.class);
         UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);

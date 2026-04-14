@@ -1,7 +1,11 @@
 package com.prodigalgal.xaigateway.admin.api;
 
 import com.prodigalgal.xaigateway.admin.application.ProviderSiteAdminService;
+import com.prodigalgal.xaigateway.gateway.core.catalog.SurfaceCapabilityView;
 import com.prodigalgal.xaigateway.gateway.core.interop.CapabilityResolutionView;
+import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
 import com.prodigalgal.xaigateway.gateway.core.shared.AuthStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ErrorSchemaStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ModelAddressingStrategy;
@@ -68,6 +72,21 @@ class ProviderSiteAdminControllerTests {
                                 "response_object",
                                 new CapabilityResolutionView("emulated", "emulated", "emulated", List.of(), List.of())
                         ),
+                        java.util.Map.of(
+                                "response_create",
+                                new SurfaceCapabilityView(
+                                        TranslationResourceType.RESPONSE,
+                                        TranslationOperation.RESPONSE_CREATE,
+                                        InteropCapabilityLevel.EMULATED,
+                                        InteropCapabilityLevel.EMULATED,
+                                        InteropCapabilityLevel.EMULATED,
+                                        List.of("response_object"),
+                                        java.util.Map.of(
+                                                "response_object",
+                                                new CapabilityResolutionView("emulated", "emulated", "emulated", List.of(), List.of())
+                                        )
+                                )
+                        ),
                         true,
                         true,
                         true,
@@ -91,6 +110,7 @@ class ProviderSiteAdminControllerTests {
                 .jsonPath("$[0].fallbackStrategy").isEqualTo("provider-native")
                 .jsonPath("$[0].cooldownCredentialCount").isEqualTo(1)
                 .jsonPath("$[0].features.response_object.effectiveLevel").isEqualTo("emulated")
+                .jsonPath("$[0].surfaces.response_create.overallCapabilityLevel").isEqualTo("EMULATED")
                 .jsonPath("$[0].supportsRealtime").isEqualTo(true);
     }
 
@@ -138,6 +158,21 @@ class ProviderSiteAdminControllerTests {
                 java.util.Map.of(
                         "response_object",
                         new CapabilityResolutionView("emulated", "emulated", "emulated", List.of(), List.of())
+                ),
+                java.util.Map.of(
+                        "response_create",
+                        new SurfaceCapabilityView(
+                                TranslationResourceType.RESPONSE,
+                                TranslationOperation.RESPONSE_CREATE,
+                                InteropCapabilityLevel.EMULATED,
+                                InteropCapabilityLevel.EMULATED,
+                                InteropCapabilityLevel.EMULATED,
+                                List.of("response_object"),
+                                java.util.Map.of(
+                                        "response_object",
+                                        new CapabilityResolutionView("emulated", "emulated", "emulated", List.of(), List.of())
+                                )
+                        )
                 ),
                 2,
                 Instant.now(),

@@ -26,11 +26,7 @@ public class OpenAiResponsesRequestMapper {
         this.objectMapper = objectMapper;
     }
 
-    public ChatExecutionRequest toExecutionRequest(String distributedKeyPrefix, JsonNode requestBody) {
-        return canonicalChatExecutionRequestAdapter.toExecutionRequest(toCanonicalRequest(distributedKeyPrefix, requestBody));
-    }
-
-    private CanonicalRequest toCanonicalRequest(String distributedKeyPrefix, JsonNode requestBody) {
+    public CanonicalRequest toCanonicalRequest(String distributedKeyPrefix, JsonNode requestBody) {
         if (requestBody == null || !requestBody.isObject()) {
             throw new IllegalArgumentException("responses 请求体必须是 JSON object。");
         }
@@ -60,6 +56,10 @@ public class OpenAiResponsesRequestMapper {
                 buildReasoningConfig(requestBody),
                 requestBody.deepCopy()
         );
+    }
+
+    public ChatExecutionRequest toExecutionRequest(String distributedKeyPrefix, JsonNode requestBody) {
+        return canonicalChatExecutionRequestAdapter.toExecutionRequest(toCanonicalRequest(distributedKeyPrefix, requestBody));
     }
 
     private List<CanonicalMessage> toMessages(JsonNode instructionsNode, JsonNode inputNode) {

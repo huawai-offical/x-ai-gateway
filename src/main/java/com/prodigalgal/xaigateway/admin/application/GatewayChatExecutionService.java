@@ -22,12 +22,21 @@ import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolCall;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolDefinition;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalChatMapper;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalContentPart;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlanCompilation;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionResult;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionStreamResult;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalMessage;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalMessageRole;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalPartType;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResponse;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEvent;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEventType;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolCall;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolDefinition;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalUsage;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileResource;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileService;
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics;
@@ -202,33 +211,27 @@ public class GatewayChatExecutionService {
     }
 
     public AdminChatExecuteResponse execute(AdminChatExecuteRequest request) {
-        ChatExecutionResponse response = execute(new ChatExecutionRequest(
-                request.distributedKeyPrefix(),
-                request.protocol(),
-                request.requestPath(),
-                request.requestedModel(),
-                buildAdminMessages(request.systemPrompt(), request.userPrompt()),
-                List.of(),
-                null,
-                request.temperature(),
-                request.maxTokens()
-        ));
+        CanonicalExecutionResult response = executeGatewayResponse(buildAdminRequest(request));
         return new AdminChatExecuteResponse(
                 response.requestId(),
                 response.routeSelection(),
-                response.text(),
-                response.usage(),
-                response.toolCalls()
+                response.response().outputText(),
+                toGatewayUsage(response.response().usage()),
+                toGatewayToolCalls(response.response().toolCalls())
         );
     }
 
     public ChatExecutionResponse execute(ChatExecutionRequest request) {
+        return toChatExecutionResponse(executeGatewayResponse(canonicalChatMapper.toCanonicalRequest(request)));
+    }
+
+    public CanonicalExecutionResult executeGatewayResponse(CanonicalRequest request) {
         String requestId = gatewayObservabilityService.nextRequestId();
         Instant startedAt = Instant.now();
         JsonNode routeBody = buildRouteBody(request);
         RouteSelectionResult selectionResult = gatewayRouteSelectionService.select(new RouteSelectionRequest(
                 request.distributedKeyPrefix(),
-                request.protocol(),
+                request.ingressProtocol().name().toLowerCase(),
                 request.requestPath(),
                 request.requestedModel(),
                 routeBody,
@@ -246,9 +249,9 @@ public class GatewayChatExecutionService {
             for (int index = 0; index < maxAttempts; index++) {
                 RouteCandidateView candidate = selectionResult.candidates().get(index);
                 RouteSelectionResult candidateSelection = selectionForCandidate(selectionResult, candidate, attempts);
-                TranslationExecutionPlan executionPlan = translationExecutionPlanCompiler.compileSelected(
+                CanonicalExecutionPlanCompilation executionPlanCompilation = translationExecutionPlanCompiler.compileSelected(
                         candidateSelection,
-                        request.requestPath(),
+                        request,
                         semantics,
                         routeBody
                 );
@@ -256,14 +259,14 @@ public class GatewayChatExecutionService {
                 ResolvedCredentialMaterial credentialMaterial = credentialMaterialResolver.resolve(candidateSelection, credential);
                 try {
                     GatewayChatRuntime runtime = resolveRuntime(candidate.candidate());
-                    GatewayChatRuntimeResult result = runtime.execute(new GatewayChatRuntimeContext(
+                    CanonicalResponse result = runtime.execute(new GatewayChatRuntimeContext(
                             candidateSelection,
                             credential,
                             credentialMaterial,
                             request,
-                            executionPlan
+                            executionPlanCompilation.canonicalPlan()
                     ));
-                    if (isEmptyChatResult(result)) {
+                    if (isEmptyCanonicalResult(result)) {
                         throw new IllegalStateException("上游响应为空。");
                     }
 
@@ -278,16 +281,17 @@ public class GatewayChatExecutionService {
                     gatewayRouteSelectionService.recordSuccessfulSelection(finalSelection);
                     gatewayObservabilityService.recordRouteDecision(requestId, finalSelection);
 
-                    GatewayUsageView usageView = gatewayResponseMapper.toUsageView(
-                            result.usage(),
+                    CanonicalResponse enriched = enrichResponse(requestId, finalSelection, result);
+                    GatewayUsageView usageView = toUsageView(
+                            enriched.usage(),
                             GatewayUsageCompleteness.FINAL,
                             GatewayUsageSource.DIRECT_RESPONSE
                     );
-                    if (result.usage() != null && !result.usage().isEmpty()) {
+                    if (enriched.usage() != null && enriched.usage().present()) {
                         gatewayObservabilityService.recordCacheUsage(
                                 requestId,
                                 finalSelection,
-                                result.usage(),
+                                toGatewayUsage(enriched.usage()),
                                 cacheKind(usageView),
                                 usageView.cachedContentRef()
                         );
@@ -300,15 +304,7 @@ public class GatewayChatExecutionService {
                             usageView,
                             startedAt
                     );
-                    return new ChatExecutionResponse(
-                            requestId,
-                            finalSelection,
-                            result.text(),
-                            result.usage(),
-                            result.toolCalls(),
-                            result.finishReason(),
-                            result.reasoning()
-                    );
+                    return new CanonicalExecutionResult(requestId, finalSelection, enriched);
                 } catch (RuntimeException exception) {
                     attempts.add(new RouteExecutionAttempt(
                             index + 1,
@@ -347,13 +343,21 @@ public class GatewayChatExecutionService {
         }
     }
 
+    public GatewayResponse executeGatewayResponse(ChatExecutionRequest request) {
+        return gatewayResponseMapper.toGatewayResponse(execute(request));
+    }
+
     public ChatExecutionStreamResponse executeStream(ChatExecutionRequest request) {
+        return toChatExecutionStreamResponse(executeGatewayStream(canonicalChatMapper.toCanonicalRequest(request)));
+    }
+
+    public CanonicalExecutionStreamResult executeGatewayStream(CanonicalRequest request) {
         String requestId = gatewayObservabilityService.nextRequestId();
         Instant startedAt = Instant.now();
         JsonNode routeBody = buildRouteBody(request);
         RouteSelectionResult selectionResult = gatewayRouteSelectionService.select(new RouteSelectionRequest(
                 request.distributedKeyPrefix(),
-                request.protocol(),
+                request.ingressProtocol().name().toLowerCase(),
                 request.requestPath(),
                 request.requestedModel(),
                 routeBody,
@@ -362,12 +366,12 @@ public class GatewayChatExecutionService {
         ));
         GatewayRequestSemantics semantics = gatewayRequestFeatureService.describe(request.requestPath(), routeBody);
         gatewayRequestLifecycleService.startRequest(requestId, selectionResult, request, true, startedAt);
-        AtomicReference<GatewayUsage> lastVisibleUsage = new AtomicReference<>(GatewayUsage.empty());
+        AtomicReference<CanonicalUsage> lastVisibleUsage = new AtomicReference<>(CanonicalUsage.empty());
         AtomicBoolean terminalRecorded = new AtomicBoolean(false);
         AtomicReference<RouteSelectionResult> finalSelectionRef = new AtomicReference<>(selectionResult);
         List<RouteExecutionAttempt> attempts = new java.util.concurrent.CopyOnWriteArrayList<>();
         int maxAttempts = Math.min(selectionResult.candidates().size(), gatewayProperties.getRouting().getMaxFallbackAttempts());
-        Flux<ChatExecutionStreamChunk> chunks = streamAttempt(
+        Flux<CanonicalStreamEvent> chunks = streamAttempt(
                         requestId,
                         selectionResult,
                         request,
@@ -378,15 +382,15 @@ public class GatewayChatExecutionService {
                         attempts,
                         finalSelectionRef
                 )
-                .doOnNext(chunk -> {
-                    if (chunk.usage() != null && !chunk.usage().isEmpty()) {
-                        lastVisibleUsage.set(chunk.usage());
+                .doOnNext(event -> {
+                    if (event.usage() != null && event.usage().present()) {
+                        lastVisibleUsage.set(event.usage());
                     }
-                    if (chunk.terminal()) {
-                        GatewayUsageView usageView = terminalUsageView(chunk.usage(), lastVisibleUsage.get());
+                    if (event.terminal()) {
+                        GatewayUsageView usageView = terminalUsageView(event.usage(), lastVisibleUsage.get());
                         RouteSelectionResult finalSelection = finalSelectionRef.get().withAttempts(List.copyOf(attempts));
                         gatewayObservabilityService.recordRouteDecision(requestId, finalSelection);
-                        recordTerminalUsage(requestId, finalSelection, request, startedAt, usageView, chunk.usage(), lastVisibleUsage.get());
+                        recordTerminalUsage(requestId, finalSelection, request, startedAt, usageView, event.usage(), lastVisibleUsage.get());
                         terminalRecorded.set(true);
                     }
                 })
@@ -427,21 +431,17 @@ public class GatewayChatExecutionService {
                 })
                 .doFinally(signalType -> distributedKeyGovernanceService.releaseConcurrency(selectionResult.governanceReservationKey()));
 
-        return new ChatExecutionStreamResponse(requestId, selectionResult, chunks);
-    }
-
-    public GatewayResponse executeGatewayResponse(ChatExecutionRequest request) {
-        return gatewayResponseMapper.toGatewayResponse(execute(request));
+        return new CanonicalExecutionStreamResult(requestId, selectionResult, chunks);
     }
 
     public GatewayStreamResponse executeGatewayStream(ChatExecutionRequest request) {
         return gatewayResponseMapper.toGatewayStreamResponse(executeStream(request));
     }
 
-    private Flux<ChatExecutionStreamChunk> streamAttempt(
+    private Flux<CanonicalStreamEvent> streamAttempt(
             String requestId,
             RouteSelectionResult baseSelection,
-            ChatExecutionRequest request,
+            CanonicalRequest request,
             JsonNode routeBody,
             GatewayRequestSemantics semantics,
             int candidateIndex,
@@ -454,9 +454,9 @@ public class GatewayChatExecutionService {
 
         UpstreamCredentialEntity credential = getRequiredCredential(candidate.candidate().credentialId());
         ResolvedCredentialMaterial credentialMaterial = credentialMaterialResolver.resolve(candidateSelection, credential);
-        TranslationExecutionPlan executionPlan = translationExecutionPlanCompiler.compileSelected(
+        CanonicalExecutionPlanCompilation executionPlanCompilation = translationExecutionPlanCompiler.compileSelected(
                 candidateSelection,
-                request.requestPath(),
+                request,
                 semantics,
                 routeBody
         );
@@ -469,13 +469,13 @@ public class GatewayChatExecutionService {
                         credential,
                         credentialMaterial,
                         request,
-                        executionPlan
+                        executionPlanCompilation.canonicalPlan()
                 ))
-                .doOnNext(chunk -> {
-                    if (isVisibleStreamChunk(chunk)) {
+                .doOnNext(event -> {
+                    if (isVisibleStreamEvent(event)) {
                         firstOutputCommitted.set(true);
                     }
-                    if (chunk.terminal() && successRecorded.compareAndSet(false, true)) {
+                    if (event.terminal() && successRecorded.compareAndSet(false, true)) {
                         attempts.add(new RouteExecutionAttempt(
                                 candidateIndex + 1,
                                 candidate.candidate().credentialId(),
@@ -538,12 +538,14 @@ public class GatewayChatExecutionService {
     private void recordTerminalUsage(
             String requestId,
             RouteSelectionResult selectionResult,
-            ChatExecutionRequest request,
+            CanonicalRequest request,
             Instant startedAt,
             GatewayUsageView usageView,
-            GatewayUsage terminalUsage,
-            GatewayUsage lastVisibleUsage) {
-        GatewayUsage usageForLog = terminalUsage != null && !terminalUsage.isEmpty() ? terminalUsage : lastVisibleUsage;
+            CanonicalUsage terminalUsage,
+            CanonicalUsage lastVisibleUsage) {
+        GatewayUsage usageForLog = terminalUsage != null && terminalUsage.present()
+                ? toGatewayUsage(terminalUsage)
+                : toGatewayUsage(lastVisibleUsage);
         if (usageForLog != null && !usageForLog.isEmpty()) {
             gatewayObservabilityService.recordCacheUsage(
                     requestId,
@@ -563,22 +565,139 @@ public class GatewayChatExecutionService {
         );
     }
 
-    private GatewayUsageView terminalUsageView(GatewayUsage terminalUsage, GatewayUsage lastVisibleUsage) {
-        if (terminalUsage != null && !terminalUsage.isEmpty()) {
-            return gatewayResponseMapper.toUsageView(
+    private GatewayUsageView terminalUsageView(CanonicalUsage terminalUsage, CanonicalUsage lastVisibleUsage) {
+        if (terminalUsage != null && terminalUsage.present()) {
+            return toUsageView(
                     terminalUsage,
                     GatewayUsageCompleteness.FINAL,
                     GatewayUsageSource.PROVIDER_FINAL
             );
         }
-        if (lastVisibleUsage != null && !lastVisibleUsage.isEmpty()) {
-            return gatewayResponseMapper.toUsageView(
+        if (lastVisibleUsage != null && lastVisibleUsage.present()) {
+            return toUsageView(
                     lastVisibleUsage,
                     GatewayUsageCompleteness.PARTIAL,
                     GatewayUsageSource.LAST_VISIBLE
             );
         }
         return GatewayUsageView.empty();
+    }
+
+    private GatewayUsageView toUsageView(
+            CanonicalUsage usage,
+            GatewayUsageCompleteness completeness,
+            GatewayUsageSource source) {
+        if (usage == null || !usage.present()) {
+            return GatewayUsageView.empty();
+        }
+        return new GatewayUsageView(
+                usage.promptTokens(),
+                usage.promptTokens(),
+                usage.completionTokens(),
+                usage.reasoningTokens(),
+                usage.cacheHitTokens(),
+                usage.cacheWriteTokens(),
+                usage.cacheHitTokens(),
+                usage.cacheWriteTokens(),
+                Math.max(usage.promptTokens() - usage.cacheWriteTokens(), 0),
+                null,
+                usage.totalTokens(),
+                completeness,
+                source,
+                null
+        );
+    }
+
+    private GatewayUsage toGatewayUsage(CanonicalUsage usage) {
+        if (usage == null || !usage.present()) {
+            return GatewayUsage.empty();
+        }
+        return new GatewayUsage(
+                usage.promptTokens(),
+                usage.promptTokens(),
+                usage.completionTokens(),
+                usage.reasoningTokens(),
+                usage.cacheHitTokens(),
+                usage.cacheWriteTokens(),
+                usage.cacheHitTokens(),
+                usage.cacheWriteTokens(),
+                null,
+                usage.totalTokens(),
+                null
+        );
+    }
+
+    private List<GatewayToolCall> toGatewayToolCalls(List<CanonicalToolCall> toolCalls) {
+        if (toolCalls == null || toolCalls.isEmpty()) {
+            return List.of();
+        }
+        return toolCalls.stream()
+                .map(toolCall -> new GatewayToolCall(toolCall.id(), toolCall.type(), toolCall.name(), toolCall.arguments()))
+                .toList();
+    }
+
+    private ChatExecutionResponse toChatExecutionResponse(CanonicalExecutionResult result) {
+        return new ChatExecutionResponse(
+                result.requestId(),
+                result.routeSelection(),
+                result.response().outputText(),
+                toGatewayUsage(result.response().usage()),
+                toGatewayToolCalls(result.response().toolCalls()),
+                result.response().finishReason() == null ? null : result.response().finishReason().name().toLowerCase(),
+                result.response().reasoning()
+        );
+    }
+
+    private ChatExecutionStreamResponse toChatExecutionStreamResponse(CanonicalExecutionStreamResult result) {
+        Flux<ChatExecutionStreamChunk> chunks = result.events().map(event -> switch (event.type()) {
+            case TEXT_DELTA -> new ChatExecutionStreamChunk(event.textDelta(), null, GatewayUsage.empty(), false, List.of(), null);
+            case REASONING_DELTA -> new ChatExecutionStreamChunk(null, null, GatewayUsage.empty(), false, List.of(), event.reasoningDelta());
+            case TOOL_CALLS -> new ChatExecutionStreamChunk(null, null, GatewayUsage.empty(), false, toGatewayToolCalls(event.toolCalls()), null);
+            case COMPLETED -> new ChatExecutionStreamChunk(
+                    null,
+                    event.finishReason() == null ? null : event.finishReason().name().toLowerCase(),
+                    toGatewayUsage(event.usage()),
+                    true,
+                    List.of(),
+                    null
+            );
+            case ERROR -> new ChatExecutionStreamChunk(null, "error", GatewayUsage.empty(), true, List.of(), null);
+        });
+        return new ChatExecutionStreamResponse(result.requestId(), result.routeSelection(), chunks);
+    }
+
+    private CanonicalResponse enrichResponse(String requestId, RouteSelectionResult selectionResult, CanonicalResponse result) {
+        return new CanonicalResponse(
+                requestId,
+                selectionResult.publicModel(),
+                result.outputText(),
+                result.reasoning(),
+                result.toolCalls(),
+                result.usage(),
+                result.finishReason()
+        );
+    }
+
+    private CanonicalRequest buildAdminRequest(AdminChatExecuteRequest request) {
+        List<CanonicalMessage> messages = request.systemPrompt() == null || request.systemPrompt().isBlank()
+                ? List.of(new CanonicalMessage(CanonicalMessageRole.USER, List.of(CanonicalContentPart.text(request.userPrompt()))))
+                : List.of(
+                        new CanonicalMessage(CanonicalMessageRole.SYSTEM, List.of(CanonicalContentPart.text(request.systemPrompt()))),
+                        new CanonicalMessage(CanonicalMessageRole.USER, List.of(CanonicalContentPart.text(request.userPrompt())))
+                );
+        return new CanonicalRequest(
+                request.distributedKeyPrefix(),
+                CanonicalIngressProtocol.from(request.protocol()),
+                request.requestPath(),
+                request.requestedModel(),
+                messages,
+                List.of(),
+                null,
+                request.temperature(),
+                request.maxTokens(),
+                null,
+                null
+        );
     }
 
     private String cacheKind(GatewayUsageView usageView) {
@@ -628,24 +747,24 @@ public class GatewayChatExecutionService {
                 : throwable.getMessage();
     }
 
-    private boolean isEmptyChatResult(GatewayChatRuntimeResult result) {
+    private boolean isEmptyCanonicalResult(CanonicalResponse result) {
         if (result == null) {
             return true;
         }
-        boolean hasText = result.text() != null && !result.text().isBlank();
+        boolean hasText = result.outputText() != null && !result.outputText().isBlank();
         boolean hasReasoning = result.reasoning() != null && !result.reasoning().isBlank();
         boolean hasToolCalls = result.toolCalls() != null && !result.toolCalls().isEmpty();
         return !hasText && !hasReasoning && !hasToolCalls;
     }
 
-    private boolean isVisibleStreamChunk(ChatExecutionStreamChunk chunk) {
-        if (chunk == null) {
+    private boolean isVisibleStreamEvent(CanonicalStreamEvent event) {
+        if (event == null) {
             return false;
         }
-        return (chunk.textDelta() != null && !chunk.textDelta().isBlank())
-                || (chunk.reasoningDelta() != null && !chunk.reasoningDelta().isBlank())
-                || (chunk.toolCalls() != null && !chunk.toolCalls().isEmpty())
-                || chunk.terminal();
+        return (event.textDelta() != null && !event.textDelta().isBlank())
+                || (event.reasoningDelta() != null && !event.reasoningDelta().isBlank())
+                || (event.toolCalls() != null && !event.toolCalls().isEmpty())
+                || event.terminal();
     }
 
     private GatewayChatRuntime resolveRuntime(com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView candidate) {
@@ -741,8 +860,7 @@ public class GatewayChatExecutionService {
         return new Prompt(messages, (org.springframework.ai.chat.prompt.ChatOptions) options);
     }
 
-    private JsonNode buildRouteBody(ChatExecutionRequest request) {
-        CanonicalRequest canonicalRequest = canonicalChatMapper.toCanonicalRequest(request);
+    private JsonNode buildRouteBody(CanonicalRequest canonicalRequest) {
         ObjectNode root = JsonNodeFactory.instance.objectNode();
         root.put("model", canonicalRequest.requestedModel());
 
@@ -788,16 +906,6 @@ public class GatewayChatExecutionService {
         }
 
         return root;
-    }
-
-    private List<ChatExecutionRequest.MessageInput> buildAdminMessages(String systemPrompt, String userPrompt) {
-        if (systemPrompt == null || systemPrompt.isBlank()) {
-            return List.of(new ChatExecutionRequest.MessageInput("user", userPrompt, null, null, List.of()));
-        }
-        return List.of(
-                new ChatExecutionRequest.MessageInput("system", systemPrompt, null, null, List.of()),
-                new ChatExecutionRequest.MessageInput("user", userPrompt, null, null, List.of())
-        );
     }
 
     private Message toPromptMessage(String distributedKeyPrefix, ChatExecutionRequest.MessageInput message) {

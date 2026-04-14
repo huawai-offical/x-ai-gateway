@@ -1,8 +1,8 @@
 package com.prodigalgal.xaigateway.gateway.core.execution;
 
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
 import com.prodigalgal.xaigateway.gateway.core.credential.CredentialAuthKind;
 import com.prodigalgal.xaigateway.gateway.core.credential.ResolvedCredentialMaterial;
-import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlan;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
 import java.util.Map;
@@ -12,7 +12,7 @@ public record GatewayResourceExecutionContext(
         UpstreamCredentialEntity credential,
         ResolvedCredentialMaterial credentialMaterial,
         String requestPath,
-        TranslationExecutionPlan executionPlan
+        CanonicalExecutionPlan executionPlan
 ) {
     public GatewayResourceExecutionContext(
             RouteSelectionResult selectionResult,

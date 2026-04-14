@@ -1,16 +1,15 @@
 package com.prodigalgal.xaigateway.admin.api;
 
 import com.prodigalgal.xaigateway.admin.application.TranslationExplainService;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
-import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlan;
-import com.prodigalgal.xaigateway.gateway.core.shared.AuthStrategy;
-import com.prodigalgal.xaigateway.gateway.core.shared.ErrorSchemaStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind;
-import com.prodigalgal.xaigateway.gateway.core.shared.PathStrategy;
-import com.prodigalgal.xaigateway.gateway.core.shared.ProviderFamily;
+import com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
 import com.prodigalgal.xaigateway.testsupport.PermitAllSecurityTestConfig;
 import java.util.List;
-import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,22 +31,23 @@ class TranslationExplainAdminControllerTests {
 
     @Test
     void shouldExplainTranslationPlan() {
-        Mockito.when(translationExplainService.explain(Mockito.any())).thenReturn(new TranslationExecutionPlan(
+        Mockito.when(translationExplainService.explain(Mockito.any())).thenReturn(new CanonicalExecutionPlan(
                 true,
-                "chat",
-                "chat_completion",
-                ProviderFamily.OPENAI,
-                1L,
+                CanonicalIngressProtocol.OPENAI,
+                "/v1/chat/completions",
+                "gpt-4o",
+                "gpt-4o",
+                "gpt-4o",
+                TranslationResourceType.CHAT,
+                TranslationOperation.CHAT_COMPLETION,
                 ExecutionKind.NATIVE,
                 InteropCapabilityLevel.NATIVE,
-                "direct_upstream_execution",
+                InteropCapabilityLevel.NATIVE,
+                InteropCapabilityLevel.NATIVE,
+                List.of(InteropFeature.CHAT_TEXT),
+                java.util.Map.of("chat_text", InteropCapabilityLevel.NATIVE),
                 List.of(),
-                List.of(),
-                AuthStrategy.BEARER,
-                PathStrategy.OPENAI_V1,
-                ErrorSchemaStrategy.OPENAI_ERROR,
-                Map.of("protocol", "openai"),
-                Map.of("publicModel", "gpt-4o")
+                List.of()
         ));
 
         webTestClient.post()
@@ -65,8 +65,8 @@ class TranslationExplainAdminControllerTests {
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
-                .jsonPath("$.providerFamily").isEqualTo("OPENAI")
+                .jsonPath("$.ingressProtocol").isEqualTo("OPENAI")
                 .jsonPath("$.executionKind").isEqualTo("NATIVE")
-                .jsonPath("$.authStrategy").isEqualTo("BEARER");
+                .jsonPath("$.executionCapabilityLevel").isEqualTo("NATIVE");
     }
 }

@@ -252,7 +252,7 @@ class GatewayEndToEndSmokeTests {
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
-                .jsonPath("$.selectionSource").isEqualTo("PREFIX_AFFINITY");
+                .jsonPath("$.selection.selectionSource").isEqualTo("PREFIX_AFFINITY");
 
         fakeGatewayChatRuntime.failNext();
         webTestClient.post()
@@ -285,7 +285,7 @@ class GatewayEndToEndSmokeTests {
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
-                .jsonPath("$.selectedCandidate.candidate.credentialId").value(value -> assertNotEquals(initialCredentialId.intValue(), value));
+                .jsonPath("$.selection.selectedCandidate.candidate.credentialId").value(value -> assertNotEquals(initialCredentialId.intValue(), value));
 
         Long selectedCredentialId = latestRequestLog().getCredentialId();
         assertNotEquals(initialCredentialId, selectedCredentialId);
@@ -334,8 +334,8 @@ class GatewayEndToEndSmokeTests {
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
-                .jsonPath("$.resolvedModelKey").isEqualTo("gpt-4o")
-                .jsonPath("$.selectedCandidate.candidate.providerType").isEqualTo("OPENAI_DIRECT");
+                .jsonPath("$.selection.resolvedModelKey").isEqualTo("gpt-4o")
+                .jsonPath("$.selection.selectedCandidate.candidate.providerType").isEqualTo("OPENAI_DIRECT");
 
         webTestClient.post()
                 .uri("/admin/translation/explain")
@@ -353,8 +353,8 @@ class GatewayEndToEndSmokeTests {
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
-                .jsonPath("$.resolvedModelKey").isEqualTo("gpt-4o")
-                .jsonPath("$.selectionSource").exists()
+                .jsonPath("$.resolvedModel").isEqualTo("gpt-4o")
+                .jsonPath("$.ingressProtocol").isEqualTo("OPENAI")
                 .jsonPath("$.executionKind").exists();
 
         List<AuditLogEntity> audits = auditLogRepository.findAll().stream()
@@ -659,41 +659,70 @@ class GatewayEndToEndSmokeTests {
         }
 
         @Override
-        public GatewayChatRuntimeResult execute(GatewayChatRuntimeContext context) {
+        public com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResponse execute(GatewayChatRuntimeContext context) {
             if (failNext.getAndSet(false)) {
                 throw new IllegalStateException("forced fake runtime failure");
             }
             String protocol = context.request().protocol();
             if ("anthropic_native".equals(protocol)) {
-                return new GatewayChatRuntimeResult(
+                return new com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResponse(
+                        null,
+                        context.selectionResult().publicModel(),
                         "anthropic ok",
-                        new GatewayUsage(900, 900, 120, 0, 300, 60, 300, 60, null, 1020, null),
+                        null,
                         List.of(),
-                        "end_turn"
+                        new com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalUsage(true, 900, 120, 1020, 300, 60, 0),
+                        com.prodigalgal.xaigateway.gateway.core.response.GatewayFinishReason.END_TURN
                 );
             }
             if ("google_native".equals(protocol)) {
-                return new GatewayChatRuntimeResult(
+                return new com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResponse(
+                        null,
+                        context.selectionResult().publicModel(),
                         "gemini ok",
-                        new GatewayUsage(800, 520, 180, 40, 280, 0, 280, 0, "cached-content-1", 980, null),
+                        null,
                         List.of(),
-                        "stop"
+                        new com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalUsage(true, 520, 180, 980, 280, 0, 40),
+                        com.prodigalgal.xaigateway.gateway.core.response.GatewayFinishReason.STOP
                 );
             }
-            return new GatewayChatRuntimeResult(
+            return new com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResponse(
+                    null,
+                    context.selectionResult().publicModel(),
                     "openai ok",
-                    new GatewayUsage(1000, 700, 180, 20, 300, 0, 300, 0, null, 1180, null),
+                    null,
                     List.of(),
-                    "stop"
+                    new com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalUsage(true, 700, 180, 1180, 300, 0, 20),
+                    com.prodigalgal.xaigateway.gateway.core.response.GatewayFinishReason.STOP
             );
         }
 
         @Override
-        public Flux<ChatExecutionStreamChunk> executeStream(GatewayChatRuntimeContext context) {
-            GatewayChatRuntimeResult result = execute(context);
+        public Flux<com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEvent> executeStream(GatewayChatRuntimeContext context) {
+            var result = execute(context);
             return Flux.just(
-                    new ChatExecutionStreamChunk(result.text(), null, GatewayUsage.empty(), false),
-                    new ChatExecutionStreamChunk(null, result.finishReason(), result.usage(), true)
+                    new com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEvent(
+                            com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEventType.TEXT_DELTA,
+                            result.outputText(),
+                            null,
+                            List.of(),
+                            com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalUsage.empty(),
+                            false,
+                            null,
+                            null,
+                            null
+                    ),
+                    new com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEvent(
+                            com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEventType.COMPLETED,
+                            null,
+                            null,
+                            List.of(),
+                            result.usage(),
+                            true,
+                            result.finishReason(),
+                            result.outputText(),
+                            result.reasoning()
+                    )
             );
         }
     }

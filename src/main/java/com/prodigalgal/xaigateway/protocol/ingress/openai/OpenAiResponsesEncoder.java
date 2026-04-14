@@ -2,6 +2,8 @@ package com.prodigalgal.xaigateway.protocol.ingress.openai;
 
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionResult;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionStreamResult;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalGatewayResponseMapper;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResponse;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEvent;
@@ -32,6 +34,10 @@ public class OpenAiResponsesEncoder {
         return OpenAiResponsesResponse.fromCanonical(canonicalResponse);
     }
 
+    public OpenAiResponsesResponse encode(CanonicalExecutionResult response) {
+        return OpenAiResponsesResponse.fromCanonical(response.response());
+    }
+
     public Flux<String> encodeStream(GatewayStreamResponse response) {
         String itemId = "msg_" + response.requestId();
         String reasoningItemId = "rs_" + response.requestId();
@@ -46,6 +52,49 @@ public class OpenAiResponsesEncoder {
                         encodeEvent("response.content_part.added", contentPartAddedEvent(itemId))
                 ),
                 response.events().concatMap(event -> encodeEvent(response, event, itemId, reasoningItemId, reasoningStarted, messageOpened))
+        );
+    }
+
+    public Flux<String> encodeStream(CanonicalExecutionStreamResult response) {
+        String itemId = "msg_" + response.requestId();
+        String reasoningItemId = "rs_" + response.requestId();
+        AtomicBoolean reasoningStarted = new AtomicBoolean(false);
+        AtomicBoolean messageOpened = new AtomicBoolean(true);
+
+        return Flux.concat(
+                Flux.just(
+                        encodeEvent("response.created", Map.of(
+                                "type", "response.created",
+                                "response", OpenAiResponsesResponse.completedCanonical(
+                                        response.requestId(),
+                                        response.routeSelection().publicModel(),
+                                        null,
+                                        com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalUsage.empty(),
+                                        null
+                                )
+                        )),
+                        encodeEvent("response.in_progress", Map.of(
+                                "type", "response.in_progress",
+                                "response", OpenAiResponsesResponse.completedCanonical(
+                                        response.requestId(),
+                                        response.routeSelection().publicModel(),
+                                        null,
+                                        com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalUsage.empty(),
+                                        null
+                                )
+                        )),
+                        encodeEvent("response.output_item.added", outputItemAddedEvent(itemId)),
+                        encodeEvent("response.content_part.added", contentPartAddedEvent(itemId))
+                ),
+                response.events().concatMap(event -> encodeCanonicalEvent(
+                        response.requestId(),
+                        response.routeSelection().publicModel(),
+                        event,
+                        itemId,
+                        reasoningItemId,
+                        reasoningStarted,
+                        messageOpened
+                ))
         );
     }
 
@@ -288,6 +337,58 @@ public class OpenAiResponsesEncoder {
                         event.reasoning()
                 )
         );
+    }
+
+    private Flux<String> encodeCanonicalEvent(
+            String requestId,
+            String publicModel,
+            CanonicalStreamEvent canonicalEvent,
+            String itemId,
+            String reasoningItemId,
+            AtomicBoolean reasoningStarted,
+            AtomicBoolean messageOpened) {
+        List<String> events = new ArrayList<>();
+
+        if (canonicalEvent.type() == CanonicalStreamEventType.REASONING_DELTA && canonicalEvent.reasoningDelta() != null && !canonicalEvent.reasoningDelta().isBlank()) {
+            if (reasoningStarted.compareAndSet(false, true)) {
+                events.add(encodeEvent("response.output_item.added", reasoningItemAddedEvent(reasoningItemId)));
+                events.add(encodeEvent("response.reasoning_summary_part.added", reasoningSummaryPartAddedEvent(reasoningItemId)));
+            }
+            events.add(encodeEvent("response.reasoning_summary_text.delta", reasoningSummaryTextDeltaEvent(reasoningItemId, canonicalEvent.reasoningDelta())));
+        }
+
+        if (canonicalEvent.type() == CanonicalStreamEventType.TOOL_CALLS && canonicalEvent.toolCalls() != null && !canonicalEvent.toolCalls().isEmpty()) {
+            int outputIndexBase = reasoningStarted.get() ? 2 : 1;
+            for (int index = 0; index < canonicalEvent.toolCalls().size(); index++) {
+                events.addAll(encodeToolCallEvents(canonicalEvent.toolCalls().get(index), outputIndexBase + index));
+            }
+        }
+
+        if (canonicalEvent.type() == CanonicalStreamEventType.TEXT_DELTA && canonicalEvent.textDelta() != null && !canonicalEvent.textDelta().isBlank()) {
+            events.add(encodeEvent("response.output_text.delta", outputTextDeltaEvent(itemId, canonicalEvent.textDelta())));
+        }
+
+        if (canonicalEvent.type() != CanonicalStreamEventType.COMPLETED) {
+            return events.isEmpty() ? Flux.empty() : Flux.fromIterable(events);
+        }
+
+        String finalReasoning = canonicalEvent.reasoning();
+        String finalText = canonicalEvent.outputText();
+        if (reasoningStarted.get()) {
+            events.add(encodeEvent("response.reasoning_summary_text.done", reasoningSummaryTextDoneEvent(reasoningItemId, finalReasoning == null ? "" : finalReasoning)));
+            events.add(encodeEvent("response.reasoning_summary_part.done", reasoningSummaryPartDoneEvent(reasoningItemId, finalReasoning == null ? "" : finalReasoning)));
+            events.add(encodeEvent("response.output_item.done", reasoningItemDoneEvent(reasoningItemId, finalReasoning == null ? "" : finalReasoning)));
+        }
+        if (messageOpened.get()) {
+            events.add(encodeEvent("response.output_text.done", outputTextDoneEvent(itemId, finalText == null ? "" : finalText)));
+            events.add(encodeEvent("response.content_part.done", contentPartDoneEvent(itemId, finalText == null ? "" : finalText)));
+            events.add(encodeEvent("response.output_item.done", outputItemDoneEvent(itemId, finalText == null ? "" : finalText)));
+        }
+        events.add(encodeEvent("response.completed", Map.of(
+                "type", "response.completed",
+                "response", OpenAiResponsesResponse.completedCanonical(requestId, publicModel, finalText, canonicalEvent.usage(), finalReasoning)
+        )));
+        return Flux.fromIterable(events);
     }
 
     private String encodeEvent(String eventName, Object payload) {

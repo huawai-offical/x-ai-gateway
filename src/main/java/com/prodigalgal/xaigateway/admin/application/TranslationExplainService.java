@@ -1,8 +1,8 @@
 package com.prodigalgal.xaigateway.admin.application;
 
 import com.prodigalgal.xaigateway.admin.api.TranslationExplainRequest;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayDegradationPolicy;
-import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlan;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlanCompiler;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
 import org.springframework.stereotype.Service;
@@ -18,7 +18,7 @@ public class TranslationExplainService {
         this.translationExecutionPlanCompiler = translationExecutionPlanCompiler;
     }
 
-    public TranslationExecutionPlan explain(TranslationExplainRequest request) {
+    public CanonicalExecutionPlan explain(TranslationExplainRequest request) {
         return translationExecutionPlanCompiler.compilePreview(
                 request.distributedKeyPrefix(),
                 request.protocol(),
@@ -29,6 +29,6 @@ public class TranslationExplainService {
                         : GatewayDegradationPolicy.from(request.degradationPolicy()),
                 GatewayClientFamily.GENERIC_OPENAI,
                 request.body()
-        ).plan();
+        ).canonicalPlan();
     }
 }

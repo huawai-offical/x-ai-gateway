@@ -1,6 +1,16 @@
 package com.prodigalgal.xaigateway.admin.api;
 
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlanCompilation;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
+import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics;
+import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
+import com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlanCompiler;
 import com.prodigalgal.xaigateway.gateway.core.routing.GatewayRouteSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
@@ -35,10 +45,15 @@ class ExecutionPreviewControllerTests {
     @MockitoBean
     private ProviderExecutionSupportService providerExecutionSupportService;
 
+    @MockitoBean
+    private TranslationExecutionPlanCompiler translationExecutionPlanCompiler;
+
     @Test
     void shouldReturnExecutionPreview() {
         RouteSelectionResult selectionResult = selectionResult();
         Mockito.when(gatewayRouteSelectionService.select(Mockito.any())).thenReturn(selectionResult);
+        Mockito.when(translationExecutionPlanCompiler.compilePreview(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
+                .thenReturn(compilation(selectionResult));
         Mockito.when(providerExecutionSupportService.prepareOpenAi(
                         Mockito.any(),
                         Mockito.any(),
@@ -68,7 +83,9 @@ class ExecutionPreviewControllerTests {
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
-                .jsonPath("$.providerType").isEqualTo("OPENAI_DIRECT")
+                .jsonPath("$.selection.selectionSource").isEqualTo("PREFIX_AFFINITY")
+                .jsonPath("$.providerBinding.candidate.credentialId").isEqualTo(101)
+                .jsonPath("$.plan.ingressProtocol").isEqualTo("OPENAI")
                 .jsonPath("$.providerOptions.promptCacheKey").isEqualTo("xag:pc:1:gpt-4o:prefix");
     }
 
@@ -103,6 +120,32 @@ class ExecutionPreviewControllerTests {
                 RouteSelectionSource.PREFIX_AFFINITY,
                 routeCandidateView,
                 List.of(routeCandidateView)
+        );
+    }
+
+    private CanonicalExecutionPlanCompilation compilation(RouteSelectionResult selectionResult) {
+        return new CanonicalExecutionPlanCompilation(
+                new CanonicalExecutionPlan(
+                        true,
+                        CanonicalIngressProtocol.OPENAI,
+                        "/v1/chat/completions",
+                        "gpt-4o",
+                        "gpt-4o",
+                        "gpt-4o",
+                        TranslationResourceType.CHAT,
+                        TranslationOperation.CHAT_COMPLETION,
+                        com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind.NATIVE,
+                        InteropCapabilityLevel.NATIVE,
+                        InteropCapabilityLevel.NATIVE,
+                        InteropCapabilityLevel.NATIVE,
+                        List.of(InteropFeature.CHAT_TEXT),
+                        java.util.Map.of("chat_text", InteropCapabilityLevel.NATIVE),
+                        List.of(),
+                        List.of()
+                ),
+                selectionResult,
+                new GatewayRequestSemantics(TranslationResourceType.CHAT, TranslationOperation.CHAT_COMPLETION, List.of(InteropFeature.CHAT_TEXT), true),
+                new CanonicalRequest("sk-gw-test", CanonicalIngressProtocol.OPENAI, "/v1/chat/completions", "gpt-4o", List.of(), List.of(), null, null, null, null, null)
         );
     }
 }

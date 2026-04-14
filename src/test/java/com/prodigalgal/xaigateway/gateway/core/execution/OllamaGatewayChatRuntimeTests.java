@@ -3,6 +3,8 @@ package com.prodigalgal.xaigateway.gateway.core.execution;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResponse;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEvent;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileContent;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileResponse;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileService;
@@ -95,9 +97,9 @@ class OllamaGatewayChatRuntimeTests {
                 metadata
         );
 
-        GatewayChatRuntimeResult result = runtime.execute(context(request));
+        CanonicalResponse result = runtime.execute(context(request));
 
-        assertEquals("done", result.text());
+        assertEquals("done", result.outputText());
         assertEquals("step-by-step", result.reasoning());
         assertEquals(1, result.toolCalls().size());
         assertEquals("lookup_weather", result.toolCalls().get(0).name());
@@ -181,7 +183,7 @@ class OllamaGatewayChatRuntimeTests {
                 null
         );
 
-        List<ChatExecutionStreamChunk> chunks = runtime.executeStream(context(request)).collectList().block();
+        List<CanonicalStreamEvent> chunks = runtime.executeStream(context(request)).collectList().block();
 
         assertNotNull(chunks);
         assertEquals(5, chunks.size());
@@ -191,7 +193,7 @@ class OllamaGatewayChatRuntimeTests {
         assertEquals("lo", chunks.get(3).textDelta());
         assertEquals("step 2", chunks.get(3).reasoningDelta());
         assertEquals(true, chunks.get(4).terminal());
-        assertEquals("stop", chunks.get(4).finishReason());
+        assertEquals("STOP", chunks.get(4).finishReason().name());
         assertEquals(5, chunks.get(4).usage().totalTokens());
     }
 

@@ -16,13 +16,14 @@ public record GatewayPublicModelView(
         InteropCapabilityLevel capabilityLevel,
         boolean supportsChat,
         boolean supportsEmbeddings,
-        Map<String, CapabilityResolutionView> capabilities
+        Map<String, CapabilityResolutionView> capabilities,
+        Map<String, SurfaceCapabilityView> surfaces
 ) {
     public GatewayPublicModelView(
             String publicModelId,
             String resolvedModelKey,
             boolean alias
     ) {
-        this(publicModelId, resolvedModelKey, alias, null, null, null, InteropCapabilityLevel.NATIVE, true, false, Map.of());
+        this(publicModelId, resolvedModelKey, alias, null, null, null, InteropCapabilityLevel.NATIVE, true, false, Map.of(), Map.of());
     }
 }

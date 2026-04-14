@@ -1,6 +1,16 @@
 package com.prodigalgal.xaigateway.admin.api;
 
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlanCompilation;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
+import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics;
+import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
+import com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlanCompiler;
 import com.prodigalgal.xaigateway.gateway.core.routing.GatewayRouteSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
@@ -28,10 +38,15 @@ class RoutingPreviewControllerTests {
     @MockitoBean
     private GatewayRouteSelectionService gatewayRouteSelectionService;
 
+    @MockitoBean
+    private TranslationExecutionPlanCompiler translationExecutionPlanCompiler;
+
     @Test
     void shouldReturnRoutePreview() {
         Mockito.when(gatewayRouteSelectionService.select(Mockito.any()))
                 .thenReturn(selectionResult());
+        Mockito.when(translationExecutionPlanCompiler.compilePreview(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
+                .thenReturn(compilation());
 
         webTestClient.post()
                 .uri("/admin/routing/preview")
@@ -48,9 +63,11 @@ class RoutingPreviewControllerTests {
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
-                .jsonPath("$.distributedKeyId").isEqualTo(1)
-                .jsonPath("$.selectionSource").isEqualTo("PREFIX_AFFINITY")
-                .jsonPath("$.selectedCandidate.candidate.credentialId").isEqualTo(101);
+                .jsonPath("$.selection.distributedKeyId").isEqualTo(1)
+                .jsonPath("$.selection.selectionSource").isEqualTo("PREFIX_AFFINITY")
+                .jsonPath("$.selection.selectedCandidate.candidate.credentialId").isEqualTo(101)
+                .jsonPath("$.requestedSemantics.resourceType").isEqualTo("CHAT")
+                .jsonPath("$.plan.ingressProtocol").isEqualTo("OPENAI");
     }
 
     private RouteSelectionResult selectionResult() {
@@ -84,6 +101,32 @@ class RoutingPreviewControllerTests {
                 RouteSelectionSource.PREFIX_AFFINITY,
                 routeCandidateView,
                 List.of(routeCandidateView)
+        );
+    }
+
+    private CanonicalExecutionPlanCompilation compilation() {
+        return new CanonicalExecutionPlanCompilation(
+                new CanonicalExecutionPlan(
+                        true,
+                        CanonicalIngressProtocol.OPENAI,
+                        "/v1/chat/completions",
+                        "gpt-4o",
+                        "gpt-4o",
+                        "gpt-4o",
+                        TranslationResourceType.CHAT,
+                        TranslationOperation.CHAT_COMPLETION,
+                        com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind.NATIVE,
+                        InteropCapabilityLevel.NATIVE,
+                        InteropCapabilityLevel.NATIVE,
+                        InteropCapabilityLevel.NATIVE,
+                        List.of(InteropFeature.CHAT_TEXT),
+                        java.util.Map.of("chat_text", InteropCapabilityLevel.NATIVE),
+                        List.of(),
+                        List.of()
+                ),
+                selectionResult(),
+                new GatewayRequestSemantics(TranslationResourceType.CHAT, TranslationOperation.CHAT_COMPLETION, List.of(InteropFeature.CHAT_TEXT), true),
+                new CanonicalRequest("sk-gw-test", CanonicalIngressProtocol.OPENAI, "/v1/chat/completions", "gpt-4o", List.of(), List.of(), null, null, null, null, null)
         );
     }
 }

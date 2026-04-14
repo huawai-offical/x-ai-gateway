@@ -1,6 +1,11 @@
 package com.prodigalgal.xaigateway.gateway.core.interop;
 
 import tools.jackson.databind.JsonNode;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlanCompilation;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRenderCapabilitySupport;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
 import com.prodigalgal.xaigateway.gateway.core.routing.GatewayRouteSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionRequest;
@@ -27,7 +32,7 @@ public class TranslationExecutionPlanCompiler {
         this.siteCapabilityTruthService = siteCapabilityTruthService;
     }
 
-    public TranslationExecutionPlanCompilation compilePreview(
+    public CanonicalExecutionPlanCompilation compilePreview(
             String distributedKeyPrefix,
             String protocol,
             String requestPath,
@@ -82,7 +87,20 @@ public class TranslationExecutionPlanCompiler {
             blockedReasons.add("当前策略不允许 " + report.overallEffectiveLevel().name().toLowerCase(Locale.ROOT) + " 执行。");
         }
 
-        TranslationExecutionPlan plan = buildPlan(
+        CanonicalRequest canonicalRequest = new CanonicalRequest(
+                distributedKeyPrefix,
+                CanonicalIngressProtocol.from(normalizedProtocol),
+                normalizedRequestPath,
+                resolvedRequestedModel,
+                List.of(),
+                List.of(),
+                null,
+                null,
+                null,
+                null,
+                body
+        );
+        CanonicalExecutionPlan plan = buildPlan(
                 normalizedProtocol,
                 normalizedRequestPath,
                 resolvedRequestedModel,
@@ -99,18 +117,18 @@ public class TranslationExecutionPlanCompiler {
                 List.copyOf(lossReasons),
                 List.copyOf(blockedReasons)
         );
-        return new TranslationExecutionPlanCompilation(plan, selectionResult, semantics);
+        return new CanonicalExecutionPlanCompilation(plan, selectionResult, semantics, canonicalRequest);
     }
 
-    public TranslationExecutionPlan compileSelected(
+    public CanonicalExecutionPlanCompilation compileSelected(
             RouteSelectionResult selectionResult,
-            String requestPath,
+            CanonicalRequest canonicalRequest,
             GatewayRequestSemantics semantics,
             JsonNode body) {
         CapabilityResolutionReport report = siteCapabilityTruthService.resolve(selectionResult.selectedCandidate().candidate(), semantics);
-        return buildPlan(
+        CanonicalExecutionPlan plan = buildPlan(
                 selectionResult.protocol(),
-                requestPath,
+                canonicalRequest.requestPath(),
                 selectionResult.requestedModel(),
                 selectionResult.clientFamily(),
                 semantics,
@@ -121,9 +139,31 @@ public class TranslationExecutionPlanCompiler {
                 report.lossReasons(),
                 report.blockedReasons()
         );
+        return new CanonicalExecutionPlanCompilation(plan, selectionResult, semantics, canonicalRequest);
     }
 
-    private TranslationExecutionPlan buildPlan(
+    public CanonicalExecutionPlanCompilation compileSelected(
+            RouteSelectionResult selectionResult,
+            String requestPath,
+            GatewayRequestSemantics semantics,
+            JsonNode body) {
+        CanonicalRequest canonicalRequest = new CanonicalRequest(
+                selectionResult.distributedKeyPrefix(),
+                CanonicalIngressProtocol.from(selectionResult.protocol()),
+                requestPath,
+                selectionResult.requestedModel(),
+                List.of(),
+                List.of(),
+                null,
+                null,
+                null,
+                null,
+                body
+        );
+        return compileSelected(selectionResult, canonicalRequest, semantics, body);
+    }
+
+    private CanonicalExecutionPlan buildPlan(
             String protocol,
             String requestPath,
             String requestedModel,
@@ -136,59 +176,26 @@ public class TranslationExecutionPlanCompiler {
             List<String> lossReasons,
             List<String> blockedReasons) {
         java.util.Map<String, InteropCapabilityLevel> featureLevels = new java.util.LinkedHashMap<>();
-        java.util.Map<String, CapabilityResolutionView> featureResolutionViews = new java.util.LinkedHashMap<>();
-        resolutionReport.featureResolutions().forEach((key, value) -> {
-            featureLevels.put(key, value.effectiveLevel());
-            featureResolutionViews.put(key, CapabilityResolutionView.from(value));
-        });
-        return new TranslationExecutionPlan(
+        resolutionReport.featureResolutions().forEach((key, value) -> featureLevels.put(key, value.effectiveLevel()));
+        InteropCapabilityLevel executionCapabilityLevel = resolutionReport.overallEffectiveLevel();
+        InteropCapabilityLevel renderCapabilityLevel = CanonicalRenderCapabilitySupport.renderLevel(protocol, requestPath, semantics);
+        return new CanonicalExecutionPlan(
                 blockedReasons.isEmpty(),
-                protocol,
+                CanonicalIngressProtocol.from(protocol),
                 requestPath,
                 requestedModel,
                 selectionResult == null ? null : selectionResult.publicModel(),
                 selectionResult == null ? null : selectionResult.resolvedModelKey(),
-                clientFamily,
                 semantics.resourceType(),
                 semantics.operation(),
+                executionKind,
+                executionCapabilityLevel,
+                renderCapabilityLevel,
+                CanonicalRenderCapabilitySupport.minimum(executionCapabilityLevel, renderCapabilityLevel),
                 semantics.requiredFeatures(),
                 java.util.Map.copyOf(featureLevels),
-                java.util.Map.copyOf(featureResolutionViews),
-                selectionResult == null ? null : selectionResult.selectionSource(),
-                selectionResult == null ? null : selectionResult.selectedCandidate().candidate().providerFamily(),
-                selectionResult == null ? null : selectionResult.selectedCandidate().candidate().siteProfileId(),
-                executionKind,
-                resolutionReport.overallDeclaredLevel(),
-                resolutionReport.overallImplementedLevel(),
-                resolutionReport.overallEffectiveLevel(),
-                resolutionReport.overallEffectiveLevel(),
-                upstreamObjectMode,
-                lossReasons,
-                blockedReasons,
-                selectionResult == null ? null : selectionResult.selectedCandidate().candidate().authStrategy(),
-                selectionResult == null ? null : selectionResult.selectedCandidate().candidate().pathStrategy(),
-                selectionResult == null ? null : selectionResult.selectedCandidate().candidate().errorSchemaStrategy(),
-                new TranslationExecutionRequestMapping(
-                        protocol,
-                        requestPath,
-                        requestedModel,
-                        selectionResult == null ? null : selectionResult.publicModel(),
-                        selectionResult == null ? null : selectionResult.resolvedModelKey(),
-                        clientFamily,
-                        semantics.requiredFeatures(),
-                        java.util.Map.copyOf(featureLevels)
-                ),
-                new TranslationExecutionResponseMapping(
-                        selectionResult == null ? null : selectionResult.selectionSource(),
-                        selectionResult == null ? null : selectionResult.selectedCandidate().candidate().providerFamily(),
-                        selectionResult == null ? null : selectionResult.selectedCandidate().candidate().siteProfileId(),
-                        executionKind,
-                        resolutionReport.overallEffectiveLevel(),
-                        upstreamObjectMode,
-                        selectionResult == null ? null : selectionResult.selectedCandidate().candidate().authStrategy(),
-                        selectionResult == null ? null : selectionResult.selectedCandidate().candidate().pathStrategy(),
-                        selectionResult == null ? null : selectionResult.selectedCandidate().candidate().errorSchemaStrategy()
-                )
+                List.copyOf(lossReasons),
+                List.copyOf(blockedReasons)
         );
     }
 

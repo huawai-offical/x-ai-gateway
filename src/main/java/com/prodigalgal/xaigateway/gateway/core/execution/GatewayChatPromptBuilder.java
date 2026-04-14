@@ -46,13 +46,16 @@ public class GatewayChatPromptBuilder {
         this(new CanonicalChatMapper(new tools.jackson.databind.ObjectMapper()), distributedKeyQueryService, gatewayFileService);
     }
 
-    public Prompt buildPrompt(Object options, ChatExecutionRequest request) {
-        CanonicalRequest canonicalRequest = canonicalChatMapper.toCanonicalRequest(request);
+    public Prompt buildPrompt(Object options, CanonicalRequest canonicalRequest) {
         List<Message> messages = canonicalRequest.messages().stream()
                 .filter(this::isUsableMessage)
                 .map(message -> toPromptMessage(canonicalRequest.distributedKeyPrefix(), message))
                 .toList();
         return new Prompt(messages, (ChatOptions) options);
+    }
+
+    public Prompt buildPrompt(Object options, ChatExecutionRequest request) {
+        return buildPrompt(options, canonicalChatMapper.toCanonicalRequest(request));
     }
 
     private Message toPromptMessage(String distributedKeyPrefix, CanonicalMessage message) {

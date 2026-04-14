@@ -111,7 +111,8 @@ public class ModelCatalogQueryService {
                     java.util.Map.of(
                             InteropFeature.CHAT_TEXT.wireName(), CapabilityResolutionView.from(chatResolution.featureResolutions().get(InteropFeature.CHAT_TEXT.wireName())),
                             InteropFeature.EMBEDDINGS.wireName(), CapabilityResolutionView.from(embeddingsResolution.featureResolutions().get(InteropFeature.EMBEDDINGS.wireName()))
-                    )
+                    ),
+                    buildSurfaces(candidate)
             ));
         }
 
@@ -155,7 +156,8 @@ public class ModelCatalogQueryService {
                                 InteropFeature.EMBEDDINGS.wireName(),
                                 CapabilityResolutionView.from(featureResolution(representative, InteropFeature.EMBEDDINGS, TranslationResourceType.EMBEDDING, TranslationOperation.EMBEDDING_CREATE)
                                         .featureResolutions().get(InteropFeature.EMBEDDINGS.wireName()))
-                        )
+                        ),
+                        representative == null ? Map.of() : buildSurfaces(representative)
                 ));
             }
         }
@@ -282,6 +284,47 @@ public class ModelCatalogQueryService {
             case "google_native" -> "/v1beta/models/{model}:generateContent";
             default -> "/v1/chat/completions";
         };
+    }
+
+    private Map<String, SurfaceCapabilityView> buildSurfaces(CatalogCandidateView candidate) {
+        CapabilityResolutionReport chatResolution = featureResolution(candidate, InteropFeature.CHAT_TEXT, TranslationResourceType.CHAT, TranslationOperation.CHAT_COMPLETION);
+        CapabilityResolutionReport responseResolution = featureResolution(candidate, InteropFeature.RESPONSE_OBJECT, TranslationResourceType.RESPONSE, TranslationOperation.RESPONSE_CREATE);
+        CapabilityResolutionReport embeddingsResolution = featureResolution(candidate, InteropFeature.EMBEDDINGS, TranslationResourceType.EMBEDDING, TranslationOperation.EMBEDDING_CREATE);
+
+        return Map.of(
+                "chat_completion", toSurface("openai", "/v1/chat/completions", TranslationResourceType.CHAT, TranslationOperation.CHAT_COMPLETION, List.of(InteropFeature.CHAT_TEXT), chatResolution),
+                "response_create", toSurface("responses", "/v1/responses", TranslationResourceType.RESPONSE, TranslationOperation.RESPONSE_CREATE, List.of(InteropFeature.RESPONSE_OBJECT), responseResolution),
+                "embedding_create", toSurface("openai", "/v1/embeddings", TranslationResourceType.EMBEDDING, TranslationOperation.EMBEDDING_CREATE, List.of(InteropFeature.EMBEDDINGS), embeddingsResolution)
+        );
+    }
+
+    private SurfaceCapabilityView toSurface(
+            String protocol,
+            String requestPath,
+            TranslationResourceType resourceType,
+            TranslationOperation operation,
+            List<InteropFeature> requiredFeatures,
+            CapabilityResolutionReport resolutionReport) {
+        InteropCapabilityLevel renderLevel = CanonicalRenderCapabilitySupport.renderLevel(
+                protocol,
+                requestPath,
+                new GatewayRequestSemantics(resourceType, operation, requiredFeatures, true)
+        );
+        return new SurfaceCapabilityView(
+                resourceType,
+                operation,
+                resolutionReport.overallEffectiveLevel(),
+                renderLevel,
+                CanonicalRenderCapabilitySupport.minimum(resolutionReport.overallEffectiveLevel(), renderLevel),
+                requiredFeatures.stream().map(InteropFeature::wireName).toList(),
+                resolutionReport.featureResolutions().entrySet().stream()
+                        .collect(java.util.stream.Collectors.toMap(
+                                Map.Entry::getKey,
+                                entry -> CapabilityResolutionView.from(entry.getValue()),
+                                (left, right) -> left,
+                                java.util.LinkedHashMap::new
+                        ))
+        );
     }
 
     private List<CatalogCandidateView> expandCandidates(List<SiteModelCapabilityEntity> capabilities) {

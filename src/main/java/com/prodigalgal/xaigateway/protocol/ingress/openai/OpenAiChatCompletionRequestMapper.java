@@ -25,13 +25,7 @@ public class OpenAiChatCompletionRequestMapper {
         this.objectMapper = objectMapper;
     }
 
-    public ChatExecutionRequest toExecutionRequest(
-            AuthenticatedDistributedKey distributedKey,
-            OpenAiChatCompletionRequest request) {
-        return canonicalChatExecutionRequestAdapter.toExecutionRequest(toCanonicalRequest(distributedKey, request));
-    }
-
-    private CanonicalRequest toCanonicalRequest(
+    public CanonicalRequest toCanonicalRequest(
             AuthenticatedDistributedKey distributedKey,
             OpenAiChatCompletionRequest request) {
         List<CanonicalMessage> messages = toMessages(request.messages());
@@ -49,6 +43,12 @@ public class OpenAiChatCompletionRequestMapper {
                 buildReasoningConfig(request),
                 buildExecutionMetadata(request)
         );
+    }
+
+    public ChatExecutionRequest toExecutionRequest(
+            AuthenticatedDistributedKey distributedKey,
+            OpenAiChatCompletionRequest request) {
+        return canonicalChatExecutionRequestAdapter.toExecutionRequest(toCanonicalRequest(distributedKey, request));
     }
 
     private List<CanonicalMessage> toMessages(List<OpenAiChatCompletionRequest.Message> messages) {

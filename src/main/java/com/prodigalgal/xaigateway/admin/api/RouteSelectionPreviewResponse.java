@@ -1,29 +1,17 @@
 package com.prodigalgal.xaigateway.admin.api;
 
-import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
+import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateEvaluation;
-import com.prodigalgal.xaigateway.gateway.core.routing.RouteExecutionAttempt;
-import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateView;
-import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionSource;
+import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
 import java.util.List;
 
 public record RouteSelectionPreviewResponse(
-        Long distributedKeyId,
-        String distributedKeyPrefix,
-        String requestedModel,
-        String publicModel,
-        String resolvedModelKey,
-        String protocol,
-        String prefixHash,
-        String fingerprint,
-        String modelGroup,
-        GatewayClientFamily clientFamily,
-        List<String> governanceNotes,
-        RouteSelectionSource selectionSource,
-        RouteCandidateView selectedCandidate,
-        int candidateCount,
-        List<RouteCandidateView> candidates,
-        List<RouteCandidateEvaluation> candidateEvaluations,
-        List<RouteExecutionAttempt> attempts
+        RouteSelectionResult selection,
+        GatewayRequestSemantics requestedSemantics,
+        CanonicalRequest canonicalRequest,
+        CanonicalExecutionPlan plan,
+        List<RouteCandidateEvaluation> candidateEvaluations
 ) {
 }

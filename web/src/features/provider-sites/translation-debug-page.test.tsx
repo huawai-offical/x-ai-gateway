@@ -14,30 +14,21 @@ apiRequest.mockImplementation(async (url: string) => {
   if (url === '/admin/translation/explain') {
     return {
       executable: true,
-      providerFamily: 'OPENAI',
+      ingressProtocol: 'OPENAI',
+      requestPath: '/v1/chat/completions',
+      requestedModel: 'gpt-4o',
+      publicModel: 'gpt-4o',
+      resolvedModel: 'gpt-4o',
+      resourceType: 'CHAT',
+      operation: 'CHAT_COMPLETION',
       executionKind: 'NATIVE',
-      selectionSource: 'MODEL_ALIAS',
-      siteProfileId: 1,
-      overallDeclaredLevel: 'NATIVE',
-      overallImplementedLevel: 'NATIVE',
-      overallEffectiveLevel: 'NATIVE',
-      authStrategy: 'BEARER',
-      pathStrategy: 'OPENAI_V1',
-      errorSchemaStrategy: 'OPENAI_ERROR',
-      upstreamObjectMode: 'direct_upstream_execution',
-      lossReasons: [],
-      blockedReasons: [],
-      featureResolutions: {
-        response_object: {
-          declaredLevel: 'EMULATED',
-          implementedLevel: 'EMULATED',
-          effectiveLevel: 'EMULATED',
-          blockedReasons: [],
-          lossReasons: [],
-        },
-      },
-      requestMapping: { protocol: 'openai' },
-      responseMapping: { publicModel: 'gpt-4o' },
+      executionCapabilityLevel: 'NATIVE',
+      renderCapabilityLevel: 'NATIVE',
+      overallCapabilityLevel: 'NATIVE',
+      requiredFeatures: ['CHAT_TEXT'],
+      featureLevels: { chat_text: 'NATIVE' },
+      degradations: [],
+      blockers: [],
     }
   }
   if (url === '/admin/chat/execute') {
@@ -72,7 +63,7 @@ describe('TranslationDebugPage', () => {
     )
 
     fireEvent.click(screen.getByRole('button', { name: '查看 Explain' }))
-    expect(await screen.findByText('selection: MODEL_ALIAS')).toBeInTheDocument()
+    expect(await screen.findByText('protocol: OPENAI')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: '执行 Chat 调试' }))
     expect(await screen.findByText('hello from runtime')).toBeInTheDocument()

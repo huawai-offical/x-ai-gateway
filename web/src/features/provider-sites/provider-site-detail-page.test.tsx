@@ -38,6 +38,42 @@ apiRequest.mockImplementation(async (url: string, init?: RequestInit) => {
         supportsReasoningReuse: true,
         reasoningTransport: 'VISIBLE',
         capabilityLevel: 'NATIVE',
+        surfaces: {
+          chat_completion: {
+            resourceType: 'CHAT',
+            operation: 'CHAT_COMPLETION',
+            executionCapabilityLevel: 'NATIVE',
+            renderCapabilityLevel: 'NATIVE',
+            overallCapabilityLevel: 'NATIVE',
+            requiredFeatures: ['chat_text'],
+            featureResolutions: {
+              chat_text: {
+                declaredLevel: 'NATIVE',
+                implementedLevel: 'NATIVE',
+                effectiveLevel: 'NATIVE',
+                blockedReasons: [],
+                lossReasons: [],
+              },
+            },
+          },
+          response_create: {
+            resourceType: 'RESPONSE',
+            operation: 'RESPONSE_CREATE',
+            executionCapabilityLevel: 'NATIVE',
+            renderCapabilityLevel: 'EMULATED',
+            overallCapabilityLevel: 'EMULATED',
+            requiredFeatures: ['response_object'],
+            featureResolutions: {
+              response_object: {
+                declaredLevel: 'EMULATED',
+                implementedLevel: 'EMULATED',
+                effectiveLevel: 'EMULATED',
+                blockedReasons: [],
+                lossReasons: [],
+              },
+            },
+          },
+        },
       },
       {
         id: 2,
@@ -54,6 +90,25 @@ apiRequest.mockImplementation(async (url: string, init?: RequestInit) => {
         supportsReasoningReuse: false,
         reasoningTransport: null,
         capabilityLevel: 'EMULATED',
+        surfaces: {
+          chat_completion: {
+            resourceType: 'CHAT',
+            operation: 'CHAT_COMPLETION',
+            executionCapabilityLevel: 'EMULATED',
+            renderCapabilityLevel: 'NATIVE',
+            overallCapabilityLevel: 'EMULATED',
+            requiredFeatures: ['chat_text'],
+            featureResolutions: {
+              chat_text: {
+                declaredLevel: 'EMULATED',
+                implementedLevel: 'EMULATED',
+                effectiveLevel: 'EMULATED',
+                blockedReasons: [],
+                lossReasons: [],
+              },
+            },
+          },
+        },
       },
     ]
   }
@@ -91,6 +146,25 @@ const sampleSite = {
       lossReasons: [],
     },
   },
+  surfaces: {
+    response_create: {
+      resourceType: 'RESPONSE',
+      operation: 'RESPONSE_CREATE',
+      executionCapabilityLevel: 'EMULATED',
+      renderCapabilityLevel: 'EMULATED',
+      overallCapabilityLevel: 'EMULATED',
+      requiredFeatures: ['response_object'],
+      featureResolutions: {
+        response_object: {
+          declaredLevel: 'EMULATED',
+          implementedLevel: 'EMULATED',
+          effectiveLevel: 'EMULATED',
+          blockedReasons: [],
+          lossReasons: [],
+        },
+      },
+    },
+  },
   modelCount: 2,
   refreshedAt: '2026-04-13T03:00:00Z',
   createdAt: '2026-04-13T02:00:00Z',
@@ -110,7 +184,7 @@ describe('ProviderSiteDetailPage', () => {
   it('filters capabilities by feature and saves edits', async () => {
     render(
       <QueryClientProvider client={new QueryClient()}>
-        <MemoryRouter initialEntries={['/provider-sites/1?feature=response_object']}>
+        <MemoryRouter initialEntries={['/provider-sites/1?surface=response_create']}>
           <Routes>
             <Route path="/provider-sites/:id" element={<ProviderSiteDetailPage />} />
           </Routes>
@@ -121,6 +195,7 @@ describe('ProviderSiteDetailPage', () => {
     expect(await screen.findByText('surface: openai')).toBeInTheDocument()
     expect(screen.getAllByText('gpt-4o').length).toBeGreaterThan(0)
     expect(screen.queryByText('chat-only')).not.toBeInTheDocument()
+    expect(screen.getAllByText('RESPONSE_CREATE').length).toBeGreaterThan(0)
 
     fireEvent.change(screen.getByLabelText('displayName'), {
       target: { value: 'OPENAI_DIRECT_EDITED' },

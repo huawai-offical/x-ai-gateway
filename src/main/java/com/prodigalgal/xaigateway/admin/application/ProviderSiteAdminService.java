@@ -4,10 +4,16 @@ import com.prodigalgal.xaigateway.admin.api.CapabilityMatrixRowResponse;
 import com.prodigalgal.xaigateway.admin.api.ProviderSiteRequest;
 import com.prodigalgal.xaigateway.admin.api.ProviderSiteResponse;
 import com.prodigalgal.xaigateway.admin.api.SiteModelCapabilityResponse;
+import com.prodigalgal.xaigateway.gateway.core.catalog.SurfaceCapabilityView;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRenderCapabilitySupport;
 import com.prodigalgal.xaigateway.gateway.core.interop.CapabilityResolutionView;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CredentialModelDiscoveryService;
+import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics;
+import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature;
 import com.prodigalgal.xaigateway.gateway.core.interop.SiteCapabilityTruthService;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SiteCapabilitySnapshotEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SiteModelCapabilityEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
@@ -111,6 +117,7 @@ public class ProviderSiteAdminService {
                         item.isSupportsReasoningReuse(),
                         item.getReasoningTransport(),
                         item.getCapabilityLevel(),
+                        buildModelSurfaces(item),
                         item.getSourceRefreshedAt()
                 ))
                 .toList();
@@ -146,6 +153,7 @@ public class ProviderSiteAdminService {
                 cooldown.credentialCount(),
                 cooldown.cooldownUntil(),
                 buildFeatureViews(entity, snapshot),
+                buildSurfaceViews(entity, snapshot),
                 siteCapabilityTruthService.supportsFeature(entity, snapshot, InteropFeature.RESPONSE_OBJECT),
                 siteCapabilityTruthService.supportsFeature(entity, snapshot, InteropFeature.EMBEDDINGS),
                 siteCapabilityTruthService.supportsFeature(entity, snapshot, InteropFeature.AUDIO_TRANSCRIPTION),
@@ -186,6 +194,7 @@ public class ProviderSiteAdminService {
                 cooldown.credentialCount(),
                 cooldown.cooldownUntil(),
                 buildFeatureViews(entity, snapshot),
+                buildSurfaceViews(entity, snapshot),
                 modelCount,
                 snapshot == null ? null : snapshot.getRefreshedAt(),
                 entity.getCreatedAt(),
@@ -225,6 +234,95 @@ public class ProviderSiteAdminService {
                 InteropFeature.BATCH_CREATE.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.BATCH_CREATE)),
                 InteropFeature.TUNING_CREATE.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.TUNING_CREATE)),
                 InteropFeature.REALTIME_CLIENT_SECRET.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.REALTIME_CLIENT_SECRET))
+        );
+    }
+
+    private Map<String, SurfaceCapabilityView> buildSurfaceViews(
+            UpstreamSiteProfileEntity entity,
+            SiteCapabilitySnapshotEntity snapshot) {
+        return Map.of(
+                "chat_completion", toSurface(
+                        "openai",
+                        "/v1/chat/completions",
+                        TranslationResourceType.CHAT,
+                        TranslationOperation.CHAT_COMPLETION,
+                        List.of(InteropFeature.CHAT_TEXT),
+                        siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.CHAT_TEXT)
+                ),
+                "response_create", toSurface(
+                        "responses",
+                        "/v1/responses",
+                        TranslationResourceType.RESPONSE,
+                        TranslationOperation.RESPONSE_CREATE,
+                        List.of(InteropFeature.RESPONSE_OBJECT),
+                        siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.RESPONSE_OBJECT)
+                ),
+                "embedding_create", toSurface(
+                        "openai",
+                        "/v1/embeddings",
+                        TranslationResourceType.EMBEDDING,
+                        TranslationOperation.EMBEDDING_CREATE,
+                        List.of(InteropFeature.EMBEDDINGS),
+                        siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.EMBEDDINGS)
+                )
+        );
+    }
+
+    private Map<String, SurfaceCapabilityView> buildModelSurfaces(SiteModelCapabilityEntity item) {
+        InteropCapabilityLevel chatLevel = item.isSupportsChat() ? item.getCapabilityLevel() : InteropCapabilityLevel.UNSUPPORTED;
+        InteropCapabilityLevel responseLevel = item.getSupportedProtocols().contains("responses") ? item.getCapabilityLevel() : InteropCapabilityLevel.UNSUPPORTED;
+        InteropCapabilityLevel embeddingsLevel = item.isSupportsEmbeddings() ? item.getCapabilityLevel() : InteropCapabilityLevel.UNSUPPORTED;
+        return Map.of(
+                "chat_completion", modelSurface("openai", "/v1/chat/completions", TranslationResourceType.CHAT, TranslationOperation.CHAT_COMPLETION, InteropFeature.CHAT_TEXT, chatLevel),
+                "response_create", modelSurface("responses", "/v1/responses", TranslationResourceType.RESPONSE, TranslationOperation.RESPONSE_CREATE, InteropFeature.RESPONSE_OBJECT, responseLevel),
+                "embedding_create", modelSurface("openai", "/v1/embeddings", TranslationResourceType.EMBEDDING, TranslationOperation.EMBEDDING_CREATE, InteropFeature.EMBEDDINGS, embeddingsLevel)
+        );
+    }
+
+    private SurfaceCapabilityView toSurface(
+            String protocol,
+            String requestPath,
+            TranslationResourceType resourceType,
+            TranslationOperation operation,
+            List<InteropFeature> requiredFeatures,
+            com.prodigalgal.xaigateway.gateway.core.interop.CapabilityResolution resolution) {
+        InteropCapabilityLevel executionLevel = resolution == null ? InteropCapabilityLevel.UNSUPPORTED : resolution.effectiveLevel();
+        InteropCapabilityLevel renderLevel = CanonicalRenderCapabilitySupport.renderLevel(
+                protocol,
+                requestPath,
+                new GatewayRequestSemantics(resourceType, operation, requiredFeatures, true)
+        );
+        return new SurfaceCapabilityView(
+                resourceType,
+                operation,
+                executionLevel,
+                renderLevel,
+                CanonicalRenderCapabilitySupport.minimum(executionLevel, renderLevel),
+                requiredFeatures.stream().map(InteropFeature::wireName).toList(),
+                Map.of(requiredFeatures.get(0).wireName(), CapabilityResolutionView.from(resolution))
+        );
+    }
+
+    private SurfaceCapabilityView modelSurface(
+            String protocol,
+            String requestPath,
+            TranslationResourceType resourceType,
+            TranslationOperation operation,
+            InteropFeature feature,
+            InteropCapabilityLevel executionLevel) {
+        InteropCapabilityLevel renderLevel = CanonicalRenderCapabilitySupport.renderLevel(
+                protocol,
+                requestPath,
+                new GatewayRequestSemantics(resourceType, operation, List.of(feature), true)
+        );
+        return new SurfaceCapabilityView(
+                resourceType,
+                operation,
+                executionLevel,
+                renderLevel,
+                CanonicalRenderCapabilitySupport.minimum(executionLevel, renderLevel),
+                List.of(feature.wireName()),
+                Map.of(feature.wireName(), new CapabilityResolutionView(null, null, executionLevel.name().toLowerCase(), List.of(), List.of()))
         );
     }
 

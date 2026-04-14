@@ -6,9 +6,12 @@ import com.prodigalgal.xaigateway.admin.application.CredentialCryptoService;
 import com.prodigalgal.xaigateway.gateway.core.account.AccountSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyGovernanceService;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlanCompilation;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestFeatureService;
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics;
-import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlan;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlanCompiler;
 import com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityService;
 import com.prodigalgal.xaigateway.gateway.core.routing.GatewayRouteSelectionService;
@@ -80,7 +83,7 @@ class GatewayResourceExecutionServiceTests {
                         true
                 ));
         Mockito.when(translationExecutionPlanCompiler.compileSelected(any(), eq("/v1/embeddings"), any(), any()))
-                .thenReturn(Mockito.mock(TranslationExecutionPlan.class));
+                .thenReturn(compilation("/v1/embeddings", "text-embedding-004"));
         Mockito.when(embeddingsExecutor.supports(eq("/v1/embeddings"), any())).thenReturn(true);
         Mockito.when(embeddingsExecutor.executeJson(any(), any(), eq("text-embedding-004")))
                 .thenReturn(ResponseEntity.ok(new ObjectMapper().createObjectNode().put("object", "list")));
@@ -135,7 +138,7 @@ class GatewayResourceExecutionServiceTests {
                         true
                 ));
         Mockito.when(translationExecutionPlanCompiler.compileSelected(any(), eq("/v1/moderations"), any(), any()))
-                .thenReturn(Mockito.mock(TranslationExecutionPlan.class));
+                .thenReturn(compilation("/v1/moderations", "omni-moderation-latest"));
         Mockito.when(unsupportedExecutor.supports(eq("/v1/moderations"), any())).thenReturn(false);
 
         assertThrows(IllegalArgumentException.class, () -> service.executeJson(
@@ -191,7 +194,7 @@ class GatewayResourceExecutionServiceTests {
                         true
                 ));
         Mockito.when(translationExecutionPlanCompiler.compileSelected(any(), eq("/v1/embeddings"), any(), any()))
-                .thenReturn(Mockito.mock(TranslationExecutionPlan.class));
+                .thenReturn(compilation("/v1/embeddings", "text-embedding-004"));
         Mockito.when(embeddingsExecutor.supports(eq("/v1/embeddings"), any())).thenReturn(true);
         Mockito.when(embeddingsExecutor.executeJson(any(), any(), eq("text-embedding-004")))
                 .thenReturn(ResponseEntity.status(503).body(null))
@@ -330,5 +333,36 @@ class GatewayResourceExecutionServiceTests {
         entity.setBaseUrl("https://example.com");
         entity.setApiKeyCiphertext("cipher");
         return entity;
+    }
+
+    private CanonicalExecutionPlanCompilation compilation(String requestPath, String model) {
+        return new CanonicalExecutionPlanCompilation(
+                new CanonicalExecutionPlan(
+                        true,
+                        CanonicalIngressProtocol.OPENAI,
+                        requestPath,
+                        model,
+                        model,
+                        model,
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType.UNKNOWN,
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation.UNKNOWN,
+                        com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind.NATIVE,
+                        com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel.NATIVE,
+                        com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel.NATIVE,
+                        com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel.NATIVE,
+                        List.of(),
+                        java.util.Map.of(),
+                        List.of(),
+                        List.of()
+                ),
+                null,
+                new GatewayRequestSemantics(
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType.UNKNOWN,
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation.UNKNOWN,
+                        List.of(),
+                        true
+                ),
+                new CanonicalRequest("sk-gw-test", CanonicalIngressProtocol.OPENAI, requestPath, model, List.of(), List.of(), null, null, null, null, null)
+        );
     }
 }

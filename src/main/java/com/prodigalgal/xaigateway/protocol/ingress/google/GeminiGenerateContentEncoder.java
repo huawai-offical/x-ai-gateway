@@ -2,6 +2,8 @@ package com.prodigalgal.xaigateway.protocol.ingress.google;
 
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionResult;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionStreamResult;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalGatewayResponseMapper;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResponse;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEvent;
@@ -26,12 +28,24 @@ public class GeminiGenerateContentEncoder {
         return GeminiGenerateContentResponse.fromCanonical(canonicalResponse);
     }
 
+    public GeminiGenerateContentResponse encode(CanonicalExecutionResult response) {
+        return GeminiGenerateContentResponse.fromCanonical(response.response());
+    }
+
     public Flux<String> encodeStream(GatewayStreamResponse response) {
         return response.events().concatMap(this::encodeEvent);
     }
 
+    public Flux<String> encodeStream(CanonicalExecutionStreamResult response) {
+        return response.events().concatMap(this::encodeCanonicalEvent);
+    }
+
     private Flux<String> encodeEvent(com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamEvent event) {
         CanonicalStreamEvent canonicalEvent = canonicalGatewayResponseMapper.toCanonicalStreamEvent(event);
+        return encodeCanonicalEvent(canonicalEvent);
+    }
+
+    private Flux<String> encodeCanonicalEvent(CanonicalStreamEvent canonicalEvent) {
         if (canonicalEvent.type() == CanonicalStreamEventType.TEXT_DELTA && canonicalEvent.textDelta() != null && !canonicalEvent.textDelta().isBlank()) {
             return Flux.just(encode(GeminiGenerateContentResponse.fromCanonical(
                     new CanonicalResponse(null, null, canonicalEvent.textDelta(), null, java.util.List.of(), com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalUsage.empty(), null)

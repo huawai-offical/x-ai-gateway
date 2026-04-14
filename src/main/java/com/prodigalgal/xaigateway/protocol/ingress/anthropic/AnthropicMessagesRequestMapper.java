@@ -25,13 +25,7 @@ public class AnthropicMessagesRequestMapper {
         this.objectMapper = objectMapper;
     }
 
-    public ChatExecutionRequest toExecutionRequest(
-            AuthenticatedDistributedKey distributedKey,
-            AnthropicMessagesRequest request) {
-        return canonicalChatExecutionRequestAdapter.toExecutionRequest(toCanonicalRequest(distributedKey, request));
-    }
-
-    private CanonicalRequest toCanonicalRequest(
+    public CanonicalRequest toCanonicalRequest(
             AuthenticatedDistributedKey distributedKey,
             AnthropicMessagesRequest request) {
         List<CanonicalMessage> messages = toMessages(request.system(), request.messages());
@@ -49,6 +43,12 @@ public class AnthropicMessagesRequestMapper {
                 null,
                 objectMapper.valueToTree(request)
         );
+    }
+
+    public ChatExecutionRequest toExecutionRequest(
+            AuthenticatedDistributedKey distributedKey,
+            AnthropicMessagesRequest request) {
+        return canonicalChatExecutionRequestAdapter.toExecutionRequest(toCanonicalRequest(distributedKey, request));
     }
 
     private List<CanonicalMessage> toMessages(JsonNode systemNode, List<AnthropicMessagesRequest.Message> messages) {

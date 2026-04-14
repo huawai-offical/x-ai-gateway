@@ -1,7 +1,7 @@
 package com.prodigalgal.xaigateway.admin.api;
 
 import com.prodigalgal.xaigateway.admin.application.TranslationExplainService;
-import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlan;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -19,7 +19,7 @@ public class TranslationExplainAdminController {
     }
 
     @PostMapping("/explain")
-    public TranslationExecutionPlan explain(@Valid @RequestBody TranslationExplainRequest request) {
+    public CanonicalExecutionPlan explain(@Valid @RequestBody TranslationExplainRequest request) {
         return translationExplainService.explain(request);
     }
 }

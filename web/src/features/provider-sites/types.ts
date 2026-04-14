@@ -6,6 +6,16 @@ export type CapabilityResolution = {
   lossReasons: string[]
 }
 
+export type SurfaceCapability = {
+  resourceType: string
+  operation: string
+  executionCapabilityLevel?: string | null
+  renderCapabilityLevel?: string | null
+  overallCapabilityLevel?: string | null
+  requiredFeatures: string[]
+  featureResolutions: Record<string, CapabilityResolution>
+}
+
 export type ProviderSite = {
   id: number
   profileCode: string
@@ -29,6 +39,7 @@ export type ProviderSite = {
   cooldownCredentialCount: number
   cooldownUntil?: string | null
   features: Record<string, CapabilityResolution>
+  surfaces: Record<string, SurfaceCapability>
   modelCount: number
   refreshedAt?: string | null
   createdAt?: string | null
@@ -54,6 +65,7 @@ export type CapabilityMatrixRow = {
   cooldownCredentialCount: number
   cooldownUntil?: string | null
   features: Record<string, CapabilityResolution>
+  surfaces: Record<string, SurfaceCapability>
   supportsResponses: boolean
   supportsEmbeddings: boolean
   supportsAudio: boolean
@@ -81,37 +93,48 @@ export type SiteModelCapability = {
   supportsReasoningReuse: boolean
   reasoningTransport?: string | null
   capabilityLevel: string
+  surfaces: Record<string, SurfaceCapability>
   sourceRefreshedAt?: string | null
 }
 
 export type TranslationPlan = {
   executable: boolean
-  protocol?: string | null
+  ingressProtocol?: string | null
   requestPath?: string | null
   requestedModel?: string | null
   publicModel?: string | null
-  resolvedModelKey?: string | null
+  resolvedModel?: string | null
   resourceType?: string | null
   operation?: string | null
   requiredFeatures: string[]
   featureLevels: Record<string, string>
-  featureResolutions: Record<string, CapabilityResolution>
-  selectionSource?: string | null
-  providerFamily?: string | null
-  siteProfileId?: number | null
   executionKind?: string | null
-  overallDeclaredLevel?: string | null
-  overallImplementedLevel?: string | null
-  overallEffectiveLevel?: string | null
-  capabilityLevel?: string | null
-  upstreamObjectMode?: string | null
-  lossReasons: string[]
-  blockedReasons: string[]
-  authStrategy?: string | null
-  pathStrategy?: string | null
-  errorSchemaStrategy?: string | null
-  requestMapping: Record<string, unknown>
-  responseMapping: Record<string, unknown>
+  executionCapabilityLevel?: string | null
+  renderCapabilityLevel?: string | null
+  overallCapabilityLevel?: string | null
+  degradations: string[]
+  blockers: string[]
+}
+
+export type RouteSelectionPreview = {
+  selection: unknown
+  requestedSemantics: {
+    resourceType: string
+    operation: string
+    requiredFeatures: string[]
+    requiresRouteSelection: boolean
+  }
+  canonicalRequest: Record<string, unknown>
+  plan: TranslationPlan
+  candidateEvaluations: unknown[]
+}
+
+export type ExecutionPreview = {
+  selection: unknown
+  canonicalRequest: Record<string, unknown>
+  plan: TranslationPlan
+  providerBinding: unknown
+  providerOptions: Record<string, unknown>
 }
 
 export type AdminChatExecuteResponse = {
@@ -198,22 +221,9 @@ export function matchesResolutionFilter(rowFeatures: Record<string, CapabilityRe
   return true
 }
 
-export function modelSupportsFeature(model: SiteModelCapability, feature?: string | null) {
-  if (!feature) return true
-  switch (feature) {
-    case 'response_object':
-      return model.supportedProtocols.includes('responses')
-    case 'embeddings':
-      return model.supportsEmbeddings
-    case 'tools':
-      return model.supportsTools
-    case 'image_input':
-      return model.supportsImageInput
-    case 'reasoning':
-      return model.supportsThinking
-    default:
-      return true
-  }
+export function modelSupportsFeature(model: SiteModelCapability, surface?: string | null) {
+  if (!surface) return true
+  return Boolean(model.surfaces[surface])
 }
 
 export function isChatLikePath(requestPath: string) {
