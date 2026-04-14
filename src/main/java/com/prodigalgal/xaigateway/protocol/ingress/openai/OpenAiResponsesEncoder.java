@@ -2,10 +2,12 @@ package com.prodigalgal.xaigateway.protocol.ingress.openai;
 
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
-import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolCall;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalGatewayResponseMapper;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResponse;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEvent;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEventType;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolCall;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayResponse;
-import com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamEvent;
-import com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamEventType;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamResponse;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -19,13 +21,15 @@ import reactor.core.publisher.Flux;
 public class OpenAiResponsesEncoder {
 
     private final ObjectMapper objectMapper;
+    private final CanonicalGatewayResponseMapper canonicalGatewayResponseMapper = new CanonicalGatewayResponseMapper();
 
     public OpenAiResponsesEncoder(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 
     public OpenAiResponsesResponse encode(GatewayResponse response) {
-        return OpenAiResponsesResponse.from(response);
+        CanonicalResponse canonicalResponse = canonicalGatewayResponseMapper.toCanonicalResponse(response);
+        return OpenAiResponsesResponse.fromCanonical(canonicalResponse);
     }
 
     public Flux<String> encodeStream(GatewayStreamResponse response) {
@@ -47,38 +51,39 @@ public class OpenAiResponsesEncoder {
 
     private Flux<String> encodeEvent(
             GatewayStreamResponse response,
-            GatewayStreamEvent event,
+            com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamEvent event,
             String itemId,
             String reasoningItemId,
             AtomicBoolean reasoningStarted,
             AtomicBoolean messageOpened) {
+        CanonicalStreamEvent canonicalEvent = canonicalGatewayResponseMapper.toCanonicalStreamEvent(event);
         List<String> events = new ArrayList<>();
 
-        if (event.type() == GatewayStreamEventType.REASONING_DELTA && event.reasoningDelta() != null && !event.reasoningDelta().isBlank()) {
+        if (canonicalEvent.type() == CanonicalStreamEventType.REASONING_DELTA && canonicalEvent.reasoningDelta() != null && !canonicalEvent.reasoningDelta().isBlank()) {
             if (reasoningStarted.compareAndSet(false, true)) {
                 events.add(encodeEvent("response.output_item.added", reasoningItemAddedEvent(reasoningItemId)));
                 events.add(encodeEvent("response.reasoning_summary_part.added", reasoningSummaryPartAddedEvent(reasoningItemId)));
             }
-            events.add(encodeEvent("response.reasoning_summary_text.delta", reasoningSummaryTextDeltaEvent(reasoningItemId, event.reasoningDelta())));
+            events.add(encodeEvent("response.reasoning_summary_text.delta", reasoningSummaryTextDeltaEvent(reasoningItemId, canonicalEvent.reasoningDelta())));
         }
 
-        if (event.type() == GatewayStreamEventType.TOOL_CALLS && event.toolCalls() != null && !event.toolCalls().isEmpty()) {
+        if (canonicalEvent.type() == CanonicalStreamEventType.TOOL_CALLS && canonicalEvent.toolCalls() != null && !canonicalEvent.toolCalls().isEmpty()) {
             int outputIndexBase = reasoningStarted.get() ? 2 : 1;
-            for (int index = 0; index < event.toolCalls().size(); index++) {
-                events.addAll(encodeToolCallEvents(event.toolCalls().get(index), outputIndexBase + index));
+            for (int index = 0; index < canonicalEvent.toolCalls().size(); index++) {
+                events.addAll(encodeToolCallEvents(canonicalEvent.toolCalls().get(index), outputIndexBase + index));
             }
         }
 
-        if (event.type() == GatewayStreamEventType.TEXT_DELTA && event.textDelta() != null && !event.textDelta().isBlank()) {
-            events.add(encodeEvent("response.output_text.delta", outputTextDeltaEvent(itemId, event.textDelta())));
+        if (canonicalEvent.type() == CanonicalStreamEventType.TEXT_DELTA && canonicalEvent.textDelta() != null && !canonicalEvent.textDelta().isBlank()) {
+            events.add(encodeEvent("response.output_text.delta", outputTextDeltaEvent(itemId, canonicalEvent.textDelta())));
         }
 
-        if (event.type() != GatewayStreamEventType.COMPLETED) {
+        if (canonicalEvent.type() != CanonicalStreamEventType.COMPLETED) {
             return events.isEmpty() ? Flux.empty() : Flux.fromIterable(events);
         }
 
-        String finalReasoning = event.reasoning();
-        String finalText = event.outputText();
+        String finalReasoning = canonicalEvent.reasoning();
+        String finalText = canonicalEvent.outputText();
         if (reasoningStarted.get()) {
             events.add(encodeEvent("response.reasoning_summary_text.done", reasoningSummaryTextDoneEvent(reasoningItemId, finalReasoning == null ? "" : finalReasoning)));
             events.add(encodeEvent("response.reasoning_summary_part.done", reasoningSummaryPartDoneEvent(reasoningItemId, finalReasoning == null ? "" : finalReasoning)));
@@ -89,7 +94,7 @@ public class OpenAiResponsesEncoder {
             events.add(encodeEvent("response.content_part.done", contentPartDoneEvent(itemId, finalText == null ? "" : finalText)));
             events.add(encodeEvent("response.output_item.done", outputItemDoneEvent(itemId, finalText == null ? "" : finalText)));
         }
-        events.add(encodeEvent("response.completed", completedEvent(response, finalText, event)));
+        events.add(encodeEvent("response.completed", completedEvent(response, canonicalEvent)));
         return Flux.fromIterable(events);
     }
 
@@ -222,7 +227,7 @@ public class OpenAiResponsesEncoder {
         return Map.of("type", "response.output_item.done", "output_index", 0, "item", item);
     }
 
-    private List<String> encodeToolCallEvents(GatewayToolCall toolCall, int outputIndex) {
+    private List<String> encodeToolCallEvents(CanonicalToolCall toolCall, int outputIndex) {
         String itemId = toolCall.id() == null || toolCall.id().isBlank() ? "fc_" + outputIndex : toolCall.id();
         List<String> events = new ArrayList<>();
         events.add(encodeEvent("response.output_item.added", functionCallAddedEvent(itemId, outputIndex, toolCall)));
@@ -234,7 +239,7 @@ public class OpenAiResponsesEncoder {
         return events;
     }
 
-    private Map<String, Object> functionCallAddedEvent(String itemId, int outputIndex, GatewayToolCall toolCall) {
+    private Map<String, Object> functionCallAddedEvent(String itemId, int outputIndex, CanonicalToolCall toolCall) {
         return Map.of(
                 "type", "response.output_item.added",
                 "output_index", outputIndex,
@@ -257,7 +262,7 @@ public class OpenAiResponsesEncoder {
         return Map.of("type", "response.function_call_arguments.done", "item_id", itemId, "output_index", outputIndex, "arguments", arguments);
     }
 
-    private Map<String, Object> functionCallDoneEvent(String itemId, int outputIndex, GatewayToolCall toolCall) {
+    private Map<String, Object> functionCallDoneEvent(String itemId, int outputIndex, CanonicalToolCall toolCall) {
         return Map.of(
                 "type", "response.output_item.done",
                 "output_index", outputIndex,
@@ -272,10 +277,16 @@ public class OpenAiResponsesEncoder {
         );
     }
 
-    private Map<String, Object> completedEvent(GatewayStreamResponse response, String text, GatewayStreamEvent event) {
+    private Map<String, Object> completedEvent(GatewayStreamResponse response, CanonicalStreamEvent event) {
         return Map.of(
                 "type", "response.completed",
-                "response", OpenAiResponsesResponse.completed(response, text, event.usage(), event.reasoning())
+                "response", OpenAiResponsesResponse.completedCanonical(
+                        response.requestId(),
+                        response.routeSelection().publicModel(),
+                        event.outputText(),
+                        event.usage(),
+                        event.reasoning()
+                )
         );
     }
 

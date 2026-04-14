@@ -1,6 +1,9 @@
 package com.prodigalgal.xaigateway.protocol.ingress.openai;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResponse;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolCall;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalUsage;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayResponse;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamResponse;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageView;
@@ -113,6 +116,18 @@ public record OpenAiResponsesResponse(
         );
     }
 
+    public static OpenAiResponsesResponse fromCanonical(CanonicalResponse response) {
+        return buildFromCanonical(
+                "resp-" + response.requestId(),
+                "completed",
+                response.publicModel(),
+                response.outputText(),
+                response.usage(),
+                response.toolCalls(),
+                response.reasoning()
+        );
+    }
+
     public static OpenAiResponsesResponse inProgress(GatewayStreamResponse response) {
         return buildFromUsageView(
                 "resp-" + response.requestId(),
@@ -150,6 +165,23 @@ public record OpenAiResponsesResponse(
                 "resp-" + response.requestId(),
                 "completed",
                 response.routeSelection().publicModel(),
+                text,
+                usage,
+                List.of(),
+                reasoning
+        );
+    }
+
+    public static OpenAiResponsesResponse completedCanonical(
+            String requestId,
+            String model,
+            String text,
+            CanonicalUsage usage,
+            String reasoning) {
+        return buildFromCanonical(
+                "resp-" + requestId,
+                "completed",
+                model,
                 text,
                 usage,
                 List.of(),
@@ -268,6 +300,77 @@ public record OpenAiResponsesResponse(
         }
 
         for (GatewayToolCall toolCall : toolCalls) {
+            output.add(new OutputItem(
+                    toolCall.id(),
+                    "function_call",
+                    null,
+                    null,
+                    toolCall.name(),
+                    toolCall.arguments(),
+                    toolCall.id(),
+                    status,
+                    null
+            ));
+        }
+
+        return new OpenAiResponsesResponse(
+                responseId,
+                "response",
+                now.getEpochSecond(),
+                status,
+                model,
+                List.copyOf(output),
+                text == null || text.isBlank() ? null : text,
+                usage == null || !usage.present() ? null : new Usage(
+                        usage.promptTokens(),
+                        usage.completionTokens(),
+                        usage.totalTokens(),
+                        new InputTokensDetails(usage.cacheHitTokens()),
+                        new OutputTokensDetails(usage.reasoningTokens())
+                )
+        );
+    }
+
+    private static OpenAiResponsesResponse buildFromCanonical(
+            String responseId,
+            String status,
+            String model,
+            String text,
+            CanonicalUsage usage,
+            List<CanonicalToolCall> toolCalls,
+            String reasoning) {
+        Instant now = Instant.now();
+        List<OutputItem> output = new ArrayList<>();
+
+        if (reasoning != null && !reasoning.isBlank()) {
+            output.add(new OutputItem(
+                    "rs_" + now.toEpochMilli(),
+                    "reasoning",
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    status,
+                    List.of(new SummaryItem("summary_text", reasoning))
+            ));
+        }
+
+        if (text != null && !text.isBlank()) {
+            output.add(new OutputItem(
+                    "msg_" + now.toEpochMilli(),
+                    "message",
+                    "assistant",
+                    List.of(new ContentItem("output_text", text)),
+                    null,
+                    null,
+                    null,
+                    status,
+                    null
+            ));
+        }
+
+        for (CanonicalToolCall toolCall : toolCalls) {
             output.add(new OutputItem(
                     toolCall.id(),
                     "function_call",

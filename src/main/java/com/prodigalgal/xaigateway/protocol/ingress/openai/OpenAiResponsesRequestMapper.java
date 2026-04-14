@@ -3,10 +3,15 @@ package com.prodigalgal.xaigateway.protocol.ingress.openai;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.JsonNodeFactory;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalChatExecutionRequestAdapter;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalContentPart;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalMessage;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalMessageRole;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalReasoningConfig;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolDefinition;
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest.MediaInput;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest.MessageInput;
-import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolDefinition;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Component;
@@ -15,12 +20,17 @@ import org.springframework.stereotype.Component;
 public class OpenAiResponsesRequestMapper {
 
     private final ObjectMapper objectMapper;
+    private final CanonicalChatExecutionRequestAdapter canonicalChatExecutionRequestAdapter = new CanonicalChatExecutionRequestAdapter();
 
     public OpenAiResponsesRequestMapper(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 
     public ChatExecutionRequest toExecutionRequest(String distributedKeyPrefix, JsonNode requestBody) {
+        return canonicalChatExecutionRequestAdapter.toExecutionRequest(toCanonicalRequest(distributedKeyPrefix, requestBody));
+    }
+
+    private CanonicalRequest toCanonicalRequest(String distributedKeyPrefix, JsonNode requestBody) {
         if (requestBody == null || !requestBody.isObject()) {
             throw new IllegalArgumentException("responses 请求体必须是 JSON object。");
         }
@@ -30,12 +40,12 @@ public class OpenAiResponsesRequestMapper {
             throw new IllegalArgumentException("responses 请求缺少 model。");
         }
 
-        List<MessageInput> messages = toMessages(requestBody.path("instructions"), requestBody.path("input"));
+        List<CanonicalMessage> messages = toMessages(requestBody.path("instructions"), requestBody.path("input"));
         ensureUserMessage(messages);
 
-        return new ChatExecutionRequest(
+        return new CanonicalRequest(
                 distributedKeyPrefix,
-                "responses",
+                CanonicalIngressProtocol.RESPONSES,
                 "/v1/responses",
                 model,
                 messages,
@@ -47,16 +57,17 @@ public class OpenAiResponsesRequestMapper {
                 requestBody.has("max_output_tokens") && !requestBody.get("max_output_tokens").isNull()
                         ? requestBody.get("max_output_tokens").asInt()
                         : null,
-                objectMapper.valueToTree(requestBody)
+                buildReasoningConfig(requestBody),
+                requestBody.deepCopy()
         );
     }
 
-    private List<MessageInput> toMessages(JsonNode instructionsNode, JsonNode inputNode) {
-        List<MessageInput> messages = new ArrayList<>();
+    private List<CanonicalMessage> toMessages(JsonNode instructionsNode, JsonNode inputNode) {
+        List<CanonicalMessage> messages = new ArrayList<>();
 
         String instructions = instructionsNode == null || instructionsNode.isNull() ? null : instructionsNode.asText(null);
         if (instructions != null && !instructions.isBlank()) {
-            messages.add(new MessageInput("system", instructions, null, null, List.of()));
+            messages.add(new CanonicalMessage(CanonicalMessageRole.SYSTEM, List.of(CanonicalContentPart.text(instructions))));
         }
 
         if (inputNode == null || inputNode.isMissingNode() || inputNode.isNull()) {
@@ -64,7 +75,7 @@ public class OpenAiResponsesRequestMapper {
         }
 
         if (inputNode.isTextual()) {
-            messages.add(new MessageInput("user", inputNode.asText(), null, null, List.of()));
+            messages.add(new CanonicalMessage(CanonicalMessageRole.USER, List.of(CanonicalContentPart.text(inputNode.asText()))));
             return List.copyOf(messages);
         }
 
@@ -88,15 +99,14 @@ public class OpenAiResponsesRequestMapper {
         throw new IllegalArgumentException("responses input 格式不受支持。");
     }
 
-    private MessageInput toMessage(JsonNode messageNode) {
-        String role = messageNode.path("role").asText("user");
-        ParsedContent parsed = parseContent(messageNode.path("content"));
-        String toolCallId = messageNode.path("tool_call_id").asText(null);
-        return new MessageInput(role, parsed.text(), toolCallId, "tool".equalsIgnoreCase(role) ? "tool" : null, parsed.media());
+    private CanonicalMessage toMessage(JsonNode messageNode) {
+        CanonicalMessageRole role = CanonicalMessageRole.from(messageNode.path("role").asText("user"));
+        List<CanonicalContentPart> parts = parseContent(messageNode.path("content"), role, messageNode.path("tool_call_id").asText(null), "tool");
+        return new CanonicalMessage(role, parts);
     }
 
-    private List<MessageInput> toInputItems(JsonNode inputItemsNode) {
-        List<MessageInput> messages = new ArrayList<>();
+    private List<CanonicalMessage> toInputItems(JsonNode inputItemsNode) {
+        List<CanonicalMessage> messages = new ArrayList<>();
         ParsedContentAccumulator userAccumulator = new ParsedContentAccumulator();
 
         if (inputItemsNode.isArray()) {
@@ -111,8 +121,8 @@ public class OpenAiResponsesRequestMapper {
         return List.copyOf(messages);
     }
 
-    private List<MessageInput> toConversationItems(JsonNode inputItemsNode) {
-        List<MessageInput> messages = new ArrayList<>();
+    private List<CanonicalMessage> toConversationItems(JsonNode inputItemsNode) {
+        List<CanonicalMessage> messages = new ArrayList<>();
         ParsedContentAccumulator userAccumulator = new ParsedContentAccumulator();
 
         for (JsonNode item : inputItemsNode) {
@@ -128,7 +138,7 @@ public class OpenAiResponsesRequestMapper {
         return List.copyOf(messages);
     }
 
-    private void handleInputItem(List<MessageInput> messages, ParsedContentAccumulator userAccumulator, JsonNode item) {
+    private void handleInputItem(List<CanonicalMessage> messages, ParsedContentAccumulator userAccumulator, JsonNode item) {
         String type = item.path("type").asText();
         if ("function_call_output".equalsIgnoreCase(type)) {
             flushUserAccumulator(messages, userAccumulator);
@@ -140,47 +150,56 @@ public class OpenAiResponsesRequestMapper {
             String output = outputNode.isMissingNode() || outputNode.isNull()
                     ? ""
                     : outputNode.isTextual() ? outputNode.asText() : outputNode.toString();
-            messages.add(new MessageInput(
-                    "tool",
-                    output,
-                    callId,
-                    item.path("name").asText("tool"),
-                    List.of()
+            messages.add(new CanonicalMessage(
+                    CanonicalMessageRole.TOOL,
+                    List.of(CanonicalContentPart.toolResult(callId, item.path("name").asText("tool"), output))
             ));
             return;
         }
 
-        ParsedContent parsed = parseContent(JsonNodeFactory.instance.arrayNode().add(item));
-        userAccumulator.append(parsed);
+        List<CanonicalContentPart> parts = parseContent(JsonNodeFactory.instance.arrayNode().add(item), CanonicalMessageRole.USER, null, null);
+        userAccumulator.append(parts);
     }
 
-    private ParsedContent parseContent(JsonNode contentNode) {
+    private List<CanonicalContentPart> parseContent(
+            JsonNode contentNode,
+            CanonicalMessageRole role,
+            String toolCallId,
+            String toolName) {
         if (contentNode == null || contentNode.isMissingNode() || contentNode.isNull()) {
-            return new ParsedContent("", List.of());
+            return List.of();
+        }
+
+        if (role == CanonicalMessageRole.TOOL) {
+            String content = contentNode.isTextual() ? contentNode.asText()
+                    : contentNode.isObject() || contentNode.isArray() ? contentNode.toString()
+                    : "";
+            return List.of(CanonicalContentPart.toolResult(toolCallId, toolName == null ? "tool" : toolName, content));
         }
 
         if (contentNode.isTextual()) {
-            return new ParsedContent(contentNode.asText(), List.of());
+            return List.of(CanonicalContentPart.text(contentNode.asText()));
         }
 
         if (!contentNode.isArray()) {
-            return new ParsedContent(contentNode.toString(), List.of());
+            return List.of(CanonicalContentPart.text(contentNode.toString()));
         }
 
-        StringBuilder text = new StringBuilder();
-        List<MediaInput> media = new ArrayList<>();
+        List<CanonicalContentPart> parts = new ArrayList<>();
         for (JsonNode item : contentNode) {
             String type = item.path("type").asText();
             if ("input_text".equalsIgnoreCase(type) || "text".equalsIgnoreCase(type)) {
-                appendText(text, item.path("text").asText(""));
+                String text = item.path("text").asText(null);
+                if (text != null && !text.isBlank()) {
+                    parts.add(CanonicalContentPart.text(text));
+                }
                 continue;
             }
 
             if ("input_image".equalsIgnoreCase(type) || "image_url".equalsIgnoreCase(type)) {
                 String fileId = item.path("file_id").asText(null);
                 if (fileId != null && !fileId.isBlank()) {
-                    media.add(new MediaInput(
-                            "image",
+                    parts.add(CanonicalContentPart.image(
                             readText(item, "mime_type", "image/*"),
                             "gateway://" + fileId,
                             readOptionalText(item, "filename")
@@ -196,8 +215,7 @@ public class OpenAiResponsesRequestMapper {
                     url = item.path("file_url").asText(null);
                 }
                 if (url != null && !url.isBlank()) {
-                    media.add(new MediaInput(
-                            "image",
+                    parts.add(CanonicalContentPart.image(
                             readText(item, "mime_type", "image/*"),
                             url,
                             readOptionalText(item, "filename")
@@ -212,8 +230,7 @@ public class OpenAiResponsesRequestMapper {
                     fileId = item.path("input_file").path("file_id").asText(null);
                 }
                 if (fileId != null && !fileId.isBlank()) {
-                    media.add(new MediaInput(
-                            "file",
+                    parts.add(CanonicalContentPart.file(
                             readText(item, "mime_type", "application/octet-stream"),
                             "gateway://" + fileId,
                             readOptionalText(item, "filename")
@@ -230,8 +247,7 @@ public class OpenAiResponsesRequestMapper {
                     }
                 }
                 if (fileUrl != null && !fileUrl.isBlank()) {
-                    media.add(new MediaInput(
-                            "file",
+                    parts.add(CanonicalContentPart.file(
                             readText(item, "mime_type", "application/octet-stream"),
                             fileUrl,
                             readOptionalText(item, "filename")
@@ -239,15 +255,15 @@ public class OpenAiResponsesRequestMapper {
                 }
             }
         }
-        return new ParsedContent(text.toString(), List.copyOf(media));
+        return List.copyOf(parts);
     }
 
-    private List<GatewayToolDefinition> toTools(JsonNode toolsNode) {
+    private List<CanonicalToolDefinition> toTools(JsonNode toolsNode) {
         if (toolsNode == null || toolsNode.isMissingNode() || toolsNode.isNull() || !toolsNode.isArray()) {
             return List.of();
         }
 
-        List<GatewayToolDefinition> tools = new ArrayList<>();
+        List<CanonicalToolDefinition> tools = new ArrayList<>();
         for (JsonNode tool : toolsNode) {
             JsonNode definition = tool.path("function").isObject() ? tool.path("function") : tool;
             String type = tool.path("type").asText("function");
@@ -258,7 +274,7 @@ public class OpenAiResponsesRequestMapper {
             if (name == null || name.isBlank()) {
                 continue;
             }
-            tools.add(new GatewayToolDefinition(
+            tools.add(new CanonicalToolDefinition(
                     name,
                     definition.path("description").asText(null),
                     definition.has("parameters") ? definition.get("parameters") : null,
@@ -270,34 +286,29 @@ public class OpenAiResponsesRequestMapper {
         return List.copyOf(tools);
     }
 
-    private void ensureUserMessage(List<MessageInput> messages) {
+    private CanonicalReasoningConfig buildReasoningConfig(JsonNode requestBody) {
+        JsonNode reasoning = requestBody.get("reasoning");
+        String reasoningEffort = requestBody.path("reasoning_effort").asText(null);
+        if ((reasoning == null || reasoning.isNull()) && (reasoningEffort == null || reasoningEffort.isBlank())) {
+            return null;
+        }
+        return new CanonicalReasoningConfig(reasoning, reasoningEffort);
+    }
+
+    private void ensureUserMessage(List<CanonicalMessage> messages) {
         boolean hasUsableConversationInput = messages.stream()
-                .anyMatch(message -> {
-                    boolean hasPayload = (message.content() != null && !message.content().isBlank())
-                            || (message.media() != null && !message.media().isEmpty());
-                    return hasPayload && ("user".equalsIgnoreCase(message.role()) || "tool".equalsIgnoreCase(message.role()));
-                });
+                .anyMatch(message -> message.role() == CanonicalMessageRole.USER || message.role() == CanonicalMessageRole.TOOL);
         if (!hasUsableConversationInput) {
             throw new IllegalArgumentException("至少需要一条 user 输入或 function_call_output。");
         }
     }
 
-    private void flushUserAccumulator(List<MessageInput> messages, ParsedContentAccumulator accumulator) {
+    private void flushUserAccumulator(List<CanonicalMessage> messages, ParsedContentAccumulator accumulator) {
         if (accumulator.isEmpty()) {
             return;
         }
-        messages.add(new MessageInput("user", accumulator.text(), null, null, accumulator.media()));
+        messages.add(new CanonicalMessage(CanonicalMessageRole.USER, accumulator.parts()));
         accumulator.clear();
-    }
-
-    private void appendText(StringBuilder text, String value) {
-        if (value == null || value.isBlank()) {
-            return;
-        }
-        if (!text.isEmpty()) {
-            text.append('\n');
-        }
-        text.append(value);
     }
 
     private String readText(JsonNode item, String field, String defaultValue) {
@@ -328,46 +339,25 @@ public class OpenAiResponsesRequestMapper {
         return null;
     }
 
-    private record ParsedContent(
-            String text,
-            List<MediaInput> media
-    ) {
-    }
-
     private static final class ParsedContentAccumulator {
-        private final StringBuilder text = new StringBuilder();
-        private final List<MediaInput> media = new ArrayList<>();
+        private final List<CanonicalContentPart> parts = new ArrayList<>();
 
-        private void append(ParsedContent parsedContent) {
-            if (parsedContent == null) {
-                return;
-            }
-            if (parsedContent.text() != null && !parsedContent.text().isBlank()) {
-                if (!text.isEmpty()) {
-                    text.append('\n');
-                }
-                text.append(parsedContent.text());
-            }
-            if (parsedContent.media() != null && !parsedContent.media().isEmpty()) {
-                media.addAll(parsedContent.media());
+        private void append(List<CanonicalContentPart> canonicalParts) {
+            if (canonicalParts != null && !canonicalParts.isEmpty()) {
+                parts.addAll(canonicalParts);
             }
         }
 
         private boolean isEmpty() {
-            return text.isEmpty() && media.isEmpty();
+            return parts.isEmpty();
         }
 
-        private String text() {
-            return text.toString();
-        }
-
-        private List<MediaInput> media() {
-            return List.copyOf(media);
+        private List<CanonicalContentPart> parts() {
+            return List.copyOf(parts);
         }
 
         private void clear() {
-            text.setLength(0);
-            media.clear();
+            parts.clear();
         }
     }
 }

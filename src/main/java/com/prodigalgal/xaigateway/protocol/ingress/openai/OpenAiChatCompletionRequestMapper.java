@@ -3,9 +3,14 @@ package com.prodigalgal.xaigateway.protocol.ingress.openai;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalChatExecutionRequestAdapter;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalContentPart;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalMessage;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalMessageRole;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolDefinition;
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest.MessageInput;
-import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolDefinition;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Component;
@@ -14,6 +19,7 @@ import org.springframework.stereotype.Component;
 public class OpenAiChatCompletionRequestMapper {
 
     private final ObjectMapper objectMapper;
+    private final CanonicalChatExecutionRequestAdapter canonicalChatExecutionRequestAdapter = new CanonicalChatExecutionRequestAdapter();
 
     public OpenAiChatCompletionRequestMapper(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
@@ -22,12 +28,17 @@ public class OpenAiChatCompletionRequestMapper {
     public ChatExecutionRequest toExecutionRequest(
             AuthenticatedDistributedKey distributedKey,
             OpenAiChatCompletionRequest request) {
-        List<MessageInput> messages = toMessages(request.messages());
-        ensureUserMessage(messages);
+        return canonicalChatExecutionRequestAdapter.toExecutionRequest(toCanonicalRequest(distributedKey, request));
+    }
 
-        return new ChatExecutionRequest(
+    private CanonicalRequest toCanonicalRequest(
+            AuthenticatedDistributedKey distributedKey,
+            OpenAiChatCompletionRequest request) {
+        List<CanonicalMessage> messages = toMessages(request.messages());
+        ensureUserMessage(messages);
+        return new CanonicalRequest(
                 distributedKey.keyPrefix(),
-                "openai",
+                CanonicalIngressProtocol.OPENAI,
                 "/v1/chat/completions",
                 request.model(),
                 messages,
@@ -35,43 +46,38 @@ public class OpenAiChatCompletionRequestMapper {
                 request.toolChoice(),
                 request.temperature(),
                 request.maxTokens(),
+                buildReasoningConfig(request),
                 buildExecutionMetadata(request)
         );
     }
 
-    private List<MessageInput> toMessages(List<OpenAiChatCompletionRequest.Message> messages) {
-        List<MessageInput> result = new ArrayList<>();
+    private List<CanonicalMessage> toMessages(List<OpenAiChatCompletionRequest.Message> messages) {
+        List<CanonicalMessage> result = new ArrayList<>();
         if (messages == null) {
             return result;
         }
         for (OpenAiChatCompletionRequest.Message message : messages) {
-            ParsedMessageContent parsed = parseMessageContent(message.content());
-            if ((parsed.text() == null || parsed.text().isBlank()) && parsed.media().isEmpty()) {
+            ParsedMessageContent parsed = parseMessageContent(message.content(), CanonicalMessageRole.from(message.role()), message.toolCallId());
+            if (parsed.parts().isEmpty()) {
                 continue;
             }
-            String toolName = null;
-            if ("tool".equalsIgnoreCase(message.role()) && message.toolCallId() != null) {
-                toolName = "tool";
-            }
-            result.add(new MessageInput(message.role(), parsed.text(), message.toolCallId(), toolName, parsed.media()));
+            result.add(new CanonicalMessage(CanonicalMessageRole.from(message.role()), parsed.parts()));
         }
         return List.copyOf(result);
     }
 
-    private void ensureUserMessage(List<MessageInput> messages) {
+    private void ensureUserMessage(List<CanonicalMessage> messages) {
         boolean hasUser = messages.stream()
-                .anyMatch(message ->
-                        "user".equalsIgnoreCase(message.role())
-                                && ((message.content() != null && !message.content().isBlank())
-                                || (message.media() != null && !message.media().isEmpty()))
-                );
+                .anyMatch(message -> message.role() == CanonicalMessageRole.USER
+                        && message.parts() != null
+                        && !message.parts().isEmpty());
         if (!hasUser) {
             throw new IllegalArgumentException("至少需要一条 user 消息。");
         }
     }
 
-    private List<GatewayToolDefinition> toTools(List<OpenAiChatCompletionRequest.Tool> tools) {
-        List<GatewayToolDefinition> result = new ArrayList<>();
+    private List<CanonicalToolDefinition> toTools(List<OpenAiChatCompletionRequest.Tool> tools) {
+        List<CanonicalToolDefinition> result = new ArrayList<>();
         if (tools == null) {
             return result;
         }
@@ -79,7 +85,7 @@ public class OpenAiChatCompletionRequestMapper {
             if (tool == null || tool.function() == null || tool.function().name() == null || tool.function().name().isBlank()) {
                 continue;
             }
-            result.add(new GatewayToolDefinition(
+            result.add(new CanonicalToolDefinition(
                     tool.function().name(),
                     tool.function().description(),
                     tool.function().parameters(),
@@ -87,6 +93,15 @@ public class OpenAiChatCompletionRequestMapper {
             ));
         }
         return List.copyOf(result);
+    }
+
+    private com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalReasoningConfig buildReasoningConfig(OpenAiChatCompletionRequest request) {
+        JsonNode reasoning = request.reasoning();
+        String effort = request.reasoningEffort();
+        if ((reasoning == null || reasoning.isNull()) && (effort == null || effort.isBlank())) {
+            return null;
+        }
+        return new com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalReasoningConfig(reasoning, effort);
     }
 
     private JsonNode buildExecutionMetadata(OpenAiChatCompletionRequest request) {
@@ -100,35 +115,41 @@ public class OpenAiChatCompletionRequestMapper {
         return metadata.isEmpty() ? null : metadata;
     }
 
-    private ParsedMessageContent parseMessageContent(JsonNode contentNode) {
+    private ParsedMessageContent parseMessageContent(JsonNode contentNode, CanonicalMessageRole role, String toolCallId) {
         if (contentNode == null || contentNode.isNull() || contentNode.isMissingNode()) {
-            return new ParsedMessageContent("", List.of());
+            return new ParsedMessageContent(List.of());
+        }
+
+        if (role == CanonicalMessageRole.TOOL) {
+            String text = contentNode.isTextual() ? contentNode.asText() : contentNode.toString();
+            return new ParsedMessageContent(List.of(CanonicalContentPart.toolResult(toolCallId, "tool", text)));
         }
 
         if (contentNode.isTextual()) {
-            return new ParsedMessageContent(contentNode.asText(), List.of());
+            return new ParsedMessageContent(List.of(CanonicalContentPart.text(contentNode.asText())));
         }
 
         if (contentNode.isArray()) {
-            String text = "";
-            List<ChatExecutionRequest.MediaInput> media = new ArrayList<>();
+            List<CanonicalContentPart> parts = new ArrayList<>();
             for (JsonNode item : contentNode) {
                 String type = item.path("type").asText();
                 if ("text".equalsIgnoreCase(type)) {
-                    text = item.path("text").asText(text);
+                    String text = item.path("text").asText(null);
+                    if (text != null && !text.isBlank()) {
+                        parts.add(CanonicalContentPart.text(text));
+                    }
                 }
                 if ("image_url".equalsIgnoreCase(type)) {
-                    String url = item.path("image_url").path("url").asText();
+                    String url = item.path("image_url").path("url").asText(null);
                     if (url != null && !url.isBlank()) {
-                        media.add(new ChatExecutionRequest.MediaInput("image", "image/*", url, null));
+                        parts.add(CanonicalContentPart.image("image/*", url, null));
                     }
                 }
                 if ("input_file".equalsIgnoreCase(type)) {
                     JsonNode inputFile = item.path("input_file");
                     String fileId = inputFile.path("file_id").asText(null);
                     if (fileId != null && !fileId.isBlank()) {
-                        media.add(new ChatExecutionRequest.MediaInput(
-                                "file",
+                        parts.add(CanonicalContentPart.file(
                                 inputFile.path("mime_type").asText("application/octet-stream"),
                                 "gateway://" + fileId,
                                 inputFile.path("filename").asText(fileId)
@@ -143,8 +164,7 @@ public class OpenAiChatCompletionRequestMapper {
                         url = item.path("file_url").asText(null);
                     }
                     if (url != null && !url.isBlank()) {
-                        media.add(new ChatExecutionRequest.MediaInput(
-                                "file",
+                        parts.add(CanonicalContentPart.file(
                                 inputFile.path("mime_type").asText("application/octet-stream"),
                                 url,
                                 inputFile.path("filename").asText(null)
@@ -152,15 +172,14 @@ public class OpenAiChatCompletionRequestMapper {
                     }
                 }
             }
-            return new ParsedMessageContent(text, List.copyOf(media));
+            return new ParsedMessageContent(List.copyOf(parts));
         }
 
-        return new ParsedMessageContent(contentNode.toString(), List.of());
+        return new ParsedMessageContent(List.of(CanonicalContentPart.text(contentNode.toString())));
     }
 
     private record ParsedMessageContent(
-            String text,
-            List<ChatExecutionRequest.MediaInput> media
+            List<CanonicalContentPart> parts
     ) {
     }
 }

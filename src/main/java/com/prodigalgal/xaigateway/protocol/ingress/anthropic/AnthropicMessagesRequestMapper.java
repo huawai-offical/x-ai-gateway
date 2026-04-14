@@ -1,10 +1,16 @@
 package com.prodigalgal.xaigateway.protocol.ingress.anthropic;
 
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalChatExecutionRequestAdapter;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalContentPart;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalMessage;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalMessageRole;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolDefinition;
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest.MessageInput;
-import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolDefinition;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Component;
@@ -12,30 +18,44 @@ import org.springframework.stereotype.Component;
 @Component
 public class AnthropicMessagesRequestMapper {
 
+    private final ObjectMapper objectMapper;
+    private final CanonicalChatExecutionRequestAdapter canonicalChatExecutionRequestAdapter = new CanonicalChatExecutionRequestAdapter();
+
+    public AnthropicMessagesRequestMapper(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+    }
+
     public ChatExecutionRequest toExecutionRequest(
             AuthenticatedDistributedKey distributedKey,
             AnthropicMessagesRequest request) {
-        List<MessageInput> messages = toMessages(request.system(), request.messages());
-        ensureUserMessage(messages);
+        return canonicalChatExecutionRequestAdapter.toExecutionRequest(toCanonicalRequest(distributedKey, request));
+    }
 
-        return new ChatExecutionRequest(
+    private CanonicalRequest toCanonicalRequest(
+            AuthenticatedDistributedKey distributedKey,
+            AnthropicMessagesRequest request) {
+        List<CanonicalMessage> messages = toMessages(request.system(), request.messages());
+        ensureUserMessage(messages);
+        return new CanonicalRequest(
                 distributedKey.keyPrefix(),
-                "anthropic_native",
+                CanonicalIngressProtocol.ANTHROPIC_NATIVE,
                 "/v1/messages",
                 request.model(),
                 messages,
                 toTools(request.tools()),
                 request.toolChoice(),
                 request.temperature(),
-                request.maxTokens()
+                request.maxTokens(),
+                null,
+                objectMapper.valueToTree(request)
         );
     }
 
-    private List<MessageInput> toMessages(JsonNode systemNode, List<AnthropicMessagesRequest.Message> messages) {
-        List<MessageInput> result = new ArrayList<>();
+    private List<CanonicalMessage> toMessages(JsonNode systemNode, List<AnthropicMessagesRequest.Message> messages) {
+        List<CanonicalMessage> result = new ArrayList<>();
         String systemPrompt = extractText(systemNode);
         if (systemPrompt != null && !systemPrompt.isBlank()) {
-            result.add(new MessageInput("system", systemPrompt, null, null, List.of()));
+            result.add(new CanonicalMessage(CanonicalMessageRole.SYSTEM, List.of(CanonicalContentPart.text(systemPrompt))));
         }
 
         if (messages != null) {
@@ -49,16 +69,18 @@ public class AnthropicMessagesRequestMapper {
                             .map(JsonNode::asText)
                             .reduce((first, second) -> second)
                             .orElse("");
-                    result.add(new MessageInput("tool", toolContent, toolUseId, "tool", List.of()));
+                    result.add(new CanonicalMessage(
+                            CanonicalMessageRole.TOOL,
+                            List.of(CanonicalContentPart.toolResult(toolUseId, "tool", toolContent))
+                    ));
                     continue;
                 }
 
-                String text = extractText(message.content());
-                List<ChatExecutionRequest.MediaInput> media = extractMedia(message.content());
-                if ((text == null || text.isBlank()) && media.isEmpty()) {
+                List<CanonicalContentPart> parts = extractParts(message.content());
+                if (parts.isEmpty()) {
                     continue;
                 }
-                result.add(new MessageInput(message.role(), text, null, null, media));
+                result.add(new CanonicalMessage(CanonicalMessageRole.from(message.role()), parts));
             }
         }
 
@@ -71,20 +93,34 @@ public class AnthropicMessagesRequestMapper {
                 && contentNode.findValues("type").stream().anyMatch(node -> "tool_result".equalsIgnoreCase(node.asText()));
     }
 
-    private List<ChatExecutionRequest.MediaInput> extractMedia(JsonNode contentNode) {
-        List<ChatExecutionRequest.MediaInput> result = new ArrayList<>();
-        if (contentNode == null || !contentNode.isArray()) {
+    private List<CanonicalContentPart> extractParts(JsonNode contentNode) {
+        List<CanonicalContentPart> result = new ArrayList<>();
+        if (contentNode == null || contentNode.isNull() || contentNode.isMissingNode()) {
             return result;
+        }
+        if (contentNode.isTextual()) {
+            result.add(CanonicalContentPart.text(contentNode.asText()));
+            return List.copyOf(result);
+        }
+        if (!contentNode.isArray()) {
+            result.add(CanonicalContentPart.text(contentNode.toString()));
+            return List.copyOf(result);
         }
 
         for (JsonNode block : contentNode) {
+            if ("text".equalsIgnoreCase(block.path("type").asText())) {
+                String text = block.path("text").asText(null);
+                if (text != null && !text.isBlank()) {
+                    result.add(CanonicalContentPart.text(text));
+                }
+                continue;
+            }
             if (!"image".equalsIgnoreCase(block.path("type").asText())) {
                 if ("document".equalsIgnoreCase(block.path("type").asText())) {
                     JsonNode source = block.path("source");
                     String fileId = source.path("file_id").asText(null);
                     if (fileId != null && !fileId.isBlank()) {
-                        result.add(new ChatExecutionRequest.MediaInput(
-                                "file",
+                        result.add(CanonicalContentPart.file(
                                 source.path("media_type").asText("application/octet-stream"),
                                 "gateway://" + fileId,
                                 block.path("title").asText(fileId)
@@ -98,10 +134,8 @@ public class AnthropicMessagesRequestMapper {
                     if (url == null || url.isBlank()) {
                         continue;
                     }
-                    String mimeType = source.path("media_type").asText("application/octet-stream");
-                    result.add(new ChatExecutionRequest.MediaInput(
-                            "file",
-                            mimeType,
+                    result.add(CanonicalContentPart.file(
+                            source.path("media_type").asText("application/octet-stream"),
                             url,
                             block.path("title").asText(null)
                     ));
@@ -112,8 +146,11 @@ public class AnthropicMessagesRequestMapper {
             JsonNode source = block.path("source");
             String fileId = source.path("file_id").asText(null);
             if (fileId != null && !fileId.isBlank()) {
-                String mimeType = source.path("media_type").asText("image/*");
-                result.add(new ChatExecutionRequest.MediaInput("image", mimeType, "gateway://" + fileId, null));
+                result.add(CanonicalContentPart.image(
+                        source.path("media_type").asText("image/*"),
+                        "gateway://" + fileId,
+                        null
+                ));
                 continue;
             }
             String url = source.path("url").asText(null);
@@ -123,28 +160,28 @@ public class AnthropicMessagesRequestMapper {
             if (url == null || url.isBlank()) {
                 continue;
             }
-
-            String mimeType = source.path("media_type").asText("image/*");
-            result.add(new ChatExecutionRequest.MediaInput("image", mimeType, url, null));
+            result.add(CanonicalContentPart.image(
+                    source.path("media_type").asText("image/*"),
+                    url,
+                    null
+            ));
         }
 
         return List.copyOf(result);
     }
 
-    private void ensureUserMessage(List<MessageInput> messages) {
+    private void ensureUserMessage(List<CanonicalMessage> messages) {
         boolean hasUser = messages.stream()
-                .anyMatch(message ->
-                        "user".equalsIgnoreCase(message.role())
-                                && ((message.content() != null && !message.content().isBlank())
-                                || (message.media() != null && !message.media().isEmpty()))
-                );
+                .anyMatch(message -> message.role() == CanonicalMessageRole.USER
+                        && message.parts() != null
+                        && !message.parts().isEmpty());
         if (!hasUser) {
             throw new IllegalArgumentException("至少需要一条 user 消息。");
         }
     }
 
-    private List<GatewayToolDefinition> toTools(List<AnthropicMessagesRequest.Tool> tools) {
-        List<GatewayToolDefinition> result = new ArrayList<>();
+    private List<CanonicalToolDefinition> toTools(List<AnthropicMessagesRequest.Tool> tools) {
+        List<CanonicalToolDefinition> result = new ArrayList<>();
         if (tools == null) {
             return result;
         }
@@ -152,7 +189,7 @@ public class AnthropicMessagesRequestMapper {
             if (tool.name() == null || tool.name().isBlank()) {
                 continue;
             }
-            result.add(new GatewayToolDefinition(
+            result.add(new CanonicalToolDefinition(
                     tool.name(),
                     tool.description(),
                     tool.inputSchema(),

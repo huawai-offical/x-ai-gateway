@@ -20,6 +20,14 @@ import com.prodigalgal.xaigateway.gateway.core.execution.GatewayChatRuntimeConte
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayChatRuntimeResult;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolCall;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolDefinition;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalChatMapper;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalContentPart;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalMessage;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalMessageRole;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalPartType;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolDefinition;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileResource;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileService;
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics;
@@ -71,6 +79,7 @@ import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.beans.factory.DisposableBean;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.MimeTypeUtils;
 import java.net.URI;
@@ -96,12 +105,57 @@ public class GatewayChatExecutionService {
     private final GatewayFileService gatewayFileService;
     private final GatewayRequestFeatureService gatewayRequestFeatureService;
     private final TranslationExecutionPlanCompiler translationExecutionPlanCompiler;
+    private final CanonicalChatMapper canonicalChatMapper;
     private final OpenAiChatModelFactory openAiChatModelFactory;
     private final AnthropicChatModelFactory anthropicChatModelFactory;
     private final GeminiChatModelFactory geminiChatModelFactory;
     private final List<GatewayChatRuntime> gatewayChatRuntimes;
     private final GatewayResponseMapper gatewayResponseMapper;
     private final GatewayProperties gatewayProperties;
+
+    @Autowired
+    public GatewayChatExecutionService(
+            GatewayRouteSelectionService gatewayRouteSelectionService,
+            ProviderExecutionSupportService providerExecutionSupportService,
+            UpstreamCredentialRepository upstreamCredentialRepository,
+            CredentialCryptoService credentialCryptoService,
+            GatewayObservabilityService gatewayObservabilityService,
+            GatewayRequestLifecycleService gatewayRequestLifecycleService,
+            DistributedKeyGovernanceService distributedKeyGovernanceService,
+            DistributedKeyQueryService distributedKeyQueryService,
+            AccountSelectionService accountSelectionService,
+            CredentialMaterialResolver credentialMaterialResolver,
+            GatewayFileService gatewayFileService,
+            GatewayRequestFeatureService gatewayRequestFeatureService,
+            TranslationExecutionPlanCompiler translationExecutionPlanCompiler,
+            CanonicalChatMapper canonicalChatMapper,
+            OpenAiChatModelFactory openAiChatModelFactory,
+            AnthropicChatModelFactory anthropicChatModelFactory,
+            GeminiChatModelFactory geminiChatModelFactory,
+            List<GatewayChatRuntime> gatewayChatRuntimes,
+            GatewayResponseMapper gatewayResponseMapper,
+            GatewayProperties gatewayProperties) {
+        this.gatewayRouteSelectionService = gatewayRouteSelectionService;
+        this.providerExecutionSupportService = providerExecutionSupportService;
+        this.upstreamCredentialRepository = upstreamCredentialRepository;
+        this.credentialCryptoService = credentialCryptoService;
+        this.gatewayObservabilityService = gatewayObservabilityService;
+        this.gatewayRequestLifecycleService = gatewayRequestLifecycleService;
+        this.distributedKeyGovernanceService = distributedKeyGovernanceService;
+        this.distributedKeyQueryService = distributedKeyQueryService;
+        this.accountSelectionService = accountSelectionService;
+        this.credentialMaterialResolver = credentialMaterialResolver;
+        this.gatewayFileService = gatewayFileService;
+        this.gatewayRequestFeatureService = gatewayRequestFeatureService;
+        this.translationExecutionPlanCompiler = translationExecutionPlanCompiler;
+        this.canonicalChatMapper = canonicalChatMapper;
+        this.openAiChatModelFactory = openAiChatModelFactory;
+        this.anthropicChatModelFactory = anthropicChatModelFactory;
+        this.geminiChatModelFactory = geminiChatModelFactory;
+        this.gatewayChatRuntimes = gatewayChatRuntimes;
+        this.gatewayResponseMapper = gatewayResponseMapper;
+        this.gatewayProperties = gatewayProperties;
+    }
 
     public GatewayChatExecutionService(
             GatewayRouteSelectionService gatewayRouteSelectionService,
@@ -123,25 +177,28 @@ public class GatewayChatExecutionService {
             List<GatewayChatRuntime> gatewayChatRuntimes,
             GatewayResponseMapper gatewayResponseMapper,
             GatewayProperties gatewayProperties) {
-        this.gatewayRouteSelectionService = gatewayRouteSelectionService;
-        this.providerExecutionSupportService = providerExecutionSupportService;
-        this.upstreamCredentialRepository = upstreamCredentialRepository;
-        this.credentialCryptoService = credentialCryptoService;
-        this.gatewayObservabilityService = gatewayObservabilityService;
-        this.gatewayRequestLifecycleService = gatewayRequestLifecycleService;
-        this.distributedKeyGovernanceService = distributedKeyGovernanceService;
-        this.distributedKeyQueryService = distributedKeyQueryService;
-        this.accountSelectionService = accountSelectionService;
-        this.credentialMaterialResolver = credentialMaterialResolver;
-        this.gatewayFileService = gatewayFileService;
-        this.gatewayRequestFeatureService = gatewayRequestFeatureService;
-        this.translationExecutionPlanCompiler = translationExecutionPlanCompiler;
-        this.openAiChatModelFactory = openAiChatModelFactory;
-        this.anthropicChatModelFactory = anthropicChatModelFactory;
-        this.geminiChatModelFactory = geminiChatModelFactory;
-        this.gatewayChatRuntimes = gatewayChatRuntimes;
-        this.gatewayResponseMapper = gatewayResponseMapper;
-        this.gatewayProperties = gatewayProperties;
+        this(
+                gatewayRouteSelectionService,
+                providerExecutionSupportService,
+                upstreamCredentialRepository,
+                credentialCryptoService,
+                gatewayObservabilityService,
+                gatewayRequestLifecycleService,
+                distributedKeyGovernanceService,
+                distributedKeyQueryService,
+                accountSelectionService,
+                credentialMaterialResolver,
+                gatewayFileService,
+                gatewayRequestFeatureService,
+                translationExecutionPlanCompiler,
+                new CanonicalChatMapper(new tools.jackson.databind.ObjectMapper()),
+                openAiChatModelFactory,
+                anthropicChatModelFactory,
+                geminiChatModelFactory,
+                gatewayChatRuntimes,
+                gatewayResponseMapper,
+                gatewayProperties
+        );
     }
 
     public AdminChatExecuteResponse execute(AdminChatExecuteRequest request) {
@@ -685,19 +742,20 @@ public class GatewayChatExecutionService {
     }
 
     private JsonNode buildRouteBody(ChatExecutionRequest request) {
+        CanonicalRequest canonicalRequest = canonicalChatMapper.toCanonicalRequest(request);
         ObjectNode root = JsonNodeFactory.instance.objectNode();
-        root.put("model", request.requestedModel());
+        root.put("model", canonicalRequest.requestedModel());
 
-        switch (request.protocol().trim().toLowerCase()) {
-            case "openai", "responses" -> writeOpenAiMessages(root, request.messages());
-            case "anthropic_native" -> writeAnthropicMessages(root, request.messages());
-            case "google_native" -> writeGeminiMessages(root, request.messages());
-            default -> root.put("prompt", lastUserMessage(request.messages()));
+        switch (canonicalRequest.ingressProtocol()) {
+            case OPENAI, RESPONSES -> writeOpenAiMessages(root, canonicalRequest.messages());
+            case ANTHROPIC_NATIVE -> writeAnthropicMessages(root, canonicalRequest.messages());
+            case GOOGLE_NATIVE -> writeGeminiMessages(root, canonicalRequest.messages());
+            case UNKNOWN -> root.put("prompt", lastUserMessage(canonicalRequest.messages()));
         }
 
-        if (request.tools() != null && !request.tools().isEmpty()) {
+        if (canonicalRequest.tools() != null && !canonicalRequest.tools().isEmpty()) {
             var tools = root.putArray("tools");
-            for (GatewayToolDefinition tool : request.tools()) {
+            for (CanonicalToolDefinition tool : canonicalRequest.tools()) {
                 var node = tools.addObject();
                 node.put("type", "function");
                 var function = node.putObject("function");
@@ -714,18 +772,18 @@ public class GatewayChatExecutionService {
             }
         }
 
-        if (request.toolChoice() != null) {
-            root.set("tool_choice", request.toolChoice());
+        if (canonicalRequest.toolChoice() != null) {
+            root.set("tool_choice", canonicalRequest.toolChoice());
         }
 
-        if (request.executionMetadata() != null && request.executionMetadata().isObject()) {
-            JsonNode reasoning = request.executionMetadata().get("reasoning");
+        if (canonicalRequest.reasoning() != null) {
+            JsonNode reasoning = canonicalRequest.reasoning().rawSettings();
             if (reasoning != null && !reasoning.isNull()) {
                 root.set("reasoning", reasoning);
             }
-            JsonNode reasoningEffort = request.executionMetadata().get("reasoning_effort");
-            if (reasoningEffort != null && !reasoningEffort.isNull()) {
-                root.set("reasoning_effort", reasoningEffort);
+            String reasoningEffort = canonicalRequest.reasoning().effort();
+            if (reasoningEffort != null && !reasoningEffort.isBlank()) {
+                root.put("reasoning_effort", reasoningEffort);
             }
         }
 
@@ -798,11 +856,13 @@ public class GatewayChatExecutionService {
                 .build();
     }
 
-    private void writeOpenAiMessages(ObjectNode root, List<ChatExecutionRequest.MessageInput> messages) {
+    private void writeOpenAiMessages(ObjectNode root, List<CanonicalMessage> messages) {
         var array = root.putArray("messages");
-        for (ChatExecutionRequest.MessageInput message : messages) {
-            boolean hasText = message.content() != null && !message.content().isBlank();
-            boolean hasMedia = message.media() != null && !message.media().isEmpty();
+        for (CanonicalMessage message : messages) {
+            String text = joinText(message);
+            List<CanonicalContentPart> mediaParts = mediaParts(message);
+            boolean hasText = text != null && !text.isBlank();
+            boolean hasMedia = !mediaParts.isEmpty();
             if (!hasText && !hasMedia) {
                 continue;
             }
@@ -812,17 +872,17 @@ public class GatewayChatExecutionService {
                 if (hasText) {
                     contentArray.addObject()
                             .put("type", "text")
-                            .put("text", message.content());
+                            .put("text", text);
                 }
-                for (ChatExecutionRequest.MediaInput media : message.media()) {
-                    if ("file".equalsIgnoreCase(media.kind())) {
+                for (CanonicalContentPart media : mediaParts) {
+                    if (media.type() == CanonicalPartType.FILE) {
                         var inputFile = contentArray.addObject()
                                 .put("type", "input_file")
                                 .putObject("input_file");
-                        if (media.url().startsWith("gateway://")) {
-                            inputFile.put("file_id", media.url().substring("gateway://".length()));
+                        if (media.uri().startsWith("gateway://")) {
+                            inputFile.put("file_id", media.uri().substring("gateway://".length()));
                         } else {
-                            inputFile.put("url", media.url());
+                            inputFile.put("url", media.uri());
                         }
                         if (media.mimeType() != null && !media.mimeType().isBlank()) {
                             inputFile.put("mime_type", media.mimeType());
@@ -834,41 +894,41 @@ public class GatewayChatExecutionService {
                         contentArray.addObject()
                                 .put("type", "image_url")
                             .putObject("image_url")
-                            .put("url", media.url());
+                            .put("url", media.uri());
                     }
                 }
             } else {
-                item.put("content", message.content());
-            }
-            if (message.toolCallId() != null) {
-                item.put("tool_call_id", message.toolCallId());
+                item.put("content", text);
             }
         }
     }
 
-    private void writeAnthropicMessages(ObjectNode root, List<ChatExecutionRequest.MessageInput> messages) {
+    private void writeAnthropicMessages(ObjectNode root, List<CanonicalMessage> messages) {
         String systemPrompt = messages.stream()
-                .filter(message -> "system".equalsIgnoreCase(message.role()))
-                .map(ChatExecutionRequest.MessageInput::content)
+                .filter(message -> message.role() == CanonicalMessageRole.SYSTEM)
+                .map(this::joinText)
                 .filter(value -> value != null && !value.isBlank())
                 .findFirst()
                 .orElse("");
         root.put("system", systemPrompt);
 
         var array = root.putArray("messages");
-        for (ChatExecutionRequest.MessageInput message : messages) {
+        for (CanonicalMessage message : messages) {
             String role = normalizeRole(message.role());
-            boolean hasText = message.content() != null && !message.content().isBlank();
-            boolean hasMedia = message.media() != null && !message.media().isEmpty();
-            if ("system".equals(role) || (!hasText && !hasMedia)) {
+            String text = joinText(message);
+            List<CanonicalContentPart> mediaParts = mediaParts(message);
+            boolean hasText = text != null && !text.isBlank();
+            boolean hasMedia = !mediaParts.isEmpty();
+            if ("system".equals(role) || (!hasText && !hasMedia && message.role() != CanonicalMessageRole.TOOL)) {
                 continue;
             }
             if ("tool".equals(role)) {
+                CanonicalContentPart toolResult = toolResult(message);
                 var content = JsonNodeFactory.instance.arrayNode();
                 content.addObject()
                         .put("type", "tool_result")
-                        .put("tool_use_id", message.toolCallId() == null ? "tool-use" : message.toolCallId())
-                        .put("content", message.content());
+                        .put("tool_use_id", toolResult == null || toolResult.toolCallId() == null ? "tool-use" : toolResult.toolCallId())
+                        .put("content", toolResult == null || toolResult.text() == null ? "" : toolResult.text());
                 array.addObject()
                         .put("role", "user")
                         .set("content", content);
@@ -879,89 +939,119 @@ public class GatewayChatExecutionService {
                     if (hasText) {
                         content.addObject()
                                 .put("type", "text")
-                                .put("text", message.content());
+                                .put("text", text);
                     }
-                    for (ChatExecutionRequest.MediaInput media : message.media()) {
-                        if ("file".equalsIgnoreCase(media.kind())) {
+                    for (CanonicalContentPart media : mediaParts) {
+                        if (media.type() == CanonicalPartType.FILE) {
                             var block = content.addObject()
                                     .put("type", "document")
                                     .put("title", media.name() == null ? "document" : media.name());
                             block.putObject("source")
-                                    .put("type", media.url().startsWith("gateway://") ? "file_id" : "url")
-                                    .put(media.url().startsWith("gateway://") ? "file_id" : "url",
-                                            media.url().startsWith("gateway://") ? media.url().substring("gateway://".length()) : media.url())
+                                    .put("type", media.uri().startsWith("gateway://") ? "file_id" : "url")
+                                    .put(media.uri().startsWith("gateway://") ? "file_id" : "url",
+                                            media.uri().startsWith("gateway://") ? media.uri().substring("gateway://".length()) : media.uri())
                                     .put("media_type", media.mimeType() == null ? "application/octet-stream" : media.mimeType());
                         } else {
                             var block = content.addObject().put("type", "image");
                             block.putObject("source")
-                                    .put("type", media.url().startsWith("gateway://") ? "file_id" : "url")
-                                    .put(media.url().startsWith("gateway://") ? "file_id" : "url",
-                                            media.url().startsWith("gateway://") ? media.url().substring("gateway://".length()) : media.url())
+                                    .put("type", media.uri().startsWith("gateway://") ? "file_id" : "url")
+                                    .put(media.uri().startsWith("gateway://") ? "file_id" : "url",
+                                            media.uri().startsWith("gateway://") ? media.uri().substring("gateway://".length()) : media.uri())
                                     .put("media_type", media.mimeType() == null ? "image/*" : media.mimeType());
                         }
                     }
                     item.set("content", content);
                 } else {
-                    item.put("content", message.content());
+                    item.put("content", text);
                 }
             }
         }
     }
 
-    private void writeGeminiMessages(ObjectNode root, List<ChatExecutionRequest.MessageInput> messages) {
+    private void writeGeminiMessages(ObjectNode root, List<CanonicalMessage> messages) {
         String systemPrompt = messages.stream()
-                .filter(message -> "system".equalsIgnoreCase(message.role()))
-                .map(ChatExecutionRequest.MessageInput::content)
+                .filter(message -> message.role() == CanonicalMessageRole.SYSTEM)
+                .map(this::joinText)
                 .filter(value -> value != null && !value.isBlank())
                 .findFirst()
                 .orElse("");
         root.putObject("systemInstruction").put("text", systemPrompt);
 
         var array = root.putArray("contents");
-        for (ChatExecutionRequest.MessageInput message : messages) {
+        for (CanonicalMessage message : messages) {
             String role = normalizeRole(message.role());
-            boolean hasText = message.content() != null && !message.content().isBlank();
-            boolean hasMedia = message.media() != null && !message.media().isEmpty();
-            if ("system".equals(role) || (!hasText && !hasMedia)) {
+            String text = joinText(message);
+            List<CanonicalContentPart> mediaParts = mediaParts(message);
+            boolean hasText = text != null && !text.isBlank();
+            boolean hasMedia = !mediaParts.isEmpty();
+            if ("system".equals(role) || (!hasText && !hasMedia && message.role() != CanonicalMessageRole.TOOL)) {
                 continue;
             }
             String geminiRole = "assistant".equals(role) ? "model" : "user";
             var content = array.addObject().put("role", "tool".equals(role) ? "user" : geminiRole);
             var parts = content.putArray("parts");
             if ("tool".equals(role)) {
+                CanonicalContentPart toolResult = toolResult(message);
                 parts.addObject()
                         .putObject("functionResponse")
-                        .put("name", message.toolName() == null ? "tool" : message.toolName())
+                        .put("name", toolResult == null || toolResult.toolName() == null ? "tool" : toolResult.toolName())
                         .putObject("response")
-                        .put("content", message.content());
+                        .put("content", toolResult == null || toolResult.text() == null ? "" : toolResult.text());
             } else {
                 if (hasText) {
-                    parts.addObject().put("text", message.content());
+                    parts.addObject().put("text", text);
                 }
-                for (ChatExecutionRequest.MediaInput media : message.media()) {
+                for (CanonicalContentPart media : mediaParts) {
                     parts.addObject()
                             .putObject("fileData")
                             .put("mimeType", media.mimeType() == null ? "application/octet-stream" : media.mimeType())
-                            .put(media.url().startsWith("gateway://") ? "fileId" : "fileUri",
-                                    media.url().startsWith("gateway://") ? media.url().substring("gateway://".length()) : media.url());
+                            .put(media.uri().startsWith("gateway://") ? "fileId" : "fileUri",
+                                    media.uri().startsWith("gateway://") ? media.uri().substring("gateway://".length()) : media.uri());
                 }
             }
         }
     }
 
-    private String lastUserMessage(List<ChatExecutionRequest.MessageInput> messages) {
+    private String lastUserMessage(List<CanonicalMessage> messages) {
         return messages.stream()
-                .filter(message -> "user".equalsIgnoreCase(message.role()))
-                .map(ChatExecutionRequest.MessageInput::content)
+                .filter(message -> message.role() == CanonicalMessageRole.USER)
+                .map(this::joinText)
                 .reduce((first, second) -> second)
                 .orElse(null);
     }
 
-    private String normalizeRole(String role) {
+    private List<CanonicalContentPart> mediaParts(CanonicalMessage message) {
+        return message.parts().stream()
+                .filter(part -> part.type() == CanonicalPartType.IMAGE || part.type() == CanonicalPartType.FILE)
+                .toList();
+    }
+
+    private CanonicalContentPart toolResult(CanonicalMessage message) {
+        return message.parts().stream()
+                .filter(part -> part.type() == CanonicalPartType.TOOL_RESULT)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private String joinText(CanonicalMessage message) {
+        return message.parts().stream()
+                .filter(part -> part.type() == CanonicalPartType.TEXT)
+                .map(CanonicalContentPart::text)
+                .filter(text -> text != null && !text.isBlank())
+                .reduce((left, right) -> left + "\n" + right)
+                .orElse("");
+    }
+
+    private String normalizeRole(CanonicalMessageRole role) {
         if (role == null) {
             return "user";
         }
-        return role.trim().toLowerCase();
+        return switch (role) {
+            case SYSTEM -> "system";
+            case USER -> "user";
+            case ASSISTANT -> "assistant";
+            case TOOL -> "tool";
+        };
     }
 
     private UpstreamCredentialEntity getRequiredCredential(Long credentialId) {

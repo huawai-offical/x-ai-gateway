@@ -2,6 +2,9 @@ package com.prodigalgal.xaigateway.protocol.ingress.google;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResponse;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolCall;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalUsage;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolCall;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayResponse;
@@ -90,6 +93,16 @@ public record GeminiGenerateContentResponse(
         );
     }
 
+    public static GeminiGenerateContentResponse fromCanonical(CanonicalResponse response) {
+        return new GeminiGenerateContentResponse(
+                List.of(new Candidate(
+                        new Content(toPartsCanonical(response.outputText(), response.toolCalls()), "model"),
+                        "STOP"
+                )),
+                toUsageMetadata(response.usage())
+        );
+    }
+
     public static GeminiGenerateContentResponse from(
             String text,
             GatewayUsageView usage,
@@ -126,6 +139,23 @@ public record GeminiGenerateContentResponse(
         return List.of(new Part(text, null));
     }
 
+    private static List<Part> toPartsCanonical(String text, List<CanonicalToolCall> toolCalls) {
+        if (toolCalls != null && !toolCalls.isEmpty()) {
+            ObjectMapper mapper = new ObjectMapper();
+            return toolCalls.stream()
+                    .map(toolCall -> new Part(
+                            null,
+                            new FunctionCall(
+                                    toolCall.name(),
+                                    parseArguments(mapper, toolCall.arguments())
+                            )
+                    ))
+                    .toList();
+        }
+
+        return List.of(new Part(text, null));
+    }
+
     private static JsonNode parseArguments(ObjectMapper mapper, String arguments) {
         if (arguments == null || arguments.isBlank()) {
             return mapper.createObjectNode();
@@ -136,5 +166,18 @@ public record GeminiGenerateContentResponse(
         } catch (Exception ignored) {
             return mapper.createObjectNode().put("raw", arguments);
         }
+    }
+
+    private static UsageMetadata toUsageMetadata(CanonicalUsage usage) {
+        if (usage == null || !usage.present()) {
+            return new UsageMetadata(0, 0, 0, 0, 0);
+        }
+        return new UsageMetadata(
+                usage.promptTokens(),
+                usage.completionTokens(),
+                usage.totalTokens(),
+                usage.cacheHitTokens(),
+                usage.reasoningTokens()
+        );
     }
 }

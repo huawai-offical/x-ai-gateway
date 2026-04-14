@@ -2,10 +2,11 @@ package com.prodigalgal.xaigateway.protocol.ingress.openai;
 
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalGatewayResponseMapper;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEvent;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEventType;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayFinishReason;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayResponse;
-import com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamEvent;
-import com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamEventType;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamResponse;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -14,13 +15,14 @@ import reactor.core.publisher.Flux;
 public class OpenAiChatCompletionEncoder {
 
     private final ObjectMapper objectMapper;
+    private final CanonicalGatewayResponseMapper canonicalGatewayResponseMapper = new CanonicalGatewayResponseMapper();
 
     public OpenAiChatCompletionEncoder(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 
     public OpenAiChatCompletionResponse encode(GatewayResponse response) {
-        return OpenAiChatCompletionResponse.from(response);
+        return OpenAiChatCompletionResponse.fromCanonical(canonicalGatewayResponseMapper.toCanonicalResponse(response));
     }
 
     public Flux<String> encodeStream(GatewayStreamResponse response) {
@@ -31,23 +33,24 @@ public class OpenAiChatCompletionEncoder {
         );
     }
 
-    private Flux<String> encodeEvent(GatewayStreamResponse response, GatewayStreamEvent event) {
-        if (event.type() == GatewayStreamEventType.TEXT_DELTA && event.textDelta() != null && !event.textDelta().isBlank()) {
+    private Flux<String> encodeEvent(GatewayStreamResponse response, com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamEvent event) {
+        CanonicalStreamEvent canonicalEvent = canonicalGatewayResponseMapper.toCanonicalStreamEvent(event);
+        if (canonicalEvent.type() == CanonicalStreamEventType.TEXT_DELTA && canonicalEvent.textDelta() != null && !canonicalEvent.textDelta().isBlank()) {
             return Flux.just(encode(OpenAiChatCompletionResponse.contentChunk(
                     response.routeSelection().publicModel(),
-                    event.textDelta()
+                    canonicalEvent.textDelta()
             )));
         }
-        if (event.type() == GatewayStreamEventType.TOOL_CALLS && event.toolCalls() != null && !event.toolCalls().isEmpty()) {
-            return Flux.just(encode(OpenAiChatCompletionResponse.toolCallChunk(
+        if (canonicalEvent.type() == CanonicalStreamEventType.TOOL_CALLS && canonicalEvent.toolCalls() != null && !canonicalEvent.toolCalls().isEmpty()) {
+            return Flux.just(encode(OpenAiChatCompletionResponse.toolCallChunkCanonical(
                     response.routeSelection().publicModel(),
-                    event.toolCalls()
+                    canonicalEvent.toolCalls()
             )));
         }
-        if (event.type() == GatewayStreamEventType.COMPLETED) {
+        if (canonicalEvent.type() == CanonicalStreamEventType.COMPLETED) {
             return Flux.just(encode(OpenAiChatCompletionResponse.finishChunk(
                     response.routeSelection().publicModel(),
-                    toFinishReason(event.finishReason())
+                    toFinishReason(canonicalEvent.finishReason())
             )));
         }
         return Flux.empty();

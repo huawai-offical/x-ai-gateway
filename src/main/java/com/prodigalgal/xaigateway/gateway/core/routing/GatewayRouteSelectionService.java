@@ -9,6 +9,7 @@ import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
 import com.prodigalgal.xaigateway.gateway.core.cache.AffinityBindingType;
 import com.prodigalgal.xaigateway.gateway.core.cache.AffinityCacheService;
 import com.prodigalgal.xaigateway.gateway.core.cache.PromptFingerprintService;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRenderCapabilitySupport;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.catalog.ModelCatalogQueryService;
 import com.prodigalgal.xaigateway.gateway.core.catalog.ResolvedModelView;
@@ -296,7 +297,7 @@ public class GatewayRouteSelectionService {
         }
 
         List<StaticCandidateResolution> resolutions = mergedCandidates.stream()
-                .map(candidate -> resolveStaticCandidate(distributedKey, candidate, semantics))
+                .map(candidate -> resolveStaticCandidate(distributedKey, normalizedProtocol, request.requestPath(), candidate, semantics))
                 .toList();
 
         boolean anyProviderAllowed = resolutions.stream().anyMatch(item -> !item.providerBlocked());
@@ -329,13 +330,22 @@ public class GatewayRouteSelectionService {
 
     private StaticCandidateResolution resolveStaticCandidate(
             DistributedKeyView distributedKey,
+            String normalizedProtocol,
+            String requestPath,
             RouteCandidateView candidate,
             GatewayRequestSemantics semantics) {
         boolean providerBlocked = !isProviderAllowed(distributedKey, candidate);
         CapabilityResolutionReport report = providerBlocked ? null : siteCapabilityTruthService.resolve(candidate.candidate(), semantics);
-        boolean featureBlocked = report == null || !supportsRequiredFeatures(report);
-        int capabilityRank = featureBlocked ? 0 : capabilityRank(report.overallEffectiveLevel());
-        String capabilityLevel = featureBlocked ? null : report.overallEffectiveLevel().name();
+        InteropCapabilityLevel renderLevel = providerBlocked
+                ? InteropCapabilityLevel.UNSUPPORTED
+                : CanonicalRenderCapabilitySupport.renderLevel(normalizedProtocol, requestPath, semantics);
+        InteropCapabilityLevel combinedLevel = report == null
+                ? InteropCapabilityLevel.UNSUPPORTED
+                : CanonicalRenderCapabilitySupport.minimum(report.overallEffectiveLevel(), renderLevel);
+        boolean featureBlocked = report == null || !supportsRequiredFeatures(report) || combinedLevel == InteropCapabilityLevel.UNSUPPORTED;
+        boolean renderBlocked = renderLevel == InteropCapabilityLevel.UNSUPPORTED;
+        int capabilityRank = featureBlocked ? 0 : capabilityRank(combinedLevel);
+        String capabilityLevel = featureBlocked ? null : combinedLevel.name();
 
         return new StaticCandidateResolution(
                 new RouteCandidateView(
@@ -347,7 +357,9 @@ public class GatewayRouteSelectionService {
                         capabilityRank
                 ),
                 providerBlocked,
-                featureBlocked
+                featureBlocked,
+                renderBlocked,
+                renderLevel
         );
     }
 
@@ -355,6 +367,8 @@ public class GatewayRouteSelectionService {
         List<String> exclusionReasons = new ArrayList<>();
         if (resolution.providerBlocked()) {
             exclusionReasons.add("provider_not_allowed");
+        } else if (resolution.renderBlocked()) {
+            exclusionReasons.add("render_unsupported");
         } else if (resolution.featureBlocked()) {
             exclusionReasons.add("feature_unsupported");
         } else if (resolution.capabilityRank() < bestCapabilityRank) {
@@ -442,6 +456,7 @@ public class GatewayRouteSelectionService {
         breakdown.add("capability_rank=" + candidate.capabilityRank());
         breakdown.add("binding_priority=" + candidate.bindingPriority());
         breakdown.add("binding_weight=" + candidate.bindingWeight());
+        breakdown.add("render_capability=" + (candidate.capabilityLevel() == null ? "unsupported" : candidate.capabilityLevel().toLowerCase()));
         breakdown.add("health_state=" + healthState);
         breakdown.add("selection_source=" + selectionSource.name());
         return List.copyOf(breakdown);
@@ -590,7 +605,9 @@ public class GatewayRouteSelectionService {
     private record StaticCandidateResolution(
             RouteCandidateView candidate,
             boolean providerBlocked,
-            boolean featureBlocked
+            boolean featureBlocked,
+            boolean renderBlocked,
+            InteropCapabilityLevel renderLevel
     ) {
         int capabilityRank() {
             return candidate.capabilityRank();

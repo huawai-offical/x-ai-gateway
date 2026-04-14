@@ -2,6 +2,9 @@ package com.prodigalgal.xaigateway.protocol.ingress.anthropic;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResponse;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolCall;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalUsage;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolCall;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayResponse;
@@ -84,7 +87,37 @@ public record AnthropicMessagesResponse(
         );
     }
 
+    public static AnthropicMessagesResponse fromCanonical(CanonicalResponse response) {
+        return new AnthropicMessagesResponse(
+                "msg_" + Instant.now().toEpochMilli(),
+                "message",
+                "assistant",
+                response.publicModel(),
+                toContentBlocksCanonical(response.outputText(), response.toolCalls()),
+                response.toolCalls() != null && !response.toolCalls().isEmpty() ? "tool_use" : "end_turn",
+                null,
+                toUsage(response.usage())
+        );
+    }
+
     private static List<ContentBlock> toContentBlocks(String text, List<GatewayToolCall> toolCalls) {
+        if (toolCalls != null && !toolCalls.isEmpty()) {
+            ObjectMapper mapper = new ObjectMapper();
+            return toolCalls.stream()
+                    .map(toolCall -> new ContentBlock(
+                            "tool_use",
+                            null,
+                            toolCall.id(),
+                            toolCall.name(),
+                            parseArguments(mapper, toolCall.arguments())
+                    ))
+                    .toList();
+        }
+
+        return List.of(new ContentBlock("text", text, null, null, null));
+    }
+
+    private static List<ContentBlock> toContentBlocksCanonical(String text, List<CanonicalToolCall> toolCalls) {
         if (toolCalls != null && !toolCalls.isEmpty()) {
             ObjectMapper mapper = new ObjectMapper();
             return toolCalls.stream()
@@ -239,7 +272,27 @@ public record AnthropicMessagesResponse(
         );
     }
 
+    public static MessageDelta messageDelta(CanonicalUsage usage, String stopReason) {
+        return new MessageDelta(
+                "message_delta",
+                new MessageDeltaContent(stopReason, null),
+                toUsage(usage)
+        );
+    }
+
     public static MessageStop messageStop() {
         return new MessageStop("message_stop");
+    }
+
+    private static Usage toUsage(CanonicalUsage usage) {
+        if (usage == null || !usage.present()) {
+            return new Usage(0, 0, 0, 0);
+        }
+        return new Usage(
+                usage.promptTokens(),
+                usage.completionTokens(),
+                usage.cacheWriteTokens(),
+                usage.cacheHitTokens()
+        );
     }
 }

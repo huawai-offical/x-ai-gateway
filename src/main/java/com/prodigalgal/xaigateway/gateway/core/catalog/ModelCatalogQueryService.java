@@ -5,6 +5,7 @@ import com.prodigalgal.xaigateway.gateway.core.alias.ModelAliasRuleView;
 import com.prodigalgal.xaigateway.gateway.core.alias.ModelAliasView;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedCredentialBindingView;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyView;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRenderCapabilitySupport;
 import com.prodigalgal.xaigateway.gateway.core.interop.CapabilityResolutionReport;
 import com.prodigalgal.xaigateway.gateway.core.interop.CapabilityResolutionView;
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics;
@@ -82,7 +83,7 @@ public class ModelCatalogQueryService {
                 credentials
         ).stream()
                 .filter(candidate -> actualCapabilityLevel(candidate) != InteropCapabilityLevel.UNSUPPORTED)
-                .filter(candidate -> candidate.supportedProtocols().contains(normalizedProtocol))
+                .filter(candidate -> supportsProtocolSurface(candidate, normalizedProtocol))
                 .sorted(Comparator.comparing(CatalogCandidateView::modelKey).thenComparing(CatalogCandidateView::credentialId))
                 .toList();
 
@@ -198,7 +199,6 @@ public class ModelCatalogQueryService {
         }
 
         List<CatalogCandidateView> directCandidates = listCandidatesByModelKey(normalizedRequested).stream()
-                .filter(candidate -> protocol == null || candidate.supportedProtocols().contains(protocol))
                 .toList();
 
         if (directCandidates.isEmpty()) {
@@ -235,6 +235,53 @@ public class ModelCatalogQueryService {
 
     private String normalizeProtocol(String protocol) {
         return protocol == null ? "openai" : protocol.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private boolean supportsProtocolSurface(CatalogCandidateView candidate, String protocol) {
+        if (candidate == null) {
+            return false;
+        }
+        String normalizedProtocol = normalizeProtocol(protocol);
+        if ("openai".equals(normalizedProtocol)) {
+            return actualCapabilityLevel(candidate) != InteropCapabilityLevel.UNSUPPORTED;
+        }
+        GatewayRequestSemantics semantics = switch (normalizedProtocol) {
+            case "responses" -> new GatewayRequestSemantics(
+                    TranslationResourceType.RESPONSE,
+                    TranslationOperation.RESPONSE_CREATE,
+                    List.of(InteropFeature.RESPONSE_OBJECT),
+                    true
+            );
+            case "anthropic_native", "google_native" -> new GatewayRequestSemantics(
+                    TranslationResourceType.CHAT,
+                    TranslationOperation.CHAT_COMPLETION,
+                    List.of(InteropFeature.CHAT_TEXT),
+                    true
+            );
+            default -> new GatewayRequestSemantics(
+                    TranslationResourceType.CHAT,
+                    TranslationOperation.CHAT_COMPLETION,
+                    List.of(InteropFeature.CHAT_TEXT),
+                    true
+            );
+        };
+        CapabilityResolutionReport report = siteCapabilityTruthService.resolve(candidate, semantics);
+        InteropCapabilityLevel renderLevel = CanonicalRenderCapabilitySupport.renderLevel(
+                normalizedProtocol,
+                defaultRequestPath(normalizedProtocol),
+                semantics
+        );
+        return CanonicalRenderCapabilitySupport.minimum(report.overallEffectiveLevel(), renderLevel)
+                != InteropCapabilityLevel.UNSUPPORTED;
+    }
+
+    private String defaultRequestPath(String protocol) {
+        return switch (protocol) {
+            case "responses" -> "/v1/responses";
+            case "anthropic_native" -> "/v1/messages";
+            case "google_native" -> "/v1beta/models/{model}:generateContent";
+            default -> "/v1/chat/completions";
+        };
     }
 
     private List<CatalogCandidateView> expandCandidates(List<SiteModelCapabilityEntity> capabilities) {

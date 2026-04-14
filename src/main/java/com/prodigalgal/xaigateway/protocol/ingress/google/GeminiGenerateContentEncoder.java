@@ -2,11 +2,12 @@ package com.prodigalgal.xaigateway.protocol.ingress.google;
 
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalGatewayResponseMapper;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResponse;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEvent;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEventType;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayResponse;
-import com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamEvent;
-import com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamEventType;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamResponse;
-import java.util.List;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
@@ -14,39 +15,36 @@ import reactor.core.publisher.Flux;
 public class GeminiGenerateContentEncoder {
 
     private final ObjectMapper objectMapper;
+    private final CanonicalGatewayResponseMapper canonicalGatewayResponseMapper = new CanonicalGatewayResponseMapper();
 
     public GeminiGenerateContentEncoder(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 
     public GeminiGenerateContentResponse encode(GatewayResponse response) {
-        return GeminiGenerateContentResponse.from(response);
+        CanonicalResponse canonicalResponse = canonicalGatewayResponseMapper.toCanonicalResponse(response);
+        return GeminiGenerateContentResponse.fromCanonical(canonicalResponse);
     }
 
     public Flux<String> encodeStream(GatewayStreamResponse response) {
         return response.events().concatMap(this::encodeEvent);
     }
 
-    private Flux<String> encodeEvent(GatewayStreamEvent event) {
-        if (event.type() == GatewayStreamEventType.TEXT_DELTA && event.textDelta() != null && !event.textDelta().isBlank()) {
-            return Flux.just(encode(GeminiGenerateContentResponse.from(
-                    event.textDelta(),
-                    com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageView.empty(),
-                    List.of()
+    private Flux<String> encodeEvent(com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamEvent event) {
+        CanonicalStreamEvent canonicalEvent = canonicalGatewayResponseMapper.toCanonicalStreamEvent(event);
+        if (canonicalEvent.type() == CanonicalStreamEventType.TEXT_DELTA && canonicalEvent.textDelta() != null && !canonicalEvent.textDelta().isBlank()) {
+            return Flux.just(encode(GeminiGenerateContentResponse.fromCanonical(
+                    new CanonicalResponse(null, null, canonicalEvent.textDelta(), null, java.util.List.of(), com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalUsage.empty(), null)
             )));
         }
-        if (event.type() == GatewayStreamEventType.TOOL_CALLS && event.toolCalls() != null && !event.toolCalls().isEmpty()) {
-            return Flux.just(encode(GeminiGenerateContentResponse.from(
-                    null,
-                    com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageView.empty(),
-                    event.toolCalls()
+        if (canonicalEvent.type() == CanonicalStreamEventType.TOOL_CALLS && canonicalEvent.toolCalls() != null && !canonicalEvent.toolCalls().isEmpty()) {
+            return Flux.just(encode(GeminiGenerateContentResponse.fromCanonical(
+                    new CanonicalResponse(null, null, null, null, canonicalEvent.toolCalls(), com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalUsage.empty(), null)
             )));
         }
-        if (event.type() == GatewayStreamEventType.COMPLETED) {
-            return Flux.just(encode(GeminiGenerateContentResponse.from(
-                    event.outputText(),
-                    event.usage(),
-                    List.of()
+        if (canonicalEvent.type() == CanonicalStreamEventType.COMPLETED) {
+            return Flux.just(encode(GeminiGenerateContentResponse.fromCanonical(
+                    new CanonicalResponse(null, null, canonicalEvent.outputText(), canonicalEvent.reasoning(), java.util.List.of(), canonicalEvent.usage(), canonicalEvent.finishReason())
             )));
         }
         return Flux.empty();

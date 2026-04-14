@@ -1,6 +1,9 @@
 package com.prodigalgal.xaigateway.protocol.ingress.openai;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResponse;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolCall;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalUsage;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolCall;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayResponse;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageView;
@@ -112,7 +115,36 @@ public record OpenAiChatCompletionResponse(
         );
     }
 
+    public static OpenAiChatCompletionResponse fromCanonical(CanonicalResponse response) {
+        return new OpenAiChatCompletionResponse(
+                "chatcmpl-" + Instant.now().toEpochMilli(),
+                "chat.completion",
+                Instant.now().getEpochSecond(),
+                response.publicModel(),
+                List.of(new Choice(
+                        0,
+                        new Message("assistant", response.outputText(), toToolCallsCanonical(response.toolCalls())),
+                        response.toolCalls() != null && !response.toolCalls().isEmpty() ? "tool_calls" : "stop"
+                )),
+                toUsage(response.usage())
+        );
+    }
+
     private static List<ToolCall> toToolCalls(List<GatewayToolCall> toolCalls) {
+        if (toolCalls == null || toolCalls.isEmpty()) {
+            return null;
+        }
+
+        return toolCalls.stream()
+                .map(toolCall -> new ToolCall(
+                        toolCall.id(),
+                        toolCall.type() == null ? "function" : toolCall.type(),
+                        new Function(toolCall.name(), toolCall.arguments())
+                ))
+                .toList();
+    }
+
+    private static List<ToolCall> toToolCallsCanonical(List<CanonicalToolCall> toolCalls) {
         if (toolCalls == null || toolCalls.isEmpty()) {
             return null;
         }
@@ -181,6 +213,16 @@ public record OpenAiChatCompletionResponse(
         );
     }
 
+    public static Chunk toolCallChunkCanonical(String model, List<CanonicalToolCall> toolCalls) {
+        return new Chunk(
+                "chatcmpl-" + Instant.now().toEpochMilli(),
+                "chat.completion.chunk",
+                Instant.now().getEpochSecond(),
+                model,
+                List.of(new ChunkChoice(0, new Delta(null, null, toToolCallsCanonical(toolCalls)), null))
+        );
+    }
+
     public static Chunk finishChunk(String model, String finishReason) {
         return new Chunk(
                 "chatcmpl-" + Instant.now().toEpochMilli(),
@@ -192,6 +234,19 @@ public record OpenAiChatCompletionResponse(
     }
 
     private static Usage toUsage(GatewayUsageView usage) {
+        return new Usage(
+                usage.promptTokens(),
+                usage.completionTokens(),
+                usage.totalTokens(),
+                new PromptTokensDetails(usage.cacheHitTokens()),
+                new CompletionTokensDetails(usage.reasoningTokens())
+        );
+    }
+
+    private static Usage toUsage(CanonicalUsage usage) {
+        if (usage == null || !usage.present()) {
+            return null;
+        }
         return new Usage(
                 usage.promptTokens(),
                 usage.completionTokens(),

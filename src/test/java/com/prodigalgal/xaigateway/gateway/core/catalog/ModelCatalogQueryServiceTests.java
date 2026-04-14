@@ -25,6 +25,7 @@ import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamSiteProfileEn
 import com.prodigalgal.xaigateway.infra.persistence.repository.SiteModelCapabilityRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
@@ -200,6 +201,37 @@ class ModelCatalogQueryServiceTests {
         assertEquals("Writer-Fast", model.publicModelId());
         assertEquals("writer-fast", model.resolvedModelKey());
         assertTrue(model.alias());
+    }
+
+    @Test
+    void shouldResolveCrossProtocolCandidateWithoutSupportedProtocolsShortCircuit() {
+        SiteModelCapabilityRepository siteModelCapabilityRepository = Mockito.mock(SiteModelCapabilityRepository.class);
+        UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        ModelAliasQueryService modelAliasQueryService = Mockito.mock(ModelAliasQueryService.class);
+        SiteCapabilityTruthService siteCapabilityTruthService = Mockito.mock(SiteCapabilityTruthService.class);
+        Mockito.when(siteCapabilityTruthService.resolve(Mockito.any(), Mockito.any()))
+                .thenReturn(nativeResolutionReport());
+        ModelCatalogQueryService service = new ModelCatalogQueryService(
+                siteModelCapabilityRepository,
+                upstreamCredentialRepository,
+                modelAliasQueryService,
+                siteCapabilityTruthService
+        );
+
+        when(siteModelCapabilityRepository.findAllByModelKeyAndActiveTrue("claude-sonnet-4"))
+                .thenReturn(List.of(siteCapabilityEntity(1001L, "claude-sonnet-4", List.of("openai"))));
+        when(upstreamCredentialRepository.findAllBySiteProfileIdInAndDeletedFalseAndActiveTrue(argThat(ids ->
+                ids != null && ids.contains(1001L) && ids.size() == 1)))
+                .thenReturn(List.of(credentialEntity(101L, 1001L)));
+        when(modelAliasQueryService.findEnabledAlias("claude-sonnet-4"))
+                .thenReturn(Optional.empty());
+
+        ResolvedModelView resolved = service.resolveRequestedModel("claude-sonnet-4", "anthropic_native")
+                .orElseThrow();
+
+        assertEquals("claude-sonnet-4", resolved.publicModel());
+        assertEquals(1, resolved.candidates().size());
+        assertEquals(101L, resolved.candidates().get(0).credentialId());
     }
 
     private UpstreamCredentialEntity credentialEntity(Long credentialId, Long siteProfileId) {

@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class TranslationExplainServiceTests {
 
@@ -79,5 +80,6 @@ class TranslationExplainServiceTests {
         ));
 
         assertSame(plan, result);
+        assertEquals("openai", result.canonicalExecutionPlan().ingressProtocol().name().toLowerCase());
     }
 }

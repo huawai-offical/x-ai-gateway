@@ -78,9 +78,13 @@ public class GatewayInteropPlanService {
         summary.put("requiredFeatures", executionPlan.requiredFeatures().stream().map(InteropFeature::wireName).toList());
         summary.put("blockerCount", executionPlan.blockedReasons().size());
         summary.put("degradationCount", executionPlan.lossReasons().size());
+        summary.put("renderCapabilityLevel", executionPlan.renderCapabilityLevel() == null
+                ? null
+                : executionPlan.renderCapabilityLevel().name().toLowerCase(Locale.ROOT));
 
         Map<String, Object> debug = new LinkedHashMap<>();
         debug.put("featureLevels", executionPlan.featureLevels());
+        debug.put("canonicalExecutionPlan", executionPlan.canonicalExecutionPlan());
         if (compilation.selectionResult() != null) {
             debug.put("distributedKeyId", compilation.selectionResult().distributedKeyId());
             debug.put("publicModel", compilation.selectionResult().publicModel());

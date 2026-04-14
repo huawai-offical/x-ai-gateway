@@ -64,4 +64,47 @@ class GatewayRequestFeatureServiceTests {
         assertEquals(List.of(InteropFeature.UPLOAD_CREATE), semantics.requiredFeatures());
         assertEquals(false, semantics.requiresRouteSelection());
     }
+
+    @Test
+    void shouldDescribeAnthropicMessagesSemantics() {
+        ObjectNode body = objectMapper.createObjectNode();
+        body.putArray("tools").addObject().put("name", "lookup_weather");
+        body.putObject("thinking").put("type", "enabled");
+        body.putArray("messages")
+                .addObject()
+                .put("role", "user")
+                .putArray("content")
+                .addObject()
+                .put("type", "document")
+                .putObject("source")
+                .put("type", "url")
+                .put("url", "https://example.com/doc.pdf");
+
+        GatewayRequestSemantics semantics = service.describe("/v1/messages", body);
+
+        assertEquals(TranslationResourceType.CHAT, semantics.resourceType());
+        assertEquals(TranslationOperation.CHAT_COMPLETION, semantics.operation());
+        assertEquals(List.of(InteropFeature.CHAT_TEXT, InteropFeature.TOOLS, InteropFeature.REASONING, InteropFeature.FILE_INPUT), semantics.requiredFeatures());
+    }
+
+    @Test
+    void shouldDescribeGeminiGenerateContentSemantics() {
+        ObjectNode body = objectMapper.createObjectNode();
+        body.putArray("tools").addObject().putArray("functionDeclarations").addObject().put("name", "lookup_weather");
+        body.putObject("generationConfig").put("thinkingBudget", 128);
+        body.putArray("contents")
+                .addObject()
+                .put("role", "user")
+                .putArray("parts")
+                .addObject()
+                .putObject("fileData")
+                .put("mimeType", "image/png")
+                .put("fileUri", "https://example.com/demo.png");
+
+        GatewayRequestSemantics semantics = service.describe("/v1beta/models/gemini-2.5-pro:generateContent", body);
+
+        assertEquals(TranslationResourceType.CHAT, semantics.resourceType());
+        assertEquals(TranslationOperation.CHAT_COMPLETION, semantics.operation());
+        assertEquals(List.of(InteropFeature.CHAT_TEXT, InteropFeature.TOOLS, InteropFeature.REASONING, InteropFeature.IMAGE_INPUT), semantics.requiredFeatures());
+    }
 }

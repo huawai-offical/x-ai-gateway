@@ -31,6 +31,28 @@ public class GatewayRequestFeatureService {
                     true
             );
         }
+        if ("/v1/messages".equals(requestPath)) {
+            features.add(InteropFeature.CHAT_TEXT);
+            collectAnthropicFeatures(features, body);
+            return new GatewayRequestSemantics(
+                    TranslationResourceType.CHAT,
+                    TranslationOperation.CHAT_COMPLETION,
+                    List.copyOf(features),
+                    true
+            );
+        }
+        if (requestPath != null
+                && requestPath.startsWith("/v1beta/models/")
+                && (requestPath.contains(":generateContent") || requestPath.contains(":streamGenerateContent"))) {
+            features.add(InteropFeature.CHAT_TEXT);
+            collectGeminiFeatures(features, body);
+            return new GatewayRequestSemantics(
+                    TranslationResourceType.CHAT,
+                    TranslationOperation.CHAT_COMPLETION,
+                    List.copyOf(features),
+                    true
+            );
+        }
         if ("/v1/embeddings".equals(requestPath)) {
             return new GatewayRequestSemantics(
                     TranslationResourceType.EMBEDDING,
@@ -239,6 +261,73 @@ public class GatewayRequestFeatureService {
             }
             if ("input_file".equalsIgnoreCase(type)) {
                 features.add(InteropFeature.FILE_INPUT);
+            }
+        }
+    }
+
+    private void collectAnthropicFeatures(Set<InteropFeature> features, JsonNode body) {
+        if (body == null || !body.isObject()) {
+            return;
+        }
+        if (body.has("tools") && body.get("tools").isArray() && !body.get("tools").isEmpty()) {
+            features.add(InteropFeature.TOOLS);
+        }
+        if (body.has("thinking")) {
+            features.add(InteropFeature.REASONING);
+        }
+        JsonNode messages = body.path("messages");
+        if (!messages.isArray()) {
+            return;
+        }
+        for (JsonNode message : messages) {
+            JsonNode content = message.path("content");
+            if (!content.isArray()) {
+                continue;
+            }
+            for (JsonNode item : content) {
+                String type = item.path("type").asText("");
+                if ("image".equalsIgnoreCase(type)) {
+                    features.add(InteropFeature.IMAGE_INPUT);
+                }
+                if ("document".equalsIgnoreCase(type)) {
+                    features.add(InteropFeature.FILE_INPUT);
+                }
+            }
+        }
+    }
+
+    private void collectGeminiFeatures(Set<InteropFeature> features, JsonNode body) {
+        if (body == null || !body.isObject()) {
+            return;
+        }
+        if (body.has("tools") && body.get("tools").isArray() && !body.get("tools").isEmpty()) {
+            features.add(InteropFeature.TOOLS);
+        }
+        JsonNode generationConfig = body.path("generationConfig");
+        if (generationConfig.isObject() && (generationConfig.has("thinkingConfig")
+                || generationConfig.has("thinkingBudget")
+                || generationConfig.has("thinkingLevel"))) {
+            features.add(InteropFeature.REASONING);
+        }
+        JsonNode contents = body.path("contents");
+        if (!contents.isArray()) {
+            return;
+        }
+        for (JsonNode content : contents) {
+            JsonNode parts = content.path("parts");
+            if (!parts.isArray()) {
+                continue;
+            }
+            for (JsonNode part : parts) {
+                JsonNode fileData = part.path("fileData");
+                if (fileData.isObject()) {
+                    String mimeType = fileData.path("mimeType").asText("");
+                    if (mimeType.startsWith("image/")) {
+                        features.add(InteropFeature.IMAGE_INPUT);
+                    } else {
+                        features.add(InteropFeature.FILE_INPUT);
+                    }
+                }
             }
         }
     }

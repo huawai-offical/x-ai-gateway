@@ -1,5 +1,9 @@
 package com.prodigalgal.xaigateway.gateway.core.interop;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRenderCapabilitySupport;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
 import com.prodigalgal.xaigateway.gateway.core.shared.AuthStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ErrorSchemaStrategy;
@@ -144,6 +148,46 @@ public record TranslationExecutionPlan(
                 errorSchemaStrategy,
                 TranslationExecutionRequestMapping.fromLegacy(requestMapping),
                 TranslationExecutionResponseMapping.fromLegacy(responseMapping)
+        );
+    }
+
+    @JsonProperty("renderCapabilityLevel")
+    public InteropCapabilityLevel renderCapabilityLevel() {
+        return CanonicalRenderCapabilitySupport.renderLevel(
+                protocol,
+                requestPath,
+                new GatewayRequestSemantics(
+                        resourceType,
+                        operation,
+                        requiredFeatures == null ? List.of() : requiredFeatures,
+                        true
+                )
+        );
+    }
+
+    @JsonProperty("canonicalExecutionPlan")
+    public CanonicalExecutionPlan canonicalExecutionPlan() {
+        InteropCapabilityLevel executionLevel = overallEffectiveLevel == null
+                ? InteropCapabilityLevel.UNSUPPORTED
+                : overallEffectiveLevel;
+        InteropCapabilityLevel renderLevel = renderCapabilityLevel();
+        return new CanonicalExecutionPlan(
+                executable,
+                CanonicalIngressProtocol.from(protocol),
+                requestPath,
+                requestedModel,
+                publicModel,
+                resolvedModelKey,
+                resourceType,
+                operation,
+                executionKind,
+                executionLevel,
+                renderLevel,
+                CanonicalRenderCapabilitySupport.minimum(executionLevel, renderLevel),
+                requiredFeatures == null ? List.of() : List.copyOf(requiredFeatures),
+                featureLevels == null ? Map.of() : Map.copyOf(featureLevels),
+                lossReasons == null ? List.of() : List.copyOf(lossReasons),
+                blockedReasons == null ? List.of() : List.copyOf(blockedReasons)
         );
     }
 }

@@ -1,10 +1,16 @@
 package com.prodigalgal.xaigateway.protocol.ingress.google;
 
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalChatExecutionRequestAdapter;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalContentPart;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalMessage;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalMessageRole;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolDefinition;
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest.MessageInput;
-import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolDefinition;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Component;
@@ -13,12 +19,27 @@ import org.springframework.util.StringUtils;
 @Component
 public class GeminiGenerateContentRequestMapper {
 
+    private final ObjectMapper objectMapper;
+    private final CanonicalChatExecutionRequestAdapter canonicalChatExecutionRequestAdapter = new CanonicalChatExecutionRequestAdapter();
+
+    public GeminiGenerateContentRequestMapper(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+    }
+
     public ChatExecutionRequest toExecutionRequest(
             AuthenticatedDistributedKey distributedKey,
             String model,
             GeminiGenerateContentRequest request,
             boolean stream) {
-        List<MessageInput> messages = toMessages(request.systemInstruction(), request.contents());
+        return canonicalChatExecutionRequestAdapter.toExecutionRequest(toCanonicalRequest(distributedKey, model, request, stream));
+    }
+
+    private CanonicalRequest toCanonicalRequest(
+            AuthenticatedDistributedKey distributedKey,
+            String model,
+            GeminiGenerateContentRequest request,
+            boolean stream) {
+        List<CanonicalMessage> messages = toMessages(request.systemInstruction(), request.contents());
         ensureUserMessage(messages);
 
         Double temperature = request.generationConfig() != null && request.generationConfig().has("temperature")
@@ -28,9 +49,9 @@ public class GeminiGenerateContentRequestMapper {
                 ? request.generationConfig().path("maxOutputTokens").asInt()
                 : null;
 
-        return new ChatExecutionRequest(
+        return new CanonicalRequest(
                 distributedKey.keyPrefix(),
-                "google_native",
+                CanonicalIngressProtocol.GOOGLE_NATIVE,
                 stream
                         ? "/v1beta/models/" + model + ":streamGenerateContent"
                         : "/v1beta/models/" + model + ":generateContent",
@@ -39,15 +60,17 @@ public class GeminiGenerateContentRequestMapper {
                 toTools(request.tools()),
                 null,
                 temperature,
-                maxTokens
+                maxTokens,
+                null,
+                objectMapper.valueToTree(request)
         );
     }
 
-    private List<MessageInput> toMessages(JsonNode systemInstruction, JsonNode contents) {
-        List<MessageInput> result = new ArrayList<>();
+    private List<CanonicalMessage> toMessages(JsonNode systemInstruction, JsonNode contents) {
+        List<CanonicalMessage> result = new ArrayList<>();
         String systemPrompt = extractText(systemInstruction);
         if (StringUtils.hasText(systemPrompt)) {
-            result.add(new MessageInput("system", systemPrompt, null, null, List.of()));
+            result.add(new CanonicalMessage(CanonicalMessageRole.SYSTEM, List.of(CanonicalContentPart.text(systemPrompt))));
         }
 
         if (contents != null && contents.isArray()) {
@@ -60,34 +83,42 @@ public class GeminiGenerateContentRequestMapper {
                     if (functionResponse != null && !functionResponse.isMissingNode()) {
                         String toolName = functionResponse.path("name").asText("tool");
                         String responseText = functionResponse.path("response").toString();
-                        result.add(new MessageInput("tool", responseText, null, toolName, List.of()));
+                        result.add(new CanonicalMessage(
+                                CanonicalMessageRole.TOOL,
+                                List.of(CanonicalContentPart.toolResult(null, toolName, responseText))
+                        ));
                         continue;
                     }
                 }
-                List<ChatExecutionRequest.MediaInput> media = extractMedia(parts);
-                if (!StringUtils.hasText(text) && media.isEmpty()) {
+                List<CanonicalContentPart> canonicalParts = new ArrayList<>();
+                if (StringUtils.hasText(text)) {
+                    canonicalParts.add(CanonicalContentPart.text(text));
+                }
+                canonicalParts.addAll(extractMedia(parts));
+                if (canonicalParts.isEmpty()) {
                     continue;
                 }
-                result.add(new MessageInput("model".equalsIgnoreCase(role) ? "assistant" : "user", text, null, null, media));
+                result.add(new CanonicalMessage(
+                        "model".equalsIgnoreCase(role) ? CanonicalMessageRole.ASSISTANT : CanonicalMessageRole.USER,
+                        List.copyOf(canonicalParts)
+                ));
             }
         }
         return List.copyOf(result);
     }
 
-    private void ensureUserMessage(List<MessageInput> messages) {
+    private void ensureUserMessage(List<CanonicalMessage> messages) {
         boolean hasUser = messages.stream()
-                .anyMatch(message ->
-                        "user".equalsIgnoreCase(message.role())
-                                && (StringUtils.hasText(message.content())
-                                || (message.media() != null && !message.media().isEmpty()))
-                );
+                .anyMatch(message -> message.role() == CanonicalMessageRole.USER
+                        && message.parts() != null
+                        && !message.parts().isEmpty());
         if (!hasUser) {
             throw new IllegalArgumentException("至少需要一条带 text 的 user content。");
         }
     }
 
-    private List<GatewayToolDefinition> toTools(JsonNode toolsNode) {
-        List<GatewayToolDefinition> result = new ArrayList<>();
+    private List<CanonicalToolDefinition> toTools(JsonNode toolsNode) {
+        List<CanonicalToolDefinition> result = new ArrayList<>();
         if (toolsNode == null || !toolsNode.isArray()) {
             return result;
         }
@@ -103,7 +134,7 @@ public class GeminiGenerateContentRequestMapper {
                 if (!StringUtils.hasText(name)) {
                     continue;
                 }
-                result.add(new GatewayToolDefinition(
+                result.add(new CanonicalToolDefinition(
                         name,
                         function.path("description").asText(null),
                         function.path("parameters").isMissingNode() ? null : function.path("parameters"),
@@ -145,8 +176,8 @@ public class GeminiGenerateContentRequestMapper {
         return null;
     }
 
-    private List<ChatExecutionRequest.MediaInput> extractMedia(JsonNode parts) {
-        List<ChatExecutionRequest.MediaInput> result = new ArrayList<>();
+    private List<CanonicalContentPart> extractMedia(JsonNode parts) {
+        List<CanonicalContentPart> result = new ArrayList<>();
         if (parts == null || !parts.isArray()) {
             return result;
         }
@@ -156,22 +187,16 @@ public class GeminiGenerateContentRequestMapper {
             if (!fileData.isMissingNode() && !fileData.isNull()) {
                 String fileId = fileData.path("fileId").asText(null);
                 if (fileId != null && !fileId.isBlank()) {
-                    result.add(new ChatExecutionRequest.MediaInput(
-                            fileData.path("mimeType").asText("").startsWith("image/") ? "image" : "file",
-                            fileData.path("mimeType").asText("application/octet-stream"),
-                            "gateway://" + fileId,
-                            null
-                    ));
+                    result.add(fileData.path("mimeType").asText("").startsWith("image/")
+                            ? CanonicalContentPart.image(fileData.path("mimeType").asText("image/*"), "gateway://" + fileId, null)
+                            : CanonicalContentPart.file(fileData.path("mimeType").asText("application/octet-stream"), "gateway://" + fileId, null));
                     continue;
                 }
                 String uri = fileData.path("fileUri").asText(null);
                 if (uri != null && !uri.isBlank()) {
-                    result.add(new ChatExecutionRequest.MediaInput(
-                            fileData.path("mimeType").asText("").startsWith("image/") ? "image" : "file",
-                            fileData.path("mimeType").asText("application/octet-stream"),
-                            uri,
-                            null
-                    ));
+                    result.add(fileData.path("mimeType").asText("").startsWith("image/")
+                            ? CanonicalContentPart.image(fileData.path("mimeType").asText("image/*"), uri, null)
+                            : CanonicalContentPart.file(fileData.path("mimeType").asText("application/octet-stream"), uri, null));
                 }
             }
         }
