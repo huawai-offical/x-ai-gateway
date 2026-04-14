@@ -2,6 +2,7 @@ package com.prodigalgal.xaigateway.admin.api;
 
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
 import com.prodigalgal.xaigateway.gateway.core.catalog.SurfaceCapabilityView;
+import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend;
 import com.prodigalgal.xaigateway.gateway.core.shared.ReasoningTransport;
 import java.time.Instant;
 import java.util.List;
@@ -22,6 +23,8 @@ public record SiteModelCapabilityResponse(
         boolean supportsReasoningReuse,
         ReasoningTransport reasoningTransport,
         InteropCapabilityLevel capabilityLevel,
+        ExecutionBackend preferredBackend,
+        List<ExecutionBackend> supportedBackends,
         Map<String, SurfaceCapabilityView> surfaces,
         Instant sourceRefreshedAt
 ) {

@@ -6,6 +6,8 @@ import com.prodigalgal.xaigateway.admin.api.ProviderSiteResponse;
 import com.prodigalgal.xaigateway.admin.api.SiteModelCapabilityResponse;
 import com.prodigalgal.xaigateway.gateway.core.catalog.SurfaceCapabilityView;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRenderCapabilitySupport;
+import com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendDecision;
+import com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendPolicyService;
 import com.prodigalgal.xaigateway.gateway.core.interop.CapabilityResolutionView;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CredentialModelDiscoveryService;
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics;
@@ -27,6 +29,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +44,27 @@ public class ProviderSiteAdminService {
     private final ProviderSiteRegistryService providerSiteRegistryService;
     private final CredentialModelDiscoveryService credentialModelDiscoveryService;
     private final SiteCapabilityTruthService siteCapabilityTruthService;
+    private final ExecutionBackendPolicyService executionBackendPolicyService;
+
+    @Autowired
+    public ProviderSiteAdminService(
+            UpstreamSiteProfileRepository upstreamSiteProfileRepository,
+            SiteCapabilitySnapshotRepository siteCapabilitySnapshotRepository,
+            SiteModelCapabilityRepository siteModelCapabilityRepository,
+            UpstreamCredentialRepository upstreamCredentialRepository,
+            ProviderSiteRegistryService providerSiteRegistryService,
+            CredentialModelDiscoveryService credentialModelDiscoveryService,
+            SiteCapabilityTruthService siteCapabilityTruthService,
+            ExecutionBackendPolicyService executionBackendPolicyService) {
+        this.upstreamSiteProfileRepository = upstreamSiteProfileRepository;
+        this.siteCapabilitySnapshotRepository = siteCapabilitySnapshotRepository;
+        this.siteModelCapabilityRepository = siteModelCapabilityRepository;
+        this.upstreamCredentialRepository = upstreamCredentialRepository;
+        this.providerSiteRegistryService = providerSiteRegistryService;
+        this.credentialModelDiscoveryService = credentialModelDiscoveryService;
+        this.siteCapabilityTruthService = siteCapabilityTruthService;
+        this.executionBackendPolicyService = executionBackendPolicyService;
+    }
 
     public ProviderSiteAdminService(
             UpstreamSiteProfileRepository upstreamSiteProfileRepository,
@@ -50,13 +74,16 @@ public class ProviderSiteAdminService {
             ProviderSiteRegistryService providerSiteRegistryService,
             CredentialModelDiscoveryService credentialModelDiscoveryService,
             SiteCapabilityTruthService siteCapabilityTruthService) {
-        this.upstreamSiteProfileRepository = upstreamSiteProfileRepository;
-        this.siteCapabilitySnapshotRepository = siteCapabilitySnapshotRepository;
-        this.siteModelCapabilityRepository = siteModelCapabilityRepository;
-        this.upstreamCredentialRepository = upstreamCredentialRepository;
-        this.providerSiteRegistryService = providerSiteRegistryService;
-        this.credentialModelDiscoveryService = credentialModelDiscoveryService;
-        this.siteCapabilityTruthService = siteCapabilityTruthService;
+        this(
+                upstreamSiteProfileRepository,
+                siteCapabilitySnapshotRepository,
+                siteModelCapabilityRepository,
+                upstreamCredentialRepository,
+                providerSiteRegistryService,
+                credentialModelDiscoveryService,
+                siteCapabilityTruthService,
+                new ExecutionBackendPolicyService()
+        );
     }
 
     @Transactional(readOnly = true)
@@ -117,6 +144,8 @@ public class ProviderSiteAdminService {
                         item.isSupportsReasoningReuse(),
                         item.getReasoningTransport(),
                         item.getCapabilityLevel(),
+                        preferredBackend(item),
+                        supportedBackends(item),
                         buildModelSurfaces(item),
                         item.getSourceRefreshedAt()
                 ))
@@ -134,6 +163,12 @@ public class ProviderSiteAdminService {
     private CapabilityMatrixRowResponse toCapabilityMatrixRow(UpstreamSiteProfileEntity entity) {
         SiteCapabilitySnapshotEntity snapshot = siteCapabilitySnapshotRepository.findBySiteProfile_Id(entity.getId()).orElse(null);
         CooldownSummary cooldown = cooldownSummary(entity.getId());
+        ExecutionBackendDecision backendDecision = executionBackendPolicyService.forSiteSurface(
+                entity,
+                snapshot,
+                TranslationResourceType.CHAT,
+                TranslationOperation.CHAT_COMPLETION
+        );
         return new CapabilityMatrixRowResponse(
                 entity.getId(),
                 entity.getProfileCode(),
@@ -152,6 +187,8 @@ public class ProviderSiteAdminService {
                 snapshot == null ? null : snapshot.getFallbackStrategy(),
                 cooldown.credentialCount(),
                 cooldown.cooldownUntil(),
+                backendDecision.preferredBackend(),
+                backendDecision.supportedBackends(),
                 buildFeatureViews(entity, snapshot),
                 buildSurfaceViews(entity, snapshot),
                 siteCapabilityTruthService.supportsFeature(entity, snapshot, InteropFeature.RESPONSE_OBJECT),
@@ -171,6 +208,12 @@ public class ProviderSiteAdminService {
         SiteCapabilitySnapshotEntity snapshot = siteCapabilitySnapshotRepository.findBySiteProfile_Id(entity.getId()).orElse(null);
         int modelCount = siteModelCapabilityRepository.findAllBySiteProfile_IdOrderByModelKeyAsc(entity.getId()).size();
         CooldownSummary cooldown = cooldownSummary(entity.getId());
+        ExecutionBackendDecision backendDecision = executionBackendPolicyService.forSiteSurface(
+                entity,
+                snapshot,
+                TranslationResourceType.CHAT,
+                TranslationOperation.CHAT_COMPLETION
+        );
         return new ProviderSiteResponse(
                 entity.getId(),
                 entity.getProfileCode(),
@@ -193,6 +236,8 @@ public class ProviderSiteAdminService {
                 snapshot == null ? null : snapshot.getFallbackStrategy(),
                 cooldown.credentialCount(),
                 cooldown.cooldownUntil(),
+                backendDecision.preferredBackend(),
+                backendDecision.supportedBackends(),
                 buildFeatureViews(entity, snapshot),
                 buildSurfaceViews(entity, snapshot),
                 modelCount,
@@ -220,6 +265,24 @@ public class ProviderSiteAdminService {
         };
     }
 
+    private com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend preferredBackend(SiteModelCapabilityEntity item) {
+        return executionBackendPolicyService.preferredBackendForSurface(
+                TranslationResourceType.CHAT,
+                TranslationOperation.CHAT_COMPLETION,
+                executionBackendPolicyService.providerTypeForSite(item.getSiteProfile() == null ? null : item.getSiteProfile().getSiteKind()),
+                item.getSiteProfile() == null ? null : item.getSiteProfile().getSiteKind()
+        );
+    }
+
+    private List<com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend> supportedBackends(SiteModelCapabilityEntity item) {
+        return executionBackendPolicyService.supportedBackendsForSurface(
+                TranslationResourceType.CHAT,
+                TranslationOperation.CHAT_COMPLETION,
+                executionBackendPolicyService.providerTypeForSite(item.getSiteProfile() == null ? null : item.getSiteProfile().getSiteKind()),
+                item.getSiteProfile() == null ? null : item.getSiteProfile().getSiteKind()
+        );
+    }
+
     private Map<String, CapabilityResolutionView> buildFeatureViews(
             UpstreamSiteProfileEntity entity,
             SiteCapabilitySnapshotEntity snapshot) {
@@ -240,31 +303,106 @@ public class ProviderSiteAdminService {
     private Map<String, SurfaceCapabilityView> buildSurfaceViews(
             UpstreamSiteProfileEntity entity,
             SiteCapabilitySnapshotEntity snapshot) {
-        return Map.of(
-                "chat_completion", toSurface(
+        return Map.ofEntries(
+                Map.entry("chat_completion", toSurface(
+                        entity,
                         "openai",
                         "/v1/chat/completions",
                         TranslationResourceType.CHAT,
                         TranslationOperation.CHAT_COMPLETION,
                         List.of(InteropFeature.CHAT_TEXT),
                         siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.CHAT_TEXT)
-                ),
-                "response_create", toSurface(
+                )),
+                Map.entry("response_create", toSurface(
+                        entity,
                         "responses",
                         "/v1/responses",
                         TranslationResourceType.RESPONSE,
                         TranslationOperation.RESPONSE_CREATE,
                         List.of(InteropFeature.RESPONSE_OBJECT),
                         siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.RESPONSE_OBJECT)
-                ),
-                "embedding_create", toSurface(
+                )),
+                Map.entry("embedding_create", toSurface(
+                        entity,
                         "openai",
                         "/v1/embeddings",
                         TranslationResourceType.EMBEDDING,
                         TranslationOperation.EMBEDDING_CREATE,
                         List.of(InteropFeature.EMBEDDINGS),
                         siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.EMBEDDINGS)
-                )
+                )),
+                Map.entry("audio_transcription", toSurface(
+                        entity,
+                        "openai",
+                        "/v1/audio/transcriptions",
+                        TranslationResourceType.AUDIO,
+                        TranslationOperation.AUDIO_TRANSCRIPTION,
+                        List.of(InteropFeature.AUDIO_TRANSCRIPTION),
+                        siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.AUDIO_TRANSCRIPTION)
+                )),
+                Map.entry("image_generation", toSurface(
+                        entity,
+                        "openai",
+                        "/v1/images/generations",
+                        TranslationResourceType.IMAGE,
+                        TranslationOperation.IMAGE_GENERATION,
+                        List.of(InteropFeature.IMAGE_GENERATION),
+                        siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.IMAGE_GENERATION)
+                )),
+                Map.entry("moderation_create", toSurface(
+                        entity,
+                        "openai",
+                        "/v1/moderations",
+                        TranslationResourceType.MODERATION,
+                        TranslationOperation.MODERATION_CREATE,
+                        List.of(InteropFeature.MODERATION),
+                        siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.MODERATION)
+                )),
+                Map.entry("file_create", toSurface(
+                        entity,
+                        "openai",
+                        "/v1/files",
+                        TranslationResourceType.FILE,
+                        TranslationOperation.FILE_CREATE,
+                        List.of(InteropFeature.FILE_OBJECT),
+                        siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.FILE_OBJECT)
+                )),
+                Map.entry("upload_create", toSurface(
+                        entity,
+                        "openai",
+                        "/v1/uploads",
+                        TranslationResourceType.UPLOAD,
+                        TranslationOperation.UPLOAD_CREATE,
+                        List.of(InteropFeature.UPLOAD_CREATE),
+                        siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.UPLOAD_CREATE)
+                )),
+                Map.entry("batch_create", toSurface(
+                        entity,
+                        "openai",
+                        "/v1/batches",
+                        TranslationResourceType.BATCH,
+                        TranslationOperation.BATCH_CREATE,
+                        List.of(InteropFeature.BATCH_CREATE),
+                        siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.BATCH_CREATE)
+                )),
+                Map.entry("tuning_create", toSurface(
+                        entity,
+                        "openai",
+                        "/v1/fine_tuning/jobs",
+                        TranslationResourceType.TUNING,
+                        TranslationOperation.TUNING_CREATE,
+                        List.of(InteropFeature.TUNING_CREATE),
+                        siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.TUNING_CREATE)
+                )),
+                Map.entry("realtime_client_secret_create", toSurface(
+                        entity,
+                        "openai",
+                        "/v1/realtime/client_secrets",
+                        TranslationResourceType.REALTIME,
+                        TranslationOperation.REALTIME_CLIENT_SECRET_CREATE,
+                        List.of(InteropFeature.REALTIME_CLIENT_SECRET),
+                        siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.REALTIME_CLIENT_SECRET)
+                ))
         );
     }
 
@@ -273,13 +411,14 @@ public class ProviderSiteAdminService {
         InteropCapabilityLevel responseLevel = item.getSupportedProtocols().contains("responses") ? item.getCapabilityLevel() : InteropCapabilityLevel.UNSUPPORTED;
         InteropCapabilityLevel embeddingsLevel = item.isSupportsEmbeddings() ? item.getCapabilityLevel() : InteropCapabilityLevel.UNSUPPORTED;
         return Map.of(
-                "chat_completion", modelSurface("openai", "/v1/chat/completions", TranslationResourceType.CHAT, TranslationOperation.CHAT_COMPLETION, InteropFeature.CHAT_TEXT, chatLevel),
-                "response_create", modelSurface("responses", "/v1/responses", TranslationResourceType.RESPONSE, TranslationOperation.RESPONSE_CREATE, InteropFeature.RESPONSE_OBJECT, responseLevel),
-                "embedding_create", modelSurface("openai", "/v1/embeddings", TranslationResourceType.EMBEDDING, TranslationOperation.EMBEDDING_CREATE, InteropFeature.EMBEDDINGS, embeddingsLevel)
+                "chat_completion", modelSurface(item.getSiteProfile() == null ? null : item.getSiteProfile().getSiteKind(), "openai", "/v1/chat/completions", TranslationResourceType.CHAT, TranslationOperation.CHAT_COMPLETION, InteropFeature.CHAT_TEXT, chatLevel),
+                "response_create", modelSurface(item.getSiteProfile() == null ? null : item.getSiteProfile().getSiteKind(), "responses", "/v1/responses", TranslationResourceType.RESPONSE, TranslationOperation.RESPONSE_CREATE, InteropFeature.RESPONSE_OBJECT, responseLevel),
+                "embedding_create", modelSurface(item.getSiteProfile() == null ? null : item.getSiteProfile().getSiteKind(), "openai", "/v1/embeddings", TranslationResourceType.EMBEDDING, TranslationOperation.EMBEDDING_CREATE, InteropFeature.EMBEDDINGS, embeddingsLevel)
         );
     }
 
     private SurfaceCapabilityView toSurface(
+            UpstreamSiteProfileEntity entity,
             String protocol,
             String requestPath,
             TranslationResourceType resourceType,
@@ -292,9 +431,12 @@ public class ProviderSiteAdminService {
                 requestPath,
                 new GatewayRequestSemantics(resourceType, operation, requiredFeatures, true)
         );
+        ExecutionBackendDecision backendDecision = executionBackendPolicyService.forSiteSurface(entity, null, resourceType, operation);
         return new SurfaceCapabilityView(
                 resourceType,
                 operation,
+                backendDecision.preferredBackend(),
+                backendDecision.supportedBackends(),
                 executionLevel,
                 renderLevel,
                 CanonicalRenderCapabilitySupport.minimum(executionLevel, renderLevel),
@@ -304,6 +446,7 @@ public class ProviderSiteAdminService {
     }
 
     private SurfaceCapabilityView modelSurface(
+            com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind siteKind,
             String protocol,
             String requestPath,
             TranslationResourceType resourceType,
@@ -315,15 +458,27 @@ public class ProviderSiteAdminService {
                 requestPath,
                 new GatewayRequestSemantics(resourceType, operation, List.of(feature), true)
         );
+        ExecutionBackendDecision backendDecision = executionBackendPolicyService.forSiteSurface(siteProfileForKind(siteKind), null, resourceType, operation);
         return new SurfaceCapabilityView(
                 resourceType,
                 operation,
+                backendDecision.preferredBackend(),
+                backendDecision.supportedBackends(),
                 executionLevel,
                 renderLevel,
                 CanonicalRenderCapabilitySupport.minimum(executionLevel, renderLevel),
                 List.of(feature.wireName()),
                 Map.of(feature.wireName(), new CapabilityResolutionView(null, null, executionLevel.name().toLowerCase(), List.of(), List.of()))
         );
+    }
+
+    private UpstreamSiteProfileEntity siteProfileForKind(com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind siteKind) {
+        if (siteKind == null) {
+            return null;
+        }
+        UpstreamSiteProfileEntity entity = new UpstreamSiteProfileEntity();
+        entity.setSiteKind(siteKind);
+        return entity;
     }
 
     private UpstreamSiteProfileEntity getRequired(Long id) {

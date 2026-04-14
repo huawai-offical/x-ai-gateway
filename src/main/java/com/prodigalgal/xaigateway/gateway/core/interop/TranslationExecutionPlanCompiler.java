@@ -7,6 +7,8 @@ import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtoco
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRenderCapabilitySupport;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
+import com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendDecision;
+import com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendPolicyService;
 import com.prodigalgal.xaigateway.gateway.core.routing.GatewayRouteSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionRequest;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
@@ -14,6 +16,7 @@ import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -22,14 +25,30 @@ public class TranslationExecutionPlanCompiler {
     private final GatewayRouteSelectionService gatewayRouteSelectionService;
     private final GatewayRequestFeatureService gatewayRequestFeatureService;
     private final SiteCapabilityTruthService siteCapabilityTruthService;
+    private final ExecutionBackendPolicyService executionBackendPolicyService;
+
+    @Autowired
+    public TranslationExecutionPlanCompiler(
+            GatewayRouteSelectionService gatewayRouteSelectionService,
+            GatewayRequestFeatureService gatewayRequestFeatureService,
+            SiteCapabilityTruthService siteCapabilityTruthService,
+            ExecutionBackendPolicyService executionBackendPolicyService) {
+        this.gatewayRouteSelectionService = gatewayRouteSelectionService;
+        this.gatewayRequestFeatureService = gatewayRequestFeatureService;
+        this.siteCapabilityTruthService = siteCapabilityTruthService;
+        this.executionBackendPolicyService = executionBackendPolicyService;
+    }
 
     public TranslationExecutionPlanCompiler(
             GatewayRouteSelectionService gatewayRouteSelectionService,
             GatewayRequestFeatureService gatewayRequestFeatureService,
             SiteCapabilityTruthService siteCapabilityTruthService) {
-        this.gatewayRouteSelectionService = gatewayRouteSelectionService;
-        this.gatewayRequestFeatureService = gatewayRequestFeatureService;
-        this.siteCapabilityTruthService = siteCapabilityTruthService;
+        this(
+                gatewayRouteSelectionService,
+                gatewayRequestFeatureService,
+                siteCapabilityTruthService,
+                new ExecutionBackendPolicyService()
+        );
     }
 
     public CanonicalExecutionPlanCompilation compilePreview(
@@ -114,6 +133,8 @@ public class TranslationExecutionPlanCompiler {
                 blockedReasons.isEmpty()
                         ? report.upstreamObjectMode()
                         : "blocked",
+                canonicalRequest,
+                body,
                 List.copyOf(lossReasons),
                 List.copyOf(blockedReasons)
         );
@@ -136,6 +157,8 @@ public class TranslationExecutionPlanCompiler {
                 report,
                 report.executionKind(),
                 report.upstreamObjectMode(),
+                canonicalRequest,
+                body,
                 report.lossReasons(),
                 report.blockedReasons()
         );
@@ -173,12 +196,20 @@ public class TranslationExecutionPlanCompiler {
             CapabilityResolutionReport resolutionReport,
             ExecutionKind executionKind,
             String upstreamObjectMode,
+            CanonicalRequest canonicalRequest,
+            JsonNode requestBody,
             List<String> lossReasons,
             List<String> blockedReasons) {
         java.util.Map<String, InteropCapabilityLevel> featureLevels = new java.util.LinkedHashMap<>();
         resolutionReport.featureResolutions().forEach((key, value) -> featureLevels.put(key, value.effectiveLevel()));
         InteropCapabilityLevel executionCapabilityLevel = resolutionReport.overallEffectiveLevel();
         InteropCapabilityLevel renderCapabilityLevel = CanonicalRenderCapabilitySupport.renderLevel(protocol, requestPath, semantics);
+        ExecutionBackendDecision backendDecision = executionBackendPolicyService.forCandidate(
+                selectionResult == null ? null : selectionResult.selectedCandidate().candidate(),
+                semantics,
+                canonicalRequest,
+                requestBody
+        );
         return new CanonicalExecutionPlan(
                 blockedReasons.isEmpty(),
                 CanonicalIngressProtocol.from(protocol),
@@ -189,6 +220,9 @@ public class TranslationExecutionPlanCompiler {
                 semantics.resourceType(),
                 semantics.operation(),
                 executionKind,
+                backendDecision.preferredBackend(),
+                backendDecision.supportedBackends(),
+                backendDecision.reason(),
                 executionCapabilityLevel,
                 renderCapabilityLevel,
                 CanonicalRenderCapabilitySupport.minimum(executionCapabilityLevel, renderCapabilityLevel),

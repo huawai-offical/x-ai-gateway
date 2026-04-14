@@ -2,8 +2,10 @@ package com.prodigalgal.xaigateway.gateway.core.catalog;
 
 import com.prodigalgal.xaigateway.gateway.core.interop.CapabilityResolutionView;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
+import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderFamily;
 import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
+import java.util.List;
 import java.util.Map;
 
 public record GatewayPublicModelView(
@@ -14,6 +16,8 @@ public record GatewayPublicModelView(
         ProviderFamily providerFamily,
         UpstreamSiteKind siteKind,
         InteropCapabilityLevel capabilityLevel,
+        ExecutionBackend preferredBackend,
+        List<ExecutionBackend> supportedBackends,
         boolean supportsChat,
         boolean supportsEmbeddings,
         Map<String, CapabilityResolutionView> capabilities,
@@ -24,6 +28,6 @@ public record GatewayPublicModelView(
             String resolvedModelKey,
             boolean alias
     ) {
-        this(publicModelId, resolvedModelKey, alias, null, null, null, InteropCapabilityLevel.NATIVE, true, false, Map.of(), Map.of());
+        this(publicModelId, resolvedModelKey, alias, null, null, null, InteropCapabilityLevel.NATIVE, ExecutionBackend.SPRING_AI, List.of(), true, false, Map.of(), Map.of());
     }
 }

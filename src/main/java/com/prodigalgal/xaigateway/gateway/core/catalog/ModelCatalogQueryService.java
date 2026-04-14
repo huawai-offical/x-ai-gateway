@@ -14,6 +14,7 @@ import com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature;
 import com.prodigalgal.xaigateway.gateway.core.interop.SiteCapabilityTruthService;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
+import com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendPolicyService;
 import com.prodigalgal.xaigateway.gateway.core.shared.ModelIdNormalizer;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SiteModelCapabilityEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
@@ -28,6 +29,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,16 +41,34 @@ public class ModelCatalogQueryService {
     private final UpstreamCredentialRepository upstreamCredentialRepository;
     private final ModelAliasQueryService modelAliasQueryService;
     private final SiteCapabilityTruthService siteCapabilityTruthService;
+    private final ExecutionBackendPolicyService executionBackendPolicyService;
+
+    @Autowired
+    public ModelCatalogQueryService(
+            SiteModelCapabilityRepository siteModelCapabilityRepository,
+            UpstreamCredentialRepository upstreamCredentialRepository,
+            ModelAliasQueryService modelAliasQueryService,
+            SiteCapabilityTruthService siteCapabilityTruthService,
+            ExecutionBackendPolicyService executionBackendPolicyService) {
+        this.siteModelCapabilityRepository = siteModelCapabilityRepository;
+        this.upstreamCredentialRepository = upstreamCredentialRepository;
+        this.modelAliasQueryService = modelAliasQueryService;
+        this.siteCapabilityTruthService = siteCapabilityTruthService;
+        this.executionBackendPolicyService = executionBackendPolicyService;
+    }
 
     public ModelCatalogQueryService(
             SiteModelCapabilityRepository siteModelCapabilityRepository,
             UpstreamCredentialRepository upstreamCredentialRepository,
             ModelAliasQueryService modelAliasQueryService,
             SiteCapabilityTruthService siteCapabilityTruthService) {
-        this.siteModelCapabilityRepository = siteModelCapabilityRepository;
-        this.upstreamCredentialRepository = upstreamCredentialRepository;
-        this.modelAliasQueryService = modelAliasQueryService;
-        this.siteCapabilityTruthService = siteCapabilityTruthService;
+        this(
+                siteModelCapabilityRepository,
+                upstreamCredentialRepository,
+                modelAliasQueryService,
+                siteCapabilityTruthService,
+                new ExecutionBackendPolicyService()
+        );
     }
 
     public List<CatalogCandidateView> listCandidatesByModelKey(String modelKey) {
@@ -106,6 +126,18 @@ public class ModelCatalogQueryService {
                     candidate.providerFamily(),
                     candidate.siteKind(),
                     actualCapabilityLevel(candidate),
+                    executionBackendPolicyService.preferredBackendForSurface(
+                            TranslationResourceType.CHAT,
+                            TranslationOperation.CHAT_COMPLETION,
+                            candidate.providerType(),
+                            candidate.siteKind()
+                    ),
+                    executionBackendPolicyService.supportedBackendsForSurface(
+                            TranslationResourceType.CHAT,
+                            TranslationOperation.CHAT_COMPLETION,
+                            candidate.providerType(),
+                            candidate.siteKind()
+                    ),
                     chatResolution.overallEffectiveLevel() != InteropCapabilityLevel.UNSUPPORTED,
                     embeddingsResolution.overallEffectiveLevel() != InteropCapabilityLevel.UNSUPPORTED,
                     java.util.Map.of(
@@ -143,6 +175,18 @@ public class ModelCatalogQueryService {
                         representative == null ? null : representative.providerFamily(),
                         representative == null ? null : representative.siteKind(),
                         representative == null ? InteropCapabilityLevel.EMULATED : actualCapabilityLevel(representative),
+                        representative == null ? null : executionBackendPolicyService.preferredBackendForSurface(
+                                TranslationResourceType.CHAT,
+                                TranslationOperation.CHAT_COMPLETION,
+                                representative.providerType(),
+                                representative.siteKind()
+                        ),
+                        representative == null ? List.of() : executionBackendPolicyService.supportedBackendsForSurface(
+                                TranslationResourceType.CHAT,
+                                TranslationOperation.CHAT_COMPLETION,
+                                representative.providerType(),
+                                representative.siteKind()
+                        ),
                         representative != null
                                 && featureResolution(representative, InteropFeature.CHAT_TEXT, TranslationResourceType.CHAT, TranslationOperation.CHAT_COMPLETION)
                                 .overallEffectiveLevel() != InteropCapabilityLevel.UNSUPPORTED,
@@ -292,13 +336,14 @@ public class ModelCatalogQueryService {
         CapabilityResolutionReport embeddingsResolution = featureResolution(candidate, InteropFeature.EMBEDDINGS, TranslationResourceType.EMBEDDING, TranslationOperation.EMBEDDING_CREATE);
 
         return Map.of(
-                "chat_completion", toSurface("openai", "/v1/chat/completions", TranslationResourceType.CHAT, TranslationOperation.CHAT_COMPLETION, List.of(InteropFeature.CHAT_TEXT), chatResolution),
-                "response_create", toSurface("responses", "/v1/responses", TranslationResourceType.RESPONSE, TranslationOperation.RESPONSE_CREATE, List.of(InteropFeature.RESPONSE_OBJECT), responseResolution),
-                "embedding_create", toSurface("openai", "/v1/embeddings", TranslationResourceType.EMBEDDING, TranslationOperation.EMBEDDING_CREATE, List.of(InteropFeature.EMBEDDINGS), embeddingsResolution)
+                "chat_completion", toSurface(candidate, "openai", "/v1/chat/completions", TranslationResourceType.CHAT, TranslationOperation.CHAT_COMPLETION, List.of(InteropFeature.CHAT_TEXT), chatResolution),
+                "response_create", toSurface(candidate, "responses", "/v1/responses", TranslationResourceType.RESPONSE, TranslationOperation.RESPONSE_CREATE, List.of(InteropFeature.RESPONSE_OBJECT), responseResolution),
+                "embedding_create", toSurface(candidate, "openai", "/v1/embeddings", TranslationResourceType.EMBEDDING, TranslationOperation.EMBEDDING_CREATE, List.of(InteropFeature.EMBEDDINGS), embeddingsResolution)
         );
     }
 
     private SurfaceCapabilityView toSurface(
+            CatalogCandidateView candidate,
             String protocol,
             String requestPath,
             TranslationResourceType resourceType,
@@ -310,9 +355,17 @@ public class ModelCatalogQueryService {
                 requestPath,
                 new GatewayRequestSemantics(resourceType, operation, requiredFeatures, true)
         );
+        var backendDecision = executionBackendPolicyService.forCandidate(
+                candidate,
+                new GatewayRequestSemantics(resourceType, operation, requiredFeatures, true),
+                null,
+                null
+        );
         return new SurfaceCapabilityView(
                 resourceType,
                 operation,
+                backendDecision.preferredBackend(),
+                backendDecision.supportedBackends(),
                 resolutionReport.overallEffectiveLevel(),
                 renderLevel,
                 CanonicalRenderCapabilitySupport.minimum(resolutionReport.overallEffectiveLevel(), renderLevel),

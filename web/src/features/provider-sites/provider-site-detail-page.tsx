@@ -192,6 +192,7 @@ export function ProviderSiteDetailPage() {
                 <span>{current.authStrategy} / {current.pathStrategy}</span>
                 <span>{current.modelAddressingStrategy} / {current.errorSchemaStrategy}</span>
                 <span>surface: {current.compatibilitySurface}</span>
+                <span>backend: {current.preferredBackend ?? '无'} / {(current.supportedBackends ?? []).join(', ') || '无'}</span>
                 <span>credential: {current.credentialRequirements.join(', ') || '无'}</span>
                 <span>transport: {current.streamTransport ?? '无'}</span>
                 <span>fallback: {current.fallbackStrategy ?? '无'}</span>
@@ -224,6 +225,7 @@ export function ProviderSiteDetailPage() {
               {surfaceEntries.map(([surfaceKey, surface]) => (
                 <div key={surfaceKey} className={`detail-card${selectedSurface === surfaceKey ? ' is-selected' : ''}`}>
                   <strong>{surface.operation}</strong>
+                  <span>backend: {surface.preferredBackend ?? '-'} / {(surface.supportedBackends ?? []).join(', ') || '无'}</span>
                   <span>resource: {surface.resourceType}</span>
                   <span>execution: {surface.executionCapabilityLevel ?? '-'}</span>
                   <span>render: {surface.renderCapabilityLevel ?? '-'}</span>
@@ -245,6 +247,7 @@ export function ProviderSiteDetailPage() {
                   <strong>{item.modelName}</strong>
                   <span>{item.modelKey}</span>
                   <span>{item.capabilityLevel}</span>
+                  <span>backend: {item.preferredBackend ?? '-'} / {(item.supportedBackends ?? []).join(', ') || '无'}</span>
                   {Object.entries(item.surfaces).map(([surfaceKey, surface]) => (
                     <span key={surfaceKey}>{surface.operation}: {surface.executionCapabilityLevel ?? '-'}/{surface.renderCapabilityLevel ?? '-'}/{surface.overallCapabilityLevel ?? '-'}</span>
                   ))}

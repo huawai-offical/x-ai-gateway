@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
 import com.prodigalgal.xaigateway.gateway.core.catalog.GatewayPublicModelView;
 import com.prodigalgal.xaigateway.gateway.core.catalog.SurfaceCapabilityView;
+import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +26,10 @@ public record OpenAiModelsResponse(
             String siteKind,
             @JsonProperty("capability_level")
             String capabilityLevel,
+            @JsonProperty("preferred_backend")
+            String preferredBackend,
+            @JsonProperty("supported_backends")
+            List<String> supportedBackends,
             @JsonProperty("supports_chat")
             boolean supportsChat,
             @JsonProperty("supports_embeddings")
@@ -46,6 +51,8 @@ public record OpenAiModelsResponse(
                                 model.providerFamily() == null ? null : model.providerFamily().name().toLowerCase(),
                                 model.siteKind() == null ? null : model.siteKind().name().toLowerCase(),
                                 (model.capabilityLevel() == null ? InteropCapabilityLevel.NATIVE : model.capabilityLevel()).name().toLowerCase(),
+                                model.preferredBackend() == null ? ExecutionBackend.SPRING_AI.wireName() : model.preferredBackend().wireName(),
+                                model.supportedBackends().stream().map(ExecutionBackend::wireName).toList(),
                                 model.supportsChat(),
                                 model.supportsEmbeddings(),
                                 model.surfaces()

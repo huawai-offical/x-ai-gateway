@@ -7,6 +7,7 @@ import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRenderCapabili
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
 import com.prodigalgal.xaigateway.gateway.core.shared.AuthStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ErrorSchemaStrategy;
+import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend;
 import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind;
 import com.prodigalgal.xaigateway.gateway.core.shared.PathStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderFamily;
@@ -181,6 +182,9 @@ public record TranslationExecutionPlan(
                 resourceType,
                 operation,
                 executionKind,
+                ExecutionBackend.SPRING_AI,
+                List.of(ExecutionBackend.SPRING_AI),
+                "legacy_translation_plan",
                 executionLevel,
                 renderLevel,
                 CanonicalRenderCapabilitySupport.minimum(executionLevel, renderLevel),

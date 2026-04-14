@@ -21,16 +21,20 @@ public class OpenAiChatModelFactory {
     }
 
     public OpenAiChatModel create(String baseUrl, String apiKey, OpenAiChatOptions options) {
-        OpenAiApi api = new OpenAiApi.Builder()
-                .baseUrl(baseUrl)
-                .apiKey(apiKey)
-                .webClientBuilder(webClientBuilder.clone())
-                .build();
+        OpenAiApi api = createApi(baseUrl, apiKey);
 
         return OpenAiChatModel.builder()
                 .openAiApi(api)
                 .defaultOptions(options)
                 .observationRegistry(observationRegistry)
+                .build();
+    }
+
+    public OpenAiApi createApi(String baseUrl, String apiKey) {
+        return new OpenAiApi.Builder()
+                .baseUrl(baseUrl)
+                .apiKey(apiKey)
+                .webClientBuilder(webClientBuilder.clone())
                 .build();
     }
 }

@@ -4,6 +4,7 @@ import com.prodigalgal.xaigateway.gateway.core.interop.CapabilityResolutionView;
 import com.prodigalgal.xaigateway.gateway.core.catalog.SurfaceCapabilityView;
 import com.prodigalgal.xaigateway.gateway.core.shared.AuthStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ErrorSchemaStrategy;
+import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend;
 import com.prodigalgal.xaigateway.gateway.core.shared.ModelAddressingStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.PathStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderFamily;
@@ -34,6 +35,8 @@ public record ProviderSiteResponse(
         String fallbackStrategy,
         int cooldownCredentialCount,
         Instant cooldownUntil,
+        ExecutionBackend preferredBackend,
+        List<ExecutionBackend> supportedBackends,
         Map<String, CapabilityResolutionView> features,
         Map<String, SurfaceCapabilityView> surfaces,
         int modelCount,
@@ -41,4 +44,65 @@ public record ProviderSiteResponse(
         Instant createdAt,
         Instant updatedAt
 ) {
+    public ProviderSiteResponse(
+            Long id,
+            String profileCode,
+            String displayName,
+            ProviderFamily providerFamily,
+            UpstreamSiteKind siteKind,
+            AuthStrategy authStrategy,
+            PathStrategy pathStrategy,
+            ModelAddressingStrategy modelAddressingStrategy,
+            ErrorSchemaStrategy errorSchemaStrategy,
+            String baseUrlPattern,
+            String description,
+            boolean active,
+            String healthState,
+            String blockedReason,
+            List<String> supportedProtocols,
+            String compatibilitySurface,
+            List<String> credentialRequirements,
+            String streamTransport,
+            String fallbackStrategy,
+            int cooldownCredentialCount,
+            Instant cooldownUntil,
+            Map<String, CapabilityResolutionView> features,
+            Map<String, SurfaceCapabilityView> surfaces,
+            int modelCount,
+            Instant refreshedAt,
+            Instant createdAt,
+            Instant updatedAt
+    ) {
+        this(
+                id,
+                profileCode,
+                displayName,
+                providerFamily,
+                siteKind,
+                authStrategy,
+                pathStrategy,
+                modelAddressingStrategy,
+                errorSchemaStrategy,
+                baseUrlPattern,
+                description,
+                active,
+                healthState,
+                blockedReason,
+                supportedProtocols,
+                compatibilitySurface,
+                credentialRequirements,
+                streamTransport,
+                fallbackStrategy,
+                cooldownCredentialCount,
+                cooldownUntil,
+                ExecutionBackend.SPRING_AI,
+                List.of(ExecutionBackend.SPRING_AI),
+                features,
+                surfaces,
+                modelCount,
+                refreshedAt,
+                createdAt,
+                updatedAt
+        );
+    }
 }

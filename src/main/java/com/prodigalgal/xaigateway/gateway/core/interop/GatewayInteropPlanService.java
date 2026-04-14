@@ -6,6 +6,7 @@ import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlanCompilation;
 import com.prodigalgal.xaigateway.admin.application.ErrorRuleService;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
+import com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendPolicyService;
 import com.prodigalgal.xaigateway.gateway.core.routing.GatewayRouteSelectionService;
 import com.prodigalgal.xaigateway.protocol.ingress.interop.InteropPlanRequest;
 import com.prodigalgal.xaigateway.protocol.ingress.interop.InteropPlanResponse;
@@ -34,13 +35,15 @@ public class GatewayInteropPlanService {
             ObjectMapper objectMapper,
             ErrorRuleService errorRuleService,
             SiteCapabilityTruthService siteCapabilityTruthService,
-            GatewayRequestFeatureService gatewayRequestFeatureService) {
+            GatewayRequestFeatureService gatewayRequestFeatureService,
+            ExecutionBackendPolicyService executionBackendPolicyService) {
         this(
                 errorRuleService,
                 new TranslationExecutionPlanCompiler(
                         gatewayRouteSelectionService,
                         gatewayRequestFeatureService,
-                        siteCapabilityTruthService
+                        siteCapabilityTruthService,
+                        executionBackendPolicyService
                 )
         );
     }
@@ -48,7 +51,7 @@ public class GatewayInteropPlanService {
     public GatewayInteropPlanService(
             GatewayRouteSelectionService gatewayRouteSelectionService,
             ObjectMapper objectMapper) {
-        this(gatewayRouteSelectionService, objectMapper, null, null, null);
+        this(gatewayRouteSelectionService, objectMapper, null, null, null, new ExecutionBackendPolicyService());
     }
 
     public InteropPlanResponse preview(String distributedKeyPrefix, InteropPlanRequest request) {
@@ -80,6 +83,9 @@ public class GatewayInteropPlanService {
         summary.put("requiredFeatures", executionPlan.requiredFeatures().stream().map(InteropFeature::wireName).toList());
         summary.put("blockerCount", executionPlan.blockers().size());
         summary.put("degradationCount", executionPlan.degradations().size());
+        summary.put("executionBackend", executionPlan.executionBackend() == null
+                ? null
+                : executionPlan.executionBackend().wireName());
         summary.put("renderCapabilityLevel", executionPlan.renderCapabilityLevel() == null
                 ? null
                 : executionPlan.renderCapabilityLevel().name().toLowerCase(Locale.ROOT));
@@ -87,6 +93,8 @@ public class GatewayInteropPlanService {
         Map<String, Object> debug = new LinkedHashMap<>();
         debug.put("featureLevels", executionPlan.featureLevels());
         debug.put("canonicalExecutionPlan", executionPlan);
+        debug.put("supportedBackends", executionPlan.supportedBackends().stream().map(item -> item.wireName()).toList());
+        debug.put("backendReason", executionPlan.backendReason());
         if (compilation.selectionResult() != null) {
             debug.put("distributedKeyId", compilation.selectionResult().distributedKeyId());
             debug.put("publicModel", compilation.selectionResult().publicModel());

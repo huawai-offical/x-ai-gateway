@@ -7,6 +7,8 @@ import com.prodigalgal.xaigateway.admin.application.CredentialCryptoService;
 import com.prodigalgal.xaigateway.gateway.core.account.AccountSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyGovernanceService;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest;
 import com.prodigalgal.xaigateway.gateway.core.credential.CredentialMaterialResolver;
 import com.prodigalgal.xaigateway.gateway.core.credential.ResolvedCredentialMaterial;
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestFeatureService;
@@ -140,8 +142,26 @@ public class GatewayResourceExecutionService {
             String requestPath,
             JsonNode requestBody,
             String defaultModel) {
-        ObjectNode payload = requireObjectPayload(requestBody, defaultModel);
-        RouteSelectionResult selectionResult = select(distributedKeyPrefix, requestPath, payload.path("model").asText(), payload);
+        GatewayRequestSemantics semantics = gatewayRequestFeatureService.describe(requestPath, requestBody);
+        return executeJson(new CanonicalResourceRequest(
+                distributedKeyPrefix,
+                CanonicalIngressProtocol.OPENAI,
+                requestPath,
+                requestBody != null && requestBody.isObject() ? requestBody.path("model").asText(null) : defaultModel,
+                semantics.resourceType(),
+                semantics.operation(),
+                requestBody,
+                Map.of(),
+                List.of(),
+                false
+        ), defaultModel);
+    }
+
+    public ResponseEntity<JsonNode> executeJson(
+            CanonicalResourceRequest request,
+            String defaultModel) {
+        ObjectNode payload = requireObjectPayload(request.jsonBody(), defaultModel);
+        RouteSelectionResult selectionResult = select(request.distributedKeyPrefix(), request.requestPath(), payload.path("model").asText(), payload);
         String requestId = gatewayObservabilityService.nextRequestId();
         try {
             List<RouteExecutionAttempt> attempts = new ArrayList<>();
@@ -149,7 +169,7 @@ public class GatewayResourceExecutionService {
             RuntimeException lastException = null;
             for (int index = 0; index < maxAttempts; index++) {
                 RouteSelectionResult candidateSelection = selectionForCandidate(selectionResult, selectionResult.candidates().get(index), attempts);
-                GatewayResourceExecutionContext context = prepareContext(candidateSelection, requestPath, payload);
+                GatewayResourceExecutionContext context = prepareContext(candidateSelection, request, payload);
                 try {
                     ResponseEntity<JsonNode> response = resolveExecutor(context).executeJson(context, payload, defaultModel);
                     if (shouldFallback(response.getStatusCode().value(), response.getBody())) {
@@ -217,8 +237,26 @@ public class GatewayResourceExecutionService {
             String requestPath,
             JsonNode requestBody,
             String defaultModel) {
-        ObjectNode payload = requireObjectPayload(requestBody, defaultModel);
-        RouteSelectionResult selectionResult = select(distributedKeyPrefix, requestPath, payload.path("model").asText(), payload);
+        GatewayRequestSemantics semantics = gatewayRequestFeatureService.describe(requestPath, requestBody);
+        return executeBinaryJson(new CanonicalResourceRequest(
+                distributedKeyPrefix,
+                CanonicalIngressProtocol.OPENAI,
+                requestPath,
+                requestBody != null && requestBody.isObject() ? requestBody.path("model").asText(null) : defaultModel,
+                semantics.resourceType(),
+                semantics.operation(),
+                requestBody,
+                Map.of(),
+                List.of(),
+                false
+        ), defaultModel);
+    }
+
+    public ResponseEntity<byte[]> executeBinaryJson(
+            CanonicalResourceRequest request,
+            String defaultModel) {
+        ObjectNode payload = requireObjectPayload(request.jsonBody(), defaultModel);
+        RouteSelectionResult selectionResult = select(request.distributedKeyPrefix(), request.requestPath(), payload.path("model").asText(), payload);
         String requestId = gatewayObservabilityService.nextRequestId();
         try {
             List<RouteExecutionAttempt> attempts = new ArrayList<>();
@@ -226,7 +264,7 @@ public class GatewayResourceExecutionService {
             RuntimeException lastException = null;
             for (int index = 0; index < maxAttempts; index++) {
                 RouteSelectionResult candidateSelection = selectionForCandidate(selectionResult, selectionResult.candidates().get(index), attempts);
-                GatewayResourceExecutionContext context = prepareContext(candidateSelection, requestPath, payload);
+                GatewayResourceExecutionContext context = prepareContext(candidateSelection, request, payload);
                 try {
                     ResponseEntity<byte[]> response = resolveExecutor(context).executeBinary(context, payload, defaultModel);
                     if (shouldFallback(response.getStatusCode().value(), response.getBody())) {
@@ -291,14 +329,27 @@ public class GatewayResourceExecutionService {
         ObjectNode routePayload = JsonNodeFactory.instance.objectNode();
         routePayload.put("model", requestedModel);
         formFields.forEach(routePayload::put);
-        RouteSelectionResult selectionResult = select(distributedKeyPrefix, requestPath, requestedModel, routePayload);
+        GatewayRequestSemantics semantics = gatewayRequestFeatureService.describe(requestPath, routePayload);
+        CanonicalResourceRequest request = new CanonicalResourceRequest(
+                distributedKeyPrefix,
+                CanonicalIngressProtocol.OPENAI,
+                requestPath,
+                requestedModel,
+                semantics.resourceType(),
+                semantics.operation(),
+                routePayload,
+                formFields,
+                List.of(),
+                false
+        );
+        RouteSelectionResult selectionResult = select(request.distributedKeyPrefix(), request.requestPath(), requestedModel, routePayload);
         String requestId = gatewayObservabilityService.nextRequestId();
         List<RouteExecutionAttempt> attempts = new java.util.concurrent.CopyOnWriteArrayList<>();
         int maxAttempts = Math.min(selectionResult.candidates().size(), gatewayProperties.getRouting().getMaxFallbackAttempts());
         return executeMultipartAttempt(
                 requestId,
                 selectionResult,
-                requestPath,
+                request,
                 requestedModel,
                 routePayload,
                 formFields,
@@ -329,7 +380,7 @@ public class GatewayResourceExecutionService {
     private Mono<ResponseEntity<JsonNode>> executeMultipartAttempt(
             String requestId,
             RouteSelectionResult baseSelection,
-            String requestPath,
+            CanonicalResourceRequest request,
             String requestedModel,
             JsonNode routePayload,
             Map<String, String> formFields,
@@ -338,7 +389,7 @@ public class GatewayResourceExecutionService {
             int maxAttempts,
             List<RouteExecutionAttempt> attempts) {
         RouteSelectionResult candidateSelection = selectionForCandidate(baseSelection, baseSelection.candidates().get(candidateIndex), attempts);
-        GatewayResourceExecutionContext context = prepareContext(candidateSelection, requestPath, routePayload);
+        GatewayResourceExecutionContext context = prepareContext(candidateSelection, request, routePayload);
         return resolveExecutor(context).executeMultipart(context, requestedModel, formFields, files)
                 .flatMap(response -> {
                     if (shouldFallback(response.getStatusCode().value(), response.getBody())) {
@@ -355,7 +406,7 @@ public class GatewayResourceExecutionService {
                             return executeMultipartAttempt(
                                     requestId,
                                     baseSelection,
-                                    requestPath,
+                                    request,
                                     requestedModel,
                                     routePayload,
                                     formFields,
@@ -396,7 +447,7 @@ public class GatewayResourceExecutionService {
                         return executeMultipartAttempt(
                                 requestId,
                                 baseSelection,
-                                requestPath,
+                                request,
                                 requestedModel,
                                 routePayload,
                                 formFields,
@@ -411,13 +462,21 @@ public class GatewayResourceExecutionService {
                 });
     }
 
-    private GatewayResourceExecutionContext prepareContext(RouteSelectionResult selectionResult, String requestPath, JsonNode requestBody) {
+    private GatewayResourceExecutionContext prepareContext(
+            RouteSelectionResult selectionResult,
+            CanonicalResourceRequest request,
+            JsonNode requestBody) {
         UpstreamCredentialEntity credential = getRequiredCredential(selectionResult.selectedCandidate().candidate().credentialId());
         ResolvedCredentialMaterial credentialMaterial = credentialMaterialResolver.resolve(selectionResult, credential);
-        GatewayRequestSemantics semantics = gatewayRequestFeatureService.describe(requestPath, null);
+        GatewayRequestSemantics semantics = new GatewayRequestSemantics(
+                request.resourceType(),
+                request.operation(),
+                gatewayRequestFeatureService.describe(request.requestPath(), requestBody).requiredFeatures(),
+                true
+        );
         var executionPlanCompilation = translationExecutionPlanCompiler.compileSelected(
                 selectionResult,
-                requestPath,
+                request.requestPath(),
                 semantics,
                 requestBody
         );
@@ -425,13 +484,16 @@ public class GatewayResourceExecutionService {
                 selectionResult,
                 credential,
                 credentialMaterial,
-                requestPath,
+                request.requestPath(),
                 executionPlanCompilation.canonicalPlan()
         );
     }
 
     private GatewayResourceExecutor resolveExecutor(GatewayResourceExecutionContext context) {
         return gatewayResourceExecutors.stream()
+                .filter(executor -> context.executionPlan() == null
+                        || executor.backend() == null
+                        || executor.backend() == context.executionPlan().executionBackend())
                 .filter(executor -> executor.supports(context.requestPath(), context.selectionResult().selectedCandidate().candidate()))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("当前站点不支持该资源执行。"));

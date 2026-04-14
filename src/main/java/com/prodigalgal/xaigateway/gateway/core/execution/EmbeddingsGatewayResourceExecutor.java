@@ -6,6 +6,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.shared.AuthStrategy;
+import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend;
 import com.prodigalgal.xaigateway.gateway.core.shared.PathStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import java.net.URLEncoder;
@@ -27,6 +28,11 @@ public class EmbeddingsGatewayResourceExecutor implements GatewayResourceExecuto
 
     public EmbeddingsGatewayResourceExecutor(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
+    }
+
+    @Override
+    public ExecutionBackend backend() {
+        return ExecutionBackend.NATIVE;
     }
 
     @Override

@@ -9,6 +9,8 @@ export type CapabilityResolution = {
 export type SurfaceCapability = {
   resourceType: string
   operation: string
+  preferredBackend?: string | null
+  supportedBackends: string[]
   executionCapabilityLevel?: string | null
   renderCapabilityLevel?: string | null
   overallCapabilityLevel?: string | null
@@ -38,6 +40,8 @@ export type ProviderSite = {
   fallbackStrategy?: string | null
   cooldownCredentialCount: number
   cooldownUntil?: string | null
+  preferredBackend?: string | null
+  supportedBackends: string[]
   features: Record<string, CapabilityResolution>
   surfaces: Record<string, SurfaceCapability>
   modelCount: number
@@ -64,6 +68,8 @@ export type CapabilityMatrixRow = {
   fallbackStrategy?: string | null
   cooldownCredentialCount: number
   cooldownUntil?: string | null
+  preferredBackend?: string | null
+  supportedBackends: string[]
   features: Record<string, CapabilityResolution>
   surfaces: Record<string, SurfaceCapability>
   supportsResponses: boolean
@@ -93,6 +99,8 @@ export type SiteModelCapability = {
   supportsReasoningReuse: boolean
   reasoningTransport?: string | null
   capabilityLevel: string
+  preferredBackend?: string | null
+  supportedBackends: string[]
   surfaces: Record<string, SurfaceCapability>
   sourceRefreshedAt?: string | null
 }
@@ -109,6 +117,9 @@ export type TranslationPlan = {
   requiredFeatures: string[]
   featureLevels: Record<string, string>
   executionKind?: string | null
+  executionBackend?: string | null
+  supportedBackends: string[]
+  backendReason?: string | null
   executionCapabilityLevel?: string | null
   renderCapabilityLevel?: string | null
   overallCapabilityLevel?: string | null
@@ -140,9 +151,23 @@ export type ExecutionPreview = {
 export type AdminChatExecuteResponse = {
   requestId: string
   routeSelection: unknown
+  executionBackend?: string | null
   text?: string | null
   usage?: unknown
   toolCalls?: unknown[]
+}
+
+export type AdminResourceExecuteResponse = {
+  routeSelection: unknown
+  plan: TranslationPlan
+  executionBackend?: string | null
+  upstreamPath?: string | null
+  objectMode?: string | null
+  statusCode: number
+  contentType?: string | null
+  responseJson?: unknown
+  responseText?: string | null
+  binaryLength?: number | null
 }
 
 export type ProviderSiteDraft = {
@@ -228,4 +253,25 @@ export function modelSupportsFeature(model: SiteModelCapability, surface?: strin
 
 export function isChatLikePath(requestPath: string) {
   return requestPath === '/v1/chat/completions' || requestPath === '/v1/responses'
+}
+
+export function isMultipartResourcePath(requestPath: string) {
+  return requestPath === '/v1/audio/transcriptions'
+    || requestPath === '/v1/audio/translations'
+    || requestPath === '/v1/images/edits'
+    || requestPath === '/v1/images/variations'
+    || requestPath === '/v1/files'
+}
+
+export function isDebugExecutablePath(requestPath: string) {
+  if (isChatLikePath(requestPath)) return true
+  if (isMultipartResourcePath(requestPath)) return false
+  return requestPath === '/v1/embeddings'
+    || requestPath === '/v1/audio/speech'
+    || requestPath === '/v1/images/generations'
+    || requestPath === '/v1/moderations'
+    || requestPath === '/v1/uploads'
+    || requestPath === '/v1/batches'
+    || requestPath === '/v1/fine_tuning/jobs'
+    || requestPath === '/v1/realtime/client_secrets'
 }

@@ -7,6 +7,7 @@ import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEvent;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEventType;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolCall;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalUsage;
+import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.provider.adapter.PreparedChatExecution;
 import com.prodigalgal.xaigateway.provider.adapter.ProviderExecutionSupportService;
@@ -33,6 +34,11 @@ public class AnthropicGatewayChatRuntime implements GatewayChatRuntime {
         this.providerExecutionSupportService = providerExecutionSupportService;
         this.anthropicChatModelFactory = anthropicChatModelFactory;
         this.gatewayChatPromptBuilder = gatewayChatPromptBuilder;
+    }
+
+    @Override
+    public ExecutionBackend backend() {
+        return ExecutionBackend.SPRING_AI;
     }
 
     @Override

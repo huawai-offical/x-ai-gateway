@@ -6,6 +6,7 @@ import reactor.core.publisher.Flux;
 public record CanonicalExecutionStreamResult(
         String requestId,
         RouteSelectionResult routeSelection,
+        CanonicalExecutionPlan plan,
         Flux<CanonicalStreamEvent> events
 ) {
 }

@@ -3,6 +3,7 @@ package com.prodigalgal.xaigateway.gateway.core.execution;
 import tools.jackson.databind.JsonNode;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.shared.AuthStrategy;
+import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend;
 import com.prodigalgal.xaigateway.gateway.core.shared.PathStrategy;
 import java.util.Map;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +18,11 @@ public class OpenAiAudioGatewayResourceExecutor implements GatewayResourceExecut
 
     public OpenAiAudioGatewayResourceExecutor(GatewayOpenAiPassthroughService gatewayOpenAiPassthroughService) {
         this.gatewayOpenAiPassthroughService = gatewayOpenAiPassthroughService;
+    }
+
+    @Override
+    public ExecutionBackend backend() {
+        return ExecutionBackend.PASSTHROUGH;
     }
 
     @Override

@@ -58,6 +58,7 @@ import com.prodigalgal.xaigateway.gateway.core.routing.RouteExecutionAttempt;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionRequest;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionSource;
+import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.usage.GatewayUsage;
 import com.prodigalgal.xaigateway.infra.config.GatewayProperties;
@@ -215,6 +216,7 @@ public class GatewayChatExecutionService {
         return new AdminChatExecuteResponse(
                 response.requestId(),
                 response.routeSelection(),
+                response.plan().executionBackend(),
                 response.response().outputText(),
                 toGatewayUsage(response.response().usage()),
                 toGatewayToolCalls(response.response().toolCalls())
@@ -258,7 +260,7 @@ public class GatewayChatExecutionService {
                 UpstreamCredentialEntity credential = getRequiredCredential(candidate.candidate().credentialId());
                 ResolvedCredentialMaterial credentialMaterial = credentialMaterialResolver.resolve(candidateSelection, credential);
                 try {
-                    GatewayChatRuntime runtime = resolveRuntime(candidate.candidate());
+                    GatewayChatRuntime runtime = resolveRuntime(candidate.candidate(), executionPlanCompilation.canonicalPlan().executionBackend());
                     CanonicalResponse result = runtime.execute(new GatewayChatRuntimeContext(
                             candidateSelection,
                             credential,
@@ -304,7 +306,7 @@ public class GatewayChatExecutionService {
                             usageView,
                             startedAt
                     );
-                    return new CanonicalExecutionResult(requestId, finalSelection, enriched);
+                    return new CanonicalExecutionResult(requestId, finalSelection, executionPlanCompilation.canonicalPlan(), enriched);
                 } catch (RuntimeException exception) {
                     attempts.add(new RouteExecutionAttempt(
                             index + 1,
@@ -369,6 +371,7 @@ public class GatewayChatExecutionService {
         AtomicReference<CanonicalUsage> lastVisibleUsage = new AtomicReference<>(CanonicalUsage.empty());
         AtomicBoolean terminalRecorded = new AtomicBoolean(false);
         AtomicReference<RouteSelectionResult> finalSelectionRef = new AtomicReference<>(selectionResult);
+        AtomicReference<CanonicalExecutionPlan> planRef = new AtomicReference<>();
         List<RouteExecutionAttempt> attempts = new java.util.concurrent.CopyOnWriteArrayList<>();
         int maxAttempts = Math.min(selectionResult.candidates().size(), gatewayProperties.getRouting().getMaxFallbackAttempts());
         Flux<CanonicalStreamEvent> chunks = streamAttempt(
@@ -380,7 +383,8 @@ public class GatewayChatExecutionService {
                         0,
                         maxAttempts,
                         attempts,
-                        finalSelectionRef
+                        finalSelectionRef,
+                        planRef
                 )
                 .doOnNext(event -> {
                     if (event.usage() != null && event.usage().present()) {
@@ -431,7 +435,7 @@ public class GatewayChatExecutionService {
                 })
                 .doFinally(signalType -> distributedKeyGovernanceService.releaseConcurrency(selectionResult.governanceReservationKey()));
 
-        return new CanonicalExecutionStreamResult(requestId, selectionResult, chunks);
+        return new CanonicalExecutionStreamResult(requestId, selectionResult, planRef.get(), chunks);
     }
 
     public GatewayStreamResponse executeGatewayStream(ChatExecutionRequest request) {
@@ -447,7 +451,8 @@ public class GatewayChatExecutionService {
             int candidateIndex,
             int maxAttempts,
             List<RouteExecutionAttempt> attempts,
-            AtomicReference<RouteSelectionResult> finalSelectionRef) {
+            AtomicReference<RouteSelectionResult> finalSelectionRef,
+            AtomicReference<CanonicalExecutionPlan> planRef) {
         RouteCandidateView candidate = baseSelection.candidates().get(candidateIndex);
         RouteSelectionResult candidateSelection = selectionForCandidate(baseSelection, candidate, attempts);
         finalSelectionRef.set(candidateSelection);
@@ -460,7 +465,8 @@ public class GatewayChatExecutionService {
                 semantics,
                 routeBody
         );
-        GatewayChatRuntime runtime = resolveRuntime(candidate.candidate());
+        planRef.set(executionPlanCompilation.canonicalPlan());
+        GatewayChatRuntime runtime = resolveRuntime(candidate.candidate(), executionPlanCompilation.canonicalPlan().executionBackend());
         AtomicBoolean firstOutputCommitted = new AtomicBoolean(false);
         AtomicBoolean successRecorded = new AtomicBoolean(false);
 
@@ -528,7 +534,8 @@ public class GatewayChatExecutionService {
                                 candidateIndex + 1,
                                 maxAttempts,
                                 attempts,
-                                finalSelectionRef
+                                finalSelectionRef,
+                                planRef
                         );
                     }
                     return Flux.error(error);
@@ -767,11 +774,14 @@ public class GatewayChatExecutionService {
                 || event.terminal();
     }
 
-    private GatewayChatRuntime resolveRuntime(com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView candidate) {
+    private GatewayChatRuntime resolveRuntime(
+            com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView candidate,
+            ExecutionBackend backend) {
         return gatewayChatRuntimes.stream()
+                .filter(runtime -> runtime.backend() == backend)
                 .filter(runtime -> runtime.supports(candidate))
                 .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("未找到匹配的聊天运行时：" + candidate.providerType()));
+                .orElseThrow(() -> new IllegalArgumentException("未找到匹配的聊天运行时：" + candidate.providerType() + " / " + backend));
     }
 
     private ChatResponse executeOpenAi(RouteSelectionResult selectionResult, String baseUrl, String apiKey, ChatExecutionRequest request) {

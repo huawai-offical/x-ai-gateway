@@ -69,6 +69,7 @@ export function CapabilityMatrixPage() {
               <span>{item.providerFamily} / {item.siteKind}</span>
               <span>health: {item.healthState}</span>
               <span>surface: {item.compatibilitySurface}</span>
+              <span>backend: {item.preferredBackend ?? '-'} / {(item.supportedBackends ?? []).join(', ') || '无'}</span>
               <span>fallback: {item.fallbackStrategy ?? '无'}</span>
               <span>cooldown: {item.cooldownCredentialCount} / {formatInstant(item.cooldownUntil)}</span>
               {item.blockedReason ? <span>{item.blockedReason}</span> : null}

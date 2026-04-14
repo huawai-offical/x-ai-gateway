@@ -18,6 +18,7 @@ import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalUsage;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileContent;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileService;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayFinishReason;
+import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -44,6 +45,11 @@ public class OllamaGatewayChatRuntime implements GatewayChatRuntime {
         this.webClientBuilder = webClientBuilder;
         this.objectMapper = objectMapper;
         this.gatewayFileService = gatewayFileService;
+    }
+
+    @Override
+    public ExecutionBackend backend() {
+        return ExecutionBackend.NATIVE;
     }
 
     @Override

@@ -50,7 +50,7 @@ public class OpenAiResponsesController {
     @PostMapping
     public ResponseEntity<?> createResponse(
             @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
-            @RequestBody JsonNode requestBody) {
+        @RequestBody JsonNode requestBody) {
         AuthenticatedDistributedKey distributedKey = distributedKeyAuthenticationService.authenticateBearerToken(authorization);
         ChatExecutionRequest executionRequest = openAiResponsesRequestMapper.toExecutionRequest(distributedKey.keyPrefix(), requestBody);
 

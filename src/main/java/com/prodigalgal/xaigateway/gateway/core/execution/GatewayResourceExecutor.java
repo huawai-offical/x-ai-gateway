@@ -2,12 +2,15 @@ package com.prodigalgal.xaigateway.gateway.core.execution;
 
 import tools.jackson.databind.JsonNode;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
+import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend;
 import java.util.Map;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.multipart.FilePart;
 import reactor.core.publisher.Mono;
 
 public interface GatewayResourceExecutor {
+
+    ExecutionBackend backend();
 
     boolean supports(String requestPath, CatalogCandidateView candidate);
 

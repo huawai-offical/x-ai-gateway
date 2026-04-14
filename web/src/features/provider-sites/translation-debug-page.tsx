@@ -4,7 +4,9 @@ import { apiRequest } from '../../lib/api'
 import { useTypedMutation } from '../../lib/typed-react-query'
 import {
   isChatLikePath,
+  isDebugExecutablePath,
   type AdminChatExecuteResponse,
+  type AdminResourceExecuteResponse,
   type TranslationPlan,
 } from './types'
 
@@ -60,6 +62,22 @@ export function TranslationDebugPage() {
     },
   })
 
+  const resourceExecuteMutation = useTypedMutation<AdminResourceExecuteResponse, void>({
+    mutationFn: async () => {
+      const parsedBody = parseJsonBody(body)
+      return apiRequest<AdminResourceExecuteResponse>('/admin/resource/execute', {
+        method: 'POST',
+        body: JSON.stringify({
+          distributedKeyPrefix,
+          protocol,
+          requestPath,
+          requestedModel,
+          body: parsedBody,
+        }),
+      })
+    },
+  })
+
   const handleExplain = async (event: FormEvent) => {
     event.preventDefault()
     try {
@@ -73,15 +91,20 @@ export function TranslationDebugPage() {
   const handleExecute = async () => {
     try {
       setInputError(null)
-      await executeMutation.mutateAsync()
+      if (isChatLikePath(requestPath)) {
+        await executeMutation.mutateAsync()
+        return
+      }
+      await resourceExecuteMutation.mutateAsync()
     } catch (error) {
       setInputError(error instanceof Error ? error.message : '执行调试失败。')
     }
   }
 
-  const canExecute = isChatLikePath(requestPath)
+  const canExecute = isDebugExecutablePath(requestPath)
   const explainResult = explainMutation.data
   const executeResult = executeMutation.data
+  const resourceExecuteResult = resourceExecuteMutation.data
 
   return (
     <section className="page-grid">
@@ -89,7 +112,7 @@ export function TranslationDebugPage() {
         <div className="panel-head">
           <p className="panel-kicker">Translation explain</p>
           <h2>翻译执行解释</h2>
-          <p className="empty-state">支持 explain / execute 双模式；非 chat 资源本轮保持 explain-only。</p>
+          <p className="empty-state">支持 explain / execute 双模式；资源路径会自动切到 `/admin/resource/execute`。</p>
         </div>
         <form className="stacked-form" onSubmit={handleExplain}>
           <div className="form-grid">
@@ -120,7 +143,7 @@ export function TranslationDebugPage() {
               执行 Chat 调试
             </button>
           </div>
-          {!canExecute ? <p className="empty-state">当前 requestPath 不属于 chat / responses，仅支持 explain。</p> : null}
+            {!canExecute ? <p className="empty-state">当前 requestPath 暂不支持执行调试；multipart 路径暂保持 explain-only。</p> : null}
           {inputError ? <p className="empty-state">{inputError}</p> : null}
         </form>
       </div>
@@ -135,6 +158,7 @@ export function TranslationDebugPage() {
             <div className="detail-card">
               <strong>{String(explainResult.executable)}</strong>
               <span>{explainResult.executionKind ?? '-'}</span>
+              <span>backend: {explainResult.executionBackend ?? '-'}</span>
               <span>protocol: {explainResult.ingressProtocol ?? '-'}</span>
               <span>resource / operation: {explainResult.resourceType ?? '-'} / {explainResult.operation ?? '-'}</span>
               <span>execution / render / overall: {explainResult.executionCapabilityLevel ?? '-'} / {explainResult.renderCapabilityLevel ?? '-'} / {explainResult.overallCapabilityLevel ?? '-'}</span>
@@ -166,12 +190,13 @@ export function TranslationDebugPage() {
       <div className="panel panel-wide">
         <div className="panel-head">
           <p className="panel-kicker">Execute result</p>
-          <h3>Chat 执行调试</h3>
+          <h3>{isChatLikePath(requestPath) ? 'Chat 执行调试' : '资源执行调试'}</h3>
         </div>
-        {executeResult ? (
+        {isChatLikePath(requestPath) && executeResult ? (
           <div className="card-list">
             <div className="detail-card">
               <strong>{executeResult.requestId}</strong>
+              <span>backend: {executeResult.executionBackend ?? '无'}</span>
               <span>{executeResult.text ?? '无文本输出'}</span>
             </div>
             <div className="code-block">
@@ -184,8 +209,28 @@ export function TranslationDebugPage() {
               <pre>{JSON.stringify(executeResult.toolCalls ?? [], null, 2)}</pre>
             </div>
           </div>
+        ) : !isChatLikePath(requestPath) && resourceExecuteResult ? (
+          <div className="card-list">
+            <div className="detail-card">
+              <strong>{resourceExecuteResult.executionBackend ?? '无 backend'}</strong>
+              <span>status: {resourceExecuteResult.statusCode}</span>
+              <span>contentType: {resourceExecuteResult.contentType ?? '未知'}</span>
+              <span>upstreamPath: {resourceExecuteResult.upstreamPath ?? '无'}</span>
+              <span>objectMode: {resourceExecuteResult.objectMode ?? '无'}</span>
+              {typeof resourceExecuteResult.binaryLength === 'number' ? <span>binaryLength: {resourceExecuteResult.binaryLength}</span> : null}
+            </div>
+            <div className="code-block">
+              <pre>{JSON.stringify(resourceExecuteResult.routeSelection, null, 2)}</pre>
+            </div>
+            <div className="code-block">
+              <pre>{JSON.stringify(resourceExecuteResult.plan, null, 2)}</pre>
+            </div>
+            <div className="code-block">
+              <pre>{JSON.stringify(resourceExecuteResult.responseJson ?? resourceExecuteResult.responseText ?? null, null, 2)}</pre>
+            </div>
+          </div>
         ) : (
-          <p className="empty-state">执行 chat 调试后可在这里对照 explain 与真实 route/result。</p>
+          <p className="empty-state">执行调试后可在这里对照 explain、backend 与真实 route/result。</p>
         )}
       </div>
     </section>

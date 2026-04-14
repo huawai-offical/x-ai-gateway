@@ -43,7 +43,7 @@ public class AnthropicMessagesController {
     @PostMapping
     public ResponseEntity<?> createMessage(
             @RequestHeader(API_KEY_HEADER) String apiKey,
-            @Valid @RequestBody AnthropicMessagesRequest request) {
+        @Valid @RequestBody AnthropicMessagesRequest request) {
         AuthenticatedDistributedKey distributedKey = distributedKeyAuthenticationService.authenticateRawToken(apiKey);
         ChatExecutionRequest executionRequest = anthropicMessagesRequestMapper.toExecutionRequest(distributedKey, request);
 
