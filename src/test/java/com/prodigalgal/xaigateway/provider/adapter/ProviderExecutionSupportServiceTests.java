@@ -1,6 +1,6 @@
 package com.prodigalgal.xaigateway.provider.adapter;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolDefinition;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateView;

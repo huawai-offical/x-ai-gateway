@@ -1,6 +1,6 @@
 package com.prodigalgal.xaigateway.gateway.core.routing;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics;
 import com.prodigalgal.xaigateway.infra.config.GatewayProperties;
 import java.nio.charset.StandardCharsets;

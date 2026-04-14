@@ -1,7 +1,7 @@
 package com.prodigalgal.xaigateway.gateway.core.execution;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ObjectNode;
 import com.prodigalgal.xaigateway.admin.application.CredentialCryptoService;
 import com.prodigalgal.xaigateway.admin.application.ErrorRuleService;
 import com.prodigalgal.xaigateway.gateway.core.account.AccountSelectionService;
@@ -126,7 +126,7 @@ public class GatewayOpenAiPassthroughService {
             String requestedModel,
             Map<String, String> formFields,
             Map<String, FilePart> files) {
-        ObjectNode routePayload = com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode();
+        ObjectNode routePayload = tools.jackson.databind.node.JsonNodeFactory.instance.objectNode();
         routePayload.put("model", requestedModel);
         formFields.forEach(routePayload::put);
         RouteExecutionContext context = prepareExecution(distributedKeyPrefix, requestPath, requestedModel, routePayload);

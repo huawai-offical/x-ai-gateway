@@ -1,7 +1,7 @@
 package com.prodigalgal.xaigateway.gateway.core.observability;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateEvaluation;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteExecutionAttempt;
@@ -149,7 +149,7 @@ public class GatewayObservabilityService {
         root.put("attempts", selectionResult.attempts().stream().map(this::attemptSummary).toList());
         try {
             return objectMapper.writeValueAsString(root);
-        } catch (JsonProcessingException exception) {
+        } catch (JacksonException exception) {
             throw new IllegalStateException("无法序列化候选摘要。", exception);
         }
     }

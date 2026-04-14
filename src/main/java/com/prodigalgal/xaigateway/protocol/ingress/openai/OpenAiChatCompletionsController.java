@@ -30,7 +30,7 @@ public class OpenAiChatCompletionsController {
             DistributedKeyAuthenticationService distributedKeyAuthenticationService,
             GatewayChatExecutionService gatewayChatExecutionService,
             OpenAiChatCompletionRequestMapper openAiChatCompletionRequestMapper,
-            com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
+            tools.jackson.databind.ObjectMapper objectMapper) {
         this.distributedKeyAuthenticationService = distributedKeyAuthenticationService;
         this.gatewayChatExecutionService = gatewayChatExecutionService;
         this.openAiChatCompletionRequestMapper = openAiChatCompletionRequestMapper;

@@ -1,7 +1,7 @@
 package com.prodigalgal.xaigateway.admin.application;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.admin.api.SystemSettingsRequest;
 import com.prodigalgal.xaigateway.admin.api.SystemSettingsResponse;
 import com.prodigalgal.xaigateway.infra.config.GatewayProperties;
@@ -127,7 +127,7 @@ public class SystemSettingsAdminService {
                 .map(value -> {
                     try {
                         return objectMapper.readValue(value, type);
-                    } catch (JsonProcessingException exception) {
+                    } catch (JacksonException exception) {
                         throw new IllegalStateException("无法读取系统配置：" + key, exception);
                     }
                 });
@@ -140,7 +140,7 @@ public class SystemSettingsAdminService {
         entity.setDescription(description);
         try {
             entity.setSettingValue(objectMapper.writeValueAsString(value));
-        } catch (JsonProcessingException exception) {
+        } catch (JacksonException exception) {
             throw new IllegalStateException("无法保存系统配置：" + key, exception);
         }
         systemSettingRepository.save(entity);

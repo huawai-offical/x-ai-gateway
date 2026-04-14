@@ -1,12 +1,12 @@
 package com.prodigalgal.xaigateway.gateway.core.cache;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.fasterxml.jackson.databind.node.TextNode;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.JsonNodeFactory;
+import tools.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.node.StringNode;
 import com.prodigalgal.xaigateway.infra.config.GatewayProperties;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -57,7 +57,7 @@ public class PromptFingerprintService {
         JsonNode normalized = extractStablePromptShape(normalizeProtocol(protocol), path, source);
         try {
             return objectMapper.writeValueAsString(normalized);
-        } catch (JsonProcessingException exception) {
+        } catch (JacksonException exception) {
             throw new IllegalStateException("无法序列化稳定请求形状。", exception);
         }
     }
@@ -85,7 +85,7 @@ public class PromptFingerprintService {
                     "betas", requestBody.path("betas")
             )));
             case "google_native" -> normalizeJson(object(Map.of(
-                    "pathname", TextNode.valueOf(path == null ? "" : path.replace("/streamGenerateContent", "/generateContent")),
+                    "pathname", StringNode.valueOf(path == null ? "" : path.replace("/streamGenerateContent", "/generateContent")),
                     "contents", requestBody.path("contents"),
                     "systemInstruction", requestBody.path("systemInstruction"),
                     "tools", requestBody.path("tools"),
@@ -126,7 +126,7 @@ public class PromptFingerprintService {
         if (input.isObject()) {
             ObjectNode objectNode = JsonNodeFactory.instance.objectNode();
             Map<String, JsonNode> sorted = new TreeMap<>();
-            Iterator<Map.Entry<String, JsonNode>> fields = input.fields();
+            Iterator<Map.Entry<String, JsonNode>> fields = input.properties().iterator();
             while (fields.hasNext()) {
                 Map.Entry<String, JsonNode> field = fields.next();
                 if (EXCLUDED_KEYS.contains(field.getKey()) || field.getValue().isMissingNode()) {

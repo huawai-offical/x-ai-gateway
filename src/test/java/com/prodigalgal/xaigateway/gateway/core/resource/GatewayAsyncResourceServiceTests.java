@@ -1,7 +1,7 @@
 package com.prodigalgal.xaigateway.gateway.core.resource;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 import com.prodigalgal.xaigateway.admin.application.CredentialCryptoService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedCredentialBindingView;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyQueryService;
@@ -116,7 +116,7 @@ class GatewayAsyncResourceServiceTests {
         request.put("input_file_id", "file-local-1");
         request.put("endpoint", "/v1/chat/completions");
 
-        com.fasterxml.jackson.databind.JsonNode response = service.createBatch(1L, request);
+        tools.jackson.databind.JsonNode response = service.createBatch(1L, request);
 
         assertTrue(response.path("id").asText().startsWith("batch_"));
         ArgumentCaptor<GatewayAsyncResourceEntity> captor = ArgumentCaptor.forClass(GatewayAsyncResourceEntity.class);
@@ -184,7 +184,7 @@ class GatewayAsyncResourceServiceTests {
         }});
         Mockito.when(filePart.content()).thenReturn(Flux.just(new DefaultDataBufferFactory().wrap("hello".getBytes())));
 
-        com.fasterxml.jackson.databind.JsonNode response = service.addUploadPart("upload_1", 1L, filePart).block();
+        tools.jackson.databind.JsonNode response = service.addUploadPart("upload_1", 1L, filePart).block();
 
         assertEquals("/v1/uploads/upload-upstream-1/parts", requestedPath.get());
         assertEquals("part-upstream-1", response.path("id").asText());

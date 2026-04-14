@@ -1,6 +1,6 @@
 package com.prodigalgal.xaigateway.gateway.core.catalog;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import com.prodigalgal.xaigateway.admin.application.CredentialCryptoService;
 import com.prodigalgal.xaigateway.admin.application.ProviderSiteRegistryService;
 import com.prodigalgal.xaigateway.gateway.core.credential.CredentialAuthKind;
@@ -61,7 +61,7 @@ public class CredentialModelDiscoveryService {
                         null,
                         null,
                         null
-                ), credentialCryptoService, new com.fasterxml.jackson.databind.ObjectMapper()),
+                ), credentialCryptoService, new tools.jackson.databind.ObjectMapper()),
                 webClientBuilder
         );
     }

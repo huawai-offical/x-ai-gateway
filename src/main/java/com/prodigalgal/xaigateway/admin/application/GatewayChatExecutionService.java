@@ -1,8 +1,8 @@
 package com.prodigalgal.xaigateway.admin.application;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.JsonNodeFactory;
+import tools.jackson.databind.node.ObjectNode;
 import com.prodigalgal.xaigateway.admin.api.AdminChatExecuteRequest;
 import com.prodigalgal.xaigateway.admin.api.AdminChatExecuteResponse;
 import com.prodigalgal.xaigateway.gateway.core.account.AccountSelectionService;

@@ -1,7 +1,7 @@
 package com.prodigalgal.xaigateway.gateway.core.execution;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ObjectNode;
 import com.prodigalgal.xaigateway.admin.application.CredentialCryptoService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyGovernanceService;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;

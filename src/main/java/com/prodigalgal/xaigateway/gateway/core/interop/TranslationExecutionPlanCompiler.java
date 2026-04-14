@@ -1,6 +1,6 @@
 package com.prodigalgal.xaigateway.gateway.core.interop;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
 import com.prodigalgal.xaigateway.gateway.core.routing.GatewayRouteSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionRequest;

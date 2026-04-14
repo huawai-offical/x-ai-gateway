@@ -1,6 +1,6 @@
 package com.prodigalgal.xaigateway.admin.api;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import jakarta.validation.constraints.NotBlank;
 
 public record RouteSelectionPreviewRequest(

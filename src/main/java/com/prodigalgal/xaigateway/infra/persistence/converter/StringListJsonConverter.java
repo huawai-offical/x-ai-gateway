@@ -1,8 +1,8 @@
 package com.prodigalgal.xaigateway.infra.persistence.converter;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
 import java.util.Collections;
@@ -19,7 +19,7 @@ public class StringListJsonConverter implements AttributeConverter<List<String>,
     public String convertToDatabaseColumn(List<String> attribute) {
         try {
             return OBJECT_MAPPER.writeValueAsString(attribute == null ? List.of() : attribute);
-        } catch (JsonProcessingException exception) {
+        } catch (JacksonException exception) {
             throw new IllegalArgumentException("无法将字符串列表序列化为 JSON。", exception);
         }
     }
@@ -32,7 +32,7 @@ public class StringListJsonConverter implements AttributeConverter<List<String>,
 
         try {
             return Collections.unmodifiableList(OBJECT_MAPPER.readValue(dbData, LIST_TYPE));
-        } catch (JsonProcessingException exception) {
+        } catch (JacksonException exception) {
             throw new IllegalArgumentException("无法将 JSON 反序列化为字符串列表。", exception);
         }
     }

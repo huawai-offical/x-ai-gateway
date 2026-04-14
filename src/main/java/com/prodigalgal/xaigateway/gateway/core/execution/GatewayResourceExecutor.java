@@ -1,6 +1,6 @@
 package com.prodigalgal.xaigateway.gateway.core.execution;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
 import java.util.Map;
 import org.springframework.http.ResponseEntity;

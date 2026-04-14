@@ -1,6 +1,6 @@
 package com.prodigalgal.xaigateway.gateway.core.auth;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;

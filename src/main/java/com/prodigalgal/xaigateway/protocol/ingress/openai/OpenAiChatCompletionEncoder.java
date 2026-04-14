@@ -1,7 +1,7 @@
 package com.prodigalgal.xaigateway.protocol.ingress.openai;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayFinishReason;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayResponse;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamEvent;
@@ -68,7 +68,7 @@ public class OpenAiChatCompletionEncoder {
     private String encode(Object payload) {
         try {
             return "data: " + objectMapper.writeValueAsString(payload) + "\n\n";
-        } catch (JsonProcessingException exception) {
+        } catch (JacksonException exception) {
             throw new IllegalStateException("无法序列化 OpenAI Chat Completions 响应。", exception);
         }
     }

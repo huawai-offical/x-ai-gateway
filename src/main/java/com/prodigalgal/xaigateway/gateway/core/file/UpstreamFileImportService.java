@@ -1,7 +1,7 @@
 package com.prodigalgal.xaigateway.gateway.core.file;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.admin.application.CredentialCryptoService;
 import com.prodigalgal.xaigateway.gateway.core.credential.CredentialMaterialResolver;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;

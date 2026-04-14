@@ -1,16 +1,21 @@
 package com.prodigalgal.xaigateway.provider.adapter.anthropic;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import com.anthropic.models.messages.Metadata;
+import com.anthropic.models.messages.ToolChoice;
+import com.anthropic.models.messages.ToolChoiceAny;
+import com.anthropic.models.messages.ToolChoiceAuto;
+import com.anthropic.models.messages.ToolChoiceNone;
+import com.anthropic.models.messages.ToolChoiceTool;
+import tools.jackson.databind.JsonNode;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolDefinition;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
 import com.prodigalgal.xaigateway.provider.adapter.SpringAiToolCallbackFactory;
 import java.util.List;
 import java.util.Locale;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
-import org.springframework.ai.anthropic.api.AnthropicApi;
-import org.springframework.ai.anthropic.api.AnthropicCacheOptions;
-import org.springframework.ai.anthropic.api.AnthropicCacheStrategy;
-import org.springframework.ai.anthropic.api.AnthropicCacheTtl;
+import org.springframework.ai.anthropic.AnthropicCacheOptions;
+import org.springframework.ai.anthropic.AnthropicCacheStrategy;
+import org.springframework.ai.anthropic.AnthropicCacheTtl;
 import org.springframework.ai.chat.messages.MessageType;
 import org.springframework.stereotype.Service;
 
@@ -28,7 +33,7 @@ public class AnthropicOptionsMapper {
             RouteSelectionResult selectionResult,
             List<GatewayToolDefinition> tools,
             JsonNode toolChoice) {
-        AnthropicChatOptions source = baseOptions == null ? AnthropicChatOptions.builder().build() : AnthropicChatOptions.fromOptions(baseOptions);
+        AnthropicChatOptions source = baseOptions == null ? AnthropicChatOptions.builder().build() : baseOptions.copy();
 
         AnthropicCacheOptions cacheOptions = AnthropicCacheOptions.builder()
                 .strategy(resolveStrategy(selectionResult))
@@ -39,9 +44,9 @@ public class AnthropicOptionsMapper {
                 .multiBlockSystemCaching(true)
                 .build();
 
-        AnthropicApi.ChatCompletionRequest.Metadata metadata = new AnthropicApi.ChatCompletionRequest.Metadata(
-                metadataValue(selectionResult)
-        );
+        Metadata metadata = Metadata.builder()
+                .userId(metadataValue(selectionResult))
+                .build();
 
         AnthropicChatOptions.Builder builder = AnthropicChatOptions.builder()
                 .model(source.getModel())
@@ -82,26 +87,28 @@ public class AnthropicOptionsMapper {
                 + ",prefixHash=" + selectionResult.prefixHash();
     }
 
-    private AnthropicApi.ToolChoice mapToolChoice(JsonNode toolChoice) {
+    private ToolChoice mapToolChoice(JsonNode toolChoice) {
         if (toolChoice.isTextual()) {
             return switch (toolChoice.asText().toLowerCase(Locale.ROOT)) {
-                case "any", "required" -> new AnthropicApi.ToolChoiceAny();
-                case "none" -> new AnthropicApi.ToolChoiceNone();
-                case "auto" -> new AnthropicApi.ToolChoiceAuto();
-                default -> new AnthropicApi.ToolChoiceAuto();
+                case "any", "required" -> ToolChoice.ofAny(ToolChoiceAny.builder().build());
+                case "none" -> ToolChoice.ofNone(ToolChoiceNone.builder().build());
+                case "auto" -> ToolChoice.ofAuto(ToolChoiceAuto.builder().build());
+                default -> ToolChoice.ofAuto(ToolChoiceAuto.builder().build());
             };
         }
 
         String type = toolChoice.path("type").asText();
         if ("tool".equalsIgnoreCase(type)) {
-            return new AnthropicApi.ToolChoiceTool(toolChoice.path("name").asText());
+            return ToolChoice.ofTool(ToolChoiceTool.builder()
+                    .name(toolChoice.path("name").asText())
+                    .build());
         }
         if ("any".equalsIgnoreCase(type)) {
-            return new AnthropicApi.ToolChoiceAny();
+            return ToolChoice.ofAny(ToolChoiceAny.builder().build());
         }
         if ("none".equalsIgnoreCase(type)) {
-            return new AnthropicApi.ToolChoiceNone();
+            return ToolChoice.ofNone(ToolChoiceNone.builder().build());
         }
-        return new AnthropicApi.ToolChoiceAuto();
+        return ToolChoice.ofAuto(ToolChoiceAuto.builder().build());
     }
 }

@@ -1,7 +1,7 @@
 package com.prodigalgal.xaigateway.gateway.core.observability;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageCompleteness;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageView;
@@ -273,7 +273,7 @@ public class GatewayRequestLifecycleService {
         }
         try {
             return objectMapper.writeValueAsString(value);
-        } catch (JsonProcessingException exception) {
+        } catch (JacksonException exception) {
             return null;
         }
     }

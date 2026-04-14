@@ -1,7 +1,7 @@
 package com.prodigalgal.xaigateway.protocol.ingress.openai;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest;
 import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest.MessageInput;
@@ -90,7 +90,7 @@ public class OpenAiChatCompletionRequestMapper {
     }
 
     private JsonNode buildExecutionMetadata(OpenAiChatCompletionRequest request) {
-        com.fasterxml.jackson.databind.node.ObjectNode metadata = objectMapper.createObjectNode();
+        tools.jackson.databind.node.ObjectNode metadata = objectMapper.createObjectNode();
         if (request.reasoning() != null && !request.reasoning().isNull()) {
             metadata.set("reasoning", request.reasoning());
         }

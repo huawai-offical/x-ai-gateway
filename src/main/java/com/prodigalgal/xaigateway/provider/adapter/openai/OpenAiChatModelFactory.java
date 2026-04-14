@@ -4,7 +4,6 @@ import io.micrometer.observation.ObservationRegistry;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.api.OpenAiApi;
-import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -31,7 +30,6 @@ public class OpenAiChatModelFactory {
         return OpenAiChatModel.builder()
                 .openAiApi(api)
                 .defaultOptions(options)
-                .retryTemplate(RetryTemplate.builder().maxAttempts(1).build())
                 .observationRegistry(observationRegistry)
                 .build();
     }

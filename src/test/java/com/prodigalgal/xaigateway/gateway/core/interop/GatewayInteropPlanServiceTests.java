@@ -1,7 +1,7 @@
 package com.prodigalgal.xaigateway.gateway.core.interop;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
 import com.prodigalgal.xaigateway.protocol.ingress.interop.InteropPlanRequest;
 import com.prodigalgal.xaigateway.protocol.ingress.interop.InteropPlanResponse;

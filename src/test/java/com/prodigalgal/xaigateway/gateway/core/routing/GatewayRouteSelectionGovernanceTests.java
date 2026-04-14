@@ -1,6 +1,6 @@
 package com.prodigalgal.xaigateway.gateway.core.routing;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.gateway.core.account.AccountSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedCredentialBindingView;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyGovernanceService;

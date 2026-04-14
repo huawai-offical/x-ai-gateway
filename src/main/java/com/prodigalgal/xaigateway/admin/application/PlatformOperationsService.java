@@ -1,6 +1,7 @@
 package com.prodigalgal.xaigateway.admin.application;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.admin.api.*;
 import com.prodigalgal.xaigateway.gateway.core.ops.OpsEventBusService;
 import com.prodigalgal.xaigateway.gateway.core.ops.OpsEventType;
@@ -230,7 +231,7 @@ public class PlatformOperationsService {
             InstallationStateEntity state = getOrCreateInstallationState();
             state.setMetadataJson(writeJson(snapshot.get("installationState")));
             installationStateRepository.save(state);
-        } catch (IOException exception) {
+        } catch (JacksonException exception) {
             throw new IllegalStateException("恢复快照失败。", exception);
         }
     }
@@ -250,7 +251,7 @@ public class PlatformOperationsService {
     private String writeJson(Object value) {
         try {
             return objectMapper.writeValueAsString(value);
-        } catch (IOException exception) {
+        } catch (JacksonException exception) {
             throw new IllegalStateException("序列化失败。", exception);
         }
     }

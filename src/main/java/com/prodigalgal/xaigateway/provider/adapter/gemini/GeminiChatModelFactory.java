@@ -11,7 +11,6 @@ import java.time.Instant;
 import java.util.Date;
 import org.springframework.ai.google.genai.GoogleGenAiChatModel;
 import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
-import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -38,7 +37,6 @@ public class GeminiChatModelFactory {
         return GoogleGenAiChatModel.builder()
                 .genAiClient(client)
                 .defaultOptions(options)
-                .retryTemplate(RetryTemplate.builder().maxAttempts(1).build())
                 .observationRegistry(observationRegistry)
                 .build();
     }
@@ -64,7 +62,6 @@ public class GeminiChatModelFactory {
             return GoogleGenAiChatModel.builder()
                     .genAiClient(client)
                     .defaultOptions(options)
-                    .retryTemplate(RetryTemplate.builder().maxAttempts(1).build())
                     .observationRegistry(observationRegistry)
                     .build();
         }

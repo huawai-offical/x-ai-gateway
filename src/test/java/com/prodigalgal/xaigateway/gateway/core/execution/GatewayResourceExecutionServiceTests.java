@@ -1,7 +1,7 @@
 package com.prodigalgal.xaigateway.gateway.core.execution;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 import com.prodigalgal.xaigateway.admin.application.CredentialCryptoService;
 import com.prodigalgal.xaigateway.gateway.core.account.AccountSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyGovernanceService;
@@ -85,7 +85,7 @@ class GatewayResourceExecutionServiceTests {
         Mockito.when(embeddingsExecutor.executeJson(any(), any(), eq("text-embedding-004")))
                 .thenReturn(ResponseEntity.ok(new ObjectMapper().createObjectNode().put("object", "list")));
 
-        ResponseEntity<com.fasterxml.jackson.databind.JsonNode> response = service.executeJson(
+        ResponseEntity<tools.jackson.databind.JsonNode> response = service.executeJson(
                 "sk-gw-test",
                 "/v1/embeddings",
                 requestBody,
@@ -197,7 +197,7 @@ class GatewayResourceExecutionServiceTests {
                 .thenReturn(ResponseEntity.status(503).body(null))
                 .thenReturn(ResponseEntity.ok(new ObjectMapper().createObjectNode().put("object", "list")));
 
-        ResponseEntity<com.fasterxml.jackson.databind.JsonNode> response = service.executeJson(
+        ResponseEntity<tools.jackson.databind.JsonNode> response = service.executeJson(
                 "sk-gw-test",
                 "/v1/embeddings",
                 requestBody,

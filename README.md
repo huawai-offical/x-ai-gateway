@@ -20,8 +20,8 @@
 
 先准备依赖：
 
-- PostgreSQL：默认 `jdbc:postgresql://localhost:5432/x_ai_gateway`
-- Redis：默认 `localhost:6379`
+- PostgreSQL：默认 `jdbc:postgresql://192.168.154.143:5432/hope_ircs?connectionTimeZone=UTC`
+- Redis：默认 `192.168.154.143:6379`
 - 可选环境变量：
   - `DB_URL`
   - `DB_USERNAME`

@@ -4,7 +4,7 @@ import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolDefinition;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.usage.GatewayUsage;
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import com.prodigalgal.xaigateway.provider.adapter.anthropic.AnthropicOptionsMapper;
 import com.prodigalgal.xaigateway.provider.adapter.anthropic.AnthropicUsageNormalizer;
 import com.prodigalgal.xaigateway.provider.adapter.gemini.GeminiOptionsMapper;

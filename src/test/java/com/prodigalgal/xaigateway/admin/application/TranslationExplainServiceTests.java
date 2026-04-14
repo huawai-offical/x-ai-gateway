@@ -1,6 +1,6 @@
 package com.prodigalgal.xaigateway.admin.application;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.admin.api.TranslationExplainRequest;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayDegradationPolicy;

@@ -1,6 +1,6 @@
 package com.prodigalgal.xaigateway.gateway.core.interop;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;

@@ -1,6 +1,6 @@
 package com.prodigalgal.xaigateway.protocol.ingress.openai;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayTokenAuthenticationResolver;
 import com.prodigalgal.xaigateway.gateway.core.resource.GatewayAsyncResourceService;

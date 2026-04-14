@@ -1,6 +1,6 @@
 package com.prodigalgal.xaigateway.gateway.core.cache;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.infra.config.GatewayProperties;
 import java.util.List;
 import java.util.Map;

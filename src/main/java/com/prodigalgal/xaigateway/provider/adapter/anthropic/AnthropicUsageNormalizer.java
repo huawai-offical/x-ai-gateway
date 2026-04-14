@@ -1,7 +1,6 @@
 package com.prodigalgal.xaigateway.provider.adapter.anthropic;
 
 import com.prodigalgal.xaigateway.gateway.core.usage.GatewayUsage;
-import org.springframework.ai.anthropic.api.AnthropicApi;
 import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.stereotype.Service;
 
@@ -14,8 +13,9 @@ public class AnthropicUsageNormalizer {
         }
 
         Object nativeUsage = usage.getNativeUsage();
-        if (nativeUsage instanceof AnthropicApi.Usage anthropicUsage) {
-            return normalize(anthropicUsage);
+        GatewayUsage normalized = normalizeNativeUsage(nativeUsage);
+        if (normalized != null) {
+            return normalized;
         }
 
         int promptTokens = valueOrZero(usage.getPromptTokens());
@@ -39,15 +39,22 @@ public class AnthropicUsageNormalizer {
         );
     }
 
-    public GatewayUsage normalize(AnthropicApi.Usage usage) {
-        if (usage == null) {
-            return GatewayUsage.empty();
+    private GatewayUsage normalizeNativeUsage(Object usage) {
+        Integer promptTokensValue = readInteger(usage, "inputTokens");
+        Integer completionTokensValue = readInteger(usage, "outputTokens");
+        Integer cacheWriteTokensValue = readInteger(usage, "cacheCreationInputTokens");
+        Integer cacheHitTokensValue = readInteger(usage, "cacheReadInputTokens");
+        if (promptTokensValue == null
+                && completionTokensValue == null
+                && cacheWriteTokensValue == null
+                && cacheHitTokensValue == null) {
+            return null;
         }
 
-        int promptTokens = valueOrZero(usage.inputTokens());
-        int completionTokens = valueOrZero(usage.outputTokens());
-        int cacheWriteTokens = valueOrZero(usage.cacheCreationInputTokens());
-        int cacheHitTokens = valueOrZero(usage.cacheReadInputTokens());
+        int promptTokens = valueOrZero(promptTokensValue);
+        int completionTokens = valueOrZero(completionTokensValue);
+        int cacheWriteTokens = valueOrZero(cacheWriteTokensValue);
+        int cacheHitTokens = valueOrZero(cacheHitTokensValue);
         int rawPromptTokens = promptTokens + cacheWriteTokens + cacheHitTokens;
         int totalTokens = rawPromptTokens + completionTokens;
 
@@ -68,5 +75,20 @@ public class AnthropicUsageNormalizer {
 
     private int valueOrZero(Integer value) {
         return value == null ? 0 : value;
+    }
+
+    private Integer readInteger(Object target, String methodName) {
+        if (target == null) {
+            return null;
+        }
+        try {
+            Object value = target.getClass().getMethod(methodName).invoke(target);
+            if (value instanceof Number number) {
+                return number.intValue();
+            }
+        } catch (ReflectiveOperationException ignored) {
+            return null;
+        }
+        return null;
     }
 }

@@ -1,6 +1,6 @@
 package com.prodigalgal.xaigateway.gateway.core.credential;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.admin.application.CredentialCryptoService;
 import com.prodigalgal.xaigateway.gateway.core.account.AccountSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.account.UpstreamAccountProviderType;

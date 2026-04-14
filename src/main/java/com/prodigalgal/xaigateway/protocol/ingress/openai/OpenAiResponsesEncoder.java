@@ -1,7 +1,7 @@
 package com.prodigalgal.xaigateway.protocol.ingress.openai;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolCall;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayResponse;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamEvent;
@@ -282,7 +282,7 @@ public class OpenAiResponsesEncoder {
     private String encodeEvent(String eventName, Object payload) {
         try {
             return "event: " + eventName + "\n" + "data: " + objectMapper.writeValueAsString(payload) + "\n\n";
-        } catch (JsonProcessingException exception) {
+        } catch (JacksonException exception) {
             throw new IllegalStateException("无法序列化 Responses stream 响应。", exception);
         }
     }

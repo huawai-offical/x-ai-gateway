@@ -1,8 +1,8 @@
 package com.prodigalgal.xaigateway.gateway.core.credential;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.admin.application.CredentialCryptoService;
 import com.prodigalgal.xaigateway.gateway.core.account.AccountSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.account.UpstreamAccountProviderType;
@@ -148,7 +148,7 @@ public class CredentialMaterialResolver {
         }
         try {
             return objectMapper.readValue(json, MAP_TYPE);
-        } catch (JsonProcessingException exception) {
+        } catch (JacksonException exception) {
             throw new IllegalArgumentException("无法解析凭证 metadata。", exception);
         }
     }

@@ -1,9 +1,9 @@
 package com.prodigalgal.xaigateway.gateway.core.resource;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 import com.prodigalgal.xaigateway.admin.application.CredentialCryptoService;
 import com.prodigalgal.xaigateway.gateway.core.credential.CredentialMaterialResolver;
 import com.prodigalgal.xaigateway.gateway.core.credential.ResolvedCredentialMaterial;
@@ -557,7 +557,7 @@ public class GatewayAsyncResourceService {
     private JsonNode readJson(String json) {
         try {
             return json == null || json.isBlank() ? objectMapper.createObjectNode() : objectMapper.readTree(json);
-        } catch (JsonProcessingException exception) {
+        } catch (JacksonException exception) {
             throw new IllegalStateException("解析异步资源 JSON 失败。", exception);
         }
     }
@@ -575,7 +575,7 @@ public class GatewayAsyncResourceService {
     private String writeJson(JsonNode node) {
         try {
             return node == null ? null : objectMapper.writeValueAsString(node);
-        } catch (JsonProcessingException exception) {
+        } catch (JacksonException exception) {
             throw new IllegalStateException("序列化异步资源 JSON 失败。", exception);
         }
     }

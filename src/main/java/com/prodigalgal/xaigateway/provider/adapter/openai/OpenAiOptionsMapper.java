@@ -1,6 +1,6 @@
 package com.prodigalgal.xaigateway.provider.adapter.openai;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolDefinition;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
 import java.util.LinkedHashMap;

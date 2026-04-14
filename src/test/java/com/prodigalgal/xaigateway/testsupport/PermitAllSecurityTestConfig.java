@@ -9,7 +9,8 @@ import org.springframework.security.web.server.SecurityWebFilterChain;
 public class PermitAllSecurityTestConfig {
 
     @Bean
-    SecurityWebFilterChain testSecurityWebFilterChain(ServerHttpSecurity http) {
+    SecurityWebFilterChain testSecurityWebFilterChain() {
+        ServerHttpSecurity http = ServerHttpSecurity.http();
         return http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .authorizeExchange(exchange -> exchange.anyExchange().permitAll())

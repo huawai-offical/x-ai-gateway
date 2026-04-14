@@ -1,6 +1,6 @@
 package com.prodigalgal.xaigateway.protocol.ingress.anthropic;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import java.util.List;

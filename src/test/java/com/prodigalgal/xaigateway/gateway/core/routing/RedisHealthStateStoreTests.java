@@ -1,7 +1,6 @@
 package com.prodigalgal.xaigateway.gateway.core.routing;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.infra.config.GatewayProperties;
 import java.time.Duration;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,7 +19,7 @@ class RedisHealthStateStoreTests {
     private final StringRedisTemplate stringRedisTemplate = Mockito.mock(StringRedisTemplate.class);
     private final ValueOperations<String, String> valueOperations = Mockito.mock(ValueOperations.class);
     private final GatewayProperties gatewayProperties = new GatewayProperties();
-    private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @BeforeEach
     void setUp() {

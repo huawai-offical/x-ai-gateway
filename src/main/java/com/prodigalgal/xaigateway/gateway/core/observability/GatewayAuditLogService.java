@@ -1,7 +1,7 @@
 package com.prodigalgal.xaigateway.gateway.core.observability;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.infra.persistence.entity.AuditLogEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.AuditLogRepository;
 import java.time.Instant;
@@ -70,7 +70,7 @@ public class GatewayAuditLogService {
         }
         try {
             return objectMapper.writeValueAsString(detail);
-        } catch (JsonProcessingException exception) {
+        } catch (JacksonException exception) {
             return "{\"serializationError\":true,\"createdAt\":\"" + Instant.now() + "\"}";
         }
     }

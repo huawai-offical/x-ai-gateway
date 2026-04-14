@@ -1,12 +1,13 @@
 spring:
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/x_ai_gateway}
-    username: ${DB_USERNAME:x_ai_gateway}
-    password: ${DB_PASSWORD:x_ai_gateway}
+    url: ${DB_URL:jdbc:postgresql://192.168.154.143:5432/x_ai_gateway?connectionTimeZone=UTC}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:fuckharkadmin}
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
+      host: ${REDIS_HOST:192.168.154.143}
       port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:nj363600}
 
 management:
   endpoint:

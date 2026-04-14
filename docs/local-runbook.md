@@ -16,8 +16,8 @@
 
 默认值：
 
-- PostgreSQL：`jdbc:postgresql://localhost:5432/x_ai_gateway`
-- Redis：`localhost:6379`
+- PostgreSQL：`jdbc:postgresql://192.168.154.143:5432/hope_ircs?connectionTimeZone=UTC`
+- Redis：`192.168.154.143:6379`
 - Actuator 暴露：`health,info,metrics,prometheus,configprops`
 
 ## 启动步骤

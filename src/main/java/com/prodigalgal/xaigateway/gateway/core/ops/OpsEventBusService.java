@@ -1,7 +1,7 @@
 package com.prodigalgal.xaigateway.gateway.core.ops;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
@@ -27,7 +27,7 @@ public class OpsEventBusService {
         envelope.put("payload", payload);
         try {
             sink.tryEmitNext(objectMapper.writeValueAsString(envelope));
-        } catch (JsonProcessingException exception) {
+        } catch (JacksonException exception) {
             throw new IllegalStateException("无法序列化 Ops 事件。", exception);
         }
     }

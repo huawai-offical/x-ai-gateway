@@ -1,7 +1,7 @@
 package com.prodigalgal.xaigateway.protocol.ingress.openai;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthenticationService;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayResourceExecutionService;
@@ -9,7 +9,7 @@ import com.prodigalgal.xaigateway.testsupport.PermitAllSecurityTestConfig;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
+import org.springframework.boot.webflux.test.autoconfigure.WebFluxTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;

@@ -1,7 +1,7 @@
 package com.prodigalgal.xaigateway.gateway.core.execution;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;

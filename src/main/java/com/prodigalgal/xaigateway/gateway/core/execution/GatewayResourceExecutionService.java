@@ -1,8 +1,8 @@
 package com.prodigalgal.xaigateway.gateway.core.execution;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.JsonNodeFactory;
+import tools.jackson.databind.node.ObjectNode;
 import com.prodigalgal.xaigateway.admin.application.CredentialCryptoService;
 import com.prodigalgal.xaigateway.gateway.core.account.AccountSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyGovernanceService;
@@ -94,7 +94,7 @@ public class GatewayResourceExecutionService {
                 credentialCryptoService,
                 distributedKeyGovernanceService,
                 accountSelectionService,
-                new CredentialMaterialResolver(accountSelectionService, credentialCryptoService, new com.fasterxml.jackson.databind.ObjectMapper()),
+                new CredentialMaterialResolver(accountSelectionService, credentialCryptoService, new tools.jackson.databind.ObjectMapper()),
                 gatewayRequestFeatureService,
                 translationExecutionPlanCompiler,
                 gatewayResourceExecutors,
@@ -121,7 +121,7 @@ public class GatewayResourceExecutionService {
                 gatewayRequestFeatureService,
                 translationExecutionPlanCompiler,
                 gatewayResourceExecutors,
-                new GatewayObservabilityService(null, null, null, new com.fasterxml.jackson.databind.ObjectMapper()) {
+                new GatewayObservabilityService(null, null, null, new tools.jackson.databind.ObjectMapper()) {
                     @Override
                     public String nextRequestId() {
                         return "test-request";

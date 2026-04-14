@@ -6,8 +6,8 @@ import com.prodigalgal.xaigateway.admin.api.CredentialModelRefreshResponse;
 import com.prodigalgal.xaigateway.admin.api.CredentialRequest;
 import com.prodigalgal.xaigateway.admin.api.CredentialResponse;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CredentialModelDiscoveryService;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import java.util.Comparator;
@@ -175,7 +175,7 @@ public class CredentialAdminService {
     private String writeMetadata(Map<String, Object> metadata) {
         try {
             return metadata == null || metadata.isEmpty() ? null : objectMapper.writeValueAsString(metadata);
-        } catch (JsonProcessingException exception) {
+        } catch (JacksonException exception) {
             throw new IllegalArgumentException("无法序列化凭证 metadata。", exception);
         }
     }
@@ -187,7 +187,7 @@ public class CredentialAdminService {
         }
         try {
             return objectMapper.readValue(metadataJson, Map.class);
-        } catch (JsonProcessingException exception) {
+        } catch (JacksonException exception) {
             throw new IllegalArgumentException("无法解析凭证 metadata。", exception);
         }
     }

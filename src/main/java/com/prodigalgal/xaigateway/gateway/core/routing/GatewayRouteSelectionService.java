@@ -157,7 +157,7 @@ public class GatewayRouteSelectionService {
 
         GatewayRequestSemantics semantics = gatewayRequestFeatureService.describe(
                 request.requestPath(),
-                request.requestBody() instanceof com.fasterxml.jackson.databind.JsonNode jsonNode ? jsonNode : null
+                request.requestBody() instanceof tools.jackson.databind.JsonNode jsonNode ? jsonNode : null
         );
         RoutePlanSnapshot snapshot = routeCacheStore
                 .get(distributedKey.id(), normalizedProtocol, request.requestPath(), request.requestedModel(), semantics)
