@@ -39,7 +39,7 @@ public class GatewayAsyncResourceCanonicalizer {
     public CanonicalResourceLifecycle toLifecycle(GatewayAsyncResourceEntity entity) {
         JsonNode metadata = readJson(entity.getMetadataJson());
         JsonNode response = readJson(entity.getResponsePayloadJson());
-        List<CanonicalResourceTransition> transitions = transitions(metadata);
+        List<CanonicalResourceTransition> transitions = toTransitions(entity);
         String normalizedStatus = normalizeStatus(entity.getStatus());
         String failureReason = firstText(metadata, "failure_reason", "error_message", "last_error");
         if (failureReason == null) {
@@ -65,6 +65,10 @@ public class GatewayAsyncResourceCanonicalizer {
         );
     }
 
+    public List<CanonicalResourceTransition> toTransitions(GatewayAsyncResourceEntity entity) {
+        return transitions(readJson(entity.getMetadataJson()));
+    }
+
     public CanonicalResourceLineage toLineage(GatewayAsyncResourceEntity entity) {
         JsonNode metadata = readJson(entity.getMetadataJson());
         return new CanonicalResourceLineage(
@@ -83,9 +87,11 @@ public class GatewayAsyncResourceCanonicalizer {
         List<CanonicalResourceArtifact> artifacts = new ArrayList<>();
         JsonNode metadata = readJson(entity.getMetadataJson());
         JsonNode requestPayload = readJson(entity.getRequestPayloadJson());
+        JsonNode responsePayload = readJson(entity.getResponsePayloadJson());
+        Long credentialId = longValue(metadata, "credential_id");
 
         artifacts.addAll(uploadPartArtifacts(metadata));
-        artifacts.addAll(fileBindingArtifacts(requestPayload, longValue(metadata, "credential_id")));
+        artifacts.addAll(fileBindingArtifacts(requestPayload, responsePayload, credentialId));
 
         return List.copyOf(artifacts);
     }
@@ -142,33 +148,72 @@ public class GatewayAsyncResourceCanonicalizer {
         return List.copyOf(artifacts);
     }
 
-    private List<CanonicalResourceArtifact> fileBindingArtifacts(JsonNode requestPayload, Long credentialId) {
-        if (requestPayload == null || requestPayload.isMissingNode() || credentialId == null) {
+    private List<CanonicalResourceArtifact> fileBindingArtifacts(
+            JsonNode requestPayload,
+            JsonNode responsePayload,
+            Long credentialId) {
+        if (credentialId == null) {
             return List.of();
         }
         List<CanonicalResourceArtifact> artifacts = new ArrayList<>();
-        collectFileArtifact(artifacts, credentialId, requestPayload, "input_file_id");
-        collectFileArtifact(artifacts, credentialId, requestPayload, "training_file");
+        collectFileArtifacts(artifacts, credentialId, requestPayload, "input_file_id");
+        collectFileArtifacts(artifacts, credentialId, requestPayload, "training_file");
+        collectFileArtifacts(artifacts, credentialId, requestPayload, "validation_file");
+        collectFileArtifacts(artifacts, credentialId, responsePayload, "output_file_id");
+        collectFileArtifacts(artifacts, credentialId, responsePayload, "error_file_id");
+        collectFileArtifacts(artifacts, credentialId, responsePayload, "result_files");
         return List.copyOf(artifacts);
     }
 
-    private void collectFileArtifact(
+    private void collectFileArtifacts(
             List<CanonicalResourceArtifact> artifacts,
             Long credentialId,
-            JsonNode requestPayload,
+            JsonNode payload,
             String fieldName) {
-        String externalFileId = text(requestPayload, fieldName);
-        if (externalFileId == null) {
+        if (payload == null || payload.isMissingNode()) {
             return;
         }
+        JsonNode valueNode = payload.path(fieldName);
+        if (valueNode.isMissingNode() || valueNode.isNull()) {
+            return;
+        }
+        if (valueNode.isArray()) {
+            int sourceIndex = 0;
+            for (JsonNode item : valueNode) {
+                String externalFileId = extractExternalFileId(item);
+                if (externalFileId != null) {
+                    collectResolvedFileArtifact(artifacts, credentialId, fieldName, externalFileId, sourceIndex);
+                }
+                sourceIndex++;
+            }
+            return;
+        }
+        String externalFileId = extractExternalFileId(valueNode);
+        if (externalFileId != null) {
+            collectResolvedFileArtifact(artifacts, credentialId, fieldName, externalFileId, null);
+        }
+    }
+
+    private void collectResolvedFileArtifact(
+            List<CanonicalResourceArtifact> artifacts,
+            Long credentialId,
+            String fieldName,
+            String externalFileId,
+            Integer sourceIndex) {
         List<GatewayFileBindingEntity> bindings = gatewayFileBindingRepository
                 .findAllByCredentialIdAndExternalFileIdOrderByCreatedAtDesc(credentialId, externalFileId);
         if (bindings.isEmpty()) {
+            Map<String, Object> attributes = new LinkedHashMap<>();
+            attributes.put("fieldName", fieldName);
+            attributes.put("externalFileId", externalFileId);
+            if (sourceIndex != null) {
+                attributes.put("sourceIndex", sourceIndex);
+            }
             artifacts.add(new CanonicalResourceArtifact(
                     "file_ref",
                     externalFileId,
                     externalFileId,
-                    Map.of("fieldName", fieldName, "externalFileId", externalFileId)
+                    attributes
             ));
             return;
         }
@@ -180,6 +225,9 @@ public class GatewayAsyncResourceCanonicalizer {
         attributes.put("externalFileId", binding.getExternalFileId());
         attributes.put("credentialId", binding.getCredentialId());
         attributes.put("bindingStatus", binding.getStatus());
+        if (sourceIndex != null) {
+            attributes.put("sourceIndex", sourceIndex);
+        }
         if (gatewayFile != null) {
             attributes.put("gatewayFileKey", gatewayFile.getFileKey());
             attributes.put("mimeType", gatewayFile.getMimeType());
@@ -191,6 +239,21 @@ public class GatewayAsyncResourceCanonicalizer {
                 gatewayFile == null ? defaultDisplayName(binding) : gatewayFile.getFilename(),
                 attributes
         ));
+    }
+
+    private String extractExternalFileId(JsonNode node) {
+        if (node == null || node.isMissingNode() || node.isNull()) {
+            return null;
+        }
+        if (node.isTextual()) {
+            String value = node.asText(null);
+            return value == null || value.isBlank() ? null : value;
+        }
+        String id = text(node, "id");
+        if (id != null) {
+            return id;
+        }
+        return firstText(node, "file_id", "external_file_id");
     }
 
     private List<Map<String, Object>> partBindings(JsonNode node) {

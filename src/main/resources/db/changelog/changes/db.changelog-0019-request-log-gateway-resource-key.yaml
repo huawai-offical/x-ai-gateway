@@ -1,0 +1,11 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0019-request-log-gateway-resource-key
+      author: codex
+      changes:
+        - addColumn:
+            tableName: request_log
+            columns:
+              - column:
+                  name: gateway_resource_key
+                  type: VARCHAR(96)

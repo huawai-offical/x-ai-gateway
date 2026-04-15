@@ -166,6 +166,17 @@ const sampleSite = {
       declaredLevel: 'EMULATED',
       implementedLevel: 'EMULATED',
       effectiveLevel: 'EMULATED',
+      supportStatus: 'DEGRADED',
+      degradationLevel: 'EMULATED',
+      blockedReasons: [],
+      lossReasons: [],
+    },
+    file_object: {
+      declaredLevel: 'UNSUPPORTED',
+      implementedLevel: 'UNSUPPORTED',
+      effectiveLevel: 'UNSUPPORTED',
+      supportStatus: 'BLOCKED',
+      degradationLevel: 'UNSUPPORTED',
       blockedReasons: [],
       lossReasons: [],
     },
@@ -192,6 +203,33 @@ const sampleSite = {
           supportStatus: 'DEGRADED',
           degradationLevel: 'EMULATED',
           blockedReasons: [],
+          lossReasons: [],
+        },
+      },
+    },
+    file_create: {
+      resourceType: 'FILE',
+      operation: 'FILE_CREATE',
+      surface: 'openai',
+      normalizedPath: '/v1/files',
+      preferredBackend: 'ORCHESTRATION',
+      supportedBackends: ['ORCHESTRATION'],
+      supportStatus: 'ORCHESTRATION',
+      degradationLevel: 'NATIVE',
+      executionCapabilityLevel: 'NATIVE',
+      renderCapabilityLevel: 'NATIVE',
+      overallCapabilityLevel: 'NATIVE',
+      blockerReasons: [],
+      lossReasons: [],
+      requiredFeatures: ['file_object'],
+      featureResolutions: {
+        file_object: {
+          declaredLevel: 'UNSUPPORTED',
+          implementedLevel: 'UNSUPPORTED',
+          effectiveLevel: 'UNSUPPORTED',
+          supportStatus: 'BLOCKED',
+          degradationLevel: 'UNSUPPORTED',
+          blockedReasons: ['file_object 当前站点声明不支持。'],
           lossReasons: [],
         },
       },
@@ -224,13 +262,16 @@ describe('ProviderSiteDetailPage', () => {
       </QueryClientProvider>,
     )
 
-    expect(await screen.findByText('surface: openai')).toBeInTheDocument()
+    expect((await screen.findAllByText('surface: openai')).length).toBeGreaterThan(0)
     expect(screen.getAllByText('gpt-4o').length).toBeGreaterThan(0)
     expect(screen.queryByText('chat-only')).not.toBeInTheDocument()
     expect(screen.getAllByText('RESPONSE_CREATE').length).toBeGreaterThan(0)
     expect(screen.getByText('supportStatus: DEGRADED')).toBeInTheDocument()
     expect(screen.getByText('normalizedPath: /v1/responses')).toBeInTheDocument()
     expect(screen.getByText(/blockerReasons: response object fallback/)).toBeInTheDocument()
+    expect(screen.getByText('supportStatus: ORCHESTRATION')).toBeInTheDocument()
+    expect(screen.getByText('normalizedPath: /v1/files')).toBeInTheDocument()
+    expect(screen.getByText('featureSupport: file_object:BLOCKED')).toBeInTheDocument()
 
     fireEvent.change(screen.getByLabelText('displayName'), {
       target: { value: 'OPENAI_DIRECT_EDITED' },

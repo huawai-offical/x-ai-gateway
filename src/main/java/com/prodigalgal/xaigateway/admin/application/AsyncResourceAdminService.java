@@ -4,6 +4,7 @@ import com.prodigalgal.xaigateway.admin.api.AsyncResourceDetailResponse;
 import com.prodigalgal.xaigateway.admin.api.AsyncResourceSummaryResponse;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceLifecycle;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceLineage;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceTransition;
 import com.prodigalgal.xaigateway.gateway.core.resource.GatewayAsyncResourceCanonicalizer;
 import com.prodigalgal.xaigateway.gateway.core.resource.GatewayAsyncResourceType;
 import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayAsyncResourceEntity;
@@ -68,17 +69,25 @@ public class AsyncResourceAdminService {
                 entity.getResourceType(),
                 lifecycle.status(),
                 lifecycle.normalizedStatus(),
+                lifecycle.terminal(),
+                lifecycle.deleted(),
                 lineage.objectMode(),
                 lineage.upstreamObjectId(),
                 lifecycle.eventCount(),
+                lifecycle.latestTransition(),
+                lifecycle.failureReason(),
+                lifecycle.cancelReason(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
         );
     }
 
     private AsyncResourceDetailResponse toDetailResponse(GatewayAsyncResourceEntity entity) {
+        CanonicalResourceLifecycle lifecycle = gatewayAsyncResourceCanonicalizer.toLifecycle(entity);
+        List<CanonicalResourceTransition> transitions = gatewayAsyncResourceCanonicalizer.toTransitions(entity);
         return new AsyncResourceDetailResponse(
-                gatewayAsyncResourceCanonicalizer.toLifecycle(entity),
+                lifecycle,
+                transitions,
                 gatewayAsyncResourceCanonicalizer.toLineage(entity),
                 gatewayAsyncResourceCanonicalizer.toArtifacts(entity),
                 gatewayAsyncResourceCanonicalizer.readPayload(entity.getRequestPayloadJson()),

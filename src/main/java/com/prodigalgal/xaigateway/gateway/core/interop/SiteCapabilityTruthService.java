@@ -1,6 +1,8 @@
 package com.prodigalgal.xaigateway.gateway.core.interop;
 
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
+import com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendDecision;
+import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend;
 import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderFamily;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
@@ -180,6 +182,61 @@ public class SiteCapabilityTruthService {
                 report.blockedReasons(),
                 report.executionKind(),
                 report.upstreamObjectMode()
+        );
+    }
+
+    public SurfaceCompatibilityReport evaluateSurface(
+            UpstreamSiteProfileEntity siteProfile,
+            SiteCapabilitySnapshotEntity snapshot,
+            GatewayRequestSemantics semantics,
+            ExecutionBackendDecision backendDecision) {
+        if (siteProfile == null || semantics == null) {
+            return new SurfaceCompatibilityReport(
+                    Map.of(),
+                    InteropCapabilityLevel.UNSUPPORTED,
+                    List.of("未找到站点档案。"),
+                    List.of()
+            );
+        }
+
+        Map<String, CapabilityResolution> featureResolutions = new LinkedHashMap<>();
+        java.util.ArrayList<String> blockedReasons = new java.util.ArrayList<>();
+        java.util.ArrayList<String> lossReasons = new java.util.ArrayList<>();
+        InteropCapabilityLevel executionCapabilityLevel = InteropCapabilityLevel.NATIVE;
+
+        for (InteropFeature feature : semantics.requiredFeatures()) {
+            CapabilityResolution resolution = resolve(siteProfile, snapshot, feature);
+            featureResolutions.put(feature.wireName(), resolution);
+            executionCapabilityLevel = minimumLevel(executionCapabilityLevel, resolution.effectiveLevel());
+            blockedReasons.addAll(resolution.blockedReasons());
+            lossReasons.addAll(resolution.lossReasons());
+        }
+
+        if (semantics.requiredFeatures().isEmpty()) {
+            executionCapabilityLevel = InteropCapabilityLevel.NATIVE;
+        }
+
+        List<String> distinctBlockedReasons = blockedReasons.stream()
+                .distinct()
+                .toList();
+        List<String> distinctLossReasons = lossReasons.stream()
+                .distinct()
+                .toList();
+
+        if (supportsGatewayOrchestrationSurface(backendDecision, semantics)) {
+            return new SurfaceCompatibilityReport(
+                    Map.copyOf(featureResolutions),
+                    InteropCapabilityLevel.NATIVE,
+                    List.of(),
+                    List.of()
+            );
+        }
+
+        return new SurfaceCompatibilityReport(
+                Map.copyOf(featureResolutions),
+                executionCapabilityLevel,
+                executionCapabilityLevel == InteropCapabilityLevel.UNSUPPORTED ? distinctBlockedReasons : List.of(),
+                distinctLossReasons
         );
     }
 
@@ -440,6 +497,22 @@ public class SiteCapabilityTruthService {
 
     private boolean supportsUpstreamAsyncObjects(UpstreamSiteKind siteKind) {
         return siteKind == UpstreamSiteKind.OPENAI_DIRECT;
+    }
+
+    private boolean supportsGatewayOrchestrationSurface(
+            ExecutionBackendDecision backendDecision,
+            GatewayRequestSemantics semantics) {
+        if (backendDecision == null || semantics == null) {
+            return false;
+        }
+        if (backendDecision.preferredBackend() != ExecutionBackend.ORCHESTRATION) {
+            return false;
+        }
+        return semantics.resourceType() == TranslationResourceType.FILE
+                || semantics.resourceType() == TranslationResourceType.UPLOAD
+                || semantics.resourceType() == TranslationResourceType.BATCH
+                || semantics.resourceType() == TranslationResourceType.TUNING
+                || semantics.resourceType() == TranslationResourceType.REALTIME;
     }
 
     private String upstreamObjectMode(TranslationResourceType resourceType, ExecutionKind executionKind) {

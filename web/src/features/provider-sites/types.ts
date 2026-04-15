@@ -301,6 +301,16 @@ export function matchesResolutionFilter(rowFeatures: Record<string, CapabilityRe
   return true
 }
 
+export function summarizeSurfaceFeatureStatuses(surface: SurfaceCapability) {
+  return surface.requiredFeatures
+    .map((feature) => {
+      const resolution = surface.featureResolutions[feature]
+      const status = resolution?.supportStatus ?? resolution?.effectiveLevel ?? '-'
+      return `${feature}:${status}`
+    })
+    .join(', ')
+}
+
 export function modelSupportsFeature(model: SiteModelCapability, surface?: string | null) {
   if (!surface) return true
   return Boolean(model.surfaces[surface])

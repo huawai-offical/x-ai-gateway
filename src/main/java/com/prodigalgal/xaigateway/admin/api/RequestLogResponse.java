@@ -24,6 +24,7 @@ public record RequestLogResponse(
         String supportStatus,
         String degradationLevel,
         String objectMode,
+        String gatewayResourceKey,
         String responseKind,
         String responseObjectType,
         String responseObjectId,

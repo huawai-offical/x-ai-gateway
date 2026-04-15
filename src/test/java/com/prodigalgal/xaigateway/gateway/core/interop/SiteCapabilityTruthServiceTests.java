@@ -6,6 +6,7 @@ import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionSource;
 import com.prodigalgal.xaigateway.gateway.core.shared.AuthStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ErrorSchemaStrategy;
+import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend;
 import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind;
 import com.prodigalgal.xaigateway.gateway.core.shared.PathStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderFamily;
@@ -230,7 +231,7 @@ class SiteCapabilityTruthServiceTests {
                 true,
                 true,
                 true,
-                false,
+                true,
                 false,
                 true,
                 true,
@@ -242,6 +243,154 @@ class SiteCapabilityTruthServiceTests {
         assertEquals(InteropCapabilityLevel.NATIVE, service.capabilityLevel(candidate, InteropFeature.CHAT_TEXT));
         assertEquals(InteropCapabilityLevel.NATIVE, service.capabilityLevel(candidate, InteropFeature.IMAGE_INPUT));
         assertEquals(InteropCapabilityLevel.UNSUPPORTED, service.capabilityLevel(candidate, InteropFeature.EMBEDDINGS));
+    }
+
+    @Test
+    void shouldFreezeGeminiFirstSliceSupportStatuses() {
+        SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        Mockito.when(repository.findBySiteProfile_Id(10L)).thenReturn(Optional.of(snapshot(false, true, false, false, false, false, false, false, false, false)));
+        Mockito.when(repository.findBySiteProfile_Id(11L)).thenReturn(Optional.of(snapshot(false, false, false, false, false, false, false, false, false, false)));
+        SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
+
+        FeatureCompatibilityReport nativeEmbeddings = service.evaluate(
+                geminiCandidate(10L, UpstreamSiteKind.GEMINI_DIRECT),
+                new GatewayRequestSemantics(
+                        TranslationResourceType.EMBEDDING,
+                        TranslationOperation.EMBEDDING_CREATE,
+                        List.of(InteropFeature.EMBEDDINGS),
+                        true
+                )
+        );
+        FeatureCompatibilityReport blockedAudio = service.evaluate(
+                geminiCandidate(10L, UpstreamSiteKind.GEMINI_DIRECT),
+                new GatewayRequestSemantics(
+                        TranslationResourceType.AUDIO,
+                        TranslationOperation.AUDIO_TRANSCRIPTION,
+                        List.of(InteropFeature.AUDIO_TRANSCRIPTION),
+                        true
+                )
+        );
+        FeatureCompatibilityReport blockedVertexEmbeddings = service.evaluate(
+                geminiCandidate(11L, UpstreamSiteKind.VERTEX_AI),
+                new GatewayRequestSemantics(
+                        TranslationResourceType.EMBEDDING,
+                        TranslationOperation.EMBEDDING_CREATE,
+                        List.of(InteropFeature.EMBEDDINGS),
+                        true
+                )
+        );
+
+        assertEquals(SupportStatus.NATIVE, nativeEmbeddings.supportStatus());
+        assertEquals(ExecutionKind.NATIVE, nativeEmbeddings.executionKind());
+        assertEquals(SupportStatus.BLOCKED, blockedAudio.supportStatus());
+        assertEquals(SupportStatus.BLOCKED, blockedVertexEmbeddings.supportStatus());
+    }
+
+    @Test
+    void shouldExposeOrchestrationSurfaceForGeminiFileResources() {
+        SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
+
+        SurfaceCompatibilityReport report = service.evaluateSurface(
+                siteProfile(UpstreamSiteKind.GEMINI_DIRECT),
+                snapshot(false, true, false, false, false, false, false, false, false, false),
+                new GatewayRequestSemantics(
+                        TranslationResourceType.FILE,
+                        TranslationOperation.FILE_CREATE,
+                        List.of(InteropFeature.FILE_OBJECT),
+                        true
+                ),
+                new com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendDecision(
+                        ExecutionBackend.ORCHESTRATION,
+                        List.of(ExecutionBackend.ORCHESTRATION),
+                        "test"
+                )
+        );
+
+        assertEquals(InteropCapabilityLevel.NATIVE, report.executionCapabilityLevel());
+        assertTrue(report.blockedReasons().isEmpty());
+        assertEquals(
+                InteropCapabilityLevel.UNSUPPORTED,
+                report.featureResolutions().get("file_object").effectiveLevel()
+        );
+    }
+
+    @Test
+    void shouldKeepVertexEmbeddingsBlockedAtSurfaceLevel() {
+        SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
+
+        SurfaceCompatibilityReport report = service.evaluateSurface(
+                siteProfile(UpstreamSiteKind.VERTEX_AI),
+                snapshot(false, true, false, false, false, false, false, false, false, false),
+                new GatewayRequestSemantics(
+                        TranslationResourceType.EMBEDDING,
+                        TranslationOperation.EMBEDDING_CREATE,
+                        List.of(InteropFeature.EMBEDDINGS),
+                        true
+                ),
+                new com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendDecision(
+                        ExecutionBackend.NATIVE,
+                        List.of(ExecutionBackend.NATIVE),
+                        "test"
+                )
+        );
+
+        assertEquals(InteropCapabilityLevel.UNSUPPORTED, report.executionCapabilityLevel());
+        assertTrue(report.blockedReasons().stream().anyMatch(item -> item.contains("embeddings")));
+    }
+
+    @Test
+    void shouldKeepGeminiAudioBlockedAtSurfaceLevel() {
+        SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
+
+        SurfaceCompatibilityReport report = service.evaluateSurface(
+                siteProfile(UpstreamSiteKind.GEMINI_DIRECT),
+                snapshot(false, true, false, false, false, false, false, false, false, false),
+                new GatewayRequestSemantics(
+                        TranslationResourceType.AUDIO,
+                        TranslationOperation.AUDIO_TRANSCRIPTION,
+                        List.of(InteropFeature.AUDIO_TRANSCRIPTION),
+                        true
+                ),
+                new com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendDecision(
+                        ExecutionBackend.PASSTHROUGH,
+                        List.of(ExecutionBackend.PASSTHROUGH),
+                        "test"
+                )
+        );
+
+        assertEquals(InteropCapabilityLevel.UNSUPPORTED, report.executionCapabilityLevel());
+        assertTrue(report.blockedReasons().stream().anyMatch(item -> item.contains("audio_transcription")));
+    }
+
+    private CatalogCandidateView geminiCandidate(Long siteProfileId, UpstreamSiteKind siteKind) {
+        return new CatalogCandidateView(
+                301L,
+                "gemini",
+                ProviderType.GEMINI_DIRECT,
+                siteProfileId,
+                ProviderFamily.GEMINI,
+                siteKind,
+                AuthStrategy.BEARER,
+                PathStrategy.GEMINI_V1BETA_MODELS,
+                ErrorSchemaStrategy.GEMINI_ERROR,
+                "https://example.com",
+                "gemini-2.5-pro",
+                "gemini-2.5-pro",
+                List.of("google_native"),
+                true,
+                true,
+                true,
+                true,
+                false,
+                true,
+                true,
+                false,
+                ReasoningTransport.GEMINI_THOUGHTS,
+                InteropCapabilityLevel.NATIVE
+        );
     }
 
     private CatalogCandidateView candidate(Long siteProfileId, ProviderType providerType, UpstreamSiteKind siteKind) {
@@ -268,6 +417,13 @@ class SiteCapabilityTruthServiceTests {
                 ReasoningTransport.OPENAI_CHAT,
                 InteropCapabilityLevel.NATIVE
         );
+    }
+
+    private com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamSiteProfileEntity siteProfile(UpstreamSiteKind siteKind) {
+        com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamSiteProfileEntity entity =
+                new com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamSiteProfileEntity();
+        entity.setSiteKind(siteKind);
+        return entity;
     }
 
     private SiteCapabilitySnapshotEntity snapshot(

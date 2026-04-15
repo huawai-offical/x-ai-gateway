@@ -14,6 +14,7 @@ import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature;
 import com.prodigalgal.xaigateway.gateway.core.interop.SiteCapabilityTruthService;
+import com.prodigalgal.xaigateway.gateway.core.interop.SurfaceCompatibilityReport;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SiteCapabilitySnapshotEntity;
@@ -306,102 +307,102 @@ public class ProviderSiteAdminService {
         return Map.ofEntries(
                 Map.entry("chat_completion", toSurface(
                         entity,
+                        snapshot,
                         "openai",
                         "/v1/chat/completions",
                         TranslationResourceType.CHAT,
                         TranslationOperation.CHAT_COMPLETION,
-                        List.of(InteropFeature.CHAT_TEXT),
-                        siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.CHAT_TEXT)
+                        List.of(InteropFeature.CHAT_TEXT)
                 )),
                 Map.entry("response_create", toSurface(
                         entity,
+                        snapshot,
                         "responses",
                         "/v1/responses",
                         TranslationResourceType.RESPONSE,
                         TranslationOperation.RESPONSE_CREATE,
-                        List.of(InteropFeature.RESPONSE_OBJECT),
-                        siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.RESPONSE_OBJECT)
+                        List.of(InteropFeature.RESPONSE_OBJECT)
                 )),
                 Map.entry("embedding_create", toSurface(
                         entity,
+                        snapshot,
                         "openai",
                         "/v1/embeddings",
                         TranslationResourceType.EMBEDDING,
                         TranslationOperation.EMBEDDING_CREATE,
-                        List.of(InteropFeature.EMBEDDINGS),
-                        siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.EMBEDDINGS)
+                        List.of(InteropFeature.EMBEDDINGS)
                 )),
                 Map.entry("audio_transcription", toSurface(
                         entity,
+                        snapshot,
                         "openai",
                         "/v1/audio/transcriptions",
                         TranslationResourceType.AUDIO,
                         TranslationOperation.AUDIO_TRANSCRIPTION,
-                        List.of(InteropFeature.AUDIO_TRANSCRIPTION),
-                        siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.AUDIO_TRANSCRIPTION)
+                        List.of(InteropFeature.AUDIO_TRANSCRIPTION)
                 )),
                 Map.entry("image_generation", toSurface(
                         entity,
+                        snapshot,
                         "openai",
                         "/v1/images/generations",
                         TranslationResourceType.IMAGE,
                         TranslationOperation.IMAGE_GENERATION,
-                        List.of(InteropFeature.IMAGE_GENERATION),
-                        siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.IMAGE_GENERATION)
+                        List.of(InteropFeature.IMAGE_GENERATION)
                 )),
                 Map.entry("moderation_create", toSurface(
                         entity,
+                        snapshot,
                         "openai",
                         "/v1/moderations",
                         TranslationResourceType.MODERATION,
                         TranslationOperation.MODERATION_CREATE,
-                        List.of(InteropFeature.MODERATION),
-                        siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.MODERATION)
+                        List.of(InteropFeature.MODERATION)
                 )),
                 Map.entry("file_create", toSurface(
                         entity,
+                        snapshot,
                         "openai",
                         "/v1/files",
                         TranslationResourceType.FILE,
                         TranslationOperation.FILE_CREATE,
-                        List.of(InteropFeature.FILE_OBJECT),
-                        siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.FILE_OBJECT)
+                        List.of(InteropFeature.FILE_OBJECT)
                 )),
                 Map.entry("upload_create", toSurface(
                         entity,
+                        snapshot,
                         "openai",
                         "/v1/uploads",
                         TranslationResourceType.UPLOAD,
                         TranslationOperation.UPLOAD_CREATE,
-                        List.of(InteropFeature.UPLOAD_CREATE),
-                        siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.UPLOAD_CREATE)
+                        List.of(InteropFeature.UPLOAD_CREATE, InteropFeature.FILE_OBJECT)
                 )),
                 Map.entry("batch_create", toSurface(
                         entity,
+                        snapshot,
                         "openai",
                         "/v1/batches",
                         TranslationResourceType.BATCH,
                         TranslationOperation.BATCH_CREATE,
-                        List.of(InteropFeature.BATCH_CREATE),
-                        siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.BATCH_CREATE)
+                        List.of(InteropFeature.BATCH_CREATE, InteropFeature.FILE_OBJECT)
                 )),
                 Map.entry("tuning_create", toSurface(
                         entity,
+                        snapshot,
                         "openai",
                         "/v1/fine_tuning/jobs",
                         TranslationResourceType.TUNING,
                         TranslationOperation.TUNING_CREATE,
-                        List.of(InteropFeature.TUNING_CREATE),
-                        siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.TUNING_CREATE)
+                        List.of(InteropFeature.TUNING_CREATE, InteropFeature.FILE_OBJECT)
                 )),
                 Map.entry("realtime_client_secret_create", toSurface(
                         entity,
+                        snapshot,
                         "openai",
                         "/v1/realtime/client_secrets",
                         TranslationResourceType.REALTIME,
                         TranslationOperation.REALTIME_CLIENT_SECRET_CREATE,
-                        List.of(InteropFeature.REALTIME_CLIENT_SECRET),
-                        siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.REALTIME_CLIENT_SECRET)
+                        List.of(InteropFeature.REALTIME_CLIENT_SECRET)
                 ))
         );
     }
@@ -419,29 +420,58 @@ public class ProviderSiteAdminService {
 
     private SurfaceCapabilityView toSurface(
             UpstreamSiteProfileEntity entity,
+            SiteCapabilitySnapshotEntity snapshot,
             String protocol,
             String requestPath,
             TranslationResourceType resourceType,
             TranslationOperation operation,
-            List<InteropFeature> requiredFeatures,
-            com.prodigalgal.xaigateway.gateway.core.interop.CapabilityResolution resolution) {
-        InteropCapabilityLevel executionLevel = resolution == null ? InteropCapabilityLevel.UNSUPPORTED : resolution.effectiveLevel();
+            List<InteropFeature> requiredFeatures) {
+        GatewayRequestSemantics semantics = new GatewayRequestSemantics(resourceType, operation, requiredFeatures, true);
+        ExecutionBackendDecision backendDecision = executionBackendPolicyService.forSiteSurface(entity, snapshot, resourceType, operation);
+        SurfaceCompatibilityReport surfaceReport = siteCapabilityTruthService.evaluateSurface(
+                entity,
+                snapshot,
+                semantics,
+                backendDecision
+        );
         InteropCapabilityLevel renderLevel = CanonicalRenderCapabilitySupport.renderLevel(
                 protocol,
                 requestPath,
-                new GatewayRequestSemantics(resourceType, operation, requiredFeatures, true)
+                semantics
         );
-        ExecutionBackendDecision backendDecision = executionBackendPolicyService.forSiteSurface(entity, null, resourceType, operation);
+        InteropCapabilityLevel overallCapabilityLevel = CanonicalRenderCapabilitySupport.minimum(
+                surfaceReport.executionCapabilityLevel(),
+                renderLevel
+        );
         return new SurfaceCapabilityView(
                 resourceType,
                 operation,
+                protocol,
+                requestPath,
                 backendDecision.preferredBackend(),
                 backendDecision.supportedBackends(),
-                executionLevel,
+                com.prodigalgal.xaigateway.gateway.core.interop.SupportStatus.resolve(
+                        backendDecision.preferredBackend(),
+                        overallCapabilityLevel,
+                        surfaceReport.blockedReasons()
+                ),
+                com.prodigalgal.xaigateway.gateway.core.interop.SupportStatus.normalizeDegradationLevel(
+                        overallCapabilityLevel,
+                        surfaceReport.blockedReasons()
+                ),
+                surfaceReport.executionCapabilityLevel(),
                 renderLevel,
-                CanonicalRenderCapabilitySupport.minimum(executionLevel, renderLevel),
+                overallCapabilityLevel,
+                surfaceReport.blockedReasons(),
+                surfaceReport.lossReasons(),
                 requiredFeatures.stream().map(InteropFeature::wireName).toList(),
-                Map.of(requiredFeatures.get(0).wireName(), CapabilityResolutionView.from(resolution))
+                surfaceReport.featureResolutions().entrySet().stream()
+                        .collect(java.util.stream.Collectors.toMap(
+                                Map.Entry::getKey,
+                                entry -> CapabilityResolutionView.from(entry.getValue()),
+                                (left, right) -> left,
+                                java.util.LinkedHashMap::new
+                        ))
         );
     }
 

@@ -10,6 +10,7 @@ import com.prodigalgal.xaigateway.gateway.core.shared.AuthStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend;
 import com.prodigalgal.xaigateway.gateway.core.shared.PathStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
+import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -42,7 +43,8 @@ public class EmbeddingsGatewayResourceExecutor implements GatewayResourceExecuto
             return false;
         }
         return switch (candidate.providerType()) {
-            case OPENAI_DIRECT, OPENAI_COMPATIBLE, GEMINI_DIRECT -> true;
+            case OPENAI_DIRECT, OPENAI_COMPATIBLE -> true;
+            case GEMINI_DIRECT -> supportsGeminiEmbeddingsCandidate(candidate);
             case ANTHROPIC_DIRECT, OLLAMA_DIRECT -> false;
         };
     }
@@ -213,6 +215,12 @@ public class EmbeddingsGatewayResourceExecutor implements GatewayResourceExecuto
 
     private String encodeQuery(String value) {
         return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
+    private boolean supportsGeminiEmbeddingsCandidate(CatalogCandidateView candidate) {
+        return candidate.siteKind() == UpstreamSiteKind.GEMINI_DIRECT
+                && candidate.pathStrategy() == PathStrategy.GEMINI_V1BETA_MODELS
+                && candidate.authStrategy() == AuthStrategy.API_KEY_QUERY;
     }
 
     private record CatalogSiteRequest(

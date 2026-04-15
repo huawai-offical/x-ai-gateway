@@ -144,6 +144,7 @@ class ObservabilityQueryServiceTests {
         entity.setSupportStatus("DEGRADED");
         entity.setDegradationLevel("LOSSY");
         entity.setObjectMode("resource-orchestration");
+        entity.setGatewayResourceKey("batch_1");
         entity.setResponseKind("binary");
         entity.setResponseObjectType("file.content");
         entity.setResponseObjectId("file_123");
@@ -165,6 +166,7 @@ class ObservabilityQueryServiceTests {
         assertEquals(1, logs.size());
         assertEquals("DEGRADED", logs.get(0).supportStatus());
         assertEquals("LOSSY", logs.get(0).degradationLevel());
+        assertEquals("batch_1", logs.get(0).gatewayResourceKey());
         assertEquals("binary", logs.get(0).responseKind());
         assertEquals("file.content", logs.get(0).responseObjectType());
         verify(requestLogRepository).search(eq(7L), eq(ProviderType.OPENAI_DIRECT), ArgumentMatchers.any(Pageable.class));

@@ -303,6 +303,7 @@ public class ObservabilityQueryService {
                 entity.getSupportStatus(),
                 entity.getDegradationLevel(),
                 entity.getObjectMode(),
+                entity.getGatewayResourceKey(),
                 entity.getResponseKind(),
                 entity.getResponseObjectType(),
                 entity.getResponseObjectId(),

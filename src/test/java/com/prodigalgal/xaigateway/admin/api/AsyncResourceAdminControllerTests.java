@@ -41,9 +41,14 @@ class AsyncResourceAdminControllerTests {
                         GatewayAsyncResourceType.UPLOAD,
                         "created",
                         "created",
+                        false,
+                        false,
                         "upstream_object_with_local_lineage",
                         "upload-upstream-1",
                         1,
+                        new CanonicalResourceTransition("created", "created", createdAt),
+                        null,
+                        null,
                         createdAt,
                         updatedAt
                 )));
@@ -61,6 +66,7 @@ class AsyncResourceAdminControllerTests {
                 .expectBody()
                 .jsonPath("$[0].resourceKey").isEqualTo("upload_1")
                 .jsonPath("$[0].normalizedStatus").isEqualTo("created")
+                .jsonPath("$[0].latestTransition.eventType").isEqualTo("created")
                 .jsonPath("$[0].objectMode").isEqualTo("upstream_object_with_local_lineage");
     }
 
@@ -84,6 +90,7 @@ class AsyncResourceAdminControllerTests {
                                 null,
                                 null
                         ),
+                        List.of(new CanonicalResourceTransition("created", "queued", createdAt)),
                         new CanonicalResourceLineage(
                                 "upstream_object_with_local_lineage",
                                 "batch_1",
@@ -111,6 +118,7 @@ class AsyncResourceAdminControllerTests {
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.lifecycle.normalizedStatus").isEqualTo("in_progress")
+                .jsonPath("$.transitions[0].eventType").isEqualTo("created")
                 .jsonPath("$.lineage.upstreamObjectId").isEqualTo("batch-upstream-1")
                 .jsonPath("$.artifacts[0].artifactKind").isEqualTo("gateway_file_binding")
                 .jsonPath("$.requestPayloadJson.input_file_id").isEqualTo("file-upstream-1");

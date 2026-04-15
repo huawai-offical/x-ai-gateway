@@ -5,6 +5,7 @@ import { useTypedQuery } from '../../lib/typed-react-query'
 import {
   formatInstant,
   matchesResolutionFilter,
+  summarizeSurfaceFeatureStatuses,
   type CapabilityMatrixRow,
 } from './types'
 
@@ -93,6 +94,7 @@ export function CapabilityMatrixPage() {
                     <span>normalizedPath: {surface.normalizedPath ?? '无'}</span>
                     <span>supportStatus: {surface.supportStatus ?? '-'}</span>
                     <span>degradationLevel: {surface.degradationLevel ?? '-'}</span>
+                    <span>featureSupport: {summarizeSurfaceFeatureStatuses(surface) || '无'}</span>
                     {surface.blockerReasons.length ? <span>blockerReasons: {surface.blockerReasons.join(', ')}</span> : null}
                   </div>
                 ))}

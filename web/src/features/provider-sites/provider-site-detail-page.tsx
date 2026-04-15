@@ -7,6 +7,7 @@ import {
   formatInstant,
   modelSupportsFeature,
   SITE_KIND_OPTIONS,
+  summarizeSurfaceFeatureStatuses,
   type ProviderSite,
   type ProviderSiteDraft,
   type SiteModelCapability,
@@ -235,6 +236,7 @@ export function ProviderSiteDetailPage() {
                   <span>render: {surface.renderCapabilityLevel ?? '-'}</span>
                   <span>overall: {surface.overallCapabilityLevel ?? '-'}</span>
                   <span>requiredFeatures: {surface.requiredFeatures.join(', ') || '无'}</span>
+                  <span>featureSupport: {summarizeSurfaceFeatureStatuses(surface) || '无'}</span>
                   {surface.blockerReasons.length ? <span>blockerReasons: {surface.blockerReasons.join(', ')}</span> : null}
                 </div>
               ))}

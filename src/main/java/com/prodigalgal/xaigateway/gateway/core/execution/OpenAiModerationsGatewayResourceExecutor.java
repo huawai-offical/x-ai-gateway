@@ -27,7 +27,7 @@ public class OpenAiModerationsGatewayResourceExecutor implements GatewayResource
     public boolean supports(CanonicalResourceRequest request, CatalogCandidateView candidate) {
         return request != null
                 && "/v1/moderations".equals(request.normalizedPath())
-                && candidate != null;
+                && isCompatible(candidate);
     }
 
     @Override
@@ -53,14 +53,24 @@ public class OpenAiModerationsGatewayResourceExecutor implements GatewayResource
     }
 
     private void ensureCompatible(CatalogCandidateView candidate) {
-        if (candidate.pathStrategy() != PathStrategy.OPENAI_V1) {
-            throw new IllegalArgumentException("当前站点路径策略不支持 moderations 执行。");
-        }
-        if (candidate.authStrategy() != AuthStrategy.BEARER
-                && candidate.authStrategy() != AuthStrategy.API_KEY_HEADER
-                && candidate.authStrategy() != AuthStrategy.API_KEY_QUERY
-                && candidate.authStrategy() != AuthStrategy.AZURE_API_KEY) {
+        if (!isCompatible(candidate)) {
+            if (candidate == null || candidate.pathStrategy() != PathStrategy.OPENAI_V1) {
+                throw new IllegalArgumentException("当前站点路径策略不支持 moderations 执行。");
+            }
             throw new IllegalArgumentException("当前站点鉴权策略不支持 moderations 执行。");
         }
+    }
+
+    private boolean isCompatible(CatalogCandidateView candidate) {
+        if (candidate == null) {
+            return false;
+        }
+        if (candidate.pathStrategy() != PathStrategy.OPENAI_V1) {
+            return false;
+        }
+        return candidate.authStrategy() == AuthStrategy.BEARER
+                || candidate.authStrategy() == AuthStrategy.API_KEY_HEADER
+                || candidate.authStrategy() == AuthStrategy.API_KEY_QUERY
+                || candidate.authStrategy() == AuthStrategy.AZURE_API_KEY;
     }
 }

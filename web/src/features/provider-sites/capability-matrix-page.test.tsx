@@ -80,6 +80,77 @@ apiRequest.mockImplementation(async () => [
   },
   {
     siteProfileId: 2,
+    profileCode: 'site:gemini_direct',
+    displayName: 'GEMINI_DIRECT',
+    providerFamily: 'GEMINI',
+    siteKind: 'GEMINI_DIRECT',
+    authStrategy: 'API_KEY_QUERY',
+    pathStrategy: 'GEMINI_V1BETA_MODELS',
+    errorSchemaStrategy: 'GEMINI_ERROR',
+    healthState: 'READY',
+    blockedReason: null,
+    supportedProtocols: ['google_native'],
+    compatibilitySurface: 'google_native',
+    credentialRequirements: ['api_key_query'],
+    streamTransport: 'sse',
+    fallbackStrategy: 'gateway-orchestration',
+    cooldownCredentialCount: 0,
+    cooldownUntil: null,
+    preferredBackend: 'ORCHESTRATION',
+    supportedBackends: ['ORCHESTRATION'],
+    features: {
+      file_object: {
+        declaredLevel: 'UNSUPPORTED',
+        implementedLevel: 'UNSUPPORTED',
+        effectiveLevel: 'UNSUPPORTED',
+        supportStatus: 'BLOCKED',
+        degradationLevel: 'UNSUPPORTED',
+        blockedReasons: ['file object unsupported'],
+        lossReasons: [],
+      },
+    },
+    surfaces: {
+      file_create: {
+        resourceType: 'FILE',
+        operation: 'FILE_CREATE',
+        surface: 'openai',
+        normalizedPath: '/v1/files',
+        preferredBackend: 'ORCHESTRATION',
+        supportedBackends: ['ORCHESTRATION'],
+        supportStatus: 'ORCHESTRATION',
+        degradationLevel: 'NATIVE',
+        executionCapabilityLevel: 'NATIVE',
+        renderCapabilityLevel: 'NATIVE',
+        overallCapabilityLevel: 'NATIVE',
+        blockerReasons: [],
+        lossReasons: [],
+        requiredFeatures: ['file_object'],
+        featureResolutions: {
+          file_object: {
+            declaredLevel: 'UNSUPPORTED',
+            implementedLevel: 'UNSUPPORTED',
+            effectiveLevel: 'UNSUPPORTED',
+            supportStatus: 'BLOCKED',
+            degradationLevel: 'UNSUPPORTED',
+            blockedReasons: ['file object unsupported'],
+            lossReasons: [],
+          },
+        },
+      },
+    },
+    supportsResponses: false,
+    supportsEmbeddings: true,
+    supportsAudio: false,
+    supportsImages: false,
+    supportsModeration: false,
+    supportsFiles: false,
+    supportsUploads: false,
+    supportsBatches: false,
+    supportsTuning: false,
+    supportsRealtime: false,
+  },
+  {
+    siteProfileId: 3,
     profileCode: 'site:vertex_ai',
     displayName: 'VERTEX_AI',
     providerFamily: 'GEMINI',
@@ -97,38 +168,40 @@ apiRequest.mockImplementation(async () => [
     cooldownCredentialCount: 1,
     cooldownUntil: '2026-04-13T03:00:00Z',
     features: {
-      response_object: {
+      embeddings: {
         declaredLevel: 'UNSUPPORTED',
         implementedLevel: 'UNSUPPORTED',
         effectiveLevel: 'UNSUPPORTED',
         supportStatus: 'BLOCKED',
         degradationLevel: 'UNSUPPORTED',
-        blockedReasons: ['missing metadata'],
+        blockedReasons: ['embeddings unavailable'],
         lossReasons: [],
       },
     },
     surfaces: {
-      response_create: {
-        resourceType: 'RESPONSE',
-        operation: 'RESPONSE_CREATE',
-        surface: 'responses',
-        normalizedPath: '/v1/responses',
+      embedding_create: {
+        resourceType: 'EMBEDDING',
+        operation: 'EMBEDDING_CREATE',
+        surface: 'openai',
+        normalizedPath: '/v1/embeddings',
+        preferredBackend: 'NATIVE',
+        supportedBackends: ['NATIVE'],
         supportStatus: 'BLOCKED',
         degradationLevel: 'UNSUPPORTED',
         executionCapabilityLevel: 'UNSUPPORTED',
-        renderCapabilityLevel: 'EMULATED',
+        renderCapabilityLevel: 'NATIVE',
         overallCapabilityLevel: 'UNSUPPORTED',
-        blockerReasons: ['missing metadata'],
+        blockerReasons: ['embeddings unavailable'],
         lossReasons: [],
-        requiredFeatures: ['response_object'],
+        requiredFeatures: ['embeddings'],
         featureResolutions: {
-          response_object: {
+          embeddings: {
             declaredLevel: 'UNSUPPORTED',
             implementedLevel: 'UNSUPPORTED',
             effectiveLevel: 'UNSUPPORTED',
             supportStatus: 'BLOCKED',
             degradationLevel: 'UNSUPPORTED',
-            blockedReasons: ['missing metadata'],
+            blockedReasons: ['embeddings unavailable'],
             lossReasons: [],
           },
         },
@@ -172,10 +245,15 @@ describe('CapabilityMatrixPage', () => {
     })
 
     expect(screen.queryByText('OPENAI_DIRECT')).not.toBeInTheDocument()
+    expect(screen.getByText('GEMINI_DIRECT')).toBeInTheDocument()
     expect(screen.getByText('VERTEX_AI')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /RESPONSE_CREATE/ })).toHaveAttribute('href', '/provider-sites/2?surface=response_create')
+    expect(screen.getByRole('link', { name: /FILE_CREATE/ })).toHaveAttribute('href', '/provider-sites/2?surface=file_create')
+    expect(screen.getByRole('link', { name: /EMBEDDING_CREATE/ })).toHaveAttribute('href', '/provider-sites/3?surface=embedding_create')
+    expect(screen.getByText('supportStatus: ORCHESTRATION')).toBeInTheDocument()
     expect(screen.getByText('supportStatus: BLOCKED')).toBeInTheDocument()
-    expect(screen.getByText('normalizedPath: /v1/responses')).toBeInTheDocument()
-    expect(screen.getByText(/blockerReasons: missing metadata/)).toBeInTheDocument()
+    expect(screen.getByText('normalizedPath: /v1/files')).toBeInTheDocument()
+    expect(screen.getByText('normalizedPath: /v1/embeddings')).toBeInTheDocument()
+    expect(screen.getByText('featureSupport: file_object:BLOCKED')).toBeInTheDocument()
+    expect(screen.getByText('featureSupport: embeddings:BLOCKED')).toBeInTheDocument()
   })
 })

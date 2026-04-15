@@ -92,6 +92,9 @@ public class RequestLogEntity {
     @Column(name = "object_mode", length = 64)
     private String objectMode;
 
+    @Column(name = "gateway_resource_key", length = 96)
+    private String gatewayResourceKey;
+
     @Column(name = "response_kind", length = 32)
     private String responseKind;
 
@@ -289,6 +292,14 @@ public class RequestLogEntity {
 
     public void setObjectMode(String objectMode) {
         this.objectMode = objectMode;
+    }
+
+    public String getGatewayResourceKey() {
+        return gatewayResourceKey;
+    }
+
+    public void setGatewayResourceKey(String gatewayResourceKey) {
+        this.gatewayResourceKey = gatewayResourceKey;
     }
 
     public String getResponseKind() {

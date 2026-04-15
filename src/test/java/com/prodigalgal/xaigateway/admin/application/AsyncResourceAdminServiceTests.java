@@ -39,6 +39,7 @@ class AsyncResourceAdminServiceTests {
 
         assertEquals(1, result.size());
         assertEquals("created", result.get(0).normalizedStatus());
+        assertEquals("created", result.get(0).latestTransition().status());
         verify(gatewayAsyncResourceRepository).search(ArgumentMatchers.eq(1L), ArgumentMatchers.eq(GatewayAsyncResourceType.UPLOAD), ArgumentMatchers.eq("created"), ArgumentMatchers.any(Pageable.class));
     }
 
@@ -62,6 +63,7 @@ class AsyncResourceAdminServiceTests {
         var detail = service.getAsyncResource("batch_1");
 
         assertEquals("in_progress", detail.lifecycle().normalizedStatus());
+        assertEquals(1, detail.transitions().size());
         assertEquals("upstream_object_with_local_lineage", detail.lineage().objectMode());
         assertEquals("batch-upstream-1", detail.lineage().upstreamObjectId());
     }

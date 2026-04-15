@@ -133,6 +133,93 @@ class GatewayRequestLifecycleServiceTests {
         assertEquals(0, entity.getCanonicalEventCount());
     }
 
+    @Test
+    void shouldPersistGatewayResourceKeyForAsyncResourceRequests() {
+        RequestLogRepository requestLogRepository = Mockito.mock(RequestLogRepository.class);
+        UsageRecordRepository usageRecordRepository = Mockito.mock(UsageRecordRepository.class);
+        GatewayAuditLogService gatewayAuditLogService = Mockito.mock(GatewayAuditLogService.class);
+        AtomicReference<RequestLogEntity> stored = new AtomicReference<>();
+        Mockito.when(requestLogRepository.save(Mockito.any(RequestLogEntity.class)))
+                .thenAnswer(invocation -> {
+                    RequestLogEntity entity = invocation.getArgument(0);
+                    stored.set(entity);
+                    return entity;
+                });
+        Mockito.when(requestLogRepository.findByRequestId("req-async"))
+                .thenAnswer(invocation -> Optional.ofNullable(stored.get()));
+
+        GatewayRequestLifecycleService service = new GatewayRequestLifecycleService(
+                requestLogRepository,
+                usageRecordRepository,
+                gatewayAuditLogService,
+                new SimpleMeterRegistry(),
+                new tools.jackson.databind.ObjectMapper()
+        );
+
+        RouteSelectionResult selectionResult = selectionResult();
+        CanonicalResourceRequest request = new CanonicalResourceRequest(
+                "sk-gw-test",
+                CanonicalIngressProtocol.OPENAI,
+                "GET",
+                "/v1/batches/batch_1",
+                "/v1/batches/{batchId}",
+                Map.of("batchId", "batch_1"),
+                "resource-orchestration",
+                TranslationResourceType.BATCH,
+                TranslationOperation.BATCH_GET,
+                null,
+                Map.of(),
+                List.of(),
+                false,
+                false
+        );
+        CanonicalExecutionPlan plan = new CanonicalExecutionPlan(
+                true,
+                CanonicalIngressProtocol.OPENAI,
+                "/v1/batches/batch_1",
+                "/v1/batches/{batchId}",
+                "batches",
+                "resource-orchestration",
+                "resource-orchestration",
+                "resource-orchestration",
+                TranslationResourceType.BATCH,
+                TranslationOperation.BATCH_GET,
+                ExecutionKind.NATIVE,
+                ExecutionBackend.ORCHESTRATION,
+                SupportStatus.NATIVE,
+                "gateway-object-lineage",
+                List.of(ExecutionBackend.ORCHESTRATION),
+                "test",
+                InteropCapabilityLevel.NATIVE,
+                InteropCapabilityLevel.NATIVE,
+                InteropCapabilityLevel.NATIVE,
+                InteropCapabilityLevel.NATIVE,
+                List.of(),
+                List.of(),
+                Map.of(),
+                List.of(),
+                List.of()
+        );
+        CanonicalResourceResponse canonicalResponse = new CanonicalResourceResponse(
+                TranslationResourceType.BATCH,
+                TranslationOperation.BATCH_GET,
+                "object",
+                "batch",
+                "batch_1",
+                "in_progress",
+                List.of(),
+                List.of(),
+                null,
+                null,
+                Map.of()
+        );
+
+        service.startRequest("req-async", selectionResult, request, plan, false, Instant.now());
+        service.completeRequest("req-async", selectionResult, request, plan, false, GatewayUsageView.empty(), canonicalResponse, Instant.now());
+
+        assertEquals("batch_1", stored.get().getGatewayResourceKey());
+    }
+
     private RouteSelectionResult selectionResult() {
         CatalogCandidateView candidate = new CatalogCandidateView(
                 101L,

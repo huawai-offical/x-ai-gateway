@@ -167,6 +167,7 @@ class GatewayResourceExecutionServiceTests {
                 requestBody,
                 "omni-moderation-latest"
         ));
+        Mockito.verify(unsupportedExecutor, Mockito.never()).executeJson(any(), any(), any());
     }
 
     @Test
@@ -328,29 +329,7 @@ class GatewayResourceExecutionServiceTests {
     }
 
     private RouteSelectionResult selectionResult(ProviderType providerType, UpstreamSiteKind siteKind) {
-        CatalogCandidateView candidate = new CatalogCandidateView(
-                101L,
-                "candidate",
-                providerType,
-                1L,
-                ProviderFamily.OPENAI,
-                siteKind,
-                AuthStrategy.BEARER,
-                PathStrategy.OPENAI_V1,
-                ErrorSchemaStrategy.OPENAI_ERROR,
-                "https://example.com",
-                "model-a",
-                "model-a",
-                List.of("openai"),
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                ReasoningTransport.OPENAI_CHAT,
-                com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel.NATIVE
-        );
+        CatalogCandidateView candidate = selectionCandidate(101L, "candidate", providerType, siteKind);
         RouteCandidateView routeCandidateView = new RouteCandidateView(candidate, 11L, 10, 100);
         return new RouteSelectionResult(
                 1L,
@@ -369,52 +348,8 @@ class GatewayResourceExecutionServiceTests {
     }
 
     private RouteSelectionResult selectionResultWithFallbackCandidates() {
-        CatalogCandidateView first = new CatalogCandidateView(
-                101L,
-                "candidate-a",
-                ProviderType.GEMINI_DIRECT,
-                1L,
-                ProviderFamily.GEMINI,
-                UpstreamSiteKind.GEMINI_DIRECT,
-                AuthStrategy.BEARER,
-                PathStrategy.OPENAI_V1,
-                ErrorSchemaStrategy.OPENAI_ERROR,
-                "https://example.com",
-                "model-a",
-                "model-a",
-                List.of("openai"),
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                ReasoningTransport.OPENAI_CHAT,
-                com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel.NATIVE
-        );
-        CatalogCandidateView second = new CatalogCandidateView(
-                202L,
-                "candidate-b",
-                ProviderType.GEMINI_DIRECT,
-                1L,
-                ProviderFamily.GEMINI,
-                UpstreamSiteKind.GEMINI_DIRECT,
-                AuthStrategy.BEARER,
-                PathStrategy.OPENAI_V1,
-                ErrorSchemaStrategy.OPENAI_ERROR,
-                "https://example.com",
-                "model-a",
-                "model-a",
-                List.of("openai"),
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                ReasoningTransport.OPENAI_CHAT,
-                com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel.NATIVE
-        );
+        CatalogCandidateView first = selectionCandidate(101L, "candidate-a", ProviderType.GEMINI_DIRECT, UpstreamSiteKind.GEMINI_DIRECT);
+        CatalogCandidateView second = selectionCandidate(202L, "candidate-b", ProviderType.GEMINI_DIRECT, UpstreamSiteKind.GEMINI_DIRECT);
         RouteCandidateView firstView = new RouteCandidateView(first, 11L, 10, 100, "NATIVE", 3);
         RouteCandidateView secondView = new RouteCandidateView(second, 12L, 10, 90, "NATIVE", 3);
         return new RouteSelectionResult(
@@ -438,6 +373,37 @@ class GatewayResourceExecutionServiceTests {
                         new com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateEvaluation(secondView, true, "HEALTHY", null, false, RouteSelectionSource.WEIGHTED_HASH, 90d, List.of(), List.of())
                 ),
                 List.of()
+        );
+    }
+
+    private CatalogCandidateView selectionCandidate(
+            Long credentialId,
+            String credentialName,
+            ProviderType providerType,
+            UpstreamSiteKind siteKind) {
+        boolean geminiNative = providerType == ProviderType.GEMINI_DIRECT && siteKind == UpstreamSiteKind.GEMINI_DIRECT;
+        return new CatalogCandidateView(
+                credentialId,
+                credentialName,
+                providerType,
+                1L,
+                providerType == ProviderType.GEMINI_DIRECT ? ProviderFamily.GEMINI : ProviderFamily.OPENAI,
+                siteKind,
+                geminiNative ? AuthStrategy.API_KEY_QUERY : AuthStrategy.BEARER,
+                geminiNative ? PathStrategy.GEMINI_V1BETA_MODELS : PathStrategy.OPENAI_V1,
+                geminiNative ? ErrorSchemaStrategy.GEMINI_ERROR : ErrorSchemaStrategy.OPENAI_ERROR,
+                "https://example.com",
+                "model-a",
+                "model-a",
+                List.of(geminiNative ? "google_native" : "openai"),
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                geminiNative ? ReasoningTransport.GEMINI_THOUGHTS : ReasoningTransport.OPENAI_CHAT,
+                com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel.NATIVE
         );
     }
 

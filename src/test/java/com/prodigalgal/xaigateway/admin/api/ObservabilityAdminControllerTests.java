@@ -140,6 +140,7 @@ class ObservabilityAdminControllerTests {
                         "DEGRADED",
                         "LOSSY",
                         "resource-orchestration",
+                        "batch_1",
                         "binary",
                         "file.content",
                         "file_123",
@@ -163,6 +164,7 @@ class ObservabilityAdminControllerTests {
                 .expectBody()
                 .jsonPath("$[0].requestId").isEqualTo("req-1")
                 .jsonPath("$[0].supportStatus").isEqualTo("DEGRADED")
+                .jsonPath("$[0].gatewayResourceKey").isEqualTo("batch_1")
                 .jsonPath("$[0].responseObjectType").isEqualTo("file.content")
                 .jsonPath("$[0].canonicalEventCount").isEqualTo(2);
     }

@@ -6,6 +6,7 @@ import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceResponse;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageCompleteness;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageView;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
@@ -52,7 +53,7 @@ public class GatewayRequestLifecycleService {
             CanonicalRequest request,
             boolean stream,
             Instant startedAt) {
-        startRequest(requestId, selectionResult, request.requestPath(), null, null, null, null, null, null, stream, startedAt);
+        startRequest(requestId, selectionResult, request.requestPath(), null, null, null, null, null, null, null, stream, startedAt);
     }
 
     public void startRequest(
@@ -72,6 +73,7 @@ public class GatewayRequestLifecycleService {
                 plan == null ? null : plan.supportStatus() == null ? null : plan.supportStatus().name(),
                 plan == null ? null : plan.degradationLevel() == null ? null : plan.degradationLevel().name(),
                 plan == null ? null : plan.objectMode(),
+                gatewayResourceKey(request, plan, null),
                 stream,
                 startedAt
         );
@@ -87,6 +89,7 @@ public class GatewayRequestLifecycleService {
             String supportStatus,
             String degradationLevel,
             String objectMode,
+            String gatewayResourceKey,
             boolean stream,
             Instant startedAt) {
         RequestLogEntity entity = new RequestLogEntity();
@@ -108,6 +111,7 @@ public class GatewayRequestLifecycleService {
         entity.setSupportStatus(supportStatus);
         entity.setDegradationLevel(degradationLevel);
         entity.setObjectMode(objectMode);
+        entity.setGatewayResourceKey(gatewayResourceKey);
         entity.setPrefixHash(selectionResult.prefixHash());
         entity.setFingerprint(selectionResult.fingerprint());
         entity.setStream(stream);
@@ -127,6 +131,7 @@ public class GatewayRequestLifecycleService {
                 requestId,
                 selectionResult,
                 request.requestPath(),
+                null,
                 null,
                 null,
                 null,
@@ -173,6 +178,7 @@ public class GatewayRequestLifecycleService {
                 plan == null || plan.supportStatus() == null ? null : plan.supportStatus().name(),
                 plan == null || plan.degradationLevel() == null ? null : plan.degradationLevel().name(),
                 plan == null ? null : plan.objectMode(),
+                gatewayResourceKey(request, plan, canonicalResponse),
                 stream,
                 GatewayRequestStatus.COMPLETED,
                 null,
@@ -191,7 +197,7 @@ public class GatewayRequestLifecycleService {
             Throwable error,
             GatewayUsageView usage,
             Instant startedAt) {
-        finishRequest(requestId, selectionResult, request.requestPath(), null, null, null, null, null, null, stream, GatewayRequestStatus.FAILED,
+        finishRequest(requestId, selectionResult, request.requestPath(), null, null, null, null, null, null, null, stream, GatewayRequestStatus.FAILED,
                 error == null ? null : error.getClass().getSimpleName(),
                 error == null ? null : error.getMessage(),
                 usage,
@@ -229,6 +235,7 @@ public class GatewayRequestLifecycleService {
                 plan == null || plan.supportStatus() == null ? null : plan.supportStatus().name(),
                 plan == null || plan.degradationLevel() == null ? null : plan.degradationLevel().name(),
                 plan == null ? null : plan.objectMode(),
+                gatewayResourceKey(request, plan, null),
                 stream,
                 GatewayRequestStatus.FAILED,
                 error == null ? null : error.getClass().getSimpleName(),
@@ -246,7 +253,7 @@ public class GatewayRequestLifecycleService {
             boolean stream,
             GatewayUsageView usage,
             Instant startedAt) {
-        finishRequest(requestId, selectionResult, request.requestPath(), null, null, null, null, null, null, stream, GatewayRequestStatus.CANCELED,
+        finishRequest(requestId, selectionResult, request.requestPath(), null, null, null, null, null, null, null, stream, GatewayRequestStatus.CANCELED,
                 "CLIENT_CANCELLED",
                 "Request stream cancelled by client",
                 usage,
@@ -274,6 +281,7 @@ public class GatewayRequestLifecycleService {
             String supportStatus,
             String degradationLevel,
             String objectMode,
+            String gatewayResourceKey,
             boolean stream,
             GatewayRequestStatus status,
             String errorCode,
@@ -295,6 +303,7 @@ public class GatewayRequestLifecycleService {
             entity.setSupportStatus(supportStatus);
             entity.setDegradationLevel(degradationLevel);
             entity.setObjectMode(objectMode);
+            entity.setGatewayResourceKey(gatewayResourceKey);
             entity.setResponseKind(canonicalResponse == null ? null : canonicalResponse.responseKind());
             entity.setResponseObjectType(canonicalResponse == null ? null : canonicalResponse.objectType());
             entity.setResponseObjectId(canonicalResponse == null ? null : canonicalResponse.objectId());
@@ -310,6 +319,36 @@ public class GatewayRequestLifecycleService {
 
         saveUsageRecord(requestId, selectionResult, requestPath, resourceType, operation, executionBackend, objectMode, stream, usage);
         recordMetrics(selectionResult, requestPath, stream, status, usage, durationMs);
+    }
+
+    private String gatewayResourceKey(
+            CanonicalResourceRequest request,
+            CanonicalExecutionPlan plan,
+            CanonicalResourceResponse canonicalResponse) {
+        if (plan == null || !supportsGatewayResourceKey(plan.resourceType())) {
+            return null;
+        }
+        if (canonicalResponse != null && canonicalResponse.objectId() != null && !canonicalResponse.objectId().isBlank()) {
+            return canonicalResponse.objectId();
+        }
+        if (request == null || request.pathParams().isEmpty()) {
+            return null;
+        }
+        return request.pathParams().values().stream()
+                .filter(value -> value != null && !value.isBlank())
+                .findFirst()
+                .orElse(null);
+    }
+
+    private boolean supportsGatewayResourceKey(TranslationResourceType resourceType) {
+        if (resourceType == null) {
+            return false;
+        }
+        return resourceType == TranslationResourceType.RESPONSE
+                || resourceType == TranslationResourceType.UPLOAD
+                || resourceType == TranslationResourceType.BATCH
+                || resourceType == TranslationResourceType.TUNING
+                || resourceType == TranslationResourceType.REALTIME;
     }
 
     private void saveUsageRecord(
