@@ -248,7 +248,7 @@ class SiteCapabilityTruthServiceTests {
     @Test
     void shouldFreezeGeminiFirstSliceSupportStatuses() {
         SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
-        Mockito.when(repository.findBySiteProfile_Id(10L)).thenReturn(Optional.of(snapshot(false, true, false, false, false, false, false, false, false, false)));
+        Mockito.when(repository.findBySiteProfile_Id(10L)).thenReturn(Optional.of(snapshot(false, true, true, true, true, false, false, false, false, false)));
         Mockito.when(repository.findBySiteProfile_Id(11L)).thenReturn(Optional.of(snapshot(false, false, false, false, false, false, false, false, false, false)));
         SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
 
@@ -261,12 +261,30 @@ class SiteCapabilityTruthServiceTests {
                         true
                 )
         );
-        FeatureCompatibilityReport blockedAudio = service.evaluate(
+        FeatureCompatibilityReport nativeAudio = service.evaluate(
                 geminiCandidate(10L, UpstreamSiteKind.GEMINI_DIRECT),
                 new GatewayRequestSemantics(
                         TranslationResourceType.AUDIO,
                         TranslationOperation.AUDIO_TRANSCRIPTION,
                         List.of(InteropFeature.AUDIO_TRANSCRIPTION),
+                        true
+                )
+        );
+        FeatureCompatibilityReport nativeImageGeneration = service.evaluate(
+                geminiCandidate(10L, UpstreamSiteKind.GEMINI_DIRECT),
+                new GatewayRequestSemantics(
+                        TranslationResourceType.IMAGE,
+                        TranslationOperation.IMAGE_GENERATION,
+                        List.of(InteropFeature.IMAGE_GENERATION),
+                        true
+                )
+        );
+        FeatureCompatibilityReport nativeModeration = service.evaluate(
+                geminiCandidate(10L, UpstreamSiteKind.GEMINI_DIRECT),
+                new GatewayRequestSemantics(
+                        TranslationResourceType.MODERATION,
+                        TranslationOperation.MODERATION_CREATE,
+                        List.of(InteropFeature.MODERATION),
                         true
                 )
         );
@@ -282,7 +300,9 @@ class SiteCapabilityTruthServiceTests {
 
         assertEquals(SupportStatus.NATIVE, nativeEmbeddings.supportStatus());
         assertEquals(ExecutionKind.NATIVE, nativeEmbeddings.executionKind());
-        assertEquals(SupportStatus.BLOCKED, blockedAudio.supportStatus());
+        assertEquals(SupportStatus.NATIVE, nativeAudio.supportStatus());
+        assertEquals(SupportStatus.NATIVE, nativeImageGeneration.supportStatus());
+        assertEquals(SupportStatus.NATIVE, nativeModeration.supportStatus());
         assertEquals(SupportStatus.BLOCKED, blockedVertexEmbeddings.supportStatus());
     }
 
@@ -341,13 +361,13 @@ class SiteCapabilityTruthServiceTests {
     }
 
     @Test
-    void shouldKeepGeminiAudioBlockedAtSurfaceLevel() {
+    void shouldExposeGeminiAudioAsNativeAtSurfaceLevel() {
         SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
         SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
 
         SurfaceCompatibilityReport report = service.evaluateSurface(
                 siteProfile(UpstreamSiteKind.GEMINI_DIRECT),
-                snapshot(false, true, false, false, false, false, false, false, false, false),
+                snapshot(false, true, true, true, true, false, false, false, false, false),
                 new GatewayRequestSemantics(
                         TranslationResourceType.AUDIO,
                         TranslationOperation.AUDIO_TRANSCRIPTION,
@@ -355,14 +375,14 @@ class SiteCapabilityTruthServiceTests {
                         true
                 ),
                 new com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendDecision(
-                        ExecutionBackend.PASSTHROUGH,
-                        List.of(ExecutionBackend.PASSTHROUGH),
+                        ExecutionBackend.NATIVE,
+                        List.of(ExecutionBackend.NATIVE),
                         "test"
                 )
         );
 
-        assertEquals(InteropCapabilityLevel.UNSUPPORTED, report.executionCapabilityLevel());
-        assertTrue(report.blockedReasons().stream().anyMatch(item -> item.contains("audio_transcription")));
+        assertEquals(InteropCapabilityLevel.NATIVE, report.executionCapabilityLevel());
+        assertTrue(report.blockedReasons().isEmpty());
     }
 
     private CatalogCandidateView geminiCandidate(Long siteProfileId, UpstreamSiteKind siteKind) {

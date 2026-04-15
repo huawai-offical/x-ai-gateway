@@ -112,6 +112,73 @@ class GatewayResourceExecutionServiceTests {
     }
 
     @Test
+    void shouldPreferGeminiNativeImagesExecutorForGeminiImageGeneration() {
+        GatewayRouteSelectionService gatewayRouteSelectionService = Mockito.mock(GatewayRouteSelectionService.class);
+        UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        CredentialCryptoService credentialCryptoService = Mockito.mock(CredentialCryptoService.class);
+        DistributedKeyGovernanceService distributedKeyGovernanceService = Mockito.mock(DistributedKeyGovernanceService.class);
+        DistributedKeyQueryService distributedKeyQueryService = Mockito.mock(DistributedKeyQueryService.class);
+        AccountSelectionService accountSelectionService = Mockito.mock(AccountSelectionService.class);
+        GatewayRequestFeatureService gatewayRequestFeatureService = Mockito.mock(GatewayRequestFeatureService.class);
+        TranslationExecutionPlanCompiler translationExecutionPlanCompiler = Mockito.mock(TranslationExecutionPlanCompiler.class);
+        GatewayResourceExecutor geminiImagesExecutor = Mockito.mock(GatewayResourceExecutor.class);
+        GatewayResourceExecutor passthroughExecutor = Mockito.mock(GatewayResourceExecutor.class);
+        GatewayFileService gatewayFileService = Mockito.mock(GatewayFileService.class);
+
+        GatewayResourceExecutionService service = service(
+                gatewayRouteSelectionService,
+                upstreamCredentialRepository,
+                credentialCryptoService,
+                distributedKeyGovernanceService,
+                distributedKeyQueryService,
+                accountSelectionService,
+                gatewayRequestFeatureService,
+                translationExecutionPlanCompiler,
+                List.of(geminiImagesExecutor, passthroughExecutor),
+                Mockito.mock(GatewayObservabilityService.class),
+                Mockito.mock(GatewayRequestLifecycleService.class),
+                gatewayFileService
+        );
+
+        RouteSelectionResult selectionResult = selectionResult(ProviderType.GEMINI_DIRECT, UpstreamSiteKind.GEMINI_DIRECT);
+        UpstreamCredentialEntity credential = credential(selectionResult.selectedCandidate().candidate().credentialId(), ProviderType.GEMINI_DIRECT);
+        ObjectNode requestBody = new ObjectMapper().createObjectNode();
+        requestBody.put("model", "gemini-2.0-flash-preview-image-generation");
+        requestBody.put("prompt", "draw a fox");
+
+        Mockito.when(gatewayRouteSelectionService.select(any())).thenReturn(selectionResult);
+        Mockito.when(upstreamCredentialRepository.findById(101L)).thenReturn(Optional.of(credential));
+        Mockito.when(credentialCryptoService.decrypt("cipher")).thenReturn("api-key");
+        Mockito.when(distributedKeyQueryService.findActiveByKeyPrefix("sk-gw-test"))
+                .thenReturn(Optional.of(new DistributedKeyView(1L, "test", "sk-gw-test", "masked", List.of(), List.of(), List.of())));
+        Mockito.when(accountSelectionService.resolveActiveAccount(anyLong(), any(), any(), anyInt())).thenReturn(Optional.empty());
+        Mockito.when(gatewayRequestFeatureService.describe(eq("POST"), eq("/v1/images/generations"), any()))
+                .thenReturn(new GatewayRequestSemantics(
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType.IMAGE,
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation.IMAGE_GENERATION,
+                        List.of(com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature.IMAGE_GENERATION),
+                        true
+                ));
+        Mockito.when(translationExecutionPlanCompiler.compileSelected(any(), Mockito.any(com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest.class), any(), any()))
+                .thenReturn(compilation("/v1/images/generations", "gemini-2.0-flash-preview-image-generation"));
+        Mockito.when(geminiImagesExecutor.supports(Mockito.any(com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest.class), any())).thenReturn(true);
+        Mockito.when(passthroughExecutor.supports(Mockito.any(com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest.class), any())).thenReturn(false);
+        Mockito.when(geminiImagesExecutor.executeJson(any(), any(), eq("gemini-2.0-flash-preview-image-generation")))
+                .thenReturn(ResponseEntity.ok(new ObjectMapper().createObjectNode().put("created", 1)));
+
+        ResponseEntity<tools.jackson.databind.JsonNode> response = service.executeJson(
+                "sk-gw-test",
+                "/v1/images/generations",
+                requestBody,
+                "gemini-2.0-flash-preview-image-generation"
+        );
+
+        assertEquals(200, response.getStatusCode().value());
+        Mockito.verify(geminiImagesExecutor).executeJson(any(), any(), eq("gemini-2.0-flash-preview-image-generation"));
+        Mockito.verify(passthroughExecutor, Mockito.never()).executeJson(any(), any(), any());
+    }
+
+    @Test
     void shouldFailWhenNoExecutorMatchesSelectedCandidate() {
         GatewayRouteSelectionService gatewayRouteSelectionService = Mockito.mock(GatewayRouteSelectionService.class);
         UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);

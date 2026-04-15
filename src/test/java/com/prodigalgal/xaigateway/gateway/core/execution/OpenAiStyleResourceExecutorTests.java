@@ -117,6 +117,34 @@ class OpenAiStyleResourceExecutorTests {
         assertTrue(executor.supports(request("/v1/audio/transcriptions"), compatible.selectionResult().selectedCandidate().candidate()));
     }
 
+    @Test
+    void shouldRejectGeminiMediaCandidatesForOpenAiStyleExecutors() {
+        OpenAiImagesGatewayResourceExecutor imagesExecutor = new OpenAiImagesGatewayResourceExecutor(
+                Mockito.mock(GatewayOpenAiPassthroughService.class),
+                Mockito.mock(com.prodigalgal.xaigateway.gateway.core.file.GatewayFileService.class)
+        );
+        OpenAiModerationsGatewayResourceExecutor moderationsExecutor =
+                new OpenAiModerationsGatewayResourceExecutor(Mockito.mock(GatewayOpenAiPassthroughService.class));
+
+        GatewayResourceExecutionContext geminiImageContext = context(
+                ProviderType.GEMINI_DIRECT,
+                UpstreamSiteKind.GEMINI_DIRECT,
+                AuthStrategy.API_KEY_QUERY,
+                PathStrategy.GEMINI_V1BETA_MODELS,
+                "/v1/images/generations"
+        );
+        GatewayResourceExecutionContext geminiModerationContext = context(
+                ProviderType.GEMINI_DIRECT,
+                UpstreamSiteKind.GEMINI_DIRECT,
+                AuthStrategy.API_KEY_QUERY,
+                PathStrategy.GEMINI_V1BETA_MODELS,
+                "/v1/moderations"
+        );
+
+        assertFalse(imagesExecutor.supports(request("/v1/images/generations"), geminiImageContext.selectionResult().selectedCandidate().candidate()));
+        assertFalse(moderationsExecutor.supports(request("/v1/moderations"), geminiModerationContext.selectionResult().selectedCandidate().candidate()));
+    }
+
     private GatewayResourceExecutionContext context(
             ProviderType providerType,
             UpstreamSiteKind siteKind,

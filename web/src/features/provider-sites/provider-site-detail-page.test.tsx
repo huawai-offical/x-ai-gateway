@@ -162,6 +162,33 @@ const sampleSite = {
   cooldownCredentialCount: 1,
   cooldownUntil: '2026-04-13T03:00:00Z',
   features: {
+    audio_transcription: {
+      declaredLevel: 'NATIVE',
+      implementedLevel: 'NATIVE',
+      effectiveLevel: 'NATIVE',
+      supportStatus: 'NATIVE',
+      degradationLevel: 'NATIVE',
+      blockedReasons: [],
+      lossReasons: [],
+    },
+    image_generation: {
+      declaredLevel: 'NATIVE',
+      implementedLevel: 'NATIVE',
+      effectiveLevel: 'NATIVE',
+      supportStatus: 'NATIVE',
+      degradationLevel: 'NATIVE',
+      blockedReasons: [],
+      lossReasons: [],
+    },
+    moderation: {
+      declaredLevel: 'NATIVE',
+      implementedLevel: 'NATIVE',
+      effectiveLevel: 'NATIVE',
+      supportStatus: 'NATIVE',
+      degradationLevel: 'NATIVE',
+      blockedReasons: [],
+      lossReasons: [],
+    },
     response_object: {
       declaredLevel: 'EMULATED',
       implementedLevel: 'EMULATED',
@@ -234,6 +261,87 @@ const sampleSite = {
         },
       },
     },
+    audio_transcription: {
+      resourceType: 'AUDIO',
+      operation: 'AUDIO_TRANSCRIPTION',
+      surface: 'openai',
+      normalizedPath: '/v1/audio/transcriptions',
+      preferredBackend: 'NATIVE',
+      supportedBackends: ['NATIVE'],
+      supportStatus: 'NATIVE',
+      degradationLevel: 'NATIVE',
+      executionCapabilityLevel: 'NATIVE',
+      renderCapabilityLevel: 'NATIVE',
+      overallCapabilityLevel: 'NATIVE',
+      blockerReasons: [],
+      lossReasons: [],
+      requiredFeatures: ['audio_transcription'],
+      featureResolutions: {
+        audio_transcription: {
+          declaredLevel: 'NATIVE',
+          implementedLevel: 'NATIVE',
+          effectiveLevel: 'NATIVE',
+          supportStatus: 'NATIVE',
+          degradationLevel: 'NATIVE',
+          blockedReasons: [],
+          lossReasons: [],
+        },
+      },
+    },
+    image_generation: {
+      resourceType: 'IMAGE',
+      operation: 'IMAGE_GENERATION',
+      surface: 'openai',
+      normalizedPath: '/v1/images/generations',
+      preferredBackend: 'NATIVE',
+      supportedBackends: ['NATIVE'],
+      supportStatus: 'NATIVE',
+      degradationLevel: 'NATIVE',
+      executionCapabilityLevel: 'NATIVE',
+      renderCapabilityLevel: 'NATIVE',
+      overallCapabilityLevel: 'NATIVE',
+      blockerReasons: [],
+      lossReasons: [],
+      requiredFeatures: ['image_generation'],
+      featureResolutions: {
+        image_generation: {
+          declaredLevel: 'NATIVE',
+          implementedLevel: 'NATIVE',
+          effectiveLevel: 'NATIVE',
+          supportStatus: 'NATIVE',
+          degradationLevel: 'NATIVE',
+          blockedReasons: [],
+          lossReasons: [],
+        },
+      },
+    },
+    moderation_create: {
+      resourceType: 'MODERATION',
+      operation: 'MODERATION_CREATE',
+      surface: 'openai',
+      normalizedPath: '/v1/moderations',
+      preferredBackend: 'NATIVE',
+      supportedBackends: ['NATIVE'],
+      supportStatus: 'NATIVE',
+      degradationLevel: 'NATIVE',
+      executionCapabilityLevel: 'NATIVE',
+      renderCapabilityLevel: 'NATIVE',
+      overallCapabilityLevel: 'NATIVE',
+      blockerReasons: [],
+      lossReasons: [],
+      requiredFeatures: ['moderation'],
+      featureResolutions: {
+        moderation: {
+          declaredLevel: 'NATIVE',
+          implementedLevel: 'NATIVE',
+          effectiveLevel: 'NATIVE',
+          supportStatus: 'NATIVE',
+          degradationLevel: 'NATIVE',
+          blockedReasons: [],
+          lossReasons: [],
+        },
+      },
+    },
   },
   modelCount: 2,
   refreshedAt: '2026-04-13T03:00:00Z',
@@ -272,6 +380,13 @@ describe('ProviderSiteDetailPage', () => {
     expect(screen.getByText('supportStatus: ORCHESTRATION')).toBeInTheDocument()
     expect(screen.getByText('normalizedPath: /v1/files')).toBeInTheDocument()
     expect(screen.getByText('featureSupport: file_object:BLOCKED')).toBeInTheDocument()
+    expect(screen.getAllByText('supportStatus: NATIVE').length).toBeGreaterThan(0)
+    expect(screen.getByText('normalizedPath: /v1/audio/transcriptions')).toBeInTheDocument()
+    expect(screen.getByText('normalizedPath: /v1/images/generations')).toBeInTheDocument()
+    expect(screen.getByText('normalizedPath: /v1/moderations')).toBeInTheDocument()
+    expect(screen.getByText('featureSupport: audio_transcription:NATIVE')).toBeInTheDocument()
+    expect(screen.getByText('featureSupport: image_generation:NATIVE')).toBeInTheDocument()
+    expect(screen.getByText('featureSupport: moderation:NATIVE')).toBeInTheDocument()
 
     fireEvent.change(screen.getByLabelText('displayName'), {
       target: { value: 'OPENAI_DIRECT_EDITED' },

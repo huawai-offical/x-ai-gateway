@@ -100,4 +100,34 @@ class OpenAiAudioControllerTests {
                 .expectStatus().isOk()
                 .expectBody(byte[].class).isEqualTo("audio".getBytes(StandardCharsets.UTF_8));
     }
+
+    @Test
+    void shouldPassExplicitGeminiSpeechModelThroughExistingContract() {
+        Mockito.when(gatewayTokenAuthenticationResolver.authenticate("Bearer sk-gw-test.secret", null, null, null))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayResourceExecutionService.executeBinaryJson(
+                        Mockito.eq("sk-gw-test"),
+                        Mockito.eq("/v1/audio/speech"),
+                        Mockito.any(),
+                        Mockito.eq("gpt-4o-mini-tts")))
+                .thenReturn(ResponseEntity.ok()
+                        .contentType(MediaType.parseMediaType("audio/wav"))
+                        .body("wave".getBytes(StandardCharsets.UTF_8)));
+
+        webTestClient.post()
+                .uri("/v1/audio/speech")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "model":"gemini-2.5-flash-preview-tts",
+                          "input":"hello",
+                          "voice":"alloy"
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentType("audio/wav")
+                .expectBody(byte[].class).isEqualTo("wave".getBytes(StandardCharsets.UTF_8));
+    }
 }

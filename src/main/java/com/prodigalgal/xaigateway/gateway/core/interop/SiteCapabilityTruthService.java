@@ -427,9 +427,14 @@ public class SiteCapabilityTruthService {
                             && supportsUpstreamAudio(siteKind)
                             ? InteropCapabilityLevel.NATIVE
                             : InteropCapabilityLevel.UNSUPPORTED;
-            case IMAGE_GENERATION, IMAGE_EDIT, IMAGE_VARIATION ->
+            case IMAGE_GENERATION ->
                     hasSnapshotCapability(snapshot, SiteCapabilitySnapshotEntity::isSupportsImages)
-                            && supportsUpstreamImages(siteKind)
+                            && supportsUpstreamImageGeneration(siteKind)
+                            ? InteropCapabilityLevel.NATIVE
+                            : InteropCapabilityLevel.UNSUPPORTED;
+            case IMAGE_EDIT, IMAGE_VARIATION ->
+                    hasSnapshotCapability(snapshot, SiteCapabilitySnapshotEntity::isSupportsImages)
+                            && supportsUpstreamImageEditing(siteKind)
                             ? InteropCapabilityLevel.NATIVE
                             : InteropCapabilityLevel.UNSUPPORTED;
             case MODERATION -> hasSnapshotCapability(snapshot, SiteCapabilitySnapshotEntity::isSupportsModeration)
@@ -470,15 +475,19 @@ public class SiteCapabilityTruthService {
     }
 
     private boolean supportsUpstreamAudio(UpstreamSiteKind siteKind) {
-        return supportsOpenAiStyleResources(siteKind);
+        return supportsOpenAiStyleResources(siteKind) || siteKind == UpstreamSiteKind.GEMINI_DIRECT;
     }
 
-    private boolean supportsUpstreamImages(UpstreamSiteKind siteKind) {
+    private boolean supportsUpstreamImageGeneration(UpstreamSiteKind siteKind) {
+        return supportsOpenAiStyleResources(siteKind) || siteKind == UpstreamSiteKind.GEMINI_DIRECT;
+    }
+
+    private boolean supportsUpstreamImageEditing(UpstreamSiteKind siteKind) {
         return supportsOpenAiStyleResources(siteKind);
     }
 
     private boolean supportsUpstreamModeration(UpstreamSiteKind siteKind) {
-        return supportsOpenAiStyleResources(siteKind);
+        return supportsOpenAiStyleResources(siteKind) || siteKind == UpstreamSiteKind.GEMINI_DIRECT;
     }
 
     private boolean supportsOpenAiStyleResources(UpstreamSiteKind siteKind) {

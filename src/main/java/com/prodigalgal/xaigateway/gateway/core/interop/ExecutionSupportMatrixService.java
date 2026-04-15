@@ -48,10 +48,19 @@ public class ExecutionSupportMatrixService {
                 default -> InteropCapabilityLevel.UNSUPPORTED;
             };
             case AUDIO_TRANSCRIPTION, AUDIO_TRANSLATION, AUDIO_SPEECH ->
+                    supportsGeminiDirectAudio(siteKind) || supportsOpenAiStyleSite(siteKind)
+                            ? InteropCapabilityLevel.NATIVE
+                            : InteropCapabilityLevel.UNSUPPORTED;
+            case IMAGE_GENERATION ->
+                    supportsGeminiDirectImages(siteKind) || supportsOpenAiStyleSite(siteKind)
+                            ? InteropCapabilityLevel.NATIVE
+                            : InteropCapabilityLevel.UNSUPPORTED;
+            case IMAGE_EDIT, IMAGE_VARIATION ->
                     supportsOpenAiStyleSite(siteKind) ? InteropCapabilityLevel.NATIVE : InteropCapabilityLevel.UNSUPPORTED;
-            case IMAGE_GENERATION, IMAGE_EDIT, IMAGE_VARIATION ->
-                    supportsOpenAiStyleSite(siteKind) ? InteropCapabilityLevel.NATIVE : InteropCapabilityLevel.UNSUPPORTED;
-            case MODERATION -> supportsOpenAiStyleSite(siteKind) ? InteropCapabilityLevel.NATIVE : InteropCapabilityLevel.UNSUPPORTED;
+            case MODERATION ->
+                    supportsGeminiDirectModeration(siteKind) || supportsOpenAiStyleSite(siteKind)
+                            ? InteropCapabilityLevel.NATIVE
+                            : InteropCapabilityLevel.UNSUPPORTED;
             case FILE_OBJECT -> siteKind == UpstreamSiteKind.OPENAI_DIRECT
                     ? InteropCapabilityLevel.NATIVE
                     : InteropCapabilityLevel.UNSUPPORTED;
@@ -78,5 +87,17 @@ public class ExecutionSupportMatrixService {
             case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, GROK, MISTRAL, COHERE, TOGETHER, FIREWORKS, OPENROUTER -> true;
             default -> false;
         };
+    }
+
+    private boolean supportsGeminiDirectAudio(UpstreamSiteKind siteKind) {
+        return siteKind == UpstreamSiteKind.GEMINI_DIRECT;
+    }
+
+    private boolean supportsGeminiDirectImages(UpstreamSiteKind siteKind) {
+        return siteKind == UpstreamSiteKind.GEMINI_DIRECT;
+    }
+
+    private boolean supportsGeminiDirectModeration(UpstreamSiteKind siteKind) {
+        return siteKind == UpstreamSiteKind.GEMINI_DIRECT;
     }
 }

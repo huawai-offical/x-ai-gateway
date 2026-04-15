@@ -100,4 +100,35 @@ class OpenAiImagesControllerTests {
                 .expectBody()
                 .jsonPath("$.created").isEqualTo(1);
     }
+
+    @Test
+    void shouldCreateGeminiCompatibleImageGenerationReturningB64Json() {
+        ObjectNode response = objectMapper.createObjectNode();
+        response.put("created", 1);
+        response.putArray("data").addObject().put("b64_json", "AQID");
+
+        Mockito.when(gatewayTokenAuthenticationResolver.authenticate("Bearer sk-gw-test.secret", null, null, null))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayResourceExecutionService.executeJson(
+                        Mockito.eq("sk-gw-test"),
+                        Mockito.eq("/v1/images/generations"),
+                        Mockito.any(),
+                        Mockito.eq("gpt-image-1")))
+                .thenReturn(ResponseEntity.ok(response));
+
+        webTestClient.post()
+                .uri("/v1/images/generations")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "model":"gemini-2.0-flash-preview-image-generation",
+                          "prompt":"draw a gateway dashboard"
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.data[0].b64_json").isEqualTo("AQID");
+    }
 }

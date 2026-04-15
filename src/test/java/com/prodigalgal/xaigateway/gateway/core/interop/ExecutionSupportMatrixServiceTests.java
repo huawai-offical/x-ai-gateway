@@ -80,6 +80,12 @@ class ExecutionSupportMatrixServiceTests {
                 List.of(InteropFeature.AUDIO_TRANSCRIPTION),
                 true
         );
+        GatewayRequestSemantics audioSpeechSemantics = new GatewayRequestSemantics(
+                TranslationResourceType.AUDIO,
+                TranslationOperation.AUDIO_SPEECH,
+                List.of(InteropFeature.AUDIO_SPEECH),
+                true
+        );
         GatewayRequestSemantics batchSemantics = new GatewayRequestSemantics(
                 TranslationResourceType.BATCH,
                 TranslationOperation.BATCH_CREATE,
@@ -116,6 +122,12 @@ class ExecutionSupportMatrixServiceTests {
                 List.of(InteropFeature.IMAGE_GENERATION),
                 true
         );
+        GatewayRequestSemantics imageEditSemantics = new GatewayRequestSemantics(
+                TranslationResourceType.IMAGE,
+                TranslationOperation.IMAGE_EDIT,
+                List.of(InteropFeature.IMAGE_EDIT),
+                true
+        );
         GatewayRequestSemantics moderationSemantics = new GatewayRequestSemantics(
                 TranslationResourceType.MODERATION,
                 TranslationOperation.MODERATION_CREATE,
@@ -132,15 +144,23 @@ class ExecutionSupportMatrixServiceTests {
                 service.implementedLevel(geminiCandidate(UpstreamSiteKind.VERTEX_AI), embeddingsSemantics, InteropFeature.EMBEDDINGS)
         );
         assertEquals(
-                InteropCapabilityLevel.UNSUPPORTED,
+                InteropCapabilityLevel.NATIVE,
                 service.implementedLevel(geminiCandidate(UpstreamSiteKind.GEMINI_DIRECT), audioSemantics, InteropFeature.AUDIO_TRANSCRIPTION)
         );
         assertEquals(
-                InteropCapabilityLevel.UNSUPPORTED,
+                InteropCapabilityLevel.NATIVE,
+                service.implementedLevel(geminiCandidate(UpstreamSiteKind.GEMINI_DIRECT), audioSpeechSemantics, InteropFeature.AUDIO_SPEECH)
+        );
+        assertEquals(
+                InteropCapabilityLevel.NATIVE,
                 service.implementedLevel(geminiCandidate(UpstreamSiteKind.GEMINI_DIRECT), imageSemantics, InteropFeature.IMAGE_GENERATION)
         );
         assertEquals(
                 InteropCapabilityLevel.UNSUPPORTED,
+                service.implementedLevel(geminiCandidate(UpstreamSiteKind.GEMINI_DIRECT), imageEditSemantics, InteropFeature.IMAGE_EDIT)
+        );
+        assertEquals(
+                InteropCapabilityLevel.NATIVE,
                 service.implementedLevel(geminiCandidate(UpstreamSiteKind.GEMINI_DIRECT), moderationSemantics, InteropFeature.MODERATION)
         );
         assertEquals(

@@ -62,4 +62,41 @@ class OpenAiModerationsControllerTests {
                 .expectBody()
                 .jsonPath("$.results[0].flagged").isEqualTo(false);
     }
+
+    @Test
+    void shouldCreateGeminiCompatibleModerationObject() {
+        ObjectNode response = objectMapper.createObjectNode();
+        response.put("id", "modr-2");
+        response.put("model", "gemini-2.0-flash");
+        response.putArray("results")
+                .addObject()
+                .put("flagged", true)
+                .putObject("categories")
+                .put("violence", true);
+
+        Mockito.when(gatewayTokenAuthenticationResolver.authenticate("Bearer sk-gw-test.secret", null, null, null))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayResourceExecutionService.executeJson(
+                        Mockito.eq("sk-gw-test"),
+                        Mockito.eq("/v1/moderations"),
+                        Mockito.any(),
+                        Mockito.eq("omni-moderation-latest")))
+                .thenReturn(ResponseEntity.ok(response));
+
+        webTestClient.post()
+                .uri("/v1/moderations")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "model":"gemini-2.0-flash",
+                          "input":"violent text"
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.results[0].flagged").isEqualTo(true)
+                .jsonPath("$.results[0].categories.violence").isEqualTo(true);
+    }
 }

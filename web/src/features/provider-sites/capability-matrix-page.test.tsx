@@ -99,6 +99,33 @@ apiRequest.mockImplementation(async () => [
     preferredBackend: 'ORCHESTRATION',
     supportedBackends: ['ORCHESTRATION'],
     features: {
+      audio_transcription: {
+        declaredLevel: 'NATIVE',
+        implementedLevel: 'NATIVE',
+        effectiveLevel: 'NATIVE',
+        supportStatus: 'NATIVE',
+        degradationLevel: 'NATIVE',
+        blockedReasons: [],
+        lossReasons: [],
+      },
+      image_generation: {
+        declaredLevel: 'NATIVE',
+        implementedLevel: 'NATIVE',
+        effectiveLevel: 'NATIVE',
+        supportStatus: 'NATIVE',
+        degradationLevel: 'NATIVE',
+        blockedReasons: [],
+        lossReasons: [],
+      },
+      moderation: {
+        declaredLevel: 'NATIVE',
+        implementedLevel: 'NATIVE',
+        effectiveLevel: 'NATIVE',
+        supportStatus: 'NATIVE',
+        degradationLevel: 'NATIVE',
+        blockedReasons: [],
+        lossReasons: [],
+      },
       file_object: {
         declaredLevel: 'UNSUPPORTED',
         implementedLevel: 'UNSUPPORTED',
@@ -110,6 +137,87 @@ apiRequest.mockImplementation(async () => [
       },
     },
     surfaces: {
+      audio_transcription: {
+        resourceType: 'AUDIO',
+        operation: 'AUDIO_TRANSCRIPTION',
+        surface: 'openai',
+        normalizedPath: '/v1/audio/transcriptions',
+        preferredBackend: 'NATIVE',
+        supportedBackends: ['NATIVE'],
+        supportStatus: 'NATIVE',
+        degradationLevel: 'NATIVE',
+        executionCapabilityLevel: 'NATIVE',
+        renderCapabilityLevel: 'NATIVE',
+        overallCapabilityLevel: 'NATIVE',
+        blockerReasons: [],
+        lossReasons: [],
+        requiredFeatures: ['audio_transcription'],
+        featureResolutions: {
+          audio_transcription: {
+            declaredLevel: 'NATIVE',
+            implementedLevel: 'NATIVE',
+            effectiveLevel: 'NATIVE',
+            supportStatus: 'NATIVE',
+            degradationLevel: 'NATIVE',
+            blockedReasons: [],
+            lossReasons: [],
+          },
+        },
+      },
+      image_generation: {
+        resourceType: 'IMAGE',
+        operation: 'IMAGE_GENERATION',
+        surface: 'openai',
+        normalizedPath: '/v1/images/generations',
+        preferredBackend: 'NATIVE',
+        supportedBackends: ['NATIVE'],
+        supportStatus: 'NATIVE',
+        degradationLevel: 'NATIVE',
+        executionCapabilityLevel: 'NATIVE',
+        renderCapabilityLevel: 'NATIVE',
+        overallCapabilityLevel: 'NATIVE',
+        blockerReasons: [],
+        lossReasons: [],
+        requiredFeatures: ['image_generation'],
+        featureResolutions: {
+          image_generation: {
+            declaredLevel: 'NATIVE',
+            implementedLevel: 'NATIVE',
+            effectiveLevel: 'NATIVE',
+            supportStatus: 'NATIVE',
+            degradationLevel: 'NATIVE',
+            blockedReasons: [],
+            lossReasons: [],
+          },
+        },
+      },
+      moderation_create: {
+        resourceType: 'MODERATION',
+        operation: 'MODERATION_CREATE',
+        surface: 'openai',
+        normalizedPath: '/v1/moderations',
+        preferredBackend: 'NATIVE',
+        supportedBackends: ['NATIVE'],
+        supportStatus: 'NATIVE',
+        degradationLevel: 'NATIVE',
+        executionCapabilityLevel: 'NATIVE',
+        renderCapabilityLevel: 'NATIVE',
+        overallCapabilityLevel: 'NATIVE',
+        blockerReasons: [],
+        lossReasons: [],
+        requiredFeatures: ['moderation'],
+        featureResolutions: {
+          moderation: {
+            declaredLevel: 'NATIVE',
+            implementedLevel: 'NATIVE',
+            effectiveLevel: 'NATIVE',
+            supportStatus: 'NATIVE',
+            degradationLevel: 'NATIVE',
+            blockedReasons: [],
+            lossReasons: [],
+          },
+        },
+      },
       file_create: {
         resourceType: 'FILE',
         operation: 'FILE_CREATE',
@@ -137,12 +245,39 @@ apiRequest.mockImplementation(async () => [
           },
         },
       },
+      image_edit: {
+        resourceType: 'IMAGE',
+        operation: 'IMAGE_EDIT',
+        surface: 'openai',
+        normalizedPath: '/v1/images/edits',
+        preferredBackend: 'NATIVE',
+        supportedBackends: [],
+        supportStatus: 'BLOCKED',
+        degradationLevel: 'UNSUPPORTED',
+        executionCapabilityLevel: 'UNSUPPORTED',
+        renderCapabilityLevel: 'NATIVE',
+        overallCapabilityLevel: 'UNSUPPORTED',
+        blockerReasons: ['image edits unsupported'],
+        lossReasons: [],
+        requiredFeatures: ['image_edit'],
+        featureResolutions: {
+          image_edit: {
+            declaredLevel: 'UNSUPPORTED',
+            implementedLevel: 'UNSUPPORTED',
+            effectiveLevel: 'UNSUPPORTED',
+            supportStatus: 'BLOCKED',
+            degradationLevel: 'UNSUPPORTED',
+            blockedReasons: ['image edits unsupported'],
+            lossReasons: [],
+          },
+        },
+      },
     },
     supportsResponses: false,
     supportsEmbeddings: true,
-    supportsAudio: false,
-    supportsImages: false,
-    supportsModeration: false,
+    supportsAudio: true,
+    supportsImages: true,
+    supportsModeration: true,
     supportsFiles: false,
     supportsUploads: false,
     supportsBatches: false,
@@ -250,10 +385,18 @@ describe('CapabilityMatrixPage', () => {
     expect(screen.getByRole('link', { name: /FILE_CREATE/ })).toHaveAttribute('href', '/provider-sites/2?surface=file_create')
     expect(screen.getByRole('link', { name: /EMBEDDING_CREATE/ })).toHaveAttribute('href', '/provider-sites/3?surface=embedding_create')
     expect(screen.getByText('supportStatus: ORCHESTRATION')).toBeInTheDocument()
-    expect(screen.getByText('supportStatus: BLOCKED')).toBeInTheDocument()
+    expect(screen.getAllByText('supportStatus: BLOCKED').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('supportStatus: NATIVE').length).toBeGreaterThan(0)
     expect(screen.getByText('normalizedPath: /v1/files')).toBeInTheDocument()
     expect(screen.getByText('normalizedPath: /v1/embeddings')).toBeInTheDocument()
+    expect(screen.getByText('normalizedPath: /v1/audio/transcriptions')).toBeInTheDocument()
+    expect(screen.getByText('normalizedPath: /v1/images/generations')).toBeInTheDocument()
+    expect(screen.getByText('normalizedPath: /v1/moderations')).toBeInTheDocument()
+    expect(screen.getByText('normalizedPath: /v1/images/edits')).toBeInTheDocument()
     expect(screen.getByText('featureSupport: file_object:BLOCKED')).toBeInTheDocument()
     expect(screen.getByText('featureSupport: embeddings:BLOCKED')).toBeInTheDocument()
+    expect(screen.getByText('featureSupport: audio_transcription:NATIVE')).toBeInTheDocument()
+    expect(screen.getByText('featureSupport: image_generation:NATIVE')).toBeInTheDocument()
+    expect(screen.getByText('featureSupport: moderation:NATIVE')).toBeInTheDocument()
   })
 })

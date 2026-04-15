@@ -154,11 +154,13 @@ class ProviderSiteAdminServiceTests {
         assertEquals("blocked", response.features().get("file_object").supportStatus());
         assertEquals(SupportStatus.ORCHESTRATION, response.surfaces().get("file_create").supportStatus());
         assertEquals(InteropCapabilityLevel.NATIVE, response.surfaces().get("file_create").degradationLevel());
+        assertEquals("native", response.features().get("audio_transcription").supportStatus());
+        assertEquals(SupportStatus.NATIVE, response.surfaces().get("audio_transcription").supportStatus());
+        assertEquals(SupportStatus.NATIVE, response.surfaces().get("image_generation").supportStatus());
+        assertEquals(SupportStatus.NATIVE, response.surfaces().get("moderation_create").supportStatus());
         assertEquals("blocked", response.features().get("upload_create").supportStatus());
         assertEquals(SupportStatus.ORCHESTRATION, response.surfaces().get("upload_create").supportStatus());
         assertEquals(SupportStatus.NATIVE, response.surfaces().get("embedding_create").supportStatus());
-        assertEquals(SupportStatus.BLOCKED, response.surfaces().get("audio_transcription").supportStatus());
-        assertEquals("blocked", response.features().get("audio_transcription").supportStatus());
         assertTrue(response.surfaces().get("file_create").featureResolutions().containsKey("file_object"));
     }
 
@@ -309,9 +311,9 @@ class ProviderSiteAdminServiceTests {
         snapshot.setSupportedProtocols(List.of("google_native"));
         snapshot.setHealthState("READY");
         snapshot.setSupportsEmbeddings(supportsEmbeddings);
-        snapshot.setSupportsAudio(false);
-        snapshot.setSupportsImages(false);
-        snapshot.setSupportsModeration(false);
+        snapshot.setSupportsAudio(true);
+        snapshot.setSupportsImages(true);
+        snapshot.setSupportsModeration(true);
         snapshot.setSupportsFiles(false);
         snapshot.setSupportsUploads(false);
         snapshot.setSupportsBatches(false);
