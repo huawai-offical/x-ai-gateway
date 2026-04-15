@@ -1,0 +1,35 @@
+[
+  {
+    "operation": "BATCH_CREATE",
+    "mode": "json",
+    "rawJson": { "id": "batch_1", "object": "batch", "status": "queued" },
+    "expectedResponseKind": "object",
+    "expectedObjectType": "batch",
+    "expectedStatus": "queued",
+    "expectedObjectId": "batch_1",
+    "expectedEventCount": 1,
+    "expectedDegradationCount": 0
+  },
+  {
+    "operation": "BATCH_GET",
+    "mode": "json",
+    "rawJson": { "id": "batch_1", "object": "batch", "status": "in_progress" },
+    "expectedResponseKind": "object",
+    "expectedObjectType": "batch",
+    "expectedStatus": "in_progress",
+    "expectedObjectId": "batch_1",
+    "expectedEventCount": 1,
+    "expectedDegradationCount": 0
+  },
+  {
+    "operation": "BATCH_CANCEL",
+    "mode": "json",
+    "rawJson": { "id": "batch_1", "object": "batch", "status": "cancelled" },
+    "expectedResponseKind": "object",
+    "expectedObjectType": "batch",
+    "expectedStatus": "cancelled",
+    "expectedObjectId": "batch_1",
+    "expectedEventCount": 2,
+    "expectedDegradationCount": 0
+  }
+]

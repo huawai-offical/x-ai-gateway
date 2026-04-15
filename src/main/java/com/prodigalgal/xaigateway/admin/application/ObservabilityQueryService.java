@@ -2,14 +2,17 @@ package com.prodigalgal.xaigateway.admin.application;
 
 import com.prodigalgal.xaigateway.admin.api.CacheHitLogResponse;
 import com.prodigalgal.xaigateway.admin.api.ObservabilitySummaryResponse;
+import com.prodigalgal.xaigateway.admin.api.RequestLogResponse;
 import com.prodigalgal.xaigateway.admin.api.RouteDecisionLogResponse;
 import com.prodigalgal.xaigateway.admin.api.UpstreamCacheReferenceResponse;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.infra.persistence.entity.CacheHitLogEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.RequestLogEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.RouteDecisionLogEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCacheReferenceEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UsageRecordEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.CacheHitLogRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.RequestLogRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.RouteDecisionLogRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCacheReferenceRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UsageRecordRepository;
@@ -29,16 +32,19 @@ public class ObservabilityQueryService {
 
     private final RouteDecisionLogRepository routeDecisionLogRepository;
     private final CacheHitLogRepository cacheHitLogRepository;
+    private final RequestLogRepository requestLogRepository;
     private final UpstreamCacheReferenceRepository upstreamCacheReferenceRepository;
     private final UsageRecordRepository usageRecordRepository;
 
     public ObservabilityQueryService(
             RouteDecisionLogRepository routeDecisionLogRepository,
             CacheHitLogRepository cacheHitLogRepository,
+            RequestLogRepository requestLogRepository,
             UpstreamCacheReferenceRepository upstreamCacheReferenceRepository,
             UsageRecordRepository usageRecordRepository) {
         this.routeDecisionLogRepository = routeDecisionLogRepository;
         this.cacheHitLogRepository = cacheHitLogRepository;
+        this.requestLogRepository = requestLogRepository;
         this.upstreamCacheReferenceRepository = upstreamCacheReferenceRepository;
         this.usageRecordRepository = usageRecordRepository;
     }
@@ -94,6 +100,25 @@ public class ObservabilityQueryService {
                 window.from(),
                 window.to());
         return entities.stream().map(this::toCacheHitResponse).toList();
+    }
+
+    public List<RequestLogResponse> listRequestLogs(
+            Long distributedKeyId,
+            ProviderType providerType,
+            Instant from,
+            Instant to) {
+        TimeWindow window = resolveWindow(from, to);
+        List<RequestLogEntity> entities;
+        if (window == null) {
+            entities = requestLogRepository.search(distributedKeyId, providerType, DEFAULT_SAMPLE_PAGE);
+        } else {
+            entities = requestLogRepository.searchWithinWindow(
+                    distributedKeyId,
+                    providerType,
+                    window.from(),
+                    window.to());
+        }
+        return entities.stream().map(this::toRequestLogResponse).toList();
     }
 
     public List<UpstreamCacheReferenceResponse> listUpstreamCacheReferences(Long distributedKeyId, String status) {
@@ -210,8 +235,15 @@ public class ObservabilityQueryService {
                 entity.getPublicModel(),
                 entity.getResolvedModelKey(),
                 entity.getProtocol(),
+                entity.getRequestPath(),
+                entity.getResourceType(),
+                entity.getOperation(),
                 entity.getModelGroup(),
                 entity.getSelectionSource(),
+                entity.getExecutionBackend(),
+                entity.getSupportStatus(),
+                entity.getDegradationLevel(),
+                entity.getObjectMode(),
                 entity.getSelectedCredentialId(),
                 entity.getSelectedProviderType(),
                 entity.getSelectedBaseUrl(),
@@ -229,16 +261,56 @@ public class ObservabilityQueryService {
                 entity.getRequestId(),
                 entity.getDistributedKeyId(),
                 entity.getProtocol(),
+                entity.getRequestPath(),
+                entity.getResourceType(),
+                entity.getOperation(),
                 entity.getProviderType(),
                 entity.getCredentialId(),
                 entity.getModelGroup(),
                 entity.getPrefixHash(),
                 entity.getFingerprint(),
                 entity.getCacheKind(),
+                entity.getExecutionBackend(),
+                entity.getSupportStatus(),
+                entity.getDegradationLevel(),
+                entity.getObjectMode(),
                 entity.getCacheHitTokens(),
                 entity.getCacheWriteTokens(),
                 entity.getSavedInputTokens(),
                 entity.getCachedContentRef(),
+                entity.getCreatedAt()
+        );
+    }
+
+    private RequestLogResponse toRequestLogResponse(RequestLogEntity entity) {
+        return new RequestLogResponse(
+                entity.getId(),
+                entity.getRequestId(),
+                entity.getDistributedKeyId(),
+                entity.getDistributedKeyPrefix(),
+                entity.getProtocol(),
+                entity.getRequestPath(),
+                entity.getResourceType(),
+                entity.getOperation(),
+                entity.getRequestedModel(),
+                entity.getPublicModel(),
+                entity.getResolvedModelKey(),
+                entity.getModelGroup(),
+                entity.getProviderType(),
+                entity.getCredentialId(),
+                entity.getSelectionSource(),
+                entity.getExecutionBackend(),
+                entity.getSupportStatus(),
+                entity.getDegradationLevel(),
+                entity.getObjectMode(),
+                entity.getResponseKind(),
+                entity.getResponseObjectType(),
+                entity.getResponseObjectId(),
+                entity.getResponseStatus(),
+                entity.getCanonicalEventCount(),
+                entity.getStatus(),
+                entity.getStartedAt(),
+                entity.getCompletedAt(),
                 entity.getCreatedAt()
         );
     }

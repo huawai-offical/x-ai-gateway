@@ -1,0 +1,13 @@
+[
+  {
+    "operation": "EMBEDDING_CREATE",
+    "mode": "json",
+    "rawJson": { "object": "list", "data": [ { "embedding": [0.1] } ] },
+    "expectedResponseKind": "list",
+    "expectedObjectType": "list",
+    "expectedStatus": "completed",
+    "expectedObjectId": null,
+    "expectedEventCount": 2,
+    "expectedDegradationCount": 0
+  }
+]

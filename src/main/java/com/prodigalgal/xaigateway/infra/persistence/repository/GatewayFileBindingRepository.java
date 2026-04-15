@@ -7,4 +7,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface GatewayFileBindingRepository extends JpaRepository<GatewayFileBindingEntity, Long> {
 
     List<GatewayFileBindingEntity> findAllByGatewayFileIdOrderByCreatedAtDesc(Long gatewayFileId);
+
+    List<GatewayFileBindingEntity> findAllByCredentialIdAndExternalFileIdOrderByCreatedAtDesc(
+            Long credentialId,
+            String externalFileId);
 }

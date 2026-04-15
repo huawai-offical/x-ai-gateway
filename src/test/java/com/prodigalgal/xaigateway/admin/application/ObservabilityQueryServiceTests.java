@@ -2,10 +2,12 @@ package com.prodigalgal.xaigateway.admin.application;
 
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.infra.persistence.entity.CacheHitLogEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.RequestLogEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.RouteDecisionLogEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCacheReferenceEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UsageRecordEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.CacheHitLogRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.RequestLogRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.RouteDecisionLogRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCacheReferenceRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UsageRecordRepository;
@@ -26,6 +28,7 @@ class ObservabilityQueryServiceTests {
     void shouldCombineDistributedKeyAndProviderFiltersForCacheHits() {
         RouteDecisionLogRepository routeDecisionLogRepository = Mockito.mock(RouteDecisionLogRepository.class);
         CacheHitLogRepository cacheHitLogRepository = Mockito.mock(CacheHitLogRepository.class);
+        RequestLogRepository requestLogRepository = Mockito.mock(RequestLogRepository.class);
         UpstreamCacheReferenceRepository upstreamCacheReferenceRepository = Mockito.mock(UpstreamCacheReferenceRepository.class);
         UsageRecordRepository usageRecordRepository = Mockito.mock(UsageRecordRepository.class);
 
@@ -40,6 +43,7 @@ class ObservabilityQueryServiceTests {
         ObservabilityQueryService service = new ObservabilityQueryService(
                 routeDecisionLogRepository,
                 cacheHitLogRepository,
+                requestLogRepository,
                 upstreamCacheReferenceRepository,
                 usageRecordRepository
         );
@@ -52,6 +56,7 @@ class ObservabilityQueryServiceTests {
     void shouldCombineDistributedKeyAndProviderFiltersForRouteDecisions() {
         RouteDecisionLogRepository routeDecisionLogRepository = Mockito.mock(RouteDecisionLogRepository.class);
         CacheHitLogRepository cacheHitLogRepository = Mockito.mock(CacheHitLogRepository.class);
+        RequestLogRepository requestLogRepository = Mockito.mock(RequestLogRepository.class);
         UpstreamCacheReferenceRepository upstreamCacheReferenceRepository = Mockito.mock(UpstreamCacheReferenceRepository.class);
         UsageRecordRepository usageRecordRepository = Mockito.mock(UsageRecordRepository.class);
 
@@ -65,6 +70,7 @@ class ObservabilityQueryServiceTests {
         ObservabilityQueryService service = new ObservabilityQueryService(
                 routeDecisionLogRepository,
                 cacheHitLogRepository,
+                requestLogRepository,
                 upstreamCacheReferenceRepository,
                 usageRecordRepository
         );
@@ -77,6 +83,7 @@ class ObservabilityQueryServiceTests {
     void shouldFilterActiveReferencesByDistributedKeyAndProviderInSummary() {
         RouteDecisionLogRepository routeDecisionLogRepository = Mockito.mock(RouteDecisionLogRepository.class);
         CacheHitLogRepository cacheHitLogRepository = Mockito.mock(CacheHitLogRepository.class);
+        RequestLogRepository requestLogRepository = Mockito.mock(RequestLogRepository.class);
         UpstreamCacheReferenceRepository upstreamCacheReferenceRepository = Mockito.mock(UpstreamCacheReferenceRepository.class);
         UsageRecordRepository usageRecordRepository = Mockito.mock(UsageRecordRepository.class);
 
@@ -98,6 +105,7 @@ class ObservabilityQueryServiceTests {
         ObservabilityQueryService service = new ObservabilityQueryService(
                 routeDecisionLogRepository,
                 cacheHitLogRepository,
+                requestLogRepository,
                 upstreamCacheReferenceRepository,
                 usageRecordRepository
         );
@@ -112,5 +120,53 @@ class ObservabilityQueryServiceTests {
                 eq(ProviderType.OPENAI_DIRECT),
                 eq("ACTIVE"),
                 ArgumentMatchers.any(Pageable.class));
+    }
+
+    @Test
+    void shouldMapCanonicalFieldsForRequestLogs() {
+        RouteDecisionLogRepository routeDecisionLogRepository = Mockito.mock(RouteDecisionLogRepository.class);
+        CacheHitLogRepository cacheHitLogRepository = Mockito.mock(CacheHitLogRepository.class);
+        RequestLogRepository requestLogRepository = Mockito.mock(RequestLogRepository.class);
+        UpstreamCacheReferenceRepository upstreamCacheReferenceRepository = Mockito.mock(UpstreamCacheReferenceRepository.class);
+        UsageRecordRepository usageRecordRepository = Mockito.mock(UsageRecordRepository.class);
+
+        RequestLogEntity entity = new RequestLogEntity();
+        entity.setRequestId("req-1");
+        entity.setDistributedKeyId(7L);
+        entity.setProtocol("openai");
+        entity.setRequestPath("/v1/files/file_123/content");
+        entity.setResourceType("file");
+        entity.setOperation("file_content_get");
+        entity.setRequestedModel("gpt-4o");
+        entity.setPublicModel("gpt-4o");
+        entity.setResolvedModelKey("gpt-4o");
+        entity.setProviderType(ProviderType.OPENAI_DIRECT);
+        entity.setSupportStatus("DEGRADED");
+        entity.setDegradationLevel("LOSSY");
+        entity.setObjectMode("resource-orchestration");
+        entity.setResponseKind("binary");
+        entity.setResponseObjectType("file.content");
+        entity.setResponseObjectId("file_123");
+        entity.setResponseStatus("completed");
+        entity.setCanonicalEventCount(2);
+
+        when(requestLogRepository.search(eq(7L), eq(ProviderType.OPENAI_DIRECT), ArgumentMatchers.any(Pageable.class)))
+                .thenReturn(List.of(entity));
+
+        ObservabilityQueryService service = new ObservabilityQueryService(
+                routeDecisionLogRepository,
+                cacheHitLogRepository,
+                requestLogRepository,
+                upstreamCacheReferenceRepository,
+                usageRecordRepository
+        );
+
+        var logs = service.listRequestLogs(7L, ProviderType.OPENAI_DIRECT, null, null);
+        assertEquals(1, logs.size());
+        assertEquals("DEGRADED", logs.get(0).supportStatus());
+        assertEquals("LOSSY", logs.get(0).degradationLevel());
+        assertEquals("binary", logs.get(0).responseKind());
+        assertEquals("file.content", logs.get(0).responseObjectType());
+        verify(requestLogRepository).search(eq(7L), eq(ProviderType.OPENAI_DIRECT), ArgumentMatchers.any(Pageable.class));
     }
 }

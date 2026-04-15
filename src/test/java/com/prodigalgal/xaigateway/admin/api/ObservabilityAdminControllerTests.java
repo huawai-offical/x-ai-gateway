@@ -37,8 +37,15 @@ class ObservabilityAdminControllerTests {
                         "gpt-4o",
                         "gpt-4o",
                         "openai",
+                        "/v1/chat/completions",
+                        "chat",
+                        "chat_completion",
                         "gpt-4o",
                         "PREFIX_AFFINITY",
+                        "NATIVE",
+                        "NATIVE",
+                        "NATIVE",
+                        "chat",
                         101L,
                         ProviderType.OPENAI_DIRECT,
                         "https://api.openai.com",
@@ -60,7 +67,8 @@ class ObservabilityAdminControllerTests {
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$[0].requestId").isEqualTo("req-1")
-                .jsonPath("$[0].selectionSource").isEqualTo("PREFIX_AFFINITY");
+                .jsonPath("$[0].selectionSource").isEqualTo("PREFIX_AFFINITY")
+                .jsonPath("$[0].supportStatus").isEqualTo("NATIVE");
     }
 
     @Test
@@ -73,12 +81,19 @@ class ObservabilityAdminControllerTests {
                         "req-1",
                         1L,
                         "openai",
+                        "/v1/chat/completions",
+                        "chat",
+                        "chat_completion",
                         ProviderType.OPENAI_DIRECT,
                         101L,
                         "gpt-4o",
                         "prefix",
                         "fingerprint",
                         "prompt_cache",
+                        "NATIVE",
+                        "NATIVE",
+                        "NATIVE",
+                        "chat",
                         300,
                         0,
                         300,
@@ -96,7 +111,60 @@ class ObservabilityAdminControllerTests {
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$[0].cacheKind").isEqualTo("prompt_cache")
-                .jsonPath("$[0].cacheHitTokens").isEqualTo(300);
+                .jsonPath("$[0].cacheHitTokens").isEqualTo(300)
+                .jsonPath("$[0].supportStatus").isEqualTo("NATIVE");
+    }
+
+    @Test
+    void shouldReturnRequestLogs() {
+        Instant from = Instant.parse("2026-04-07T07:00:00Z");
+        Instant to = Instant.parse("2026-04-07T09:00:00Z");
+        Mockito.when(observabilityQueryService.listRequestLogs(1L, ProviderType.OPENAI_DIRECT, from, to))
+                .thenReturn(List.of(new RequestLogResponse(
+                        1L,
+                        "req-1",
+                        1L,
+                        "sk-gw-test",
+                        "openai",
+                        "/v1/files/file_123/content",
+                        "file",
+                        "file_content_get",
+                        "gpt-4o",
+                        "gpt-4o",
+                        "gpt-4o",
+                        "gpt-4o",
+                        ProviderType.OPENAI_DIRECT,
+                        101L,
+                        "PREFIX_AFFINITY",
+                        "NATIVE",
+                        "DEGRADED",
+                        "LOSSY",
+                        "resource-orchestration",
+                        "binary",
+                        "file.content",
+                        "file_123",
+                        "completed",
+                        2,
+                        com.prodigalgal.xaigateway.gateway.core.observability.GatewayRequestStatus.COMPLETED,
+                        from,
+                        to,
+                        from
+                )));
+
+        webTestClient.get()
+                .uri(uriBuilder -> uriBuilder.path("/admin/observability/request-logs")
+                        .queryParam("distributedKeyId", 1)
+                        .queryParam("providerType", "OPENAI_DIRECT")
+                        .queryParam("from", from)
+                        .queryParam("to", to)
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$[0].requestId").isEqualTo("req-1")
+                .jsonPath("$[0].supportStatus").isEqualTo("DEGRADED")
+                .jsonPath("$[0].responseObjectType").isEqualTo("file.content")
+                .jsonPath("$[0].canonicalEventCount").isEqualTo(2);
     }
 
     @Test

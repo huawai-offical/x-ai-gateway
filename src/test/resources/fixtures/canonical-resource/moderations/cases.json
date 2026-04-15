@@ -1,0 +1,13 @@
+[
+  {
+    "operation": "MODERATION_CREATE",
+    "mode": "json",
+    "rawJson": { "id": "modr_1", "object": "moderation", "results": [] },
+    "expectedResponseKind": "object",
+    "expectedObjectType": "moderation",
+    "expectedStatus": "completed",
+    "expectedObjectId": "modr_1",
+    "expectedEventCount": 2,
+    "expectedDegradationCount": 0
+  }
+]

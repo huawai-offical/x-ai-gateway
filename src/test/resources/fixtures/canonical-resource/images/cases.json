@@ -1,0 +1,13 @@
+[
+  {
+    "operation": "IMAGE_GENERATION",
+    "mode": "json",
+    "rawJson": { "created": 123, "data": [ { "url": "https://example.com/a.png" } ] },
+    "expectedResponseKind": "list",
+    "expectedObjectType": "image.list",
+    "expectedStatus": "completed",
+    "expectedObjectId": null,
+    "expectedEventCount": 2,
+    "expectedDegradationCount": 0
+  }
+]

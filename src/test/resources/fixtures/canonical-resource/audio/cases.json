@@ -1,0 +1,36 @@
+[
+  {
+    "operation": "AUDIO_TRANSCRIPTION",
+    "mode": "json",
+    "rawJson": { "text": "hello", "object": "transcription" },
+    "expectedResponseKind": "object",
+    "expectedObjectType": "transcription",
+    "expectedStatus": "completed",
+    "expectedObjectId": null,
+    "expectedEventCount": 2,
+    "expectedDegradationCount": 0
+  },
+  {
+    "operation": "AUDIO_TRANSLATION",
+    "mode": "json",
+    "rawJson": { "text": "hello", "object": "translation", "status": "completed" },
+    "expectedResponseKind": "object",
+    "expectedObjectType": "translation",
+    "expectedStatus": "completed",
+    "expectedObjectId": null,
+    "expectedEventCount": 2,
+    "expectedDegradationCount": 0
+  },
+  {
+    "operation": "AUDIO_SPEECH",
+    "mode": "binary",
+    "binaryText": "abc",
+    "contentType": "audio/mpeg",
+    "expectedResponseKind": "binary",
+    "expectedObjectType": "audio.speech",
+    "expectedStatus": "completed",
+    "expectedObjectId": null,
+    "expectedEventCount": 2,
+    "expectedDegradationCount": 0
+  }
+]

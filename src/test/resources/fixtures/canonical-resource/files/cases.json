@@ -1,0 +1,62 @@
+[
+  {
+    "operation": "FILE_CREATE",
+    "mode": "json",
+    "rawJson": { "id": "file_1", "object": "file", "status": "processed" },
+    "expectedResponseKind": "object",
+    "expectedObjectType": "file",
+    "expectedStatus": "processed",
+    "expectedObjectId": "file_1",
+    "expectedEventCount": 1,
+    "expectedDegradationCount": 0
+  },
+  {
+    "operation": "FILE_GET",
+    "mode": "json",
+    "rawJson": { "id": "file_1", "object": "file" },
+    "expectedResponseKind": "object",
+    "expectedObjectType": "file",
+    "expectedStatus": "completed",
+    "expectedObjectId": "file_1",
+    "expectedEventCount": 2,
+    "expectedDegradationCount": 0
+  },
+  {
+    "operation": "FILE_LIST",
+    "mode": "json",
+    "rawJson": { "object": "list", "data": [ { "id": "file_1" } ] },
+    "expectedResponseKind": "list",
+    "expectedObjectType": "list",
+    "expectedStatus": "completed",
+    "expectedObjectId": null,
+    "expectedEventCount": 2,
+    "expectedDegradationCount": 0
+  },
+  {
+    "operation": "FILE_DELETE",
+    "mode": "json",
+    "rawJson": { "id": "file_1", "object": "file", "deleted": true },
+    "expectedResponseKind": "object",
+    "expectedObjectType": "file",
+    "expectedStatus": "completed",
+    "expectedObjectId": "file_1",
+    "expectedEventCount": 2,
+    "expectedDegradationCount": 0
+  },
+  {
+    "operation": "FILE_CONTENT_GET",
+    "mode": "binary",
+    "binaryText": "ok",
+    "contentType": "application/pdf",
+    "supportStatus": "DEGRADED",
+    "degradationLevel": "LOSSY",
+    "blockerReasons": ["content render degraded"],
+    "expectedResponseKind": "binary",
+    "expectedObjectType": "file.content",
+    "expectedStatus": "completed",
+    "expectedObjectId": "file_123",
+    "expectedEventCount": 2,
+    "expectedDegradationCount": 1,
+    "expectedDegradationCode": "blocker_reason"
+  }
+]

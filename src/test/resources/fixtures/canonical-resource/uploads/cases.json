@@ -1,0 +1,57 @@
+[
+  {
+    "operation": "UPLOAD_CREATE",
+    "mode": "json",
+    "rawJson": { "id": "upload_1", "object": "upload", "status": "created" },
+    "expectedResponseKind": "object",
+    "expectedObjectType": "upload",
+    "expectedStatus": "created",
+    "expectedObjectId": "upload_1",
+    "expectedEventCount": 1,
+    "expectedDegradationCount": 0
+  },
+  {
+    "operation": "UPLOAD_GET",
+    "mode": "json",
+    "rawJson": { "id": "upload_1", "object": "upload", "status": "in_progress" },
+    "expectedResponseKind": "object",
+    "expectedObjectType": "upload",
+    "expectedStatus": "in_progress",
+    "expectedObjectId": "upload_1",
+    "expectedEventCount": 1,
+    "expectedDegradationCount": 0
+  },
+  {
+    "operation": "UPLOAD_PART_ADD",
+    "mode": "json",
+    "rawJson": { "id": "upload_1", "object": "upload", "status": "in_progress" },
+    "expectedResponseKind": "object",
+    "expectedObjectType": "upload",
+    "expectedStatus": "in_progress",
+    "expectedObjectId": "upload_1",
+    "expectedEventCount": 1,
+    "expectedDegradationCount": 0
+  },
+  {
+    "operation": "UPLOAD_COMPLETE",
+    "mode": "json",
+    "rawJson": { "id": "upload_1", "object": "upload", "status": "completed" },
+    "expectedResponseKind": "object",
+    "expectedObjectType": "upload",
+    "expectedStatus": "completed",
+    "expectedObjectId": "upload_1",
+    "expectedEventCount": 2,
+    "expectedDegradationCount": 0
+  },
+  {
+    "operation": "UPLOAD_CANCEL",
+    "mode": "json",
+    "rawJson": { "id": "upload_1", "object": "upload", "status": "cancelled" },
+    "expectedResponseKind": "object",
+    "expectedObjectType": "upload",
+    "expectedStatus": "cancelled",
+    "expectedObjectId": "upload_1",
+    "expectedEventCount": 2,
+    "expectedDegradationCount": 0
+  }
+]

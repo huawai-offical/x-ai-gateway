@@ -38,6 +38,15 @@ public class ObservabilityAdminController {
         return observabilityQueryService.listCacheHits(distributedKeyId, providerType, from, to);
     }
 
+    @GetMapping("/request-logs")
+    public List<RequestLogResponse> listRequestLogs(
+            @RequestParam(required = false) Long distributedKeyId,
+            @RequestParam(required = false) ProviderType providerType,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to) {
+        return observabilityQueryService.listRequestLogs(distributedKeyId, providerType, from, to);
+    }
+
     @GetMapping("/upstream-cache-references")
     public List<UpstreamCacheReferenceResponse> listUpstreamCacheReferences(
             @RequestParam(required = false) Long distributedKeyId,

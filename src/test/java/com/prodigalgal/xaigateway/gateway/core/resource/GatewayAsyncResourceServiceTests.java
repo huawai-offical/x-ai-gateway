@@ -51,6 +51,59 @@ import static org.mockito.ArgumentMatchers.any;
 class GatewayAsyncResourceServiceTests {
 
     @Test
+    void shouldStoreGatewayResponseObjectMetadataForLifecycleProjection() {
+        GatewayAsyncResourceRepository gatewayAsyncResourceRepository = Mockito.mock(GatewayAsyncResourceRepository.class);
+        DistributedKeyQueryService distributedKeyQueryService = Mockito.mock(DistributedKeyQueryService.class);
+        UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        UpstreamSiteProfileRepository upstreamSiteProfileRepository = Mockito.mock(UpstreamSiteProfileRepository.class);
+        SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        GatewayFileRepository gatewayFileRepository = Mockito.mock(GatewayFileRepository.class);
+        GatewayFileBindingRepository gatewayFileBindingRepository = Mockito.mock(GatewayFileBindingRepository.class);
+        CredentialCryptoService credentialCryptoService = Mockito.mock(CredentialCryptoService.class);
+
+        GatewayAsyncResourceService service = new GatewayAsyncResourceService(
+                gatewayAsyncResourceRepository,
+                distributedKeyQueryService,
+                upstreamCredentialRepository,
+                upstreamSiteProfileRepository,
+                snapshotRepository,
+                gatewayFileRepository,
+                gatewayFileBindingRepository,
+                credentialCryptoService,
+                new SiteCapabilityTruthService(new UpstreamSitePolicyService(), snapshotRepository),
+                new ObjectMapper(),
+                Clock.fixed(Instant.parse("2026-04-12T04:00:00Z"), ZoneOffset.UTC),
+                WebClient.builder()
+        );
+
+        Mockito.when(gatewayAsyncResourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        GatewayAsyncResourceEntity storedEntity = new GatewayAsyncResourceEntity();
+        storedEntity.setResourceKey("resp_test");
+        storedEntity.setDistributedKeyId(1L);
+        storedEntity.setResourceType(GatewayAsyncResourceType.RESPONSE);
+        storedEntity.setStatus("completed");
+        storedEntity.setResponsePayloadJson("{\"id\":\"resp_test\",\"status\":\"completed\"}");
+        storedEntity.setMetadataJson("{\"object_mode\":\"gateway_response_object\",\"events\":[{\"type\":\"stored\",\"status\":\"completed\",\"at\":1712894400}]}");
+        Mockito.when(gatewayAsyncResourceRepository.findByResourceKeyAndResourceTypeAndDeletedFalse("resp_test", GatewayAsyncResourceType.RESPONSE))
+                .thenReturn(Optional.of(storedEntity));
+
+        ObjectNode request = new ObjectMapper().createObjectNode();
+        request.put("model", "gpt-4o");
+        ObjectNode response = new ObjectMapper().createObjectNode();
+        response.put("id", "resp-upstream");
+        response.put("status", "completed");
+
+        service.storeResponse(1L, "gpt-4o", request, response);
+        service.deleteResponse("resp_test", 1L);
+
+        ArgumentCaptor<GatewayAsyncResourceEntity> captor = ArgumentCaptor.forClass(GatewayAsyncResourceEntity.class);
+        Mockito.verify(gatewayAsyncResourceRepository, Mockito.atLeast(2)).save(captor.capture());
+        assertTrue(captor.getAllValues().get(0).getMetadataJson().contains("gateway_response_object"));
+        assertTrue(captor.getAllValues().get(0).getMetadataJson().contains("\"type\":\"stored\""));
+        assertTrue(captor.getAllValues().get(captor.getAllValues().size() - 1).getMetadataJson().contains("\"type\":\"deleted\""));
+    }
+
+    @Test
     void shouldRewriteGatewayFileIdAndPersistUpstreamMetadataForBatch() {
         GatewayAsyncResourceRepository gatewayAsyncResourceRepository = Mockito.mock(GatewayAsyncResourceRepository.class);
         DistributedKeyQueryService distributedKeyQueryService = Mockito.mock(DistributedKeyQueryService.class);

@@ -1,0 +1,13 @@
+[
+  {
+    "operation": "REALTIME_CLIENT_SECRET_CREATE",
+    "mode": "json",
+    "rawJson": { "id": "rt_1", "object": "realtime.client_secret", "status": "completed" },
+    "expectedResponseKind": "object",
+    "expectedObjectType": "realtime.client_secret",
+    "expectedStatus": "completed",
+    "expectedObjectId": "rt_1",
+    "expectedEventCount": 2,
+    "expectedDegradationCount": 0
+  }
+]

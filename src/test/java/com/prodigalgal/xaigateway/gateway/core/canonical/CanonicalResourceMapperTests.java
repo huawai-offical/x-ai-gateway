@@ -6,81 +6,111 @@ import com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
 import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend;
 import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class CanonicalResourceMapperTests {
 
+    private static final List<String> FAMILIES = List.of(
+            "embeddings",
+            "audio",
+            "images",
+            "moderations",
+            "files",
+            "uploads",
+            "batches",
+            "fine_tuning",
+            "realtime"
+    );
+
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final DefaultCanonicalResourceMapper mapper = new DefaultCanonicalResourceMapper();
 
     @Test
-    void shouldMapJsonResourceFamiliesToCanonicalSummary() throws Exception {
-        List<JsonCase> cases = List.of(
-                new JsonCase(TranslationOperation.EMBEDDING_CREATE, "{\"object\":\"list\",\"data\":[{\"embedding\":[0.1]}]}", "list", "list", "completed", null),
-                new JsonCase(TranslationOperation.AUDIO_TRANSCRIPTION, "{\"text\":\"hello\",\"object\":\"transcription\"}", "object", "transcription", "completed", null),
-                new JsonCase(TranslationOperation.AUDIO_TRANSLATION, "{\"text\":\"hello\",\"object\":\"translation\",\"status\":\"completed\"}", "object", "translation", "completed", null),
-                new JsonCase(TranslationOperation.IMAGE_GENERATION, "{\"created\":123,\"data\":[{\"url\":\"https://example.com/a.png\"}]}", "list", "image.list", "completed", null),
-                new JsonCase(TranslationOperation.MODERATION_CREATE, "{\"id\":\"modr_1\",\"object\":\"moderation\",\"results\":[]}", "object", "moderation", "completed", "modr_1"),
-                new JsonCase(TranslationOperation.FILE_CREATE, "{\"id\":\"file_1\",\"object\":\"file\",\"status\":\"processed\"}", "object", "file", "processed", "file_1"),
-                new JsonCase(TranslationOperation.FILE_GET, "{\"id\":\"file_1\",\"object\":\"file\"}", "object", "file", "completed", "file_1"),
-                new JsonCase(TranslationOperation.FILE_LIST, "{\"object\":\"list\",\"data\":[{\"id\":\"file_1\"}]}", "list", "list", "completed", null),
-                new JsonCase(TranslationOperation.FILE_DELETE, "{\"id\":\"file_1\",\"object\":\"file\",\"deleted\":true}", "object", "file", "completed", "file_1"),
-                new JsonCase(TranslationOperation.UPLOAD_CREATE, "{\"id\":\"upload_1\",\"object\":\"upload\",\"status\":\"created\"}", "object", "upload", "created", "upload_1"),
-                new JsonCase(TranslationOperation.UPLOAD_GET, "{\"id\":\"upload_1\",\"object\":\"upload\",\"status\":\"in_progress\"}", "object", "upload", "in_progress", "upload_1"),
-                new JsonCase(TranslationOperation.UPLOAD_PART_ADD, "{\"id\":\"upload_1\",\"object\":\"upload\",\"status\":\"in_progress\"}", "object", "upload", "in_progress", "upload_1"),
-                new JsonCase(TranslationOperation.UPLOAD_COMPLETE, "{\"id\":\"upload_1\",\"object\":\"upload\",\"status\":\"completed\"}", "object", "upload", "completed", "upload_1"),
-                new JsonCase(TranslationOperation.UPLOAD_CANCEL, "{\"id\":\"upload_1\",\"object\":\"upload\",\"status\":\"cancelled\"}", "object", "upload", "cancelled", "upload_1"),
-                new JsonCase(TranslationOperation.BATCH_CREATE, "{\"id\":\"batch_1\",\"object\":\"batch\",\"status\":\"queued\"}", "object", "batch", "queued", "batch_1"),
-                new JsonCase(TranslationOperation.BATCH_GET, "{\"id\":\"batch_1\",\"object\":\"batch\",\"status\":\"in_progress\"}", "object", "batch", "in_progress", "batch_1"),
-                new JsonCase(TranslationOperation.BATCH_CANCEL, "{\"id\":\"batch_1\",\"object\":\"batch\",\"status\":\"cancelled\"}", "object", "batch", "cancelled", "batch_1"),
-                new JsonCase(TranslationOperation.TUNING_CREATE, "{\"id\":\"ftjob_1\",\"object\":\"fine_tuning.job\",\"status\":\"created\"}", "object", "fine_tuning.job", "created", "ftjob_1"),
-                new JsonCase(TranslationOperation.TUNING_GET, "{\"id\":\"ftjob_1\",\"object\":\"fine_tuning.job\",\"status\":\"running\"}", "object", "fine_tuning.job", "in_progress", "ftjob_1"),
-                new JsonCase(TranslationOperation.TUNING_CANCEL, "{\"id\":\"ftjob_1\",\"object\":\"fine_tuning.job\",\"status\":\"cancelled\"}", "object", "fine_tuning.job", "cancelled", "ftjob_1"),
-                new JsonCase(TranslationOperation.REALTIME_CLIENT_SECRET_CREATE, "{\"id\":\"rt_1\",\"object\":\"realtime.client_secret\",\"status\":\"completed\"}", "object", "realtime.client_secret", "completed", "rt_1")
-        );
-
-        for (JsonCase item : cases) {
-            CanonicalResourceResponse response = mapper.mapJson(
+    void shouldMapFixtureCasesToCanonicalSummary() throws Exception {
+        for (FixtureCase item : loadFixtures()) {
+            CanonicalResourceResponse response = "binary".equals(item.mode())
+                    ? mapper.mapBinary(
                     request(item.operation()),
-                    plan(item.operation(), SupportStatus.NATIVE, InteropCapabilityLevel.NATIVE, List.of()),
-                    objectMapper.readTree(item.rawJson())
-            );
+                    plan(item),
+                    item.binaryText() == null ? new byte[0] : item.binaryText().getBytes(StandardCharsets.UTF_8),
+                    item.contentType())
+                    : mapper.mapJson(
+                    request(item.operation()),
+                    plan(item),
+                    item.rawJson());
 
             assertEquals(item.expectedResponseKind(), response.responseKind(), item.operation().name());
             assertEquals(item.expectedObjectType(), response.objectType(), item.operation().name());
             assertEquals(item.expectedStatus(), response.status(), item.operation().name());
             assertEquals(item.expectedObjectId(), response.objectId(), item.operation().name());
+            assertEquals(item.expectedEventCount(), response.events().size(), item.operation().name());
+            assertEquals(item.expectedDegradationCount(), response.degradations().size(), item.operation().name());
+            if (item.expectedDegradationCode() != null && !response.degradations().isEmpty()) {
+                assertEquals(item.expectedDegradationCode(), response.degradations().get(0).code(), item.operation().name());
+            }
+            if ("binary".equals(item.mode())) {
+                assertEquals(item.binaryText().getBytes(StandardCharsets.UTF_8).length, response.binaryLength(), item.operation().name());
+            }
         }
     }
 
-    @Test
-    void shouldMapBinaryResponsesAndCarryPlanDegradations() {
-        CanonicalResourceResponse audioResponse = mapper.mapBinary(
-                request(TranslationOperation.AUDIO_SPEECH),
-                plan(TranslationOperation.AUDIO_SPEECH, SupportStatus.NATIVE, InteropCapabilityLevel.NATIVE, List.of()),
-                new byte[] {1, 2, 3},
-                "audio/mpeg"
-        );
-        assertEquals("binary", audioResponse.responseKind());
-        assertEquals("audio.speech", audioResponse.objectType());
-        assertEquals("completed", audioResponse.status());
-        assertEquals(3, audioResponse.binaryLength());
+    private List<FixtureCase> loadFixtures() throws Exception {
+        List<FixtureCase> cases = new ArrayList<>();
+        for (String family : FAMILIES) {
+            try (InputStream stream = getClass().getClassLoader()
+                    .getResourceAsStream("fixtures/canonical-resource/" + family + "/cases.json")) {
+                if (stream == null) {
+                    throw new IllegalStateException("缺少 fixture: " + family);
+                }
+                JsonNode root = objectMapper.readTree(stream);
+                for (JsonNode item : root) {
+                    cases.add(new FixtureCase(
+                            TranslationOperation.valueOf(item.path("operation").asText()),
+                            item.path("mode").asText("json"),
+                            item.path("rawJson"),
+                            item.path("binaryText").isMissingNode() ? null : item.path("binaryText").asText(),
+                            item.path("contentType").isMissingNode() ? null : item.path("contentType").asText(),
+                            SupportStatus.valueOf(item.path("supportStatus").asText("NATIVE")),
+                            InteropCapabilityLevel.valueOf(item.path("degradationLevel").asText("NATIVE")),
+                            readBlockerReasons(item.path("blockerReasons")),
+                            item.path("expectedResponseKind").asText(),
+                            item.path("expectedObjectType").asText(),
+                            item.path("expectedStatus").asText(),
+                            item.path("expectedObjectId").isMissingNode() || item.path("expectedObjectId").isNull()
+                                    ? null
+                                    : item.path("expectedObjectId").asText(),
+                            item.path("expectedEventCount").asInt(),
+                            item.path("expectedDegradationCount").asInt(0),
+                            item.path("expectedDegradationCode").isMissingNode() || item.path("expectedDegradationCode").isNull()
+                                    ? null
+                                    : item.path("expectedDegradationCode").asText()
+                    ));
+                }
+            }
+        }
+        return cases;
+    }
 
-        CanonicalResourceResponse fileContentResponse = mapper.mapBinary(
-                request(TranslationOperation.FILE_CONTENT_GET),
-                plan(TranslationOperation.FILE_CONTENT_GET, SupportStatus.DEGRADED, InteropCapabilityLevel.LOSSY, List.of("content render degraded")),
-                new byte[] {9, 8},
-                "application/pdf"
-        );
-        assertEquals("file.content", fileContentResponse.objectType());
-        assertEquals("file_123", fileContentResponse.objectId());
-        assertEquals(1, fileContentResponse.degradations().size());
-        assertEquals("blocker_reason", fileContentResponse.degradations().get(0).code());
+    private List<String> readBlockerReasons(JsonNode node) {
+        if (node == null || node.isMissingNode() || !node.isArray()) {
+            return List.of();
+        }
+        List<String> values = new ArrayList<>();
+        for (JsonNode item : node) {
+            if (!item.isNull() && !item.asText().isBlank()) {
+                values.add(item.asText());
+            }
+        }
+        return List.copyOf(values);
     }
 
     private CanonicalResourceRequest request(TranslationOperation operation) {
@@ -102,37 +132,33 @@ class CanonicalResourceMapperTests {
         );
     }
 
-    private CanonicalExecutionPlan plan(
-            TranslationOperation operation,
-            SupportStatus supportStatus,
-            InteropCapabilityLevel degradationLevel,
-            List<String> blockerReasons) {
+    private CanonicalExecutionPlan plan(FixtureCase item) {
         return new CanonicalExecutionPlan(
                 true,
                 CanonicalIngressProtocol.OPENAI,
-                defaultPath(operation),
-                defaultPath(operation),
-                defaultSurface(operation),
+                defaultPath(item.operation()),
+                defaultPath(item.operation()),
+                defaultSurface(item.operation()),
                 "model-x",
                 "model-x",
                 "model-x",
-                resourceType(operation),
-                operation,
+                resourceType(item.operation()),
+                item.operation(),
                 ExecutionKind.NATIVE,
                 ExecutionBackend.NATIVE,
-                supportStatus,
+                item.supportStatus(),
                 null,
                 List.of(ExecutionBackend.NATIVE),
                 "test",
-                degradationLevel,
-                degradationLevel,
-                degradationLevel,
-                degradationLevel,
-                blockerReasons,
+                item.degradationLevel(),
+                item.degradationLevel(),
+                item.degradationLevel(),
+                item.degradationLevel(),
+                item.blockerReasons(),
                 List.of(),
                 Map.of(),
-                blockerReasons,
-                blockerReasons
+                item.blockerReasons(),
+                item.blockerReasons()
         );
     }
 
@@ -203,13 +229,22 @@ class CanonicalResourceMapperTests {
         };
     }
 
-    private record JsonCase(
+    private record FixtureCase(
             TranslationOperation operation,
-            String rawJson,
+            String mode,
+            JsonNode rawJson,
+            String binaryText,
+            String contentType,
+            SupportStatus supportStatus,
+            InteropCapabilityLevel degradationLevel,
+            List<String> blockerReasons,
             String expectedResponseKind,
             String expectedObjectType,
             String expectedStatus,
-            String expectedObjectId
+            String expectedObjectId,
+            int expectedEventCount,
+            int expectedDegradationCount,
+            String expectedDegradationCode
     ) {
     }
 }
