@@ -175,13 +175,23 @@ export function TranslationDebugPage() {
               <strong>{String(explainResult.executable)}</strong>
               <span>{explainResult.executionKind ?? '-'}</span>
               <span>backend: {explainResult.executionBackend ?? '-'}</span>
+              <span>supportStatus: {explainResult.supportStatus ?? '-'}</span>
+              <span>degradationLevel: {explainResult.degradationLevel ?? '-'}</span>
               <span>objectMode: {explainResult.objectMode ?? '-'}</span>
               <span>protocol: {explainResult.ingressProtocol ?? '-'}</span>
+              <span>surface: {explainResult.surface ?? '-'}</span>
+              <span>normalizedPath: {explainResult.normalizedPath ?? '-'}</span>
               <span>resource / operation: {explainResult.resourceType ?? '-'} / {explainResult.operation ?? '-'}</span>
               <span>execution / render / overall: {explainResult.executionCapabilityLevel ?? '-'} / {explainResult.renderCapabilityLevel ?? '-'} / {explainResult.overallCapabilityLevel ?? '-'}</span>
               <span>resolvedModel: {explainResult.resolvedModel ?? '-'}</span>
             </div>
             <div className="detail-grid">
+              {explainResult.blockerReasons.length ? (
+                <div className="detail-card">
+                  <strong>blockerReasons</strong>
+                  <span>{explainResult.blockerReasons.join('；')}</span>
+                </div>
+              ) : null}
               {explainResult.degradations.length ? (
                 <div className="detail-card">
                   <strong>degradations</strong>
@@ -233,15 +243,34 @@ export function TranslationDebugPage() {
               <span>status: {resourceExecuteResult.statusCode}</span>
               <span>contentType: {resourceExecuteResult.contentType ?? '未知'}</span>
               <span>upstreamPath: {resourceExecuteResult.upstreamPath ?? '无'}</span>
+              <span>supportStatus: {resourceExecuteResult.supportStatus ?? '无'}</span>
+              <span>degradationLevel: {resourceExecuteResult.degradationLevel ?? '无'}</span>
               <span>objectMode: {resourceExecuteResult.objectMode ?? '无'}</span>
               {typeof resourceExecuteResult.binaryLength === 'number' ? <span>binaryLength: {resourceExecuteResult.binaryLength}</span> : null}
+              {resourceExecuteResult.blockerReasons.length ? <span>blockerReasons: {resourceExecuteResult.blockerReasons.join('；')}</span> : null}
             </div>
+            {resourceExecuteResult.canonicalResponse ? (
+              <div className="detail-card">
+                <strong>canonical</strong>
+                <span>responseKind: {resourceExecuteResult.canonicalResponse.responseKind ?? '无'}</span>
+                <span>objectType: {resourceExecuteResult.canonicalResponse.objectType ?? '无'}</span>
+                <span>objectId: {resourceExecuteResult.canonicalResponse.objectId ?? '无'}</span>
+                <span>status: {resourceExecuteResult.canonicalResponse.status ?? '无'}</span>
+                <span>events: {resourceExecuteResult.canonicalResponse.events.length}</span>
+                <span>degradations: {resourceExecuteResult.canonicalResponse.degradations.length}</span>
+              </div>
+            ) : null}
             <div className="code-block">
               <pre>{JSON.stringify(resourceExecuteResult.routeSelection, null, 2)}</pre>
             </div>
             <div className="code-block">
               <pre>{JSON.stringify(resourceExecuteResult.plan, null, 2)}</pre>
             </div>
+            {resourceExecuteResult.canonicalResponse ? (
+              <div className="code-block">
+                <pre>{JSON.stringify(resourceExecuteResult.canonicalResponse, null, 2)}</pre>
+              </div>
+            ) : null}
             <div className="code-block">
               <pre>{JSON.stringify(resourceExecuteResult.responseJson ?? resourceExecuteResult.responseText ?? null, null, 2)}</pre>
             </div>

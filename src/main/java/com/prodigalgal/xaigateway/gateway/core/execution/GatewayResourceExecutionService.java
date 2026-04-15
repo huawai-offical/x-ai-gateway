@@ -10,9 +10,13 @@ import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyQueryService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyGovernanceService;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalFileRef;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceMapper;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceResponse;
+import com.prodigalgal.xaigateway.gateway.core.canonical.DefaultCanonicalResourceMapper;
 import com.prodigalgal.xaigateway.gateway.core.credential.CredentialMaterialResolver;
 import com.prodigalgal.xaigateway.gateway.core.credential.ResolvedCredentialMaterial;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileContent;
@@ -64,6 +68,7 @@ public class GatewayResourceExecutionService {
     private final GatewayObservabilityService gatewayObservabilityService;
     private final GatewayRequestLifecycleService gatewayRequestLifecycleService;
     private final GatewayFileService gatewayFileService;
+    private final CanonicalResourceMapper canonicalResourceMapper;
     private final ObjectMapper objectMapper;
     private final GatewayProperties gatewayProperties;
 
@@ -82,6 +87,7 @@ public class GatewayResourceExecutionService {
             GatewayObservabilityService gatewayObservabilityService,
             GatewayRequestLifecycleService gatewayRequestLifecycleService,
             GatewayFileService gatewayFileService,
+            CanonicalResourceMapper canonicalResourceMapper,
             ObjectMapper objectMapper,
             GatewayProperties gatewayProperties) {
         this.gatewayRouteSelectionService = gatewayRouteSelectionService;
@@ -97,6 +103,7 @@ public class GatewayResourceExecutionService {
         this.gatewayObservabilityService = gatewayObservabilityService;
         this.gatewayRequestLifecycleService = gatewayRequestLifecycleService;
         this.gatewayFileService = gatewayFileService;
+        this.canonicalResourceMapper = canonicalResourceMapper;
         this.objectMapper = objectMapper;
         this.gatewayProperties = gatewayProperties;
     }
@@ -130,6 +137,7 @@ public class GatewayResourceExecutionService {
                 gatewayObservabilityService,
                 gatewayRequestLifecycleService,
                 gatewayFileService,
+                new DefaultCanonicalResourceMapper(),
                 objectMapper,
                 gatewayProperties
         );
@@ -291,10 +299,23 @@ public class GatewayResourceExecutionService {
     public ResponseEntity<JsonNode> executeJson(
             CanonicalResourceRequest request,
             String defaultModel) {
-        return executeJson(request, resolveDistributedKeyId(request.distributedKeyPrefix()), defaultModel);
+        return executeDetailedJson(request, resolveDistributedKeyId(request.distributedKeyPrefix()), defaultModel).jsonResponse();
     }
 
     public ResponseEntity<JsonNode> executeJson(
+            CanonicalResourceRequest request,
+            Long distributedKeyId,
+            String defaultModel) {
+        return executeDetailedJson(request, distributedKeyId, defaultModel).jsonResponse();
+    }
+
+    public GatewayResourceExecutionResult executeDetailedJson(
+            CanonicalResourceRequest request,
+            String defaultModel) {
+        return executeDetailedJson(request, resolveDistributedKeyId(request.distributedKeyPrefix()), defaultModel);
+    }
+
+    public GatewayResourceExecutionResult executeDetailedJson(
             CanonicalResourceRequest request,
             Long distributedKeyId,
             String defaultModel) {
@@ -302,7 +323,7 @@ public class GatewayResourceExecutionService {
         if (!semantics.requiresRouteSelection()) {
             GatewayResourceExecutionContext context = prepareNoRouteContext(distributedKeyId, request);
             JsonNode payload = request.jsonBody() == null ? objectMapper.createObjectNode() : request.jsonBody();
-            return resolveExecutor(context).executeJson(context, payload, defaultModel);
+            return jsonResult(request, context.executionPlan(), resolveExecutor(context).executeJson(context, payload, defaultModel));
         }
         ObjectNode payload = requireObjectPayload(request.jsonBody(), defaultModel);
         RouteSelectionResult selectionResult = select(request.distributedKeyPrefix(), request.requestPath(), payload.path("model").asText(), payload);
@@ -319,6 +340,7 @@ public class GatewayResourceExecutionService {
                 GatewayResourceExecutionContext context = prepareContext(candidateSelection, request, payload);
                 try {
                     ResponseEntity<JsonNode> response = resolveExecutor(context).executeJson(context, payload, defaultModel);
+                    GatewayResourceExecutionResult result = jsonResult(request, context.executionPlan(), response);
                     if (shouldFallback(response.getStatusCode().value(), response.getBody())) {
                         attempts.add(new RouteExecutionAttempt(
                                 index + 1,
@@ -331,7 +353,7 @@ public class GatewayResourceExecutionService {
                         gatewayRouteSelectionService.markCredentialCooldown(candidateSelection.selectedCandidate().candidate().credentialId(), "status=" + response.getStatusCode().value());
                         if (index == maxAttempts - 1) {
                             gatewayObservabilityService.recordRouteDecision(requestId, candidateSelection.withAttempts(List.copyOf(attempts)));
-                            return response;
+                            return result;
                         }
                         continue;
                     }
@@ -344,27 +366,8 @@ public class GatewayResourceExecutionService {
                     ));
                     RouteSelectionResult finalSelection = candidateSelection.withAttempts(List.copyOf(attempts));
                     gatewayRouteSelectionService.recordSuccessfulSelection(finalSelection);
-                    gatewayObservabilityService.recordRouteDecision(
-                            requestId,
-                            finalSelection,
-                            request.requestPath(),
-                            context.executionPlan().resourceType().wireName(),
-                            context.executionPlan().operation().wireName(),
-                            context.executionPlan().executionBackend(),
-                            context.executionPlan().objectMode()
-                    );
-                    gatewayObservabilityService.recordCacheUsage(
-                            requestId,
-                            finalSelection,
-                            com.prodigalgal.xaigateway.gateway.core.usage.GatewayUsage.empty(),
-                            "none",
-                            null,
-                            request.requestPath(),
-                            context.executionPlan().resourceType().wireName(),
-                            context.executionPlan().operation().wireName(),
-                            context.executionPlan().executionBackend(),
-                            context.executionPlan().objectMode()
-                    );
+                    recordStructuredRouteDecision(requestId, finalSelection, request, context.executionPlan());
+                    recordStructuredCacheUsage(requestId, finalSelection, request, context.executionPlan());
                     gatewayRequestLifecycleService.completeRequest(
                             requestId,
                             finalSelection,
@@ -372,9 +375,10 @@ public class GatewayResourceExecutionService {
                             context.executionPlan(),
                             false,
                             GatewayUsageView.empty(),
+                            result.canonicalResponse(),
                             startedAt
                     );
-                    return response;
+                    return result;
                 } catch (RuntimeException exception) {
                     attempts.add(new RouteExecutionAttempt(
                             index + 1,
@@ -388,15 +392,7 @@ public class GatewayResourceExecutionService {
                     lastException = exception;
                     if (!shouldFallback(exception) || index == maxAttempts - 1) {
                         RouteSelectionResult failedSelection = candidateSelection.withAttempts(List.copyOf(attempts));
-                        gatewayObservabilityService.recordRouteDecision(
-                                requestId,
-                                failedSelection,
-                                request.requestPath(),
-                                context.executionPlan().resourceType().wireName(),
-                                context.executionPlan().operation().wireName(),
-                                context.executionPlan().executionBackend(),
-                                context.executionPlan().objectMode()
-                        );
+                        recordStructuredRouteDecision(requestId, failedSelection, request, context.executionPlan());
                         gatewayRequestLifecycleService.failRequest(
                                 requestId,
                                 failedSelection,
@@ -448,10 +444,23 @@ public class GatewayResourceExecutionService {
     public ResponseEntity<byte[]> executeBinaryJson(
             CanonicalResourceRequest request,
             String defaultModel) {
-        return executeBinaryJson(request, resolveDistributedKeyId(request.distributedKeyPrefix()), defaultModel);
+        return executeDetailedBinaryJson(request, resolveDistributedKeyId(request.distributedKeyPrefix()), defaultModel).binaryResponse();
     }
 
     public ResponseEntity<byte[]> executeBinaryJson(
+            CanonicalResourceRequest request,
+            Long distributedKeyId,
+            String defaultModel) {
+        return executeDetailedBinaryJson(request, distributedKeyId, defaultModel).binaryResponse();
+    }
+
+    public GatewayResourceExecutionResult executeDetailedBinaryJson(
+            CanonicalResourceRequest request,
+            String defaultModel) {
+        return executeDetailedBinaryJson(request, resolveDistributedKeyId(request.distributedKeyPrefix()), defaultModel);
+    }
+
+    public GatewayResourceExecutionResult executeDetailedBinaryJson(
             CanonicalResourceRequest request,
             Long distributedKeyId,
             String defaultModel) {
@@ -459,7 +468,7 @@ public class GatewayResourceExecutionService {
         if (!semantics.requiresRouteSelection()) {
             GatewayResourceExecutionContext context = prepareNoRouteContext(distributedKeyId, request);
             JsonNode payload = request.jsonBody() == null ? objectMapper.createObjectNode() : request.jsonBody();
-            return resolveExecutor(context).executeBinary(context, payload, defaultModel);
+            return binaryResult(request, context.executionPlan(), resolveExecutor(context).executeBinary(context, payload, defaultModel));
         }
         ObjectNode payload = requireObjectPayload(request.jsonBody(), defaultModel);
         RouteSelectionResult selectionResult = select(request.distributedKeyPrefix(), request.requestPath(), payload.path("model").asText(), payload);
@@ -476,6 +485,7 @@ public class GatewayResourceExecutionService {
                 GatewayResourceExecutionContext context = prepareContext(candidateSelection, request, payload);
                 try {
                     ResponseEntity<byte[]> response = resolveExecutor(context).executeBinary(context, payload, defaultModel);
+                    GatewayResourceExecutionResult result = binaryResult(request, context.executionPlan(), response);
                     if (shouldFallback(response.getStatusCode().value(), response.getBody())) {
                         attempts.add(new RouteExecutionAttempt(
                                 index + 1,
@@ -488,7 +498,7 @@ public class GatewayResourceExecutionService {
                         gatewayRouteSelectionService.markCredentialCooldown(candidateSelection.selectedCandidate().candidate().credentialId(), "status=" + response.getStatusCode().value());
                         if (index == maxAttempts - 1) {
                             gatewayObservabilityService.recordRouteDecision(requestId, candidateSelection.withAttempts(List.copyOf(attempts)));
-                            return response;
+                            return result;
                         }
                         continue;
                     }
@@ -501,27 +511,8 @@ public class GatewayResourceExecutionService {
                     ));
                     RouteSelectionResult finalSelection = candidateSelection.withAttempts(List.copyOf(attempts));
                     gatewayRouteSelectionService.recordSuccessfulSelection(finalSelection);
-                    gatewayObservabilityService.recordRouteDecision(
-                            requestId,
-                            finalSelection,
-                            request.requestPath(),
-                            context.executionPlan().resourceType().wireName(),
-                            context.executionPlan().operation().wireName(),
-                            context.executionPlan().executionBackend(),
-                            context.executionPlan().objectMode()
-                    );
-                    gatewayObservabilityService.recordCacheUsage(
-                            requestId,
-                            finalSelection,
-                            com.prodigalgal.xaigateway.gateway.core.usage.GatewayUsage.empty(),
-                            "none",
-                            null,
-                            request.requestPath(),
-                            context.executionPlan().resourceType().wireName(),
-                            context.executionPlan().operation().wireName(),
-                            context.executionPlan().executionBackend(),
-                            context.executionPlan().objectMode()
-                    );
+                    recordStructuredRouteDecision(requestId, finalSelection, request, context.executionPlan());
+                    recordStructuredCacheUsage(requestId, finalSelection, request, context.executionPlan());
                     gatewayRequestLifecycleService.completeRequest(
                             requestId,
                             finalSelection,
@@ -529,9 +520,10 @@ public class GatewayResourceExecutionService {
                             context.executionPlan(),
                             false,
                             GatewayUsageView.empty(),
+                            result.canonicalResponse(),
                             startedAt
                     );
-                    return response;
+                    return result;
                 } catch (RuntimeException exception) {
                     attempts.add(new RouteExecutionAttempt(
                             index + 1,
@@ -545,15 +537,7 @@ public class GatewayResourceExecutionService {
                     lastException = exception;
                     if (!shouldFallback(exception) || index == maxAttempts - 1) {
                         RouteSelectionResult failedSelection = candidateSelection.withAttempts(List.copyOf(attempts));
-                        gatewayObservabilityService.recordRouteDecision(
-                                requestId,
-                                failedSelection,
-                                request.requestPath(),
-                                context.executionPlan().resourceType().wireName(),
-                                context.executionPlan().operation().wireName(),
-                                context.executionPlan().executionBackend(),
-                                context.executionPlan().objectMode()
-                        );
+                        recordStructuredRouteDecision(requestId, failedSelection, request, context.executionPlan());
                         gatewayRequestLifecycleService.failRequest(
                                 requestId,
                                 failedSelection,
@@ -600,10 +584,27 @@ public class GatewayResourceExecutionService {
             CanonicalResourceRequest request,
             String requestedModel,
             Map<String, FilePart> files) {
-        return executeMultipartJson(request, resolveDistributedKeyId(request.distributedKeyPrefix()), requestedModel, files);
+        return executeDetailedMultipartJson(request, resolveDistributedKeyId(request.distributedKeyPrefix()), requestedModel, files)
+                .map(GatewayResourceExecutionResult::jsonResponse);
     }
 
     public Mono<ResponseEntity<JsonNode>> executeMultipartJson(
+            CanonicalResourceRequest request,
+            Long distributedKeyId,
+            String requestedModel,
+            Map<String, FilePart> files) {
+        return executeDetailedMultipartJson(request, distributedKeyId, requestedModel, files)
+                .map(GatewayResourceExecutionResult::jsonResponse);
+    }
+
+    public Mono<GatewayResourceExecutionResult> executeDetailedMultipartJson(
+            CanonicalResourceRequest request,
+            String requestedModel,
+            Map<String, FilePart> files) {
+        return executeDetailedMultipartJson(request, resolveDistributedKeyId(request.distributedKeyPrefix()), requestedModel, files);
+    }
+
+    public Mono<GatewayResourceExecutionResult> executeDetailedMultipartJson(
             CanonicalResourceRequest request,
             Long distributedKeyId,
             String requestedModel,
@@ -612,7 +613,8 @@ public class GatewayResourceExecutionService {
         GatewayRequestSemantics semantics = gatewayRequestFeatureService.describe(request.httpMethod(), request.requestPath(), routePayload);
         if (!semantics.requiresRouteSelection()) {
             GatewayResourceExecutionContext context = prepareNoRouteContext(distributedKeyId, request);
-            return resolveExecutor(context).executeMultipart(context, requestedModel, request.formFields(), files);
+            return resolveExecutor(context).executeMultipart(context, requestedModel, request.formFields(), files)
+                    .map(response -> jsonResult(request, context.executionPlan(), response));
         }
         RouteSelectionResult selectionResult = select(request.distributedKeyPrefix(), request.requestPath(), requestedModel, routePayload);
         String requestId = gatewayObservabilityService.nextRequestId();
@@ -653,7 +655,7 @@ public class GatewayResourceExecutionService {
         ));
     }
 
-    private Mono<ResponseEntity<JsonNode>> executeMultipartAttempt(
+    private Mono<GatewayResourceExecutionResult> executeMultipartAttempt(
             String requestId,
             RouteSelectionResult baseSelection,
             CanonicalResourceRequest request,
@@ -669,6 +671,7 @@ public class GatewayResourceExecutionService {
         GatewayResourceExecutionContext context = prepareContext(candidateSelection, request, routePayload);
         return resolveExecutor(context).executeMultipart(context, requestedModel, formFields, files)
                 .flatMap(response -> {
+                    GatewayResourceExecutionResult result = jsonResult(request, context.executionPlan(), response);
                     if (shouldFallback(response.getStatusCode().value(), response.getBody())) {
                         attempts.add(new RouteExecutionAttempt(
                                 candidateIndex + 1,
@@ -694,15 +697,7 @@ public class GatewayResourceExecutionService {
                                     startedAt
                             );
                         }
-                        gatewayObservabilityService.recordRouteDecision(
-                                requestId,
-                                candidateSelection.withAttempts(List.copyOf(attempts)),
-                                request.requestPath(),
-                                context.executionPlan().resourceType().wireName(),
-                                context.executionPlan().operation().wireName(),
-                                context.executionPlan().executionBackend(),
-                                context.executionPlan().objectMode()
-                        );
+                        recordStructuredRouteDecision(requestId, candidateSelection.withAttempts(List.copyOf(attempts)), request, context.executionPlan());
                     } else {
                         attempts.add(new RouteExecutionAttempt(
                                 candidateIndex + 1,
@@ -713,27 +708,8 @@ public class GatewayResourceExecutionService {
                         ));
                         RouteSelectionResult finalSelection = candidateSelection.withAttempts(List.copyOf(attempts));
                         gatewayRouteSelectionService.recordSuccessfulSelection(finalSelection);
-                        gatewayObservabilityService.recordRouteDecision(
-                                requestId,
-                                finalSelection,
-                                request.requestPath(),
-                                context.executionPlan().resourceType().wireName(),
-                                context.executionPlan().operation().wireName(),
-                                context.executionPlan().executionBackend(),
-                                context.executionPlan().objectMode()
-                        );
-                        gatewayObservabilityService.recordCacheUsage(
-                                requestId,
-                                finalSelection,
-                                com.prodigalgal.xaigateway.gateway.core.usage.GatewayUsage.empty(),
-                                "none",
-                                null,
-                                request.requestPath(),
-                                context.executionPlan().resourceType().wireName(),
-                                context.executionPlan().operation().wireName(),
-                                context.executionPlan().executionBackend(),
-                                context.executionPlan().objectMode()
-                        );
+                        recordStructuredRouteDecision(requestId, finalSelection, request, context.executionPlan());
+                        recordStructuredCacheUsage(requestId, finalSelection, request, context.executionPlan());
                         gatewayRequestLifecycleService.completeRequest(
                                 requestId,
                                 finalSelection,
@@ -741,10 +717,11 @@ public class GatewayResourceExecutionService {
                                 context.executionPlan(),
                                 true,
                                 GatewayUsageView.empty(),
+                                result.canonicalResponse(),
                                 startedAt
                         );
                     }
-                    return Mono.just(response);
+                    return Mono.just(result);
                 })
                 .onErrorResume(error -> {
                     attempts.add(new RouteExecutionAttempt(
@@ -769,19 +746,11 @@ public class GatewayResourceExecutionService {
                                 files,
                                 candidateIndex + 1,
                                 maxAttempts,
-                                attempts,
-                                startedAt
+                                    attempts,
+                                    startedAt
                         );
                     }
-                    gatewayObservabilityService.recordRouteDecision(
-                            requestId,
-                            candidateSelection.withAttempts(List.copyOf(attempts)),
-                            request.requestPath(),
-                            context.executionPlan().resourceType().wireName(),
-                            context.executionPlan().operation().wireName(),
-                            context.executionPlan().executionBackend(),
-                            context.executionPlan().objectMode()
-                    );
+                    recordStructuredRouteDecision(requestId, candidateSelection.withAttempts(List.copyOf(attempts)), request, context.executionPlan());
                     gatewayRequestLifecycleService.failRequest(
                             requestId,
                             candidateSelection.withAttempts(List.copyOf(attempts)),
@@ -968,5 +937,61 @@ public class GatewayResourceExecutionService {
 
     private boolean shouldFallback(int statusCode, Object body) {
         return statusCode == 429 || statusCode >= 500 || body == null;
+    }
+
+    private GatewayResourceExecutionResult jsonResult(
+            CanonicalResourceRequest request,
+            CanonicalExecutionPlan plan,
+            ResponseEntity<JsonNode> response) {
+        CanonicalResourceResponse canonicalResponse = canonicalResourceMapper.mapJson(request, plan, response.getBody());
+        return GatewayResourceExecutionResult.json(response, canonicalResponse);
+    }
+
+    private GatewayResourceExecutionResult binaryResult(
+            CanonicalResourceRequest request,
+            CanonicalExecutionPlan plan,
+            ResponseEntity<byte[]> response) {
+        String contentType = response.getHeaders().getContentType() == null ? null : response.getHeaders().getContentType().toString();
+        CanonicalResourceResponse canonicalResponse = canonicalResourceMapper.mapBinary(request, plan, response.getBody(), contentType);
+        return GatewayResourceExecutionResult.binary(response, canonicalResponse);
+    }
+
+    private void recordStructuredRouteDecision(
+            String requestId,
+            RouteSelectionResult selectionResult,
+            CanonicalResourceRequest request,
+            CanonicalExecutionPlan plan) {
+        gatewayObservabilityService.recordRouteDecision(
+                requestId,
+                selectionResult,
+                request.requestPath(),
+                plan.resourceType().wireName(),
+                plan.operation().wireName(),
+                plan.executionBackend(),
+                plan.supportStatus(),
+                plan.objectMode(),
+                plan.degradationLevel()
+        );
+    }
+
+    private void recordStructuredCacheUsage(
+            String requestId,
+            RouteSelectionResult selectionResult,
+            CanonicalResourceRequest request,
+            CanonicalExecutionPlan plan) {
+        gatewayObservabilityService.recordCacheUsage(
+                requestId,
+                selectionResult,
+                com.prodigalgal.xaigateway.gateway.core.usage.GatewayUsage.empty(),
+                "none",
+                null,
+                request.requestPath(),
+                plan.resourceType().wireName(),
+                plan.operation().wireName(),
+                plan.executionBackend(),
+                plan.supportStatus(),
+                plan.objectMode(),
+                plan.degradationLevel()
+        );
     }
 }

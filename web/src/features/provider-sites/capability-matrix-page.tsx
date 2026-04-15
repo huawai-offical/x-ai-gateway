@@ -85,6 +85,18 @@ export function CapabilityMatrixPage() {
                   </Link>
                 ))}
               </div>
+              <div className="detail-grid">
+                {Object.entries(item.surfaces).map(([surfaceKey, surface]) => (
+                  <div key={surfaceKey} className="detail-card">
+                    <strong>{surface.operation}</strong>
+                    <span>surface: {surface.surface ?? surfaceKey}</span>
+                    <span>normalizedPath: {surface.normalizedPath ?? '无'}</span>
+                    <span>supportStatus: {surface.supportStatus ?? '-'}</span>
+                    <span>degradationLevel: {surface.degradationLevel ?? '-'}</span>
+                    {surface.blockerReasons.length ? <span>blockerReasons: {surface.blockerReasons.join(', ')}</span> : null}
+                  </div>
+                ))}
+              </div>
             </div>
           ))}
           {!filteredRows.length ? <p className="empty-state">暂无能力矩阵数据。</p> : null}

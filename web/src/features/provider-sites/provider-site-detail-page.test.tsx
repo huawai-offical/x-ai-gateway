@@ -42,15 +42,23 @@ apiRequest.mockImplementation(async (url: string, init?: RequestInit) => {
           chat_completion: {
             resourceType: 'CHAT',
             operation: 'CHAT_COMPLETION',
+            surface: 'chat.completions',
+            normalizedPath: '/v1/chat/completions',
+            supportStatus: 'NATIVE',
+            degradationLevel: 'NATIVE',
             executionCapabilityLevel: 'NATIVE',
             renderCapabilityLevel: 'NATIVE',
             overallCapabilityLevel: 'NATIVE',
+            blockerReasons: [],
+            lossReasons: [],
             requiredFeatures: ['chat_text'],
             featureResolutions: {
               chat_text: {
                 declaredLevel: 'NATIVE',
                 implementedLevel: 'NATIVE',
                 effectiveLevel: 'NATIVE',
+                supportStatus: 'NATIVE',
+                degradationLevel: 'NATIVE',
                 blockedReasons: [],
                 lossReasons: [],
               },
@@ -59,15 +67,23 @@ apiRequest.mockImplementation(async (url: string, init?: RequestInit) => {
           response_create: {
             resourceType: 'RESPONSE',
             operation: 'RESPONSE_CREATE',
+            surface: 'responses',
+            normalizedPath: '/v1/responses',
+            supportStatus: 'DEGRADED',
+            degradationLevel: 'EMULATED',
             executionCapabilityLevel: 'NATIVE',
             renderCapabilityLevel: 'EMULATED',
             overallCapabilityLevel: 'EMULATED',
+            blockerReasons: ['response object fallback'],
+            lossReasons: ['render emulation'],
             requiredFeatures: ['response_object'],
             featureResolutions: {
               response_object: {
                 declaredLevel: 'EMULATED',
                 implementedLevel: 'EMULATED',
                 effectiveLevel: 'EMULATED',
+                supportStatus: 'DEGRADED',
+                degradationLevel: 'EMULATED',
                 blockedReasons: [],
                 lossReasons: [],
               },
@@ -94,15 +110,23 @@ apiRequest.mockImplementation(async (url: string, init?: RequestInit) => {
           chat_completion: {
             resourceType: 'CHAT',
             operation: 'CHAT_COMPLETION',
+            surface: 'chat.completions',
+            normalizedPath: '/v1/chat/completions',
+            supportStatus: 'DEGRADED',
+            degradationLevel: 'EMULATED',
             executionCapabilityLevel: 'EMULATED',
             renderCapabilityLevel: 'NATIVE',
             overallCapabilityLevel: 'EMULATED',
+            blockerReasons: [],
+            lossReasons: [],
             requiredFeatures: ['chat_text'],
             featureResolutions: {
               chat_text: {
                 declaredLevel: 'EMULATED',
                 implementedLevel: 'EMULATED',
                 effectiveLevel: 'EMULATED',
+                supportStatus: 'DEGRADED',
+                degradationLevel: 'EMULATED',
                 blockedReasons: [],
                 lossReasons: [],
               },
@@ -150,15 +174,23 @@ const sampleSite = {
     response_create: {
       resourceType: 'RESPONSE',
       operation: 'RESPONSE_CREATE',
+      surface: 'responses',
+      normalizedPath: '/v1/responses',
+      supportStatus: 'DEGRADED',
+      degradationLevel: 'EMULATED',
       executionCapabilityLevel: 'EMULATED',
       renderCapabilityLevel: 'EMULATED',
       overallCapabilityLevel: 'EMULATED',
+      blockerReasons: ['response object fallback'],
+      lossReasons: ['render emulation'],
       requiredFeatures: ['response_object'],
       featureResolutions: {
         response_object: {
           declaredLevel: 'EMULATED',
           implementedLevel: 'EMULATED',
           effectiveLevel: 'EMULATED',
+          supportStatus: 'DEGRADED',
+          degradationLevel: 'EMULATED',
           blockedReasons: [],
           lossReasons: [],
         },
@@ -196,6 +228,9 @@ describe('ProviderSiteDetailPage', () => {
     expect(screen.getAllByText('gpt-4o').length).toBeGreaterThan(0)
     expect(screen.queryByText('chat-only')).not.toBeInTheDocument()
     expect(screen.getAllByText('RESPONSE_CREATE').length).toBeGreaterThan(0)
+    expect(screen.getByText('supportStatus: DEGRADED')).toBeInTheDocument()
+    expect(screen.getByText('normalizedPath: /v1/responses')).toBeInTheDocument()
+    expect(screen.getByText(/blockerReasons: response object fallback/)).toBeInTheDocument()
 
     fireEvent.change(screen.getByLabelText('displayName'), {
       target: { value: 'OPENAI_DIRECT_EDITED' },

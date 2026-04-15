@@ -225,16 +225,106 @@ class GatewayResourceExecutionServiceTests {
                 .thenReturn(ResponseEntity.status(503).body(null))
                 .thenReturn(ResponseEntity.ok(new ObjectMapper().createObjectNode().put("object", "list")));
 
-        ResponseEntity<tools.jackson.databind.JsonNode> response = service.executeJson(
-                "sk-gw-test",
-                "/v1/embeddings",
-                requestBody,
+        com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest request =
+                new com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest(
+                        "sk-gw-test",
+                        CanonicalIngressProtocol.OPENAI,
+                        "POST",
+                        "/v1/embeddings",
+                        "/v1/embeddings",
+                        java.util.Map.of(),
+                        "text-embedding-004",
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType.EMBEDDING,
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation.EMBEDDING_CREATE,
+                        requestBody,
+                        java.util.Map.of(),
+                        java.util.List.of(),
+                        false,
+                        false
+                );
+
+        GatewayResourceExecutionResult result = service.executeDetailedJson(
+                request,
+                1L,
                 "text-embedding-004"
         );
 
-        assertEquals(200, response.getStatusCode().value());
+        assertEquals(200, result.statusCode());
+        assertEquals("list", result.canonicalResponse().responseKind());
         Mockito.verify(gatewayRouteSelectionService).markCredentialCooldown(eq(101L), eq("status=503"));
         Mockito.verify(embeddingsExecutor, Mockito.times(2)).executeJson(any(), any(), eq("text-embedding-004"));
+    }
+
+    @Test
+    void shouldProduceCanonicalBinarySummaryForFileContent() {
+        GatewayRouteSelectionService gatewayRouteSelectionService = Mockito.mock(GatewayRouteSelectionService.class);
+        UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        CredentialCryptoService credentialCryptoService = Mockito.mock(CredentialCryptoService.class);
+        DistributedKeyGovernanceService distributedKeyGovernanceService = Mockito.mock(DistributedKeyGovernanceService.class);
+        DistributedKeyQueryService distributedKeyQueryService = Mockito.mock(DistributedKeyQueryService.class);
+        AccountSelectionService accountSelectionService = Mockito.mock(AccountSelectionService.class);
+        GatewayRequestFeatureService gatewayRequestFeatureService = Mockito.mock(GatewayRequestFeatureService.class);
+        TranslationExecutionPlanCompiler translationExecutionPlanCompiler = Mockito.mock(TranslationExecutionPlanCompiler.class);
+        GatewayResourceExecutor fileExecutor = Mockito.mock(GatewayResourceExecutor.class);
+        GatewayFileService gatewayFileService = Mockito.mock(GatewayFileService.class);
+
+        GatewayResourceExecutionService service = service(
+                gatewayRouteSelectionService,
+                upstreamCredentialRepository,
+                credentialCryptoService,
+                distributedKeyGovernanceService,
+                distributedKeyQueryService,
+                accountSelectionService,
+                gatewayRequestFeatureService,
+                translationExecutionPlanCompiler,
+                List.of(fileExecutor),
+                Mockito.mock(GatewayObservabilityService.class),
+                Mockito.mock(GatewayRequestLifecycleService.class),
+                gatewayFileService
+        );
+
+        com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest request =
+                new com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest(
+                        "sk-gw-test",
+                        CanonicalIngressProtocol.OPENAI,
+                        "GET",
+                        "/v1/files/file_123/content",
+                        "/v1/files/{fileId}/content",
+                        java.util.Map.of("fileId", "file_123"),
+                        "gpt-4o-mini",
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType.FILE,
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation.FILE_CONTENT_GET,
+                        new ObjectMapper().createObjectNode(),
+                        java.util.Map.of(),
+                        java.util.List.of(),
+                        true,
+                        false
+                );
+
+        Mockito.when(gatewayRequestFeatureService.describe(eq("GET"), eq("/v1/files/file_123/content"), any()))
+                .thenReturn(new GatewayRequestSemantics(
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType.FILE,
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation.FILE_CONTENT_GET,
+                        "files",
+                        "/v1/files/{fileId}/content",
+                        List.of(com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature.FILE_OBJECT),
+                        false
+                ));
+        Mockito.when(translationExecutionPlanCompiler.compilePreview(any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(compilation("/v1/files/{fileId}/content", "gpt-4o-mini"));
+        Mockito.when(fileExecutor.supports(Mockito.any(com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest.class), any())).thenReturn(true);
+        Mockito.when(fileExecutor.executeBinary(any(), any(), eq("gpt-4o-mini")))
+                .thenReturn(ResponseEntity.ok()
+                        .contentType(org.springframework.http.MediaType.APPLICATION_PDF)
+                        .body(new byte[] {1, 2, 3, 4}));
+
+        GatewayResourceExecutionResult result = service.executeDetailedBinaryJson(request, 1L, "gpt-4o-mini");
+
+        assertEquals(200, result.statusCode());
+        assertEquals(4, result.binaryLength());
+        assertEquals("binary", result.canonicalResponse().responseKind());
+        assertEquals("file.content", result.canonicalResponse().objectType());
+        assertEquals("file_123", result.canonicalResponse().objectId());
     }
 
     private RouteSelectionResult selectionResult(ProviderType providerType, UpstreamSiteKind siteKind) {

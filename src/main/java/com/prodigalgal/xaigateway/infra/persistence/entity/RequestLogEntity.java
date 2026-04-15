@@ -83,8 +83,29 @@ public class RequestLogEntity {
     @Column(name = "execution_backend", length = 32)
     private String executionBackend;
 
+    @Column(name = "support_status", length = 32)
+    private String supportStatus;
+
+    @Column(name = "degradation_level", length = 32)
+    private String degradationLevel;
+
     @Column(name = "object_mode", length = 64)
     private String objectMode;
+
+    @Column(name = "response_kind", length = 32)
+    private String responseKind;
+
+    @Column(name = "response_object_type", length = 128)
+    private String responseObjectType;
+
+    @Column(name = "response_object_id", length = 256)
+    private String responseObjectId;
+
+    @Column(name = "response_status", length = 64)
+    private String responseStatus;
+
+    @Column(name = "canonical_event_count")
+    private Integer canonicalEventCount;
 
     @Column(name = "prefix_hash", nullable = false, length = 128)
     private String prefixHash;
@@ -246,12 +267,68 @@ public class RequestLogEntity {
         this.executionBackend = executionBackend;
     }
 
+    public String getSupportStatus() {
+        return supportStatus;
+    }
+
+    public void setSupportStatus(String supportStatus) {
+        this.supportStatus = supportStatus;
+    }
+
+    public String getDegradationLevel() {
+        return degradationLevel;
+    }
+
+    public void setDegradationLevel(String degradationLevel) {
+        this.degradationLevel = degradationLevel;
+    }
+
     public String getObjectMode() {
         return objectMode;
     }
 
     public void setObjectMode(String objectMode) {
         this.objectMode = objectMode;
+    }
+
+    public String getResponseKind() {
+        return responseKind;
+    }
+
+    public void setResponseKind(String responseKind) {
+        this.responseKind = responseKind;
+    }
+
+    public String getResponseObjectType() {
+        return responseObjectType;
+    }
+
+    public void setResponseObjectType(String responseObjectType) {
+        this.responseObjectType = responseObjectType;
+    }
+
+    public String getResponseObjectId() {
+        return responseObjectId;
+    }
+
+    public void setResponseObjectId(String responseObjectId) {
+        this.responseObjectId = responseObjectId;
+    }
+
+    public String getResponseStatus() {
+        return responseStatus;
+    }
+
+    public void setResponseStatus(String responseStatus) {
+        this.responseStatus = responseStatus;
+    }
+
+    public Integer getCanonicalEventCount() {
+        return canonicalEventCount;
+    }
+
+    public void setCanonicalEventCount(Integer canonicalEventCount) {
+        this.canonicalEventCount = canonicalEventCount;
     }
 
     public String getPrefixHash() {

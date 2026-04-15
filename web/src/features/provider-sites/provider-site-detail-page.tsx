@@ -227,10 +227,15 @@ export function ProviderSiteDetailPage() {
                   <strong>{surface.operation}</strong>
                   <span>backend: {surface.preferredBackend ?? '-'} / {(surface.supportedBackends ?? []).join(', ') || '无'}</span>
                   <span>resource: {surface.resourceType}</span>
+                  <span>surface: {surface.surface ?? surfaceKey}</span>
+                  <span>normalizedPath: {surface.normalizedPath ?? '无'}</span>
+                  <span>supportStatus: {surface.supportStatus ?? '-'}</span>
+                  <span>degradationLevel: {surface.degradationLevel ?? '-'}</span>
                   <span>execution: {surface.executionCapabilityLevel ?? '-'}</span>
                   <span>render: {surface.renderCapabilityLevel ?? '-'}</span>
                   <span>overall: {surface.overallCapabilityLevel ?? '-'}</span>
                   <span>requiredFeatures: {surface.requiredFeatures.join(', ') || '无'}</span>
+                  {surface.blockerReasons.length ? <span>blockerReasons: {surface.blockerReasons.join(', ')}</span> : null}
                 </div>
               ))}
             </div>

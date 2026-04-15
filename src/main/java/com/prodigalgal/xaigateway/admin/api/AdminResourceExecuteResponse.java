@@ -1,6 +1,7 @@
 package com.prodigalgal.xaigateway.admin.api;
 
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceResponse;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
 import com.prodigalgal.xaigateway.gateway.core.interop.SupportStatus;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
@@ -21,6 +22,7 @@ public record AdminResourceExecuteResponse(
         String contentType,
         JsonNode responseJson,
         String responseText,
-        Integer binaryLength
+        Integer binaryLength,
+        CanonicalResourceResponse canonicalResponse
 ) {
 }

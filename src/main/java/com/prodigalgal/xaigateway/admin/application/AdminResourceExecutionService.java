@@ -8,6 +8,7 @@ import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalFileRef;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayResourceExecutionService;
+import com.prodigalgal.xaigateway.gateway.core.execution.GatewayResourceExecutionResult;
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayDegradationPolicy;
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestFeatureService;
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics;
@@ -73,14 +74,15 @@ public class AdminResourceExecutionService {
                 false
         );
         if (isMultipartRequest(request)) {
-            ResponseEntity<JsonNode> response = gatewayResourceExecutionService.executeMultipartJson(
+            GatewayResourceExecutionResult result = gatewayResourceExecutionService.executeDetailedMultipartJson(
                     canonicalRequest,
                     request.requestedModel(),
                     java.util.Map.of()
             ).block();
-            if (response == null) {
+            if (result == null || result.jsonResponse() == null) {
                 throw new IllegalStateException("资源调试响应为空。");
             }
+            ResponseEntity<JsonNode> response = result.jsonResponse();
             return new AdminResourceExecuteResponse(
                     response.getStatusCode().is2xxSuccessful() ? compilation.selectionResult() : compilation.selectionResult(),
                     compilation.canonicalPlan(),
@@ -94,29 +96,33 @@ public class AdminResourceExecutionService {
                     response.getHeaders().getContentType() == null ? null : response.getHeaders().getContentType().toString(),
                     response.getBody() == null ? JsonNodeFactory.instance.objectNode() : response.getBody(),
                     response.getBody() == null ? null : response.getBody().toPrettyString(),
-                    null
+                    null,
+                    result.canonicalResponse()
             );
         }
         if (isBinaryPath(request.requestPath())) {
-            ResponseEntity<byte[]> response = gatewayResourceExecutionService.executeBinaryJson(canonicalRequest, request.requestedModel());
-        return new AdminResourceExecuteResponse(
-                compilation.selectionResult(),
-                compilation.canonicalPlan(),
-                compilation.canonicalPlan().executionBackend(),
-                request.requestPath(),
-                compilation.canonicalPlan().objectMode(),
-                compilation.canonicalPlan().supportStatus(),
-                compilation.canonicalPlan().degradationLevel(),
-                compilation.canonicalPlan().blockerReasons(),
-                response.getStatusCode().value(),
-                response.getHeaders().getContentType() == null ? null : response.getHeaders().getContentType().toString(),
-                null,
-                null,
-                response.getBody() == null ? 0 : response.getBody().length
+            GatewayResourceExecutionResult result = gatewayResourceExecutionService.executeDetailedBinaryJson(canonicalRequest, request.requestedModel());
+            ResponseEntity<byte[]> response = result.binaryResponse();
+            return new AdminResourceExecuteResponse(
+                    compilation.selectionResult(),
+                    compilation.canonicalPlan(),
+                    compilation.canonicalPlan().executionBackend(),
+                    request.requestPath(),
+                    compilation.canonicalPlan().objectMode(),
+                    compilation.canonicalPlan().supportStatus(),
+                    compilation.canonicalPlan().degradationLevel(),
+                    compilation.canonicalPlan().blockerReasons(),
+                    response.getStatusCode().value(),
+                    response.getHeaders().getContentType() == null ? null : response.getHeaders().getContentType().toString(),
+                    null,
+                    null,
+                    response.getBody() == null ? 0 : response.getBody().length,
+                    result.canonicalResponse()
             );
         }
 
-        ResponseEntity<JsonNode> response = gatewayResourceExecutionService.executeJson(canonicalRequest, request.requestedModel());
+        GatewayResourceExecutionResult result = gatewayResourceExecutionService.executeDetailedJson(canonicalRequest, request.requestedModel());
+        ResponseEntity<JsonNode> response = result.jsonResponse();
         return new AdminResourceExecuteResponse(
                 compilation.selectionResult(),
                 compilation.canonicalPlan(),
@@ -130,12 +136,14 @@ public class AdminResourceExecutionService {
                 response.getHeaders().getContentType() == null ? null : response.getHeaders().getContentType().toString(),
                 response.getBody() == null ? JsonNodeFactory.instance.objectNode() : response.getBody(),
                 response.getBody() == null ? null : response.getBody().toPrettyString(),
-                null
+                null,
+                result.canonicalResponse()
         );
     }
 
     private boolean isBinaryPath(String requestPath) {
-        return "/v1/audio/speech".equals(requestPath);
+        return "/v1/audio/speech".equals(requestPath)
+                || gatewayRequestFeatureService.normalizePath(requestPath).equals("/v1/files/{fileId}/content");
     }
 
     private boolean isMultipartRequest(AdminResourceExecuteRequest request) {

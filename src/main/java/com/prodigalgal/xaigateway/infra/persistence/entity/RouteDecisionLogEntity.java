@@ -84,6 +84,14 @@ public class RouteDecisionLogEntity {
     @Comment("执行后端。")
     private String executionBackend;
 
+    @Column(name = "support_status", length = 32)
+    @Comment("支持状态。")
+    private String supportStatus;
+
+    @Column(name = "degradation_level", length = 32)
+    @Comment("损耗等级。")
+    private String degradationLevel;
+
     @Column(name = "object_mode", length = 64)
     @Comment("对象模式。")
     private String objectMode;
@@ -228,6 +236,22 @@ public class RouteDecisionLogEntity {
 
     public void setExecutionBackend(String executionBackend) {
         this.executionBackend = executionBackend;
+    }
+
+    public String getSupportStatus() {
+        return supportStatus;
+    }
+
+    public void setSupportStatus(String supportStatus) {
+        this.supportStatus = supportStatus;
+    }
+
+    public String getDegradationLevel() {
+        return degradationLevel;
+    }
+
+    public void setDegradationLevel(String degradationLevel) {
+        this.degradationLevel = degradationLevel;
     }
 
     public String getObjectMode() {

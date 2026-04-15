@@ -2,6 +2,8 @@ package com.prodigalgal.xaigateway.gateway.core.observability;
 
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
+import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
+import com.prodigalgal.xaigateway.gateway.core.interop.SupportStatus;
 import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateEvaluation;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateView;
@@ -48,7 +50,7 @@ public class GatewayObservabilityService {
     }
 
     public void recordRouteDecision(String requestId, RouteSelectionResult selectionResult) {
-        recordRouteDecision(requestId, selectionResult, null, null, null, null, null);
+        recordRouteDecision(requestId, selectionResult, null, null, null, null, null, null, null);
     }
 
     public void recordRouteDecision(
@@ -59,6 +61,29 @@ public class GatewayObservabilityService {
             String operation,
             ExecutionBackend executionBackend,
             String objectMode) {
+        recordRouteDecision(
+                requestId,
+                selectionResult,
+                requestPath,
+                resourceType,
+                operation,
+                executionBackend,
+                null,
+                objectMode,
+                null
+        );
+    }
+
+    public void recordRouteDecision(
+            String requestId,
+            RouteSelectionResult selectionResult,
+            String requestPath,
+            String resourceType,
+            String operation,
+            ExecutionBackend executionBackend,
+            SupportStatus supportStatus,
+            String objectMode,
+            InteropCapabilityLevel degradationLevel) {
         RouteDecisionLogEntity entity = new RouteDecisionLogEntity();
         entity.setRequestId(requestId);
         entity.setDistributedKeyId(selectionResult.distributedKeyId());
@@ -73,6 +98,8 @@ public class GatewayObservabilityService {
         entity.setModelGroup(selectionResult.modelGroup());
         entity.setSelectionSource(selectionResult.selectionSource().name());
         entity.setExecutionBackend(executionBackend == null ? null : executionBackend.wireName());
+        entity.setSupportStatus(supportStatus == null ? null : supportStatus.name());
+        entity.setDegradationLevel(degradationLevel == null ? null : degradationLevel.name());
         entity.setObjectMode(objectMode);
         entity.setSelectedCredentialId(selectionResult.selectedCandidate().candidate().credentialId());
         entity.setSelectedProviderType(selectionResult.selectedCandidate().candidate().providerType());
@@ -85,7 +112,7 @@ public class GatewayObservabilityService {
     }
 
     public void recordCacheUsage(String requestId, RouteSelectionResult selectionResult, GatewayUsage usage, String cacheKind, String cachedContentRef) {
-        recordCacheUsage(requestId, selectionResult, usage, cacheKind, cachedContentRef, null, null, null, null, null);
+        recordCacheUsage(requestId, selectionResult, usage, cacheKind, cachedContentRef, null, null, null, null, null, null, null);
     }
 
     public void recordCacheUsage(
@@ -99,6 +126,35 @@ public class GatewayObservabilityService {
             String operation,
             ExecutionBackend executionBackend,
             String objectMode) {
+        recordCacheUsage(
+                requestId,
+                selectionResult,
+                usage,
+                cacheKind,
+                cachedContentRef,
+                requestPath,
+                resourceType,
+                operation,
+                executionBackend,
+                null,
+                objectMode,
+                null
+        );
+    }
+
+    public void recordCacheUsage(
+            String requestId,
+            RouteSelectionResult selectionResult,
+            GatewayUsage usage,
+            String cacheKind,
+            String cachedContentRef,
+            String requestPath,
+            String resourceType,
+            String operation,
+            ExecutionBackend executionBackend,
+            SupportStatus supportStatus,
+            String objectMode,
+            InteropCapabilityLevel degradationLevel) {
         if (usage == null) {
             return;
         }
@@ -122,6 +178,8 @@ public class GatewayObservabilityService {
         entity.setFingerprint(selectionResult.fingerprint());
         entity.setCacheKind(cacheKind);
         entity.setExecutionBackend(executionBackend == null ? null : executionBackend.wireName());
+        entity.setSupportStatus(supportStatus == null ? null : supportStatus.name());
+        entity.setDegradationLevel(degradationLevel == null ? null : degradationLevel.name());
         entity.setObjectMode(objectMode);
         entity.setCacheHitTokens(usage.cacheHitTokens());
         entity.setCacheWriteTokens(usage.cacheWriteTokens());

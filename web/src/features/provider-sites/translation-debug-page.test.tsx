@@ -10,23 +10,57 @@ const { apiRequest } = vi.hoisted(() => ({
   apiRequest: vi.fn(),
 }))
 
-apiRequest.mockImplementation(async (url: string) => {
+apiRequest.mockImplementation(async (url: string, init?: RequestInit) => {
+  const parsed = init?.body ? JSON.parse(String(init.body)) : {}
   if (url === '/admin/translation/explain') {
+    if (parsed.requestPath === '/v1/files/file_123/content') {
+      return {
+        executable: true,
+        ingressProtocol: 'OPENAI',
+        requestPath: '/v1/files/file_123/content',
+        normalizedPath: '/v1/files/{fileId}/content',
+        surface: 'files',
+        requestedModel: 'gpt-4o-mini',
+        publicModel: 'gpt-4o-mini',
+        resolvedModel: 'gpt-4o-mini',
+        resourceType: 'FILE',
+        operation: 'FILE_CONTENT_GET',
+        executionKind: 'NATIVE',
+        executionBackend: 'NATIVE',
+        supportStatus: 'NATIVE',
+        degradationLevel: 'NATIVE',
+        objectMode: 'resource-orchestration',
+        executionCapabilityLevel: 'NATIVE',
+        renderCapabilityLevel: 'NATIVE',
+        overallCapabilityLevel: 'NATIVE',
+        requiredFeatures: ['FILE_OBJECT'],
+        featureLevels: { file_object: 'NATIVE' },
+        blockerReasons: [],
+        degradations: [],
+        blockers: [],
+      }
+    }
     return {
       executable: true,
       ingressProtocol: 'OPENAI',
       requestPath: '/v1/chat/completions',
+      normalizedPath: '/v1/chat/completions',
+      surface: 'chat.completions',
       requestedModel: 'gpt-4o',
       publicModel: 'gpt-4o',
       resolvedModel: 'gpt-4o',
       resourceType: 'CHAT',
       operation: 'CHAT_COMPLETION',
       executionKind: 'NATIVE',
+      executionBackend: 'NATIVE',
+      supportStatus: 'NATIVE',
+      degradationLevel: 'NATIVE',
       executionCapabilityLevel: 'NATIVE',
       renderCapabilityLevel: 'NATIVE',
       overallCapabilityLevel: 'NATIVE',
       requiredFeatures: ['CHAT_TEXT'],
       featureLevels: { chat_text: 'NATIVE' },
+      blockerReasons: [],
       degradations: [],
       blockers: [],
     }
@@ -38,6 +72,35 @@ apiRequest.mockImplementation(async (url: string) => {
       text: 'hello from runtime',
       usage: { totalTokens: 12 },
       toolCalls: [],
+    }
+  }
+  if (url === '/admin/resource/execute') {
+    return {
+      routeSelection: { selectedCandidate: { candidate: { credentialId: 1 } } },
+      plan: {
+        normalizedPath: '/v1/files/{fileId}/content',
+        surface: 'files',
+        supportStatus: 'NATIVE',
+        degradationLevel: 'NATIVE',
+        blockerReasons: [],
+      },
+      executionBackend: 'NATIVE',
+      upstreamPath: '/v1/files/file_123/content',
+      objectMode: 'resource-orchestration',
+      supportStatus: 'NATIVE',
+      degradationLevel: 'NATIVE',
+      blockerReasons: [],
+      statusCode: 200,
+      contentType: 'application/pdf',
+      binaryLength: 128,
+      canonicalResponse: {
+        responseKind: 'binary',
+        objectType: 'file.content',
+        objectId: 'file_123',
+        status: 'completed',
+        events: [],
+        degradations: [],
+      },
     }
   }
   throw new Error(`unexpected url: ${url}`)
@@ -64,9 +127,33 @@ describe('TranslationDebugPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '查看 Explain' }))
     expect(await screen.findByText('protocol: OPENAI')).toBeInTheDocument()
+    expect(screen.getByText('supportStatus: NATIVE')).toBeInTheDocument()
+    expect(screen.getByText('surface: chat.completions')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: '执行 Chat 调试' }))
     expect(await screen.findByText('hello from runtime')).toBeInTheDocument()
+  })
+
+  it('shows resource canonical panel and binary summary', async () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter
+          initialEntries={[
+            '/translation-debug?method=GET&requestPath=%2Fv1%2Ffiles%2Ffile_123%2Fcontent&requestedModel=gpt-4o-mini&body=%7B%7D',
+          ]}
+        >
+          <TranslationDebugPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '查看 Explain' }))
+    expect(await screen.findByText('normalizedPath: /v1/files/{fileId}/content')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '执行资源调试' }))
+    expect(await screen.findByText('binaryLength: 128')).toBeInTheDocument()
+    expect(screen.getByText('responseKind: binary')).toBeInTheDocument()
+    expect(screen.getByText('objectType: file.content')).toBeInTheDocument()
   })
 
   it('validates invalid json body before explain', async () => {

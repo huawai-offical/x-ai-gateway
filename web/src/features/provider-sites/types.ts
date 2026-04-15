@@ -171,6 +171,36 @@ export type AdminChatExecuteResponse = {
   toolCalls?: unknown[]
 }
 
+export type CanonicalResourceEvent = {
+  eventType?: string | null
+  objectType?: string | null
+  objectId?: string | null
+  lifecyclePhase?: string | null
+  status?: string | null
+  details?: Record<string, unknown> | null
+}
+
+export type CanonicalResourceDegradation = {
+  code?: string | null
+  message?: string | null
+  level?: string | null
+  blocker: boolean
+}
+
+export type CanonicalResourceResponse = {
+  resourceType?: string | null
+  operation?: string | null
+  responseKind?: string | null
+  objectType?: string | null
+  objectId?: string | null
+  status?: string | null
+  events: CanonicalResourceEvent[]
+  degradations: CanonicalResourceDegradation[]
+  body?: unknown
+  binaryLength?: number | null
+  metadata?: Record<string, unknown> | null
+}
+
 export type AdminResourceExecuteResponse = {
   routeSelection: unknown
   plan: TranslationPlan
@@ -185,6 +215,7 @@ export type AdminResourceExecuteResponse = {
   responseJson?: unknown
   responseText?: string | null
   binaryLength?: number | null
+  canonicalResponse?: CanonicalResourceResponse | null
 }
 
 export type ProviderSiteDraft = {

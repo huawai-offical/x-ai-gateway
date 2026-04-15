@@ -1,0 +1,57 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0018-request-log-canonical-resource-fields
+      author: codex
+      changes:
+        - addColumn:
+            tableName: request_log
+            columns:
+              - column:
+                  name: support_status
+                  type: VARCHAR(32)
+              - column:
+                  name: degradation_level
+                  type: VARCHAR(32)
+              - column:
+                  name: response_kind
+                  type: VARCHAR(32)
+              - column:
+                  name: response_object_type
+                  type: VARCHAR(128)
+              - column:
+                  name: response_object_id
+                  type: VARCHAR(256)
+              - column:
+                  name: response_status
+                  type: VARCHAR(64)
+              - column:
+                  name: canonical_event_count
+                  type: INT
+
+  - changeSet:
+      id: 0018-route-decision-log-support-fields
+      author: codex
+      changes:
+        - addColumn:
+            tableName: route_decision_log
+            columns:
+              - column:
+                  name: support_status
+                  type: VARCHAR(32)
+              - column:
+                  name: degradation_level
+                  type: VARCHAR(32)
+
+  - changeSet:
+      id: 0018-cache-hit-log-support-fields
+      author: codex
+      changes:
+        - addColumn:
+            tableName: cache_hit_log
+            columns:
+              - column:
+                  name: support_status
+                  type: VARCHAR(32)
+              - column:
+                  name: degradation_level
+                  type: VARCHAR(32)

@@ -33,3 +33,5 @@ databaseChangeLog:
       file: db/changelog/changes/db.changelog-0016-request-usage-audit.yaml
   - include:
       file: db/changelog/changes/db.changelog-0017-resource-observability.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0018-canonical-resource-observability.yaml

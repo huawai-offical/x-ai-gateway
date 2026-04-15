@@ -5,6 +5,7 @@ import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceResponse;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageCompleteness;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageView;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
@@ -51,7 +52,7 @@ public class GatewayRequestLifecycleService {
             CanonicalRequest request,
             boolean stream,
             Instant startedAt) {
-        startRequest(requestId, selectionResult, request.requestPath(), null, null, null, null, stream, startedAt);
+        startRequest(requestId, selectionResult, request.requestPath(), null, null, null, null, null, null, stream, startedAt);
     }
 
     public void startRequest(
@@ -68,6 +69,8 @@ public class GatewayRequestLifecycleService {
                 plan == null || plan.resourceType() == null ? null : plan.resourceType().wireName(),
                 plan == null || plan.operation() == null ? null : plan.operation().wireName(),
                 plan == null ? null : plan.executionBackend() == null ? null : plan.executionBackend().wireName(),
+                plan == null ? null : plan.supportStatus() == null ? null : plan.supportStatus().name(),
+                plan == null ? null : plan.degradationLevel() == null ? null : plan.degradationLevel().name(),
                 plan == null ? null : plan.objectMode(),
                 stream,
                 startedAt
@@ -81,6 +84,8 @@ public class GatewayRequestLifecycleService {
             String resourceType,
             String operation,
             String executionBackend,
+            String supportStatus,
+            String degradationLevel,
             String objectMode,
             boolean stream,
             Instant startedAt) {
@@ -100,6 +105,8 @@ public class GatewayRequestLifecycleService {
         entity.setCredentialId(selectionResult.selectedCandidate().candidate().credentialId());
         entity.setSelectionSource(selectionResult.selectionSource().name());
         entity.setExecutionBackend(executionBackend);
+        entity.setSupportStatus(supportStatus);
+        entity.setDegradationLevel(degradationLevel);
         entity.setObjectMode(objectMode);
         entity.setPrefixHash(selectionResult.prefixHash());
         entity.setFingerprint(selectionResult.fingerprint());
@@ -124,11 +131,14 @@ public class GatewayRequestLifecycleService {
                 null,
                 null,
                 null,
+                null,
+                null,
                 stream,
                 GatewayRequestStatus.COMPLETED,
                 null,
                 null,
                 usage,
+                null,
                 startedAt
         );
     }
@@ -141,6 +151,18 @@ public class GatewayRequestLifecycleService {
             boolean stream,
             GatewayUsageView usage,
             Instant startedAt) {
+        completeRequest(requestId, selectionResult, request, plan, stream, usage, null, startedAt);
+    }
+
+    public void completeRequest(
+            String requestId,
+            RouteSelectionResult selectionResult,
+            CanonicalResourceRequest request,
+            CanonicalExecutionPlan plan,
+            boolean stream,
+            GatewayUsageView usage,
+            CanonicalResourceResponse canonicalResponse,
+            Instant startedAt) {
         finishRequest(
                 requestId,
                 selectionResult,
@@ -148,12 +170,15 @@ public class GatewayRequestLifecycleService {
                 plan == null || plan.resourceType() == null ? null : plan.resourceType().wireName(),
                 plan == null || plan.operation() == null ? null : plan.operation().wireName(),
                 plan == null || plan.executionBackend() == null ? null : plan.executionBackend().wireName(),
+                plan == null || plan.supportStatus() == null ? null : plan.supportStatus().name(),
+                plan == null || plan.degradationLevel() == null ? null : plan.degradationLevel().name(),
                 plan == null ? null : plan.objectMode(),
                 stream,
                 GatewayRequestStatus.COMPLETED,
                 null,
                 null,
                 usage,
+                canonicalResponse,
                 startedAt
         );
     }
@@ -166,10 +191,11 @@ public class GatewayRequestLifecycleService {
             Throwable error,
             GatewayUsageView usage,
             Instant startedAt) {
-        finishRequest(requestId, selectionResult, request.requestPath(), null, null, null, null, stream, GatewayRequestStatus.FAILED,
+        finishRequest(requestId, selectionResult, request.requestPath(), null, null, null, null, null, null, stream, GatewayRequestStatus.FAILED,
                 error == null ? null : error.getClass().getSimpleName(),
                 error == null ? null : error.getMessage(),
                 usage,
+                null,
                 startedAt);
         gatewayAuditLogService.recordGatewayEvent(
                 requestId,
@@ -200,12 +226,15 @@ public class GatewayRequestLifecycleService {
                 plan == null || plan.resourceType() == null ? null : plan.resourceType().wireName(),
                 plan == null || plan.operation() == null ? null : plan.operation().wireName(),
                 plan == null || plan.executionBackend() == null ? null : plan.executionBackend().wireName(),
+                plan == null || plan.supportStatus() == null ? null : plan.supportStatus().name(),
+                plan == null || plan.degradationLevel() == null ? null : plan.degradationLevel().name(),
                 plan == null ? null : plan.objectMode(),
                 stream,
                 GatewayRequestStatus.FAILED,
                 error == null ? null : error.getClass().getSimpleName(),
                 error == null ? null : error.getMessage(),
                 usage,
+                null,
                 startedAt
         );
     }
@@ -217,10 +246,11 @@ public class GatewayRequestLifecycleService {
             boolean stream,
             GatewayUsageView usage,
             Instant startedAt) {
-        finishRequest(requestId, selectionResult, request.requestPath(), null, null, null, null, stream, GatewayRequestStatus.CANCELED,
+        finishRequest(requestId, selectionResult, request.requestPath(), null, null, null, null, null, null, stream, GatewayRequestStatus.CANCELED,
                 "CLIENT_CANCELLED",
                 "Request stream cancelled by client",
                 usage,
+                null,
                 startedAt);
         gatewayAuditLogService.recordGatewayEvent(
                 requestId,
@@ -241,12 +271,15 @@ public class GatewayRequestLifecycleService {
             String resourceType,
             String operation,
             String executionBackend,
+            String supportStatus,
+            String degradationLevel,
             String objectMode,
             boolean stream,
             GatewayRequestStatus status,
             String errorCode,
             String errorMessage,
             GatewayUsageView usage,
+            CanonicalResourceResponse canonicalResponse,
             Instant startedAt) {
         Instant completedAt = Instant.now();
         long durationMs = Duration.between(startedAt, completedAt).toMillis();
@@ -259,7 +292,14 @@ public class GatewayRequestLifecycleService {
             entity.setResourceType(resourceType);
             entity.setOperation(operation);
             entity.setExecutionBackend(executionBackend);
+            entity.setSupportStatus(supportStatus);
+            entity.setDegradationLevel(degradationLevel);
             entity.setObjectMode(objectMode);
+            entity.setResponseKind(canonicalResponse == null ? null : canonicalResponse.responseKind());
+            entity.setResponseObjectType(canonicalResponse == null ? null : canonicalResponse.objectType());
+            entity.setResponseObjectId(canonicalResponse == null ? null : canonicalResponse.objectId());
+            entity.setResponseStatus(canonicalResponse == null ? null : canonicalResponse.status());
+            entity.setCanonicalEventCount(canonicalResponse == null ? null : canonicalResponse.events().size());
             entity.setStatus(status);
             entity.setErrorCode(errorCode);
             entity.setErrorMessage(truncate(errorMessage));

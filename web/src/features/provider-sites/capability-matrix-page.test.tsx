@@ -34,6 +34,8 @@ apiRequest.mockImplementation(async () => [
         declaredLevel: 'EMULATED',
         implementedLevel: 'EMULATED',
         effectiveLevel: 'EMULATED',
+        supportStatus: 'DEGRADED',
+        degradationLevel: 'EMULATED',
         blockedReasons: [],
         lossReasons: [],
       },
@@ -42,15 +44,23 @@ apiRequest.mockImplementation(async () => [
       response_create: {
         resourceType: 'RESPONSE',
         operation: 'RESPONSE_CREATE',
+        surface: 'responses',
+        normalizedPath: '/v1/responses',
+        supportStatus: 'DEGRADED',
+        degradationLevel: 'EMULATED',
         executionCapabilityLevel: 'EMULATED',
         renderCapabilityLevel: 'EMULATED',
         overallCapabilityLevel: 'EMULATED',
+        blockerReasons: [],
+        lossReasons: ['render emulation'],
         requiredFeatures: ['response_object'],
         featureResolutions: {
           response_object: {
             declaredLevel: 'EMULATED',
             implementedLevel: 'EMULATED',
             effectiveLevel: 'EMULATED',
+            supportStatus: 'DEGRADED',
+            degradationLevel: 'EMULATED',
             blockedReasons: [],
             lossReasons: [],
           },
@@ -91,6 +101,8 @@ apiRequest.mockImplementation(async () => [
         declaredLevel: 'UNSUPPORTED',
         implementedLevel: 'UNSUPPORTED',
         effectiveLevel: 'UNSUPPORTED',
+        supportStatus: 'BLOCKED',
+        degradationLevel: 'UNSUPPORTED',
         blockedReasons: ['missing metadata'],
         lossReasons: [],
       },
@@ -99,15 +111,23 @@ apiRequest.mockImplementation(async () => [
       response_create: {
         resourceType: 'RESPONSE',
         operation: 'RESPONSE_CREATE',
+        surface: 'responses',
+        normalizedPath: '/v1/responses',
+        supportStatus: 'BLOCKED',
+        degradationLevel: 'UNSUPPORTED',
         executionCapabilityLevel: 'UNSUPPORTED',
         renderCapabilityLevel: 'EMULATED',
         overallCapabilityLevel: 'UNSUPPORTED',
+        blockerReasons: ['missing metadata'],
+        lossReasons: [],
         requiredFeatures: ['response_object'],
         featureResolutions: {
           response_object: {
             declaredLevel: 'UNSUPPORTED',
             implementedLevel: 'UNSUPPORTED',
             effectiveLevel: 'UNSUPPORTED',
+            supportStatus: 'BLOCKED',
+            degradationLevel: 'UNSUPPORTED',
             blockedReasons: ['missing metadata'],
             lossReasons: [],
           },
@@ -154,5 +174,8 @@ describe('CapabilityMatrixPage', () => {
     expect(screen.queryByText('OPENAI_DIRECT')).not.toBeInTheDocument()
     expect(screen.getByText('VERTEX_AI')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /RESPONSE_CREATE/ })).toHaveAttribute('href', '/provider-sites/2?surface=response_create')
+    expect(screen.getByText('supportStatus: BLOCKED')).toBeInTheDocument()
+    expect(screen.getByText('normalizedPath: /v1/responses')).toBeInTheDocument()
+    expect(screen.getByText(/blockerReasons: missing metadata/)).toBeInTheDocument()
   })
 })
