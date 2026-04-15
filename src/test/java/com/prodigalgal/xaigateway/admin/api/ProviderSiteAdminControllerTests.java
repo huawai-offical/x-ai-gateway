@@ -110,7 +110,13 @@ class ProviderSiteAdminControllerTests {
                 .jsonPath("$[0].fallbackStrategy").isEqualTo("provider-native")
                 .jsonPath("$[0].cooldownCredentialCount").isEqualTo(1)
                 .jsonPath("$[0].features.response_object.effectiveLevel").isEqualTo("emulated")
+                .jsonPath("$[0].features.response_object.supportStatus").isEqualTo("degraded")
+                .jsonPath("$[0].features.response_object.degradationLevel").isEqualTo("emulated")
                 .jsonPath("$[0].surfaces.response_create.overallCapabilityLevel").isEqualTo("EMULATED")
+                .jsonPath("$[0].surfaces.response_create.surface").isEqualTo("responses")
+                .jsonPath("$[0].surfaces.response_create.normalizedPath").isEqualTo("/v1/responses")
+                .jsonPath("$[0].surfaces.response_create.supportStatus").isEqualTo("DEGRADED")
+                .jsonPath("$[0].surfaces.response_create.degradationLevel").isEqualTo("EMULATED")
                 .jsonPath("$[0].supportsRealtime").isEqualTo(true);
     }
 

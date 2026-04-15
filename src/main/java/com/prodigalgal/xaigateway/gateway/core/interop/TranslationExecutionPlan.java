@@ -172,10 +172,19 @@ public record TranslationExecutionPlan(
                 ? InteropCapabilityLevel.UNSUPPORTED
                 : overallEffectiveLevel;
         InteropCapabilityLevel renderLevel = renderCapabilityLevel();
+        GatewayRequestSemantics semantics = new GatewayRequestSemantics(
+                resourceType,
+                operation,
+                requiredFeatures == null ? List.of() : requiredFeatures,
+                true
+        );
+        InteropCapabilityLevel overallLevel = CanonicalRenderCapabilitySupport.minimum(executionLevel, renderLevel);
         return new CanonicalExecutionPlan(
                 executable,
                 CanonicalIngressProtocol.from(protocol),
                 requestPath,
+                semantics.normalizedPath(),
+                semantics.surface(),
                 requestedModel,
                 publicModel,
                 resolvedModelKey,
@@ -183,12 +192,15 @@ public record TranslationExecutionPlan(
                 operation,
                 executionKind,
                 ExecutionBackend.SPRING_AI,
+                SupportStatus.resolve(ExecutionBackend.SPRING_AI, overallLevel, blockedReasons),
                 upstreamObjectMode,
                 List.of(ExecutionBackend.SPRING_AI),
                 "legacy_translation_plan",
+                SupportStatus.normalizeDegradationLevel(overallLevel, blockedReasons),
                 executionLevel,
                 renderLevel,
-                CanonicalRenderCapabilitySupport.minimum(executionLevel, renderLevel),
+                overallLevel,
+                blockedReasons == null ? List.of() : List.copyOf(blockedReasons),
                 requiredFeatures == null ? List.of() : List.copyOf(requiredFeatures),
                 featureLevels == null ? Map.of() : Map.copyOf(featureLevels),
                 lossReasons == null ? List.of() : List.copyOf(lossReasons),

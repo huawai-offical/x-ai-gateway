@@ -233,6 +233,8 @@ public class TranslationExecutionPlanCompiler {
                 blockedReasons.isEmpty() && (!semantics.requiresRouteSelection() || selectionResult != null),
                 CanonicalIngressProtocol.from(protocol),
                 requestPath,
+                semantics.normalizedPath(),
+                semantics.surface(),
                 requestedModel,
                 selectionResult == null ? null : selectionResult.publicModel(),
                 selectionResult == null ? null : selectionResult.resolvedModelKey(),
@@ -240,12 +242,15 @@ public class TranslationExecutionPlanCompiler {
                 semantics.operation(),
                 executionKind,
                 backendDecision.preferredBackend(),
+                executionSupportStatus(backendDecision.preferredBackend(), CanonicalRenderCapabilitySupport.minimum(executionCapabilityLevel, renderCapabilityLevel), blockedReasons),
                 objectMode(semantics, backendDecision.preferredBackend(), upstreamObjectMode),
                 backendDecision.supportedBackends(),
                 backendDecision.reason(),
+                SupportStatus.normalizeDegradationLevel(CanonicalRenderCapabilitySupport.minimum(executionCapabilityLevel, renderCapabilityLevel), blockedReasons),
                 executionCapabilityLevel,
                 renderCapabilityLevel,
                 CanonicalRenderCapabilitySupport.minimum(executionCapabilityLevel, renderCapabilityLevel),
+                List.copyOf(blockedReasons),
                 semantics.requiredFeatures(),
                 java.util.Map.copyOf(featureLevels),
                 List.copyOf(lossReasons),
@@ -335,5 +340,12 @@ public class TranslationExecutionPlanCompiler {
             case ORCHESTRATION -> "gateway-object-lineage";
             case SPRING_AI -> upstreamObjectMode;
         };
+    }
+
+    private SupportStatus executionSupportStatus(
+            com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend backend,
+            InteropCapabilityLevel overallCapabilityLevel,
+            List<String> blockedReasons) {
+        return SupportStatus.resolve(backend, overallCapabilityLevel, blockedReasons);
     }
 }

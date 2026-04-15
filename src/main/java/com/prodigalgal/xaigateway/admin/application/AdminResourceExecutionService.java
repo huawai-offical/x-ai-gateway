@@ -87,6 +87,9 @@ public class AdminResourceExecutionService {
                     compilation.canonicalPlan().executionBackend(),
                     request.requestPath(),
                     compilation.canonicalPlan().objectMode(),
+                    compilation.canonicalPlan().supportStatus(),
+                    compilation.canonicalPlan().degradationLevel(),
+                    compilation.canonicalPlan().blockerReasons(),
                     response.getStatusCode().value(),
                     response.getHeaders().getContentType() == null ? null : response.getHeaders().getContentType().toString(),
                     response.getBody() == null ? JsonNodeFactory.instance.objectNode() : response.getBody(),
@@ -96,17 +99,20 @@ public class AdminResourceExecutionService {
         }
         if (isBinaryPath(request.requestPath())) {
             ResponseEntity<byte[]> response = gatewayResourceExecutionService.executeBinaryJson(canonicalRequest, request.requestedModel());
-            return new AdminResourceExecuteResponse(
-                    compilation.selectionResult(),
-                    compilation.canonicalPlan(),
-                    compilation.canonicalPlan().executionBackend(),
-                    request.requestPath(),
-                    compilation.canonicalPlan().objectMode(),
-                    response.getStatusCode().value(),
-                    response.getHeaders().getContentType() == null ? null : response.getHeaders().getContentType().toString(),
-                    null,
-                    null,
-                    response.getBody() == null ? 0 : response.getBody().length
+        return new AdminResourceExecuteResponse(
+                compilation.selectionResult(),
+                compilation.canonicalPlan(),
+                compilation.canonicalPlan().executionBackend(),
+                request.requestPath(),
+                compilation.canonicalPlan().objectMode(),
+                compilation.canonicalPlan().supportStatus(),
+                compilation.canonicalPlan().degradationLevel(),
+                compilation.canonicalPlan().blockerReasons(),
+                response.getStatusCode().value(),
+                response.getHeaders().getContentType() == null ? null : response.getHeaders().getContentType().toString(),
+                null,
+                null,
+                response.getBody() == null ? 0 : response.getBody().length
             );
         }
 
@@ -117,6 +123,9 @@ public class AdminResourceExecutionService {
                 compilation.canonicalPlan().executionBackend(),
                 request.requestPath(),
                 compilation.canonicalPlan().objectMode(),
+                compilation.canonicalPlan().supportStatus(),
+                compilation.canonicalPlan().degradationLevel(),
+                compilation.canonicalPlan().blockerReasons(),
                 response.getStatusCode().value(),
                 response.getHeaders().getContentType() == null ? null : response.getHeaders().getContentType().toString(),
                 response.getBody() == null ? JsonNodeFactory.instance.objectNode() : response.getBody(),

@@ -67,6 +67,10 @@ class TranslationExplainAdminControllerTests {
                 .expectBody()
                 .jsonPath("$.ingressProtocol").isEqualTo("OPENAI")
                 .jsonPath("$.executionKind").isEqualTo("NATIVE")
-                .jsonPath("$.executionCapabilityLevel").isEqualTo("NATIVE");
+                .jsonPath("$.executionCapabilityLevel").isEqualTo("NATIVE")
+                .jsonPath("$.normalizedPath").isEqualTo("/v1/chat/completions")
+                .jsonPath("$.surface").isEqualTo("chat.completions")
+                .jsonPath("$.supportStatus").isEqualTo("NATIVE")
+                .jsonPath("$.degradationLevel").isEqualTo("NATIVE");
     }
 }

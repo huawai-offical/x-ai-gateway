@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GatewayInteropPlanServiceTests {
@@ -75,6 +76,13 @@ class GatewayInteropPlanServiceTests {
         InteropPlanResponse response = gatewayInteropPlanService.preview("sk-gw-test", request);
 
         assertFalse(response.plan().executable());
+        assertEquals("/v1/responses", response.plan().normalizedPath());
+        assertEquals("responses", response.plan().surface());
+        assertEquals(SupportStatus.BLOCKED, response.plan().supportStatus());
+        assertEquals(InteropCapabilityLevel.UNSUPPORTED, response.plan().degradationLevel());
+        assertEquals("responses", response.summary().get("surface"));
+        assertEquals("/v1/responses", response.summary().get("normalizedPath"));
+        assertEquals("blocked", response.summary().get("supportStatus"));
         assertTrue(response.plan().blockers().stream().anyMatch(item -> item.contains("emulated")));
     }
 
@@ -131,6 +139,13 @@ class GatewayInteropPlanServiceTests {
         InteropPlanResponse response = gatewayInteropPlanService.preview("sk-gw-test", request);
 
         assertTrue(response.plan().executable());
+        assertEquals("/v1/audio/transcriptions", response.plan().normalizedPath());
+        assertEquals("audio", response.plan().surface());
+        assertEquals(SupportStatus.NATIVE, response.plan().supportStatus());
+        assertEquals(InteropCapabilityLevel.NATIVE, response.plan().degradationLevel());
+        assertEquals("audio", response.summary().get("surface"));
+        assertEquals("/v1/audio/transcriptions", response.summary().get("normalizedPath"));
+        assertEquals("native", response.summary().get("supportStatus"));
         assertTrue(response.plan().blockers().isEmpty());
     }
 }

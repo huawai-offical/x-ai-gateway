@@ -11,6 +11,7 @@ import com.prodigalgal.xaigateway.gateway.core.interop.GatewayDegradationPolicy;
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature;
+import com.prodigalgal.xaigateway.gateway.core.interop.SupportStatus;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlanCompiler;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
@@ -75,5 +76,9 @@ class TranslationExplainServiceTests {
 
         assertSame(plan, result);
         assertEquals("openai", result.ingressProtocol().name().toLowerCase());
+        assertEquals("/v1/chat/completions", result.normalizedPath());
+        assertEquals("chat.completions", result.surface());
+        assertEquals(SupportStatus.NATIVE, result.supportStatus());
+        assertEquals(InteropCapabilityLevel.NATIVE, result.degradationLevel());
     }
 }

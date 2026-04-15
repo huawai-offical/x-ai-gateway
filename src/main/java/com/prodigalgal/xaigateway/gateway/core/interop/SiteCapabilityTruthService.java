@@ -174,6 +174,8 @@ public class SiteCapabilityTruthService {
         return new FeatureCompatibilityReport(
                 Map.copyOf(featureLevels),
                 report.overallEffectiveLevel(),
+                SupportStatus.fromLevel(report.overallEffectiveLevel(), report.blockedReasons()),
+                executionSupportMatrixService.degradationLevel(report.overallEffectiveLevel(), report.blockedReasons()),
                 report.lossReasons(),
                 report.blockedReasons(),
                 report.executionKind(),

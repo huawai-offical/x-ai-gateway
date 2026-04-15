@@ -32,6 +32,8 @@ class GatewayRequestFeatureServiceTests {
 
         assertEquals(TranslationResourceType.CHAT, semantics.resourceType());
         assertEquals(TranslationOperation.CHAT_COMPLETION, semantics.operation());
+        assertEquals("chat.completions", semantics.surface());
+        assertEquals("/v1/chat/completions", semantics.normalizedPath());
         assertTrue(semantics.requiresRouteSelection());
         assertEquals(
                 List.of(InteropFeature.CHAT_TEXT, InteropFeature.TOOLS, InteropFeature.REASONING, InteropFeature.IMAGE_INPUT),
@@ -52,6 +54,8 @@ class GatewayRequestFeatureServiceTests {
 
         assertEquals(TranslationResourceType.RESPONSE, semantics.resourceType());
         assertEquals(TranslationOperation.RESPONSE_CREATE, semantics.operation());
+        assertEquals("responses", semantics.surface());
+        assertEquals("/v1/responses", semantics.normalizedPath());
         assertEquals(List.of(InteropFeature.RESPONSE_OBJECT, InteropFeature.FILE_INPUT), semantics.requiredFeatures());
     }
 
@@ -61,6 +65,8 @@ class GatewayRequestFeatureServiceTests {
 
         assertEquals(TranslationResourceType.UPLOAD, semantics.resourceType());
         assertEquals(TranslationOperation.UPLOAD_PART_ADD, semantics.operation());
+        assertEquals("uploads", semantics.surface());
+        assertEquals("/v1/uploads/{uploadId}/parts", semantics.normalizedPath());
         assertEquals(List.of(InteropFeature.UPLOAD_CREATE, InteropFeature.FILE_OBJECT), semantics.requiredFeatures());
         assertEquals(true, semantics.requiresRouteSelection());
     }
@@ -84,6 +90,8 @@ class GatewayRequestFeatureServiceTests {
 
         assertEquals(TranslationResourceType.CHAT, semantics.resourceType());
         assertEquals(TranslationOperation.CHAT_COMPLETION, semantics.operation());
+        assertEquals("messages", semantics.surface());
+        assertEquals("/v1/messages", semantics.normalizedPath());
         assertEquals(List.of(InteropFeature.CHAT_TEXT, InteropFeature.TOOLS, InteropFeature.REASONING, InteropFeature.FILE_INPUT), semantics.requiredFeatures());
     }
 
@@ -105,6 +113,40 @@ class GatewayRequestFeatureServiceTests {
 
         assertEquals(TranslationResourceType.CHAT, semantics.resourceType());
         assertEquals(TranslationOperation.CHAT_COMPLETION, semantics.operation());
+        assertEquals("generateContent", semantics.surface());
+        assertEquals("/v1beta/models/{model}:generateContent", semantics.normalizedPath());
         assertEquals(List.of(InteropFeature.CHAT_TEXT, InteropFeature.TOOLS, InteropFeature.REASONING, InteropFeature.IMAGE_INPUT), semantics.requiredFeatures());
+    }
+
+    @Test
+    void shouldNormalizeResourcePathsAndExtractPathParams() {
+        assertEquals("/v1/files/{fileId}", service.normalizePath("/v1/files/file_1"));
+        assertEquals("/v1/uploads/{uploadId}/parts", service.normalizePath("/v1/uploads/upload_1/parts"));
+        assertEquals("/v1/batches/{batchId}/cancel", service.normalizePath("/v1/batches/batch_1/cancel"));
+        assertEquals("/v1/fine_tuning/jobs/{jobId}", service.normalizePath("/v1/fine_tuning/jobs/ftjob_1"));
+        assertEquals(
+                "/v1beta/models/{model}:generateContent",
+                service.normalizePath("/v1beta/models/gemini-2.5-pro:streamGenerateContent")
+        );
+
+        assertEquals(java.util.Map.of("fileId", "file_1"), service.extractPathParams("/v1/files/file_1"));
+        assertEquals(java.util.Map.of("uploadId", "upload_1"), service.extractPathParams("/v1/uploads/upload_1/parts"));
+        assertEquals(java.util.Map.of("batchId", "batch_1"), service.extractPathParams("/v1/batches/batch_1/cancel"));
+        assertEquals(java.util.Map.of("jobId", "ftjob_1"), service.extractPathParams("/v1/fine_tuning/jobs/ftjob_1"));
+        assertEquals(
+                java.util.Map.of("model", "gemini-2.5-pro"),
+                service.extractPathParams("/v1beta/models/gemini-2.5-pro:generateContent")
+        );
+    }
+
+    @Test
+    void shouldDescribeRealtimeClientSecretSemantics() {
+        GatewayRequestSemantics semantics = service.describe("POST", "/v1/realtime/client_secrets", null);
+
+        assertEquals(TranslationResourceType.REALTIME, semantics.resourceType());
+        assertEquals(TranslationOperation.REALTIME_CLIENT_SECRET_CREATE, semantics.operation());
+        assertEquals("realtime", semantics.surface());
+        assertEquals("/v1/realtime/client_secrets", semantics.normalizedPath());
+        assertEquals(List.of(InteropFeature.REALTIME_CLIENT_SECRET), semantics.requiredFeatures());
     }
 }

@@ -2,6 +2,8 @@ export type CapabilityResolution = {
   declaredLevel?: string | null
   implementedLevel?: string | null
   effectiveLevel?: string | null
+  supportStatus?: string | null
+  degradationLevel?: string | null
   blockedReasons: string[]
   lossReasons: string[]
 }
@@ -9,11 +11,17 @@ export type CapabilityResolution = {
 export type SurfaceCapability = {
   resourceType: string
   operation: string
+  surface?: string | null
+  normalizedPath?: string | null
   preferredBackend?: string | null
   supportedBackends: string[]
+  supportStatus?: string | null
+  degradationLevel?: string | null
   executionCapabilityLevel?: string | null
   renderCapabilityLevel?: string | null
   overallCapabilityLevel?: string | null
+  blockerReasons: string[]
+  lossReasons: string[]
   requiredFeatures: string[]
   featureResolutions: Record<string, CapabilityResolution>
 }
@@ -109,6 +117,8 @@ export type TranslationPlan = {
   executable: boolean
   ingressProtocol?: string | null
   requestPath?: string | null
+  normalizedPath?: string | null
+  surface?: string | null
   requestedModel?: string | null
   publicModel?: string | null
   resolvedModel?: string | null
@@ -118,12 +128,15 @@ export type TranslationPlan = {
   featureLevels: Record<string, string>
   executionKind?: string | null
   executionBackend?: string | null
+  supportStatus?: string | null
   objectMode?: string | null
   supportedBackends: string[]
   backendReason?: string | null
+  degradationLevel?: string | null
   executionCapabilityLevel?: string | null
   renderCapabilityLevel?: string | null
   overallCapabilityLevel?: string | null
+  blockerReasons: string[]
   degradations: string[]
   blockers: string[]
 }
@@ -164,6 +177,9 @@ export type AdminResourceExecuteResponse = {
   executionBackend?: string | null
   upstreamPath?: string | null
   objectMode?: string | null
+  supportStatus?: string | null
+  degradationLevel?: string | null
+  blockerReasons: string[]
   statusCode: number
   contentType?: string | null
   responseJson?: unknown
@@ -223,6 +239,13 @@ export function formatInstant(value?: string | null) {
 }
 
 export function resolutionTone(resolution: CapabilityResolution) {
+  const supportStatus = resolution.supportStatus?.toLowerCase()
+  if (supportStatus === 'blocked') {
+    return 'blocked'
+  }
+  if (supportStatus === 'degraded') {
+    return 'lossy'
+  }
   if (resolution.blockedReasons.length || resolution.effectiveLevel === 'UNSUPPORTED' || resolution.effectiveLevel === 'unsupported') {
     return 'blocked'
   }

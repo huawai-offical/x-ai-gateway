@@ -77,6 +77,8 @@ public class GatewayInteropPlanService {
         summary.put("executable", executionPlan.executable());
         summary.put("protocol", executionPlan.ingressProtocol().name().toLowerCase(Locale.ROOT));
         summary.put("requestPath", executionPlan.requestPath());
+        summary.put("normalizedPath", executionPlan.normalizedPath());
+        summary.put("surface", executionPlan.surface());
         summary.put("requestedModel", executionPlan.requestedModel());
         summary.put("resourceType", executionPlan.resourceType().wireName());
         summary.put("operation", executionPlan.operation().wireName());
@@ -87,7 +89,12 @@ public class GatewayInteropPlanService {
         summary.put("executionBackend", executionPlan.executionBackend() == null
                 ? null
                 : executionPlan.executionBackend().wireName());
+        summary.put("supportStatus", executionPlan.supportStatus() == null ? null : executionPlan.supportStatus().wireName());
         summary.put("objectMode", executionPlan.objectMode());
+        summary.put("degradationLevel", executionPlan.degradationLevel() == null
+                ? null
+                : executionPlan.degradationLevel().name().toLowerCase(Locale.ROOT));
+        summary.put("blockerReasons", executionPlan.blockerReasons());
         summary.put("renderCapabilityLevel", executionPlan.renderCapabilityLevel() == null
                 ? null
                 : executionPlan.renderCapabilityLevel().name().toLowerCase(Locale.ROOT));
@@ -98,6 +105,11 @@ public class GatewayInteropPlanService {
         debug.put("supportedBackends", executionPlan.supportedBackends().stream().map(item -> item.wireName()).toList());
         debug.put("backendReason", executionPlan.backendReason());
         debug.put("objectMode", executionPlan.objectMode());
+        debug.put("supportStatus", executionPlan.supportStatus() == null ? null : executionPlan.supportStatus().wireName());
+        debug.put("degradationLevel", executionPlan.degradationLevel() == null
+                ? null
+                : executionPlan.degradationLevel().name().toLowerCase(Locale.ROOT));
+        debug.put("blockerReasons", executionPlan.blockerReasons());
         if (compilation.selectionResult() != null) {
             debug.put("distributedKeyId", compilation.selectionResult().distributedKeyId());
             debug.put("publicModel", compilation.selectionResult().publicModel());

@@ -79,8 +79,31 @@ class SiteCapabilityTruthServiceTests {
         );
 
         assertEquals(ExecutionKind.BLOCKED, report.executionKind());
+        assertEquals(SupportStatus.BLOCKED, report.supportStatus());
+        assertEquals(InteropCapabilityLevel.UNSUPPORTED, report.degradationLevel());
         assertEquals("blocked", report.upstreamObjectMode());
         assertTrue(report.blockedReasons().stream().anyMatch(item -> item.contains("moderation")));
+    }
+
+    @Test
+    void shouldExposeNativeSupportStatusForNativeFeatureCompatibility() {
+        SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        Mockito.when(repository.findBySiteProfile_Id(9L)).thenReturn(Optional.of(snapshot(true, true, true, true, true, true, true, true, true, true)));
+        SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
+
+        FeatureCompatibilityReport report = service.evaluate(
+                candidate(9L, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT),
+                new GatewayRequestSemantics(
+                        TranslationResourceType.AUDIO,
+                        TranslationOperation.AUDIO_TRANSCRIPTION,
+                        List.of(InteropFeature.AUDIO_TRANSCRIPTION),
+                        true
+                )
+        );
+
+        assertEquals(ExecutionKind.NATIVE, report.executionKind());
+        assertEquals(SupportStatus.NATIVE, report.supportStatus());
+        assertEquals(InteropCapabilityLevel.NATIVE, report.degradationLevel());
     }
 
     @Test

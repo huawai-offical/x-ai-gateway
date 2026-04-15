@@ -1,8 +1,10 @@
 package com.prodigalgal.xaigateway.gateway.core.interop;
 
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
+import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
+import java.util.List;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -56,6 +58,19 @@ public class ExecutionSupportMatrixService {
             case UPLOAD_CREATE, BATCH_CREATE, TUNING_CREATE, REALTIME_CLIENT_SECRET ->
                     siteKind == UpstreamSiteKind.OPENAI_DIRECT ? InteropCapabilityLevel.NATIVE : InteropCapabilityLevel.UNSUPPORTED;
         };
+    }
+
+    public InteropCapabilityLevel degradationLevel(
+            InteropCapabilityLevel effectiveLevel,
+            List<String> blockerReasons) {
+        return SupportStatus.normalizeDegradationLevel(effectiveLevel, blockerReasons);
+    }
+
+    public SupportStatus supportStatus(
+            ExecutionBackend executionBackend,
+            InteropCapabilityLevel effectiveLevel,
+            List<String> blockerReasons) {
+        return SupportStatus.resolve(executionBackend, effectiveLevel, blockerReasons);
     }
 
     private boolean supportsOpenAiStyleSite(UpstreamSiteKind siteKind) {
