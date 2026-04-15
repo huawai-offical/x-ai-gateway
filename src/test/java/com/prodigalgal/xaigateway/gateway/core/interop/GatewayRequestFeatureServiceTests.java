@@ -57,12 +57,12 @@ class GatewayRequestFeatureServiceTests {
 
     @Test
     void shouldDescribeUploadFollowUpWithoutRouteSelection() {
-        GatewayRequestSemantics semantics = service.describe("/v1/uploads/upload_1/parts", null);
+        GatewayRequestSemantics semantics = service.describe("POST", "/v1/uploads/upload_1/parts", null);
 
         assertEquals(TranslationResourceType.UPLOAD, semantics.resourceType());
         assertEquals(TranslationOperation.UPLOAD_PART_ADD, semantics.operation());
-        assertEquals(List.of(InteropFeature.UPLOAD_CREATE), semantics.requiredFeatures());
-        assertEquals(false, semantics.requiresRouteSelection());
+        assertEquals(List.of(InteropFeature.UPLOAD_CREATE, InteropFeature.FILE_OBJECT), semantics.requiredFeatures());
+        assertEquals(true, semantics.requiresRouteSelection());
     }
 
     @Test

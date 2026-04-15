@@ -1,6 +1,7 @@
 package com.prodigalgal.xaigateway.admin.api;
 
 import jakarta.validation.constraints.NotBlank;
+import tools.jackson.databind.JsonNode;
 
 public record AdminChatExecuteRequest(
         @NotBlank(message = "distributedKeyPrefix 不能为空。")
@@ -11,10 +12,6 @@ public record AdminChatExecuteRequest(
         String requestPath,
         @NotBlank(message = "模型不能为空。")
         String requestedModel,
-        String systemPrompt,
-        @NotBlank(message = "用户提示词不能为空。")
-        String userPrompt,
-        Double temperature,
-        Integer maxTokens
+        JsonNode body
 ) {
 }

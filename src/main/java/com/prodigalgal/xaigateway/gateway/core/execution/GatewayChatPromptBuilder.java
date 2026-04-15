@@ -1,7 +1,6 @@
 package com.prodigalgal.xaigateway.gateway.core.execution;
 
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyQueryService;
-import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalChatMapper;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalContentPart;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalMessage;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalMessageRole;
@@ -26,24 +25,15 @@ import org.springframework.util.MimeTypeUtils;
 @Service
 public class GatewayChatPromptBuilder {
 
-    private final CanonicalChatMapper canonicalChatMapper;
     private final DistributedKeyQueryService distributedKeyQueryService;
     private final GatewayFileService gatewayFileService;
 
     @Autowired
     public GatewayChatPromptBuilder(
-            CanonicalChatMapper canonicalChatMapper,
             DistributedKeyQueryService distributedKeyQueryService,
             GatewayFileService gatewayFileService) {
-        this.canonicalChatMapper = canonicalChatMapper;
         this.distributedKeyQueryService = distributedKeyQueryService;
         this.gatewayFileService = gatewayFileService;
-    }
-
-    public GatewayChatPromptBuilder(
-            DistributedKeyQueryService distributedKeyQueryService,
-            GatewayFileService gatewayFileService) {
-        this(new CanonicalChatMapper(new tools.jackson.databind.ObjectMapper()), distributedKeyQueryService, gatewayFileService);
     }
 
     public Prompt buildPrompt(Object options, CanonicalRequest canonicalRequest) {
@@ -52,10 +42,6 @@ public class GatewayChatPromptBuilder {
                 .map(message -> toPromptMessage(canonicalRequest.distributedKeyPrefix(), message))
                 .toList();
         return new Prompt(messages, (ChatOptions) options);
-    }
-
-    public Prompt buildPrompt(Object options, ChatExecutionRequest request) {
-        return buildPrompt(options, canonicalChatMapper.toCanonicalRequest(request));
     }
 
     private Message toPromptMessage(String distributedKeyPrefix, CanonicalMessage message) {
@@ -139,13 +125,5 @@ public class GatewayChatPromptBuilder {
                 .data(URI.create(item.uri()))
                 .name(item.name())
                 .build();
-    }
-
-    @SuppressWarnings("unused")
-    private Media toMedia(String distributedKeyPrefix, ChatExecutionRequest.MediaInput item) {
-        CanonicalContentPart part = "file".equalsIgnoreCase(item.kind())
-                ? CanonicalContentPart.file(item.mimeType(), item.url(), item.name())
-                : CanonicalContentPart.image(item.mimeType(), item.url(), item.name());
-        return toMedia(distributedKeyPrefix, part);
     }
 }

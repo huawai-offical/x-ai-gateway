@@ -8,6 +8,7 @@ public record TranslationExplainRequest(
         String distributedKeyPrefix,
         @NotBlank(message = "protocol 不能为空。")
         String protocol,
+        String method,
         @NotBlank(message = "requestPath 不能为空。")
         String requestPath,
         @NotBlank(message = "requestedModel 不能为空。")
@@ -15,4 +16,14 @@ public record TranslationExplainRequest(
         String degradationPolicy,
         JsonNode body
 ) {
+    public TranslationExplainRequest(
+            String distributedKeyPrefix,
+            String protocol,
+            String requestPath,
+            String requestedModel,
+            String degradationPolicy,
+            JsonNode body
+    ) {
+        this(distributedKeyPrefix, protocol, null, requestPath, requestedModel, degradationPolicy, body);
+    }
 }

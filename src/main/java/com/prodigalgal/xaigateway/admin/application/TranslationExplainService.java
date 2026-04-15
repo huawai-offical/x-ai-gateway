@@ -22,6 +22,7 @@ public class TranslationExplainService {
         return translationExecutionPlanCompiler.compilePreview(
                 request.distributedKeyPrefix(),
                 request.protocol(),
+                request.method(),
                 request.requestPath(),
                 request.requestedModel(),
                 request.degradationPolicy() == null || request.degradationPolicy().isBlank()

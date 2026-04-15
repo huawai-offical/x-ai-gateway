@@ -130,8 +130,17 @@ public class GatewayFileService {
     }
 
     public Mono<GatewayFileResponse> createFile(Long distributedKeyId, FilePart filePart, String purpose) {
+        return createFile(distributedKeyId, filePart, purpose, null);
+    }
+
+    public Mono<GatewayFileResponse> createFile(Long distributedKeyId, FilePart filePart, String purpose, Long preferredCredentialId) {
         UpstreamFileTarget upstreamTarget = resolveUpstreamFileTarget(distributedKeyId)
                 .orElseThrow(() -> new IllegalArgumentException("当前 DistributedKey 没有可用的 files 上游编排站点。"));
+        if (preferredCredentialId != null) {
+            upstreamTarget = resolveUpstreamFileTarget(distributedKeyId, preferredCredentialId)
+                    .orElse(upstreamTarget);
+        }
+        UpstreamFileTarget selectedUpstreamTarget = upstreamTarget;
         String fileKey = "file-" + UUID.randomUUID().toString().replace("-", "");
         Path directory = ensureStorageDirectory();
         Path storagePath = directory.resolve(fileKey + "-" + sanitizeFilename(filePart.filename()));
@@ -146,9 +155,41 @@ public class GatewayFileService {
                             filePart.headers().getContentType() == null ? "application/octet-stream" : filePart.headers().getContentType().toString(),
                             purpose
                     );
-                    synchronizeUpstreamFile(file, upstreamTarget);
+                    synchronizeUpstreamFile(file, selectedUpstreamTarget);
                     return toResponse(file);
                 }));
+    }
+
+    public GatewayFileResponse createFileFromExisting(Long distributedKeyId, String sourceFileKey, String purpose) {
+        return createFileFromExisting(distributedKeyId, sourceFileKey, purpose, null);
+    }
+
+    public GatewayFileResponse createFileFromExisting(Long distributedKeyId, String sourceFileKey, String purpose, Long preferredCredentialId) {
+        UpstreamFileTarget upstreamTarget = resolveUpstreamFileTarget(distributedKeyId)
+                .orElseThrow(() -> new IllegalArgumentException("当前 DistributedKey 没有可用的 files 上游编排站点。"));
+        if (preferredCredentialId != null) {
+            upstreamTarget = resolveUpstreamFileTarget(distributedKeyId, preferredCredentialId)
+                    .orElse(upstreamTarget);
+        }
+        GatewayFileEntity source = getRequired(sourceFileKey, distributedKeyId);
+        String fileKey = "file-" + UUID.randomUUID().toString().replace("-", "");
+        Path directory = ensureStorageDirectory();
+        Path storagePath = directory.resolve(fileKey + "-" + sanitizeFilename(source.getFilename()));
+        try {
+            Files.copy(Path.of(source.getStoragePath()), storagePath);
+            GatewayFileEntity file = persistFile(
+                    distributedKeyId,
+                    fileKey,
+                    storagePath,
+                    source.getFilename(),
+                    source.getMimeType(),
+                    purpose == null || purpose.isBlank() ? source.getPurpose() : purpose
+            );
+            synchronizeUpstreamFile(file, upstreamTarget);
+            return toResponse(file);
+        } catch (IOException exception) {
+            throw new IllegalStateException("复制网关文件失败。", exception);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -274,6 +315,10 @@ public class GatewayFileService {
     }
 
     private Optional<UpstreamFileTarget> resolveUpstreamFileTarget(Long distributedKeyId) {
+        return resolveUpstreamFileTarget(distributedKeyId, null);
+    }
+
+    private Optional<UpstreamFileTarget> resolveUpstreamFileTarget(Long distributedKeyId, Long preferredCredentialId) {
         DistributedKeyView distributedKey = distributedKeyQueryService.findActiveById(distributedKeyId)
                 .orElseThrow(() -> new IllegalArgumentException("未找到可用的 DistributedKey。"));
         Map<Long, UpstreamCredentialEntity> credentials = new LinkedHashMap<>();
@@ -281,6 +326,18 @@ public class GatewayFileService {
                 distributedKey.bindings().stream().map(DistributedCredentialBindingView::credentialId).toList())) {
             if (credential.isActive()) {
                 credentials.put(credential.getId(), credential);
+            }
+        }
+
+        if (preferredCredentialId != null) {
+            UpstreamCredentialEntity preferred = credentials.get(preferredCredentialId);
+            if (preferred != null && preferred.getSiteProfileId() != null) {
+                UpstreamSiteProfileEntity siteProfile = resolveSiteProfile(preferred.getSiteProfileId()).orElse(null);
+                SiteCapabilitySnapshotEntity snapshot = siteCapabilitySnapshotRepository.findBySiteProfile_Id(preferred.getSiteProfileId())
+                        .orElse(null);
+                if (siteProfile != null && siteCapabilityTruthService.supportsFeature(siteProfile, snapshot, InteropFeature.FILE_OBJECT)) {
+                    return Optional.of(new UpstreamFileTarget(preferred, siteProfile, buildSiteClient(preferred, siteProfile, "/v1/files")));
+                }
             }
         }
 

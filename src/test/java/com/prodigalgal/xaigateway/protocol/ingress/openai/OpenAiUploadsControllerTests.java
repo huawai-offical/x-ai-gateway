@@ -4,7 +4,7 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayTokenAuthenticationResolver;
-import com.prodigalgal.xaigateway.gateway.core.resource.GatewayAsyncResourceService;
+import com.prodigalgal.xaigateway.gateway.core.execution.GatewayResourceExecutionService;
 import com.prodigalgal.xaigateway.testsupport.PermitAllSecurityTestConfig;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -33,7 +33,7 @@ class OpenAiUploadsControllerTests {
     private GatewayTokenAuthenticationResolver gatewayTokenAuthenticationResolver;
 
     @MockitoBean
-    private GatewayAsyncResourceService gatewayAsyncResourceService;
+    private GatewayResourceExecutionService gatewayResourceExecutionService;
 
     @Test
     void shouldCreateUpload() {
@@ -44,7 +44,7 @@ class OpenAiUploadsControllerTests {
 
         Mockito.when(gatewayTokenAuthenticationResolver.authenticate("Bearer sk-gw-test.secret", null, null, null))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayAsyncResourceService.createUpload(Mockito.eq(1L), Mockito.any()))
+        Mockito.when(gatewayResourceExecutionService.executeLifecycleJson(Mockito.eq(1L), Mockito.eq("sk-gw-test"), Mockito.eq("POST"), Mockito.eq("/v1/uploads"), Mockito.eq("resource-orchestration"), Mockito.any()))
                 .thenReturn(response);
 
         webTestClient.post()
@@ -74,7 +74,7 @@ class OpenAiUploadsControllerTests {
 
         Mockito.when(gatewayTokenAuthenticationResolver.authenticate("Bearer sk-gw-test.secret", null, null, null))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayAsyncResourceService.addUploadPart(Mockito.eq("upload_1"), Mockito.eq(1L), Mockito.any()))
+        Mockito.when(gatewayResourceExecutionService.executeLifecycleMultipart(Mockito.eq(1L), Mockito.eq("sk-gw-test"), Mockito.eq("POST"), Mockito.eq("/v1/uploads/upload_1/parts"), Mockito.eq("resource-orchestration"), Mockito.anyMap(), Mockito.anyList(), Mockito.anyMap()))
                 .thenReturn(Mono.just(response));
 
         MultipartBodyBuilder builder = new MultipartBodyBuilder();

@@ -3,22 +3,29 @@ package com.prodigalgal.xaigateway.protocol.ingress.openai;
 import com.prodigalgal.xaigateway.admin.application.GatewayChatExecutionService;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthenticationService;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionResult;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionStreamResult;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResponse;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEvent;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEventType;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolCall;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalUsage;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolCall;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionSource;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayFinishReason;
-import com.prodigalgal.xaigateway.gateway.core.response.GatewayResponse;
-import com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamEvent;
-import com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamEventType;
-import com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamResponse;
-import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageCompleteness;
-import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageSource;
-import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageView;
+import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.shared.ReasoningTransport;
+import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
+import com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
 import com.prodigalgal.xaigateway.gateway.core.usage.GatewayUsage;
 import com.prodigalgal.xaigateway.testsupport.PermitAllSecurityTestConfig;
 import java.util.List;
@@ -50,7 +57,7 @@ class OpenAiChatCompletionsControllerTests {
     void shouldExecuteMinimalOpenAiCompletion() {
         Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<ChatExecutionRequest>any()))
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<CanonicalRequest>any()))
                 .thenReturn(gatewayResponse(
                         "req-openai-1",
                         "hello back",
@@ -87,10 +94,11 @@ class OpenAiChatCompletionsControllerTests {
     void shouldExecuteMinimalOpenAiStreamCompletion() {
         Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.executeGatewayStream(Mockito.<ChatExecutionRequest>any()))
-                .thenReturn(new GatewayStreamResponse(
+        Mockito.when(gatewayChatExecutionService.executeGatewayStream(Mockito.<CanonicalRequest>any()))
+                .thenReturn(new CanonicalExecutionStreamResult(
                         "req-openai-stream-1",
                         selectionResult(),
+                        plan(),
                         Flux.just(
                                 textEvent("hello"),
                                 completedEvent(GatewayFinishReason.STOP, "hello", GatewayUsage.empty())
@@ -125,10 +133,11 @@ class OpenAiChatCompletionsControllerTests {
     void shouldStreamToolCallDeltas() {
         Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.executeGatewayStream(Mockito.<ChatExecutionRequest>any()))
-                .thenReturn(new GatewayStreamResponse(
+        Mockito.when(gatewayChatExecutionService.executeGatewayStream(Mockito.<CanonicalRequest>any()))
+                .thenReturn(new CanonicalExecutionStreamResult(
                         "req-openai-stream-tool-1",
                         selectionResult(),
+                        plan(),
                         Flux.just(
                                 toolCallEvent(List.of(new GatewayToolCall(
                                         "call_1",
@@ -180,7 +189,7 @@ class OpenAiChatCompletionsControllerTests {
     void shouldReturnToolCallsWhenModelRequestsFunctionExecution() {
         Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<ChatExecutionRequest>any()))
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<CanonicalRequest>any()))
                 .thenReturn(gatewayResponse(
                         "req-openai-tool-1",
                         "",
@@ -229,7 +238,7 @@ class OpenAiChatCompletionsControllerTests {
     void shouldAcceptOpenAiContentArrayWithImageUrl() {
         Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<ChatExecutionRequest>any()))
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<CanonicalRequest>any()))
                 .thenReturn(gatewayResponse("req-openai-image-1", "image processed", GatewayUsage.empty(), List.of(), GatewayFinishReason.STOP));
 
         webTestClient.post()
@@ -260,7 +269,7 @@ class OpenAiChatCompletionsControllerTests {
     void shouldAcceptOpenAiInputFileBlocks() {
         Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<ChatExecutionRequest>any()))
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<CanonicalRequest>any()))
                 .thenReturn(gatewayResponse("req-openai-file-1", "file processed", GatewayUsage.empty(), List.of(), GatewayFinishReason.STOP));
 
         webTestClient.post()
@@ -291,7 +300,7 @@ class OpenAiChatCompletionsControllerTests {
     void shouldAcceptOpenAiGatewayFileIdBlocks() {
         Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<ChatExecutionRequest>any()))
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<CanonicalRequest>any()))
                 .thenReturn(gatewayResponse("req-openai-fileid-1", "gateway file processed", GatewayUsage.empty(), List.of(), GatewayFinishReason.STOP));
 
         webTestClient.post()
@@ -321,7 +330,7 @@ class OpenAiChatCompletionsControllerTests {
     void shouldAcceptOpenAiImageOnlyMessage() {
         Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<ChatExecutionRequest>any()))
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<CanonicalRequest>any()))
                 .thenReturn(gatewayResponse("req-openai-image-only-1", "image only processed", GatewayUsage.empty(), List.of(), GatewayFinishReason.STOP));
 
         webTestClient.post()
@@ -405,85 +414,112 @@ class OpenAiChatCompletionsControllerTests {
         );
     }
 
-    private GatewayResponse gatewayResponse(
+    private CanonicalExecutionResult gatewayResponse(
             String requestId,
             String text,
             GatewayUsage usage,
             List<GatewayToolCall> toolCalls,
             GatewayFinishReason finishReason) {
-        return new GatewayResponse(
+        return new CanonicalExecutionResult(
                 requestId,
                 selectionResult(),
-                text,
-                usageView(usage),
-                toolCalls,
-                null,
-                finishReason,
-                null
+                plan(),
+                new CanonicalResponse(
+                        requestId,
+                        selectionResult().publicModel(),
+                        text,
+                        null,
+                        toCanonicalToolCalls(toolCalls),
+                        toCanonicalUsage(usage),
+                        finishReason
+                )
         );
     }
 
-    private GatewayUsageView usageView(GatewayUsage usage) {
-        return new GatewayUsageView(
-                usage.rawPromptTokens(),
-                usage.promptTokens(),
-                usage.completionTokens(),
-                usage.reasoningTokens(),
-                usage.cacheHitTokens(),
-                usage.cacheWriteTokens(),
-                usage.upstreamCacheHitTokens(),
-                usage.upstreamCacheWriteTokens(),
-                usage.savedInputTokens(),
-                usage.cachedContentRef(),
-                usage.totalTokens(),
-                GatewayUsageCompleteness.FINAL,
-                GatewayUsageSource.DIRECT_RESPONSE,
-                usage.nativeUsagePayload()
-        );
-    }
-
-    private GatewayStreamEvent textEvent(String delta) {
-        return new GatewayStreamEvent(
-                GatewayStreamEventType.TEXT_DELTA,
+    private CanonicalStreamEvent textEvent(String delta) {
+        return new CanonicalStreamEvent(
+                CanonicalStreamEventType.TEXT_DELTA,
                 delta,
                 null,
                 List.of(),
-                GatewayUsageView.empty(),
+                CanonicalUsage.empty(),
                 false,
-                null,
                 null,
                 null,
                 null
         );
     }
 
-    private GatewayStreamEvent toolCallEvent(List<GatewayToolCall> toolCalls) {
-        return new GatewayStreamEvent(
-                GatewayStreamEventType.TOOL_CALLS,
+    private CanonicalStreamEvent toolCallEvent(List<GatewayToolCall> toolCalls) {
+        return new CanonicalStreamEvent(
+                CanonicalStreamEventType.TOOL_CALLS,
                 null,
                 null,
-                toolCalls,
-                GatewayUsageView.empty(),
+                toCanonicalToolCalls(toolCalls),
+                CanonicalUsage.empty(),
                 false,
-                null,
                 null,
                 null,
                 null
         );
     }
 
-    private GatewayStreamEvent completedEvent(GatewayFinishReason finishReason, String outputText, GatewayUsage usage) {
-        return new GatewayStreamEvent(
-                GatewayStreamEventType.COMPLETED,
+    private CanonicalStreamEvent completedEvent(GatewayFinishReason finishReason, String outputText, GatewayUsage usage) {
+        return new CanonicalStreamEvent(
+                CanonicalStreamEventType.COMPLETED,
                 null,
                 null,
                 List.of(),
-                usage.isEmpty() ? GatewayUsageView.empty() : usageView(usage),
+                toCanonicalUsage(usage),
                 true,
                 finishReason,
                 outputText,
-                null,
                 null
+        );
+    }
+
+    private CanonicalExecutionPlan plan() {
+        return new CanonicalExecutionPlan(
+                true,
+                CanonicalIngressProtocol.OPENAI,
+                "/v1/chat/completions",
+                "gpt-4o",
+                "gpt-4o",
+                "gpt-4o",
+                TranslationResourceType.CHAT,
+                TranslationOperation.CHAT_COMPLETION,
+                ExecutionKind.NATIVE,
+                InteropCapabilityLevel.NATIVE,
+                InteropCapabilityLevel.NATIVE,
+                InteropCapabilityLevel.NATIVE,
+                List.of(InteropFeature.CHAT_TEXT),
+                java.util.Map.of("chat_text", InteropCapabilityLevel.NATIVE),
+                List.of(),
+                List.of()
+        );
+    }
+
+    private List<CanonicalToolCall> toCanonicalToolCalls(List<GatewayToolCall> toolCalls) {
+        if (toolCalls == null || toolCalls.isEmpty()) {
+            return List.of();
+        }
+        return toolCalls.stream()
+                .map(toolCall -> new CanonicalToolCall(toolCall.id(), toolCall.type(), toolCall.name(), toolCall.arguments()))
+                .toList();
+    }
+
+    private CanonicalUsage toCanonicalUsage(GatewayUsage usage) {
+        if (usage == null || usage.isEmpty()) {
+            return CanonicalUsage.empty();
+        }
+        return new CanonicalUsage(
+                true,
+                usage.promptTokens(),
+                usage.completionTokens(),
+                usage.totalTokens(),
+                usage.cacheHitTokens(),
+                usage.cacheWriteTokens(),
+                usage.reasoningTokens()
         );
     }
 }

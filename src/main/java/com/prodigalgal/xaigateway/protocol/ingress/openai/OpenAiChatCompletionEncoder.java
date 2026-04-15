@@ -4,12 +4,9 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionResult;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionStreamResult;
-import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalGatewayResponseMapper;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEvent;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEventType;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayFinishReason;
-import com.prodigalgal.xaigateway.gateway.core.response.GatewayResponse;
-import com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamResponse;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
@@ -17,26 +14,13 @@ import reactor.core.publisher.Flux;
 public class OpenAiChatCompletionEncoder {
 
     private final ObjectMapper objectMapper;
-    private final CanonicalGatewayResponseMapper canonicalGatewayResponseMapper = new CanonicalGatewayResponseMapper();
 
     public OpenAiChatCompletionEncoder(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 
-    public OpenAiChatCompletionResponse encode(GatewayResponse response) {
-        return OpenAiChatCompletionResponse.fromCanonical(canonicalGatewayResponseMapper.toCanonicalResponse(response));
-    }
-
     public OpenAiChatCompletionResponse encode(CanonicalExecutionResult response) {
         return OpenAiChatCompletionResponse.fromCanonical(response.response());
-    }
-
-    public Flux<String> encodeStream(GatewayStreamResponse response) {
-        return Flux.concat(
-                Flux.just(encode(OpenAiChatCompletionResponse.roleChunk(response.routeSelection().publicModel()))),
-                response.events().concatMap(event -> encodeEvent(response, event)),
-                Flux.just("data: [DONE]\n\n")
-        );
     }
 
     public Flux<String> encodeStream(CanonicalExecutionStreamResult response) {
@@ -45,11 +29,6 @@ public class OpenAiChatCompletionEncoder {
                 response.events().concatMap(event -> encodeEvent(response.routeSelection().publicModel(), event)),
                 Flux.just("data: [DONE]\n\n")
         );
-    }
-
-    private Flux<String> encodeEvent(GatewayStreamResponse response, com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamEvent event) {
-        CanonicalStreamEvent canonicalEvent = canonicalGatewayResponseMapper.toCanonicalStreamEvent(event);
-        return encodeEvent(response.routeSelection().publicModel(), canonicalEvent);
     }
 
     private Flux<String> encodeEvent(String publicModel, CanonicalStreamEvent canonicalEvent) {

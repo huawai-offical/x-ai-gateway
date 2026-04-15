@@ -3,7 +3,7 @@ package com.prodigalgal.xaigateway.protocol.ingress.openai;
 import tools.jackson.databind.JsonNode;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayTokenAuthenticationResolver;
-import com.prodigalgal.xaigateway.gateway.core.resource.GatewayAsyncResourceService;
+import com.prodigalgal.xaigateway.gateway.core.execution.GatewayResourceExecutionService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -16,13 +16,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class OpenAiRealtimeController {
 
     private final GatewayTokenAuthenticationResolver gatewayTokenAuthenticationResolver;
-    private final GatewayAsyncResourceService gatewayAsyncResourceService;
+    private final GatewayResourceExecutionService gatewayResourceExecutionService;
 
     public OpenAiRealtimeController(
             GatewayTokenAuthenticationResolver gatewayTokenAuthenticationResolver,
-            GatewayAsyncResourceService gatewayAsyncResourceService) {
+            GatewayResourceExecutionService gatewayResourceExecutionService) {
         this.gatewayTokenAuthenticationResolver = gatewayTokenAuthenticationResolver;
-        this.gatewayAsyncResourceService = gatewayAsyncResourceService;
+        this.gatewayResourceExecutionService = gatewayResourceExecutionService;
     }
 
     @PostMapping("/client_secrets")
@@ -30,6 +30,13 @@ public class OpenAiRealtimeController {
             @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
             @RequestBody JsonNode requestBody) {
         AuthenticatedDistributedKey distributedKey = gatewayTokenAuthenticationResolver.authenticate(authorization, null, null, null);
-        return gatewayAsyncResourceService.createRealtimeClientSecret(distributedKey.id(), requestBody);
+        return gatewayResourceExecutionService.executeLifecycleJson(
+                distributedKey.id(),
+                distributedKey.keyPrefix(),
+                "POST",
+                "/v1/realtime/client_secrets",
+                "resource-orchestration",
+                requestBody
+        );
     }
 }

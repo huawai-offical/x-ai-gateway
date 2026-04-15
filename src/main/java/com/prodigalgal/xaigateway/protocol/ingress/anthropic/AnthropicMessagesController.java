@@ -5,7 +5,7 @@ import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.admin.application.GatewayChatExecutionService;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthenticationService;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -45,17 +45,17 @@ public class AnthropicMessagesController {
             @RequestHeader(API_KEY_HEADER) String apiKey,
         @Valid @RequestBody AnthropicMessagesRequest request) {
         AuthenticatedDistributedKey distributedKey = distributedKeyAuthenticationService.authenticateRawToken(apiKey);
-        ChatExecutionRequest executionRequest = anthropicMessagesRequestMapper.toExecutionRequest(distributedKey, request);
+        CanonicalRequest canonicalRequest = anthropicMessagesRequestMapper.toCanonicalRequest(distributedKey, request);
 
         if (Boolean.TRUE.equals(request.stream())) {
-            var streamResponse = gatewayChatExecutionService.executeGatewayStream(executionRequest);
+            var streamResponse = gatewayChatExecutionService.executeGatewayStream(canonicalRequest);
             Flux<String> body = anthropicMessagesEncoder.encodeStream(streamResponse);
             return ResponseEntity.ok()
                     .contentType(MediaType.TEXT_EVENT_STREAM)
                     .body(body);
         }
 
-        var response = gatewayChatExecutionService.executeGatewayResponse(executionRequest);
+        var response = gatewayChatExecutionService.executeGatewayResponse(canonicalRequest);
         return ResponseEntity.ok(anthropicMessagesEncoder.encode(response));
     }
 }

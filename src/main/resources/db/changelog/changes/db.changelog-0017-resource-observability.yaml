@@ -1,0 +1,66 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0017-request-log-resource-fields
+      author: codex
+      changes:
+        - addColumn:
+            tableName: request_log
+            columns:
+              - column:
+                  name: resource_type
+                  type: VARCHAR(32)
+              - column:
+                  name: operation
+                  type: VARCHAR(64)
+              - column:
+                  name: execution_backend
+                  type: VARCHAR(32)
+              - column:
+                  name: object_mode
+                  type: VARCHAR(64)
+
+  - changeSet:
+      id: 0017-route-decision-log-resource-fields
+      author: codex
+      changes:
+        - addColumn:
+            tableName: route_decision_log
+            columns:
+              - column:
+                  name: request_path
+                  type: VARCHAR(256)
+              - column:
+                  name: resource_type
+                  type: VARCHAR(32)
+              - column:
+                  name: operation
+                  type: VARCHAR(64)
+              - column:
+                  name: execution_backend
+                  type: VARCHAR(32)
+              - column:
+                  name: object_mode
+                  type: VARCHAR(64)
+
+  - changeSet:
+      id: 0017-cache-hit-log-resource-fields
+      author: codex
+      changes:
+        - addColumn:
+            tableName: cache_hit_log
+            columns:
+              - column:
+                  name: request_path
+                  type: VARCHAR(256)
+              - column:
+                  name: resource_type
+                  type: VARCHAR(32)
+              - column:
+                  name: operation
+                  type: VARCHAR(64)
+              - column:
+                  name: execution_backend
+                  type: VARCHAR(32)
+              - column:
+                  name: object_mode
+                  type: VARCHAR(64)

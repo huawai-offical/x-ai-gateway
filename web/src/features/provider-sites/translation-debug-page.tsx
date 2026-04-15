@@ -5,35 +5,48 @@ import { useTypedMutation } from '../../lib/typed-react-query'
 import {
   isChatLikePath,
   isDebugExecutablePath,
+  isMultipartResourcePath,
   type AdminChatExecuteResponse,
   type AdminResourceExecuteResponse,
   type TranslationPlan,
 } from './types'
 
-type ExecutePayload = {
-  distributedKeyPrefix: string
-  protocol: string
-  requestPath: string
-  requestedModel: string
-  systemPrompt?: string
-  userPrompt: string
-  temperature?: number
-  maxTokens?: number
-}
-
 export function TranslationDebugPage() {
   const [searchParams] = useSearchParams()
   const [distributedKeyPrefix, setDistributedKeyPrefix] = useState(searchParams.get('distributedKeyPrefix') ?? 'sk-gw-test')
   const [protocol, setProtocol] = useState(searchParams.get('protocol') ?? 'openai')
+  const [method, setMethod] = useState(searchParams.get('method') ?? 'POST')
   const [requestPath, setRequestPath] = useState(searchParams.get('requestPath') ?? '/v1/chat/completions')
   const [requestedModel, setRequestedModel] = useState(searchParams.get('requestedModel') ?? 'gpt-4o')
   const [body, setBody] = useState(searchParams.get('body') ?? '{"model":"gpt-4o","messages":[{"role":"user","content":"hello"}]}')
+  const [formFields, setFormFields] = useState(searchParams.get('formFields') ?? '{"model":"gpt-4o-mini-transcribe"}')
+  const [fileRefs, setFileRefs] = useState(searchParams.get('fileRefs') ?? '[{"fieldName":"file","fileKey":"file-123"}]')
   const [inputError, setInputError] = useState<string | null>(null)
+  const multipartMode = isMultipartResourcePath(requestPath)
 
   const explainMutation = useTypedMutation<TranslationPlan, void>({
     mutationFn: async () => {
-      const parsedBody = parseJsonBody(body)
+      const parsedBody = multipartMode
+        ? buildMultipartExplainBody(requestedModel, formFields, fileRefs)
+        : parseJsonBody(body)
       return apiRequest<TranslationPlan>('/admin/translation/explain', {
+        method: 'POST',
+        body: JSON.stringify({
+          distributedKeyPrefix,
+          protocol,
+          method,
+          requestPath,
+          requestedModel,
+          body: parsedBody,
+        }),
+      })
+    },
+  })
+
+  const executeMutation = useTypedMutation<AdminChatExecuteResponse, void>({
+    mutationFn: async () => {
+      const parsedBody = parseJsonBody(body)
+      return apiRequest<AdminChatExecuteResponse>('/admin/chat/execute', {
         method: 'POST',
         body: JSON.stringify({
           distributedKeyPrefix,
@@ -46,33 +59,20 @@ export function TranslationDebugPage() {
     },
   })
 
-  const executeMutation = useTypedMutation<AdminChatExecuteResponse, void>({
-    mutationFn: async () => {
-      const payload = buildExecutePayload({
-        distributedKeyPrefix,
-        protocol,
-        requestPath,
-        requestedModel,
-        body,
-      })
-      return apiRequest<AdminChatExecuteResponse>('/admin/chat/execute', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      })
-    },
-  })
-
   const resourceExecuteMutation = useTypedMutation<AdminResourceExecuteResponse, void>({
     mutationFn: async () => {
-      const parsedBody = parseJsonBody(body)
+      const parsedBody = multipartMode ? safeParseJsonBody(body) : parseJsonBody(body)
       return apiRequest<AdminResourceExecuteResponse>('/admin/resource/execute', {
         method: 'POST',
         body: JSON.stringify({
           distributedKeyPrefix,
           protocol,
+          method,
           requestPath,
           requestedModel,
           body: parsedBody,
+          formFields: multipartMode ? parseJsonObject(formFields) : undefined,
+          fileRefs: multipartMode ? parseJsonArray(fileRefs) : undefined,
         }),
       })
     },
@@ -125,6 +125,10 @@ export function TranslationDebugPage() {
               <input value={protocol} onChange={(event) => setProtocol(event.target.value)} />
             </label>
             <label>
+              <span>method</span>
+              <input value={method} onChange={(event) => setMethod(event.target.value.toUpperCase())} />
+            </label>
+            <label>
               <span>requestPath</span>
               <input value={requestPath} onChange={(event) => setRequestPath(event.target.value)} />
             </label>
@@ -137,13 +141,25 @@ export function TranslationDebugPage() {
             <span>request body</span>
             <textarea value={body} onChange={(event) => setBody(event.target.value)} rows={8} />
           </label>
+          {multipartMode ? (
+            <>
+              <label>
+                <span>formFields JSON</span>
+                <textarea value={formFields} onChange={(event) => setFormFields(event.target.value)} rows={5} />
+              </label>
+              <label>
+                <span>fileRefs JSON</span>
+                <textarea value={fileRefs} onChange={(event) => setFileRefs(event.target.value)} rows={4} />
+              </label>
+            </>
+          ) : null}
           <div className="inline-actions">
             <button type="submit" disabled={explainMutation.isPending}>查看 Explain</button>
             <button type="button" onClick={handleExecute} disabled={!canExecute || executeMutation.isPending}>
-              执行 Chat 调试
+              {isChatLikePath(requestPath) ? '执行 Chat 调试' : '执行资源调试'}
             </button>
           </div>
-            {!canExecute ? <p className="empty-state">当前 requestPath 暂不支持执行调试；multipart 路径暂保持 explain-only。</p> : null}
+          {!canExecute ? <p className="empty-state">当前 requestPath 暂不支持执行调试。</p> : null}
           {inputError ? <p className="empty-state">{inputError}</p> : null}
         </form>
       </div>
@@ -159,6 +175,7 @@ export function TranslationDebugPage() {
               <strong>{String(explainResult.executable)}</strong>
               <span>{explainResult.executionKind ?? '-'}</span>
               <span>backend: {explainResult.executionBackend ?? '-'}</span>
+              <span>objectMode: {explainResult.objectMode ?? '-'}</span>
               <span>protocol: {explainResult.ingressProtocol ?? '-'}</span>
               <span>resource / operation: {explainResult.resourceType ?? '-'} / {explainResult.operation ?? '-'}</span>
               <span>execution / render / overall: {explainResult.executionCapabilityLevel ?? '-'} / {explainResult.renderCapabilityLevel ?? '-'} / {explainResult.overallCapabilityLevel ?? '-'}</span>
@@ -245,94 +262,35 @@ function parseJsonBody(value: string) {
   }
 }
 
-function buildExecutePayload(args: {
-  distributedKeyPrefix: string
-  protocol: string
-  requestPath: string
-  requestedModel: string
-  body: string
-}): ExecutePayload {
-  const parsedBody = parseJsonBody(args.body) as Record<string, unknown>
-  const messages = extractMessages(parsedBody)
-  const systemPrompt = messages.filter((item) => item.role === 'system').map((item) => item.text).join('\n\n').trim()
-  const userPrompt = messages.filter((item) => item.role === 'user').map((item) => item.text).join('\n\n').trim()
-
-  if (!userPrompt) {
-    throw new Error('当前请求体无法提取 user prompt，暂不支持执行调试。')
-  }
-
-  return {
-    distributedKeyPrefix: args.distributedKeyPrefix,
-    protocol: args.protocol,
-    requestPath: args.requestPath,
-    requestedModel: args.requestedModel,
-    systemPrompt: systemPrompt || undefined,
-    userPrompt,
-    temperature: toNumber(parsedBody.temperature),
-    maxTokens: toNumber(parsedBody.max_output_tokens ?? parsedBody.max_completion_tokens ?? parsedBody.max_tokens),
-  }
+function safeParseJsonBody(value: string) {
+  if (!value.trim()) return {}
+  return parseJsonBody(value)
 }
 
-function extractMessages(body: Record<string, unknown>) {
-  if (Array.isArray(body.messages)) {
-    return body.messages
-      .map((message) => normaliseMessage(message))
-      .filter((message): message is { role: string; text: string } => Boolean(message))
+function parseJsonObject(value: string) {
+  const parsed = safeParseJsonBody(value)
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new Error('formFields 必须是 JSON object。')
   }
+  return parsed
+}
 
-  if (typeof body.input === 'string') {
-    return [{ role: 'user', text: body.input }]
+function parseJsonArray(value: string) {
+  const parsed = safeParseJsonBody(value)
+  if (!Array.isArray(parsed)) {
+    throw new Error('fileRefs 必须是 JSON array。')
   }
+  return parsed
+}
 
-  if (Array.isArray(body.input)) {
-    return body.input
-      .flatMap((item) => {
-        if (typeof item === 'string') {
-          return [{ role: 'user', text: item }]
-        }
-        const direct = normaliseMessage(item)
-        if (direct) return [direct]
-        if (isRecord(item) && Array.isArray(item.content)) {
-          const text = extractText(item.content)
-          if (text) {
-            return [{ role: String(item.role ?? 'user'), text }]
-          }
-        }
-        return []
-      })
+function buildMultipartExplainBody(requestedModel: string, formFields: string, fileRefs: string) {
+  const payload = parseJsonObject(formFields) as Record<string, unknown>
+  if (!payload.model && requestedModel) {
+    payload.model = requestedModel
   }
-
-  return []
-}
-
-function normaliseMessage(message: unknown) {
-  if (!isRecord(message)) return null
-  const role = typeof message.role === 'string' ? message.role : 'user'
-  const text = extractText(message.content)
-  return text ? { role, text } : null
-}
-
-function extractText(content: unknown): string {
-  if (typeof content === 'string') return content
-  if (!Array.isArray(content)) return ''
-  return content
-    .flatMap((item) => {
-      if (typeof item === 'string') return [item]
-      if (!isRecord(item)) return []
-      if (typeof item.text === 'string') return [item.text]
-      if (item.type === 'text' && typeof item.text === 'string') return [item.text]
-      if (item.type === 'input_text' && typeof item.text === 'string') return [item.text]
-      if (isRecord(item.text) && typeof item.text.value === 'string') return [item.text.value]
-      return []
-    })
-    .join('\n')
-    .trim()
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null
-}
-
-function toNumber(value: unknown) {
-  return typeof value === 'number' ? value : undefined
+  const refs = parseJsonArray(fileRefs)
+  if (refs.length) {
+    payload.fileRefs = refs
+  }
+  return payload
 }

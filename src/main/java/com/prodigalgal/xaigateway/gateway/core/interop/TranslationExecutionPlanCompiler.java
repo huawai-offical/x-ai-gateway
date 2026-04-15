@@ -59,9 +59,30 @@ public class TranslationExecutionPlanCompiler {
             GatewayDegradationPolicy degradationPolicy,
             GatewayClientFamily clientFamily,
             JsonNode body) {
+        return compilePreview(
+                distributedKeyPrefix,
+                protocol,
+                "POST",
+                requestPath,
+                requestedModel,
+                degradationPolicy,
+                clientFamily,
+                body
+        );
+    }
+
+    public CanonicalExecutionPlanCompilation compilePreview(
+            String distributedKeyPrefix,
+            String protocol,
+            String httpMethod,
+            String requestPath,
+            String requestedModel,
+            GatewayDegradationPolicy degradationPolicy,
+            GatewayClientFamily clientFamily,
+            JsonNode body) {
         String normalizedProtocol = normalizeProtocol(protocol);
         String normalizedRequestPath = normalizeRequestPath(requestPath, normalizedProtocol);
-        GatewayRequestSemantics semantics = gatewayRequestFeatureService.describe(normalizedRequestPath, body);
+        GatewayRequestSemantics semantics = gatewayRequestFeatureService.describe(httpMethod, normalizedRequestPath, body);
         String resolvedRequestedModel = resolveRequestedModel(requestedModel, normalizedRequestPath, semantics, body);
         List<String> blockedReasons = new ArrayList<>();
         List<String> lossReasons = new ArrayList<>();
@@ -81,18 +102,16 @@ public class TranslationExecutionPlanCompiler {
             } catch (IllegalArgumentException exception) {
                 blockedReasons.add(exception.getMessage());
             }
-        } else {
-            blockedReasons.add("当前操作依赖资源编排上下文，暂不支持独立预检选路。");
         }
 
         CapabilityResolutionReport report = selectionResult == null
                 ? new CapabilityResolutionReport(
                         java.util.Map.of(),
-                        InteropCapabilityLevel.UNSUPPORTED,
-                        InteropCapabilityLevel.UNSUPPORTED,
-                        InteropCapabilityLevel.UNSUPPORTED,
-                        ExecutionKind.BLOCKED,
-                        "blocked",
+                        semantics.requiresRouteSelection() ? InteropCapabilityLevel.UNSUPPORTED : InteropCapabilityLevel.NATIVE,
+                        semantics.requiresRouteSelection() ? InteropCapabilityLevel.UNSUPPORTED : InteropCapabilityLevel.NATIVE,
+                        semantics.requiresRouteSelection() ? InteropCapabilityLevel.UNSUPPORTED : InteropCapabilityLevel.NATIVE,
+                        semantics.requiresRouteSelection() ? ExecutionKind.BLOCKED : ExecutionKind.NATIVE,
+                        semantics.requiresRouteSelection() ? "blocked" : "resource-orchestration",
                         List.of(),
                         List.of()
                 )
@@ -211,7 +230,7 @@ public class TranslationExecutionPlanCompiler {
                 requestBody
         );
         return new CanonicalExecutionPlan(
-                blockedReasons.isEmpty(),
+                blockedReasons.isEmpty() && (!semantics.requiresRouteSelection() || selectionResult != null),
                 CanonicalIngressProtocol.from(protocol),
                 requestPath,
                 requestedModel,
@@ -221,6 +240,7 @@ public class TranslationExecutionPlanCompiler {
                 semantics.operation(),
                 executionKind,
                 backendDecision.preferredBackend(),
+                objectMode(semantics, backendDecision.preferredBackend(), upstreamObjectMode),
                 backendDecision.supportedBackends(),
                 backendDecision.reason(),
                 executionCapabilityLevel,
@@ -231,6 +251,27 @@ public class TranslationExecutionPlanCompiler {
                 List.copyOf(lossReasons),
                 List.copyOf(blockedReasons)
         );
+    }
+
+    public CanonicalExecutionPlanCompilation compileSelected(
+            RouteSelectionResult selectionResult,
+            com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest resourceRequest,
+            GatewayRequestSemantics semantics,
+            JsonNode body) {
+        CanonicalRequest canonicalRequest = new CanonicalRequest(
+                resourceRequest.distributedKeyPrefix(),
+                resourceRequest.ingressProtocol(),
+                resourceRequest.requestPath(),
+                resourceRequest.requestedModel(),
+                List.of(),
+                List.of(),
+                null,
+                null,
+                null,
+                null,
+                body
+        );
+        return compileSelected(selectionResult, canonicalRequest, semantics, body);
     }
 
     private String normalizeProtocol(String protocol) {
@@ -270,9 +311,29 @@ public class TranslationExecutionPlanCompiler {
             case MODERATION_CREATE -> "omni-moderation-latest";
             case AUDIO_SPEECH -> "gpt-4o-mini-tts";
             case AUDIO_TRANSCRIPTION, AUDIO_TRANSLATION -> "gpt-4o-mini-transcribe";
-            case FILE_CREATE, UPLOAD_CREATE, UPLOAD_PART_ADD, UPLOAD_COMPLETE, UPLOAD_CANCEL, BATCH_CREATE, BATCH_CANCEL,
+            case FILE_CREATE, FILE_LIST, FILE_GET, FILE_CONTENT_GET, FILE_DELETE,
+                    UPLOAD_CREATE, UPLOAD_GET, UPLOAD_PART_ADD, UPLOAD_COMPLETE, UPLOAD_CANCEL,
+                    BATCH_CREATE, BATCH_GET, BATCH_CANCEL,
+                    TUNING_CREATE, TUNING_GET, TUNING_CANCEL,
                     REALTIME_CLIENT_SECRET_CREATE -> "resource-orchestration";
             default -> throw new IllegalArgumentException("预检请求缺少 model。");
+        };
+    }
+
+    private String objectMode(
+            GatewayRequestSemantics semantics,
+            com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend backend,
+            String upstreamObjectMode) {
+        if (semantics == null || backend == null) {
+            return upstreamObjectMode;
+        }
+        return switch (backend) {
+            case NATIVE -> semantics.resourceType() == TranslationResourceType.CHAT || semantics.resourceType() == TranslationResourceType.RESPONSE
+                    ? upstreamObjectMode
+                    : "native-resource";
+            case PASSTHROUGH -> "passthrough-resource";
+            case ORCHESTRATION -> "gateway-object-lineage";
+            case SPRING_AI -> upstreamObjectMode;
         };
     }
 }

@@ -2,6 +2,8 @@ package com.prodigalgal.xaigateway.protocol.ingress.interop;
 
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 public record InteropPlanResponse(
@@ -19,8 +21,8 @@ public record InteropPlanResponse(
         return new InteropPlanResponse(
                 plan,
                 selectionResult,
-                summary == null ? Map.of() : Map.copyOf(summary),
-                debug == null ? Map.of() : Map.copyOf(debug)
+                summary == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(summary)),
+                debug == null ? Map.of() : Collections.unmodifiableMap(new LinkedHashMap<>(debug))
         );
     }
 }

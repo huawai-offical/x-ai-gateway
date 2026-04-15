@@ -11,43 +11,28 @@ import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyQueryService;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
 import com.prodigalgal.xaigateway.gateway.core.credential.CredentialMaterialResolver;
 import com.prodigalgal.xaigateway.gateway.core.credential.ResolvedCredentialMaterial;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionResponse;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionStreamChunk;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionStreamResponse;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayChatRuntime;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayChatRuntimeContext;
-import com.prodigalgal.xaigateway.gateway.core.execution.GatewayChatRuntimeResult;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolCall;
-import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolDefinition;
-import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalChatMapper;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalContentPart;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlanCompilation;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionResult;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionStreamResult;
-import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalMessage;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalMessageRole;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalPartType;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResponse;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEvent;
-import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEventType;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolCall;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolDefinition;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalUsage;
-import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileResource;
-import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileService;
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics;
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestFeatureService;
-import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlan;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlanCompiler;
 import com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityService;
 import com.prodigalgal.xaigateway.gateway.core.observability.GatewayRequestLifecycleService;
-import com.prodigalgal.xaigateway.gateway.core.response.GatewayResponse;
-import com.prodigalgal.xaigateway.gateway.core.response.GatewayResponseMapper;
-import com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamResponse;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageCompleteness;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageSource;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageView;
@@ -64,46 +49,29 @@ import com.prodigalgal.xaigateway.gateway.core.usage.GatewayUsage;
 import com.prodigalgal.xaigateway.infra.config.GatewayProperties;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
-import com.prodigalgal.xaigateway.provider.adapter.PreparedChatExecution;
-import com.prodigalgal.xaigateway.provider.adapter.ProviderExecutionSupportService;
-import com.prodigalgal.xaigateway.provider.adapter.anthropic.AnthropicChatModelFactory;
-import com.prodigalgal.xaigateway.provider.adapter.gemini.GeminiChatModelFactory;
-import com.prodigalgal.xaigateway.provider.adapter.openai.OpenAiChatModelFactory;
+import com.prodigalgal.xaigateway.protocol.ingress.anthropic.AnthropicMessagesRequest;
+import com.prodigalgal.xaigateway.protocol.ingress.anthropic.AnthropicMessagesRequestMapper;
+import com.prodigalgal.xaigateway.protocol.ingress.google.GeminiGenerateContentRequest;
+import com.prodigalgal.xaigateway.protocol.ingress.google.GeminiGenerateContentRequestMapper;
+import com.prodigalgal.xaigateway.protocol.ingress.openai.OpenAiChatCompletionRequest;
+import com.prodigalgal.xaigateway.protocol.ingress.openai.OpenAiChatCompletionRequestMapper;
+import com.prodigalgal.xaigateway.protocol.ingress.openai.OpenAiResponsesRequestMapper;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import org.springframework.ai.anthropic.AnthropicChatModel;
-import org.springframework.ai.anthropic.AnthropicChatOptions;
-import org.springframework.ai.chat.messages.Message;
-import org.springframework.ai.chat.messages.SystemMessage;
-import org.springframework.ai.chat.messages.ToolResponseMessage;
-import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.ai.chat.model.ChatResponse;
-import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.content.Media;
-import org.springframework.ai.google.genai.GoogleGenAiChatModel;
-import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
-import org.springframework.ai.openai.OpenAiChatModel;
-import org.springframework.ai.openai.OpenAiChatOptions;
-import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.util.MimeTypeUtils;
-import java.net.URI;
-import java.util.ArrayList;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.SignalType;
 
 @Service
 @Transactional
 public class GatewayChatExecutionService {
 
     private final GatewayRouteSelectionService gatewayRouteSelectionService;
-    private final ProviderExecutionSupportService providerExecutionSupportService;
     private final UpstreamCredentialRepository upstreamCredentialRepository;
     private final CredentialCryptoService credentialCryptoService;
     private final GatewayObservabilityService gatewayObservabilityService;
@@ -112,21 +80,18 @@ public class GatewayChatExecutionService {
     private final DistributedKeyQueryService distributedKeyQueryService;
     private final AccountSelectionService accountSelectionService;
     private final CredentialMaterialResolver credentialMaterialResolver;
-    private final GatewayFileService gatewayFileService;
     private final GatewayRequestFeatureService gatewayRequestFeatureService;
     private final TranslationExecutionPlanCompiler translationExecutionPlanCompiler;
-    private final CanonicalChatMapper canonicalChatMapper;
-    private final OpenAiChatModelFactory openAiChatModelFactory;
-    private final AnthropicChatModelFactory anthropicChatModelFactory;
-    private final GeminiChatModelFactory geminiChatModelFactory;
+    private final OpenAiChatCompletionRequestMapper openAiChatCompletionRequestMapper;
+    private final OpenAiResponsesRequestMapper openAiResponsesRequestMapper;
+    private final AnthropicMessagesRequestMapper anthropicMessagesRequestMapper;
+    private final GeminiGenerateContentRequestMapper geminiGenerateContentRequestMapper;
     private final List<GatewayChatRuntime> gatewayChatRuntimes;
-    private final GatewayResponseMapper gatewayResponseMapper;
     private final GatewayProperties gatewayProperties;
 
     @Autowired
     public GatewayChatExecutionService(
             GatewayRouteSelectionService gatewayRouteSelectionService,
-            ProviderExecutionSupportService providerExecutionSupportService,
             UpstreamCredentialRepository upstreamCredentialRepository,
             CredentialCryptoService credentialCryptoService,
             GatewayObservabilityService gatewayObservabilityService,
@@ -135,18 +100,15 @@ public class GatewayChatExecutionService {
             DistributedKeyQueryService distributedKeyQueryService,
             AccountSelectionService accountSelectionService,
             CredentialMaterialResolver credentialMaterialResolver,
-            GatewayFileService gatewayFileService,
             GatewayRequestFeatureService gatewayRequestFeatureService,
             TranslationExecutionPlanCompiler translationExecutionPlanCompiler,
-            CanonicalChatMapper canonicalChatMapper,
-            OpenAiChatModelFactory openAiChatModelFactory,
-            AnthropicChatModelFactory anthropicChatModelFactory,
-            GeminiChatModelFactory geminiChatModelFactory,
+            OpenAiChatCompletionRequestMapper openAiChatCompletionRequestMapper,
+            OpenAiResponsesRequestMapper openAiResponsesRequestMapper,
+            AnthropicMessagesRequestMapper anthropicMessagesRequestMapper,
+            GeminiGenerateContentRequestMapper geminiGenerateContentRequestMapper,
             List<GatewayChatRuntime> gatewayChatRuntimes,
-            GatewayResponseMapper gatewayResponseMapper,
             GatewayProperties gatewayProperties) {
         this.gatewayRouteSelectionService = gatewayRouteSelectionService;
-        this.providerExecutionSupportService = providerExecutionSupportService;
         this.upstreamCredentialRepository = upstreamCredentialRepository;
         this.credentialCryptoService = credentialCryptoService;
         this.gatewayObservabilityService = gatewayObservabilityService;
@@ -155,60 +117,14 @@ public class GatewayChatExecutionService {
         this.distributedKeyQueryService = distributedKeyQueryService;
         this.accountSelectionService = accountSelectionService;
         this.credentialMaterialResolver = credentialMaterialResolver;
-        this.gatewayFileService = gatewayFileService;
         this.gatewayRequestFeatureService = gatewayRequestFeatureService;
         this.translationExecutionPlanCompiler = translationExecutionPlanCompiler;
-        this.canonicalChatMapper = canonicalChatMapper;
-        this.openAiChatModelFactory = openAiChatModelFactory;
-        this.anthropicChatModelFactory = anthropicChatModelFactory;
-        this.geminiChatModelFactory = geminiChatModelFactory;
+        this.openAiChatCompletionRequestMapper = openAiChatCompletionRequestMapper;
+        this.openAiResponsesRequestMapper = openAiResponsesRequestMapper;
+        this.anthropicMessagesRequestMapper = anthropicMessagesRequestMapper;
+        this.geminiGenerateContentRequestMapper = geminiGenerateContentRequestMapper;
         this.gatewayChatRuntimes = gatewayChatRuntimes;
-        this.gatewayResponseMapper = gatewayResponseMapper;
         this.gatewayProperties = gatewayProperties;
-    }
-
-    public GatewayChatExecutionService(
-            GatewayRouteSelectionService gatewayRouteSelectionService,
-            ProviderExecutionSupportService providerExecutionSupportService,
-            UpstreamCredentialRepository upstreamCredentialRepository,
-            CredentialCryptoService credentialCryptoService,
-            GatewayObservabilityService gatewayObservabilityService,
-            GatewayRequestLifecycleService gatewayRequestLifecycleService,
-            DistributedKeyGovernanceService distributedKeyGovernanceService,
-            DistributedKeyQueryService distributedKeyQueryService,
-            AccountSelectionService accountSelectionService,
-            CredentialMaterialResolver credentialMaterialResolver,
-            GatewayFileService gatewayFileService,
-            GatewayRequestFeatureService gatewayRequestFeatureService,
-            TranslationExecutionPlanCompiler translationExecutionPlanCompiler,
-            OpenAiChatModelFactory openAiChatModelFactory,
-            AnthropicChatModelFactory anthropicChatModelFactory,
-            GeminiChatModelFactory geminiChatModelFactory,
-            List<GatewayChatRuntime> gatewayChatRuntimes,
-            GatewayResponseMapper gatewayResponseMapper,
-            GatewayProperties gatewayProperties) {
-        this(
-                gatewayRouteSelectionService,
-                providerExecutionSupportService,
-                upstreamCredentialRepository,
-                credentialCryptoService,
-                gatewayObservabilityService,
-                gatewayRequestLifecycleService,
-                distributedKeyGovernanceService,
-                distributedKeyQueryService,
-                accountSelectionService,
-                credentialMaterialResolver,
-                gatewayFileService,
-                gatewayRequestFeatureService,
-                translationExecutionPlanCompiler,
-                new CanonicalChatMapper(new tools.jackson.databind.ObjectMapper()),
-                openAiChatModelFactory,
-                anthropicChatModelFactory,
-                geminiChatModelFactory,
-                gatewayChatRuntimes,
-                gatewayResponseMapper,
-                gatewayProperties
-        );
     }
 
     public AdminChatExecuteResponse execute(AdminChatExecuteRequest request) {
@@ -221,10 +137,6 @@ public class GatewayChatExecutionService {
                 toGatewayUsage(response.response().usage()),
                 toGatewayToolCalls(response.response().toolCalls())
         );
-    }
-
-    public ChatExecutionResponse execute(ChatExecutionRequest request) {
-        return toChatExecutionResponse(executeGatewayResponse(canonicalChatMapper.toCanonicalRequest(request)));
     }
 
     public CanonicalExecutionResult executeGatewayResponse(CanonicalRequest request) {
@@ -345,14 +257,6 @@ public class GatewayChatExecutionService {
         }
     }
 
-    public GatewayResponse executeGatewayResponse(ChatExecutionRequest request) {
-        return gatewayResponseMapper.toGatewayResponse(execute(request));
-    }
-
-    public ChatExecutionStreamResponse executeStream(ChatExecutionRequest request) {
-        return toChatExecutionStreamResponse(executeGatewayStream(canonicalChatMapper.toCanonicalRequest(request)));
-    }
-
     public CanonicalExecutionStreamResult executeGatewayStream(CanonicalRequest request) {
         String requestId = gatewayObservabilityService.nextRequestId();
         Instant startedAt = Instant.now();
@@ -436,10 +340,6 @@ public class GatewayChatExecutionService {
                 .doFinally(signalType -> distributedKeyGovernanceService.releaseConcurrency(selectionResult.governanceReservationKey()));
 
         return new CanonicalExecutionStreamResult(requestId, selectionResult, planRef.get(), chunks);
-    }
-
-    public GatewayStreamResponse executeGatewayStream(ChatExecutionRequest request) {
-        return gatewayResponseMapper.toGatewayStreamResponse(executeStream(request));
     }
 
     private Flux<CanonicalStreamEvent> streamAttempt(
@@ -643,36 +543,6 @@ public class GatewayChatExecutionService {
                 .toList();
     }
 
-    private ChatExecutionResponse toChatExecutionResponse(CanonicalExecutionResult result) {
-        return new ChatExecutionResponse(
-                result.requestId(),
-                result.routeSelection(),
-                result.response().outputText(),
-                toGatewayUsage(result.response().usage()),
-                toGatewayToolCalls(result.response().toolCalls()),
-                result.response().finishReason() == null ? null : result.response().finishReason().name().toLowerCase(),
-                result.response().reasoning()
-        );
-    }
-
-    private ChatExecutionStreamResponse toChatExecutionStreamResponse(CanonicalExecutionStreamResult result) {
-        Flux<ChatExecutionStreamChunk> chunks = result.events().map(event -> switch (event.type()) {
-            case TEXT_DELTA -> new ChatExecutionStreamChunk(event.textDelta(), null, GatewayUsage.empty(), false, List.of(), null);
-            case REASONING_DELTA -> new ChatExecutionStreamChunk(null, null, GatewayUsage.empty(), false, List.of(), event.reasoningDelta());
-            case TOOL_CALLS -> new ChatExecutionStreamChunk(null, null, GatewayUsage.empty(), false, toGatewayToolCalls(event.toolCalls()), null);
-            case COMPLETED -> new ChatExecutionStreamChunk(
-                    null,
-                    event.finishReason() == null ? null : event.finishReason().name().toLowerCase(),
-                    toGatewayUsage(event.usage()),
-                    true,
-                    List.of(),
-                    null
-            );
-            case ERROR -> new ChatExecutionStreamChunk(null, "error", GatewayUsage.empty(), true, List.of(), null);
-        });
-        return new ChatExecutionStreamResponse(result.requestId(), result.routeSelection(), chunks);
-    }
-
     private CanonicalResponse enrichResponse(String requestId, RouteSelectionResult selectionResult, CanonicalResponse result) {
         return new CanonicalResponse(
                 requestId,
@@ -686,25 +556,42 @@ public class GatewayChatExecutionService {
     }
 
     private CanonicalRequest buildAdminRequest(AdminChatExecuteRequest request) {
-        List<CanonicalMessage> messages = request.systemPrompt() == null || request.systemPrompt().isBlank()
-                ? List.of(new CanonicalMessage(CanonicalMessageRole.USER, List.of(CanonicalContentPart.text(request.userPrompt()))))
-                : List.of(
-                        new CanonicalMessage(CanonicalMessageRole.SYSTEM, List.of(CanonicalContentPart.text(request.systemPrompt()))),
-                        new CanonicalMessage(CanonicalMessageRole.USER, List.of(CanonicalContentPart.text(request.userPrompt())))
-                );
-        return new CanonicalRequest(
-                request.distributedKeyPrefix(),
-                CanonicalIngressProtocol.from(request.protocol()),
-                request.requestPath(),
-                request.requestedModel(),
-                messages,
-                List.of(),
-                null,
-                request.temperature(),
-                request.maxTokens(),
-                null,
-                null
-        );
+        if (request.body() == null || request.body().isNull()) {
+            throw new IllegalArgumentException("admin chat execute 缺少 body。");
+        }
+        return switch (request.requestPath()) {
+            case "/v1/chat/completions" -> openAiChatCompletionRequestMapper.toCanonicalRequest(
+                    request.distributedKeyPrefix(),
+                    request.body()
+            );
+            case "/v1/responses" -> openAiResponsesRequestMapper.toCanonicalRequest(
+                    request.distributedKeyPrefix(),
+                    request.body()
+            );
+            case "/v1/messages" -> anthropicMessagesRequestMapper.toCanonicalRequest(
+                    request.distributedKeyPrefix(),
+                    request.body()
+            );
+            default -> {
+                if (request.requestPath().contains(":generateContent")) {
+                    yield geminiGenerateContentRequestMapper.toCanonicalRequest(
+                            request.distributedKeyPrefix(),
+                            request.requestedModel(),
+                            request.body(),
+                            false
+                    );
+                }
+                if (request.requestPath().contains(":streamGenerateContent")) {
+                    yield geminiGenerateContentRequestMapper.toCanonicalRequest(
+                            request.distributedKeyPrefix(),
+                            request.requestedModel(),
+                            request.body(),
+                            true
+                    );
+                }
+                throw new IllegalArgumentException("当前 admin chat execute 暂不支持该 requestPath：" + request.requestPath());
+            }
+        };
     }
 
     private String cacheKind(GatewayUsageView usageView) {
@@ -784,92 +671,6 @@ public class GatewayChatExecutionService {
                 .orElseThrow(() -> new IllegalArgumentException("未找到匹配的聊天运行时：" + candidate.providerType() + " / " + backend));
     }
 
-    private ChatResponse executeOpenAi(RouteSelectionResult selectionResult, String baseUrl, String apiKey, ChatExecutionRequest request) {
-        OpenAiChatOptions baseOptions = OpenAiChatOptions.builder()
-                .model(selectionResult.resolvedModelKey())
-                .temperature(request.temperature())
-                .maxTokens(request.maxTokens())
-                .build();
-        PreparedChatExecution<OpenAiChatOptions> prepared = providerExecutionSupportService.prepareOpenAi(
-                selectionResult,
-                baseOptions,
-                request.tools(),
-                request.toolChoice()
-        );
-        OpenAiChatModel model = openAiChatModelFactory.create(baseUrl, apiKey, prepared.options());
-        return call(model, buildPrompt(prepared.options(), request));
-    }
-
-    private ChatResponse executeAnthropic(RouteSelectionResult selectionResult, String baseUrl, String apiKey, ChatExecutionRequest request) {
-        AnthropicChatOptions baseOptions = AnthropicChatOptions.builder()
-                .model(selectionResult.resolvedModelKey())
-                .temperature(request.temperature())
-                .maxTokens(request.maxTokens())
-                .build();
-        PreparedChatExecution<AnthropicChatOptions> prepared = providerExecutionSupportService.prepareAnthropic(
-                selectionResult,
-                baseOptions,
-                request.tools(),
-                request.toolChoice()
-        );
-        AnthropicChatModel model = anthropicChatModelFactory.create(baseUrl, apiKey, prepared.options());
-        return call(model, buildPrompt(prepared.options(), request));
-    }
-
-    private ChatResponse executeGemini(RouteSelectionResult selectionResult, String baseUrl, String apiKey, ChatExecutionRequest request) {
-        GoogleGenAiChatOptions baseOptions = GoogleGenAiChatOptions.builder()
-                .model(selectionResult.resolvedModelKey())
-                .temperature(request.temperature())
-                .maxOutputTokens(request.maxTokens())
-                .build();
-        PreparedChatExecution<GoogleGenAiChatOptions> prepared = providerExecutionSupportService.prepareGemini(
-                selectionResult,
-                baseOptions,
-                request.tools()
-        );
-        GoogleGenAiChatModel model = geminiChatModelFactory.create(baseUrl, apiKey, prepared.options());
-        return call(model, buildPrompt(prepared.options(), request));
-    }
-
-    private ChatResponse call(ChatModel model, Prompt prompt) {
-        try {
-            return model.call(prompt);
-        } finally {
-            closeModel(model, SignalType.ON_COMPLETE);
-        }
-    }
-
-    private void closeModel(ChatModel model, SignalType signalType) {
-        if (signalType == null) {
-            return;
-        }
-
-        if (model instanceof AutoCloseable closeable) {
-            try {
-                closeable.close();
-                return;
-            } catch (Exception ignored) {
-                // ignore
-            }
-        }
-
-        if (model instanceof DisposableBean disposableBean) {
-            try {
-                disposableBean.destroy();
-            } catch (Exception ignored) {
-                // ignore
-            }
-        }
-    }
-
-    private Prompt buildPrompt(Object options, ChatExecutionRequest request) {
-        List<Message> messages = request.messages().stream()
-                .filter(this::isUsableMessage)
-                .map(message -> toPromptMessage(request.distributedKeyPrefix(), message))
-                .toList();
-        return new Prompt(messages, (org.springframework.ai.chat.prompt.ChatOptions) options);
-    }
-
     private JsonNode buildRouteBody(CanonicalRequest canonicalRequest) {
         ObjectNode root = JsonNodeFactory.instance.objectNode();
         root.put("model", canonicalRequest.requestedModel());
@@ -918,61 +719,6 @@ public class GatewayChatExecutionService {
         return root;
     }
 
-    private Message toPromptMessage(String distributedKeyPrefix, ChatExecutionRequest.MessageInput message) {
-        return switch (message.role().trim().toLowerCase()) {
-            case "system" -> new SystemMessage(message.content() == null ? "" : message.content().trim());
-            case "assistant", "model" -> new org.springframework.ai.chat.messages.AssistantMessage(message.content() == null ? "" : message.content().trim());
-            case "tool" -> ToolResponseMessage.builder()
-                    .responses(List.of(new ToolResponseMessage.ToolResponse(
-                            message.toolCallId() == null ? "tool-call" : message.toolCallId(),
-                            message.toolName() == null ? "tool" : message.toolName(),
-                            message.content() == null ? "" : message.content().trim()
-                    )))
-                    .build();
-            default -> {
-                if (message.media() != null && !message.media().isEmpty()) {
-                    List<Media> media = message.media().stream()
-                            .filter(item -> item.url() != null && !item.url().isBlank())
-                            .map(item -> toMedia(distributedKeyPrefix, item))
-                            .toList();
-                    yield UserMessage.builder()
-                            .text(message.content() == null ? "" : message.content().trim())
-                            .media(media)
-                            .build();
-                }
-                yield new UserMessage(message.content() == null ? "" : message.content().trim());
-            }
-        };
-    }
-
-    private boolean isUsableMessage(ChatExecutionRequest.MessageInput message) {
-        boolean hasText = message.content() != null && !message.content().isBlank();
-        boolean hasMedia = message.media() != null && !message.media().isEmpty();
-        return hasText || hasMedia;
-    }
-
-    private Media toMedia(String distributedKeyPrefix, ChatExecutionRequest.MediaInput item) {
-        if (item.url() != null && item.url().startsWith("gateway://")) {
-            String fileKey = item.url().substring("gateway://".length());
-            Long distributedKeyId = distributedKeyQueryService.findActiveByKeyPrefix(distributedKeyPrefix)
-                    .orElseThrow(() -> new IllegalArgumentException("未找到可用的 DistributedKey。"))
-                    .id();
-            GatewayFileResource resource = gatewayFileService.resolveFileResource(fileKey, distributedKeyId);
-            return Media.builder()
-                    .mimeType(MimeTypeUtils.parseMimeType(resource.mimeType()))
-                    .data(resource.resource())
-                    .name(resource.filename())
-                    .build();
-        }
-
-        return Media.builder()
-                .mimeType(MimeTypeUtils.parseMimeType(item.mimeType() == null || item.mimeType().isBlank()
-                        ? ("file".equalsIgnoreCase(item.kind()) ? "application/octet-stream" : "image/*")
-                        : item.mimeType()))
-                .data(URI.create(item.url()))
-                .name(item.name())
-                .build();
-    }
 
     private void writeOpenAiMessages(ObjectNode root, List<CanonicalMessage> messages) {
         var array = root.putArray("messages");

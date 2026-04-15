@@ -4,10 +4,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResponse;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolCall;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalUsage;
-import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolCall;
-import com.prodigalgal.xaigateway.gateway.core.response.GatewayResponse;
-import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageView;
-import com.prodigalgal.xaigateway.gateway.core.usage.GatewayUsage;
 import java.time.Instant;
 import java.util.List;
 
@@ -75,46 +71,6 @@ public record OpenAiChatCompletionResponse(
     ) {
     }
 
-    public static OpenAiChatCompletionResponse from(
-            String model,
-            String text,
-            GatewayUsage usage,
-            List<GatewayToolCall> toolCalls) {
-        return new OpenAiChatCompletionResponse(
-                "chatcmpl-" + Instant.now().toEpochMilli(),
-                "chat.completion",
-                Instant.now().getEpochSecond(),
-                model,
-                List.of(new Choice(
-                        0,
-                        new Message("assistant", text, toToolCalls(toolCalls)),
-                        toolCalls != null && !toolCalls.isEmpty() ? "tool_calls" : "stop"
-                )),
-                new Usage(
-                        usage.promptTokens(),
-                        usage.completionTokens(),
-                        usage.totalTokens(),
-                        new PromptTokensDetails(usage.cacheHitTokens()),
-                        new CompletionTokensDetails(usage.reasoningTokens())
-                )
-        );
-    }
-
-    public static OpenAiChatCompletionResponse from(GatewayResponse response) {
-        return new OpenAiChatCompletionResponse(
-                "chatcmpl-" + Instant.now().toEpochMilli(),
-                "chat.completion",
-                Instant.now().getEpochSecond(),
-                response.routeSelection().publicModel(),
-                List.of(new Choice(
-                        0,
-                        new Message("assistant", response.outputText(), toToolCalls(response.toolCalls())),
-                        response.toolCalls() != null && !response.toolCalls().isEmpty() ? "tool_calls" : "stop"
-                )),
-                toUsage(response.usage())
-        );
-    }
-
     public static OpenAiChatCompletionResponse fromCanonical(CanonicalResponse response) {
         return new OpenAiChatCompletionResponse(
                 "chatcmpl-" + Instant.now().toEpochMilli(),
@@ -128,20 +84,6 @@ public record OpenAiChatCompletionResponse(
                 )),
                 toUsage(response.usage())
         );
-    }
-
-    private static List<ToolCall> toToolCalls(List<GatewayToolCall> toolCalls) {
-        if (toolCalls == null || toolCalls.isEmpty()) {
-            return null;
-        }
-
-        return toolCalls.stream()
-                .map(toolCall -> new ToolCall(
-                        toolCall.id(),
-                        toolCall.type() == null ? "function" : toolCall.type(),
-                        new Function(toolCall.name(), toolCall.arguments())
-                ))
-                .toList();
     }
 
     private static List<ToolCall> toToolCallsCanonical(List<CanonicalToolCall> toolCalls) {
@@ -203,16 +145,6 @@ public record OpenAiChatCompletionResponse(
         );
     }
 
-    public static Chunk toolCallChunk(String model, List<GatewayToolCall> toolCalls) {
-        return new Chunk(
-                "chatcmpl-" + Instant.now().toEpochMilli(),
-                "chat.completion.chunk",
-                Instant.now().getEpochSecond(),
-                model,
-                List.of(new ChunkChoice(0, new Delta(null, null, toToolCalls(toolCalls)), null))
-        );
-    }
-
     public static Chunk toolCallChunkCanonical(String model, List<CanonicalToolCall> toolCalls) {
         return new Chunk(
                 "chatcmpl-" + Instant.now().toEpochMilli(),
@@ -230,16 +162,6 @@ public record OpenAiChatCompletionResponse(
                 Instant.now().getEpochSecond(),
                 model,
                 List.of(new ChunkChoice(0, new Delta(null, null, null), finishReason))
-        );
-    }
-
-    private static Usage toUsage(GatewayUsageView usage) {
-        return new Usage(
-                usage.promptTokens(),
-                usage.completionTokens(),
-                usage.totalTokens(),
-                new PromptTokensDetails(usage.cacheHitTokens()),
-                new CompletionTokensDetails(usage.reasoningTokens())
         );
     }
 

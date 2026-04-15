@@ -3,14 +3,12 @@ package com.prodigalgal.xaigateway.protocol.ingress.openai;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
-import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalChatExecutionRequestAdapter;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalContentPart;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalMessage;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalMessageRole;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolDefinition;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Component;
@@ -19,10 +17,25 @@ import org.springframework.stereotype.Component;
 public class OpenAiChatCompletionRequestMapper {
 
     private final ObjectMapper objectMapper;
-    private final CanonicalChatExecutionRequestAdapter canonicalChatExecutionRequestAdapter = new CanonicalChatExecutionRequestAdapter();
 
     public OpenAiChatCompletionRequestMapper(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
+    }
+
+    public CanonicalRequest toCanonicalRequest(
+            String distributedKeyPrefix,
+            OpenAiChatCompletionRequest request) {
+        return toCanonicalRequest(new AuthenticatedDistributedKey(null, distributedKeyPrefix, distributedKeyPrefix), request);
+    }
+
+    public CanonicalRequest toCanonicalRequest(
+            String distributedKeyPrefix,
+            JsonNode requestBody) {
+        try {
+            return toCanonicalRequest(distributedKeyPrefix, objectMapper.treeToValue(requestBody, OpenAiChatCompletionRequest.class));
+        } catch (Exception exception) {
+            throw new IllegalArgumentException("OpenAI chat 请求体解析失败。", exception);
+        }
     }
 
     public CanonicalRequest toCanonicalRequest(
@@ -43,12 +56,6 @@ public class OpenAiChatCompletionRequestMapper {
                 buildReasoningConfig(request),
                 buildExecutionMetadata(request)
         );
-    }
-
-    public ChatExecutionRequest toExecutionRequest(
-            AuthenticatedDistributedKey distributedKey,
-            OpenAiChatCompletionRequest request) {
-        return canonicalChatExecutionRequestAdapter.toExecutionRequest(toCanonicalRequest(distributedKey, request));
     }
 
     private List<CanonicalMessage> toMessages(List<OpenAiChatCompletionRequest.Message> messages) {

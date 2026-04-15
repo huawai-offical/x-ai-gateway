@@ -50,6 +50,7 @@ class TranslationExplainServiceTests {
         Mockito.when(compiler.compilePreview(
                         Mockito.eq("sk-gw-test"),
                         Mockito.eq("openai"),
+                        Mockito.isNull(),
                         Mockito.eq("/v1/chat/completions"),
                         Mockito.eq("gpt-4o"),
                         Mockito.eq(GatewayDegradationPolicy.ALLOW_LOSSY),

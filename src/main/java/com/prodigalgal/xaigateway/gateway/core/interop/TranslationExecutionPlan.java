@@ -183,6 +183,7 @@ public record TranslationExecutionPlan(
                 operation,
                 executionKind,
                 ExecutionBackend.SPRING_AI,
+                upstreamObjectMode,
                 List.of(ExecutionBackend.SPRING_AI),
                 "legacy_translation_plan",
                 executionLevel,

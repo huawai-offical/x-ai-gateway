@@ -19,8 +19,8 @@ public class AnthropicChatModelFactory {
     }
 
     public AnthropicChatModel create(String baseUrl, String apiKey, AnthropicChatOptions options) {
-        AnthropicClient client = buildClient(baseUrl, apiKey);
-        AnthropicClientAsync clientAsync = buildAsyncClient(baseUrl, apiKey);
+        AnthropicClient client = createClient(baseUrl, apiKey);
+        AnthropicClientAsync clientAsync = createAsyncClient(baseUrl, apiKey);
 
         return AnthropicChatModel.builder()
                 .anthropicClient(client)
@@ -30,7 +30,7 @@ public class AnthropicChatModelFactory {
                 .build();
     }
 
-    private AnthropicClient buildClient(String baseUrl, String apiKey) {
+    public AnthropicClient createClient(String baseUrl, String apiKey) {
         AnthropicOkHttpClient.Builder builder = AnthropicOkHttpClient.builder()
                 .apiKey(apiKey)
                 .maxRetries(0);
@@ -40,7 +40,7 @@ public class AnthropicChatModelFactory {
         return builder.build();
     }
 
-    private AnthropicClientAsync buildAsyncClient(String baseUrl, String apiKey) {
+    public AnthropicClientAsync createAsyncClient(String baseUrl, String apiKey) {
         AnthropicOkHttpClientAsync.Builder builder = AnthropicOkHttpClientAsync.builder()
                 .apiKey(apiKey)
                 .maxRetries(0);

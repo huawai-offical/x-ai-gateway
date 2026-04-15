@@ -4,7 +4,7 @@ import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthenticationService;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileContent;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileResponse;
-import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileService;
+import com.prodigalgal.xaigateway.gateway.core.execution.GatewayResourceExecutionService;
 import java.util.List;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -25,19 +25,19 @@ import reactor.core.publisher.Mono;
 public class OpenAiFilesController {
 
     private final DistributedKeyAuthenticationService distributedKeyAuthenticationService;
-    private final GatewayFileService gatewayFileService;
+    private final GatewayResourceExecutionService gatewayResourceExecutionService;
 
     public OpenAiFilesController(
             DistributedKeyAuthenticationService distributedKeyAuthenticationService,
-            GatewayFileService gatewayFileService) {
+            GatewayResourceExecutionService gatewayResourceExecutionService) {
         this.distributedKeyAuthenticationService = distributedKeyAuthenticationService;
-        this.gatewayFileService = gatewayFileService;
+        this.gatewayResourceExecutionService = gatewayResourceExecutionService;
     }
 
     @GetMapping
     public List<GatewayFileResponse> list(@RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
         AuthenticatedDistributedKey distributedKey = distributedKeyAuthenticationService.authenticateBearerToken(authorization);
-        return gatewayFileService.listFiles(distributedKey.id());
+        return gatewayResourceExecutionService.listFiles(distributedKey.id());
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -46,7 +46,7 @@ public class OpenAiFilesController {
             @RequestPart("file") FilePart file,
             @RequestPart(value = "purpose", required = false) String purpose) {
         AuthenticatedDistributedKey distributedKey = distributedKeyAuthenticationService.authenticateBearerToken(authorization);
-        return gatewayFileService.createFile(distributedKey.id(), file, purpose);
+        return gatewayResourceExecutionService.createFile(distributedKey.keyPrefix(), distributedKey.id(), purpose, file);
     }
 
     @GetMapping("/{fileId}")
@@ -54,7 +54,7 @@ public class OpenAiFilesController {
             @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
             @PathVariable String fileId) {
         AuthenticatedDistributedKey distributedKey = distributedKeyAuthenticationService.authenticateBearerToken(authorization);
-        return gatewayFileService.getFile(fileId, distributedKey.id());
+        return gatewayResourceExecutionService.getFile(fileId, distributedKey.id());
     }
 
     @GetMapping("/{fileId}/content")
@@ -62,11 +62,7 @@ public class OpenAiFilesController {
             @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
             @PathVariable String fileId) {
         AuthenticatedDistributedKey distributedKey = distributedKeyAuthenticationService.authenticateBearerToken(authorization);
-        GatewayFileContent content = gatewayFileService.getFileContent(fileId, distributedKey.id());
-        return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(content.mimeType()))
-                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + content.metadata().filename() + "\"")
-                .body(content.bytes());
+        return gatewayResourceExecutionService.getFileContent(fileId, distributedKey.id());
     }
 
     @DeleteMapping("/{fileId}")
@@ -74,6 +70,6 @@ public class OpenAiFilesController {
             @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
             @PathVariable String fileId) {
         AuthenticatedDistributedKey distributedKey = distributedKeyAuthenticationService.authenticateBearerToken(authorization);
-        gatewayFileService.deleteFile(fileId, distributedKey.id());
+        gatewayResourceExecutionService.deleteFile(distributedKey.keyPrefix(), distributedKey.id(), fileId);
     }
 }

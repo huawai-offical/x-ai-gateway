@@ -2,7 +2,9 @@ package com.prodigalgal.xaigateway.gateway.core.execution;
 
 import tools.jackson.databind.JsonNode;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest;
 import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend;
+import java.util.List;
 import java.util.Map;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.multipart.FilePart;
@@ -12,7 +14,22 @@ public interface GatewayResourceExecutor {
 
     ExecutionBackend backend();
 
-    boolean supports(String requestPath, CatalogCandidateView candidate);
+    default boolean supports(String requestPath, CatalogCandidateView candidate) {
+        return supports(new CanonicalResourceRequest(
+                null,
+                com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol.OPENAI,
+                requestPath,
+                null,
+                com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType.UNKNOWN,
+                com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation.UNKNOWN,
+                null,
+                Map.of(),
+                List.of(),
+                false
+        ), candidate);
+    }
+
+    boolean supports(CanonicalResourceRequest request, CatalogCandidateView candidate);
 
     default ResponseEntity<JsonNode> executeJson(
             GatewayResourceExecutionContext context,

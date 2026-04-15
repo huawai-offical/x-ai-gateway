@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 public record InteropPlanRequest(
         @NotBlank(message = "协议不能为空。")
         String protocol,
+        String method,
         String requestPath,
         String requestedModel,
         String degradationPolicy,
@@ -19,6 +20,6 @@ public record InteropPlanRequest(
             String degradationPolicy,
             JsonNode body
     ) {
-        this(protocol, requestPath, requestedModel, degradationPolicy, null, body);
+        this(protocol, null, requestPath, requestedModel, degradationPolicy, null, body);
     }
 }

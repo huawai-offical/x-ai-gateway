@@ -3,14 +3,12 @@ package com.prodigalgal.xaigateway.protocol.ingress.google;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
-import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalChatExecutionRequestAdapter;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalContentPart;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalMessage;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalMessageRole;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolDefinition;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Component;
@@ -20,10 +18,34 @@ import org.springframework.util.StringUtils;
 public class GeminiGenerateContentRequestMapper {
 
     private final ObjectMapper objectMapper;
-    private final CanonicalChatExecutionRequestAdapter canonicalChatExecutionRequestAdapter = new CanonicalChatExecutionRequestAdapter();
 
     public GeminiGenerateContentRequestMapper(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
+    }
+
+    public CanonicalRequest toCanonicalRequest(
+            String distributedKeyPrefix,
+            String model,
+            GeminiGenerateContentRequest request,
+            boolean stream) {
+        return toCanonicalRequest(new AuthenticatedDistributedKey(null, distributedKeyPrefix, distributedKeyPrefix), model, request, stream);
+    }
+
+    public CanonicalRequest toCanonicalRequest(
+            String distributedKeyPrefix,
+            String model,
+            JsonNode requestBody,
+            boolean stream) {
+        try {
+            return toCanonicalRequest(
+                    distributedKeyPrefix,
+                    model,
+                    objectMapper.treeToValue(requestBody, GeminiGenerateContentRequest.class),
+                    stream
+            );
+        } catch (Exception exception) {
+            throw new IllegalArgumentException("Gemini generateContent 请求体解析失败。", exception);
+        }
     }
 
     public CanonicalRequest toCanonicalRequest(
@@ -56,14 +78,6 @@ public class GeminiGenerateContentRequestMapper {
                 null,
                 objectMapper.valueToTree(request)
         );
-    }
-
-    public ChatExecutionRequest toExecutionRequest(
-            AuthenticatedDistributedKey distributedKey,
-            String model,
-            GeminiGenerateContentRequest request,
-            boolean stream) {
-        return canonicalChatExecutionRequestAdapter.toExecutionRequest(toCanonicalRequest(distributedKey, model, request, stream));
     }
 
     private List<CanonicalMessage> toMessages(JsonNode systemInstruction, JsonNode contents) {

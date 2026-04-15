@@ -10,6 +10,7 @@ import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
 import com.prodigalgal.xaigateway.gateway.core.credential.CredentialAuthKind;
 import com.prodigalgal.xaigateway.gateway.core.credential.CredentialMaterialResolver;
 import com.prodigalgal.xaigateway.gateway.core.credential.ResolvedCredentialMaterial;
+import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileContent;
 import com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityService;
 import com.prodigalgal.xaigateway.gateway.core.routing.GatewayRouteSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionRequest;
@@ -131,7 +132,7 @@ public class GatewayOpenAiPassthroughService {
         formFields.forEach(routePayload::put);
         RouteExecutionContext context = prepareExecution(distributedKeyPrefix, requestPath, requestedModel, routePayload);
 
-        return buildMultipartBody(formFields, files)
+        return buildMultipartBody(formFields, files, Map.of())
                 .flatMap(body -> executePreparedMultipart(
                         context.selectionResult(),
                         context.credential(),
@@ -197,7 +198,14 @@ public class GatewayOpenAiPassthroughService {
     Mono<MultiValueMap<String, HttpEntity<?>>> prepareMultipartBody(
             Map<String, String> formFields,
             Map<String, FilePart> files) {
-        return buildMultipartBody(formFields, files);
+        return buildMultipartBody(formFields, files, Map.of());
+    }
+
+    Mono<MultiValueMap<String, HttpEntity<?>>> prepareMultipartBody(
+            Map<String, String> formFields,
+            Map<String, FilePart> files,
+            Map<String, GatewayFileContent> gatewayFiles) {
+        return buildMultipartBody(formFields, files, gatewayFiles);
     }
 
     CatalogSiteRequest buildPreparedSiteRequest(
@@ -224,7 +232,8 @@ public class GatewayOpenAiPassthroughService {
 
     private Mono<MultiValueMap<String, HttpEntity<?>>> buildMultipartBody(
             Map<String, String> formFields,
-            Map<String, FilePart> files) {
+            Map<String, FilePart> files,
+            Map<String, GatewayFileContent> gatewayFiles) {
         MultiValueMap<String, HttpEntity<?>> body = new LinkedMultiValueMap<>();
         formFields.forEach((name, value) -> {
             HttpHeaders headers = new HttpHeaders();
@@ -255,7 +264,21 @@ public class GatewayOpenAiPassthroughService {
                         return existing;
                     }));
         }
-        return current;
+        return current.map(existing -> {
+            gatewayFiles.forEach((fieldName, fileContent) -> {
+                HttpHeaders headers = new HttpHeaders();
+                headers.setContentType(fileContent.mimeType() == null || fileContent.mimeType().isBlank()
+                        ? MediaType.APPLICATION_OCTET_STREAM
+                        : MediaType.parseMediaType(fileContent.mimeType()));
+                existing.add(fieldName, new HttpEntity<>(new ByteArrayResource(fileContent.bytes()) {
+                    @Override
+                    public String getFilename() {
+                        return fileContent.metadata().filename();
+                    }
+                }, headers));
+            });
+            return existing;
+        });
     }
 
     private ResponseEntity<JsonNode> finalizeJsonResponse(

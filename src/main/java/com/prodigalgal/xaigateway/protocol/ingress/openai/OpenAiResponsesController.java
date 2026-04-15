@@ -5,7 +5,7 @@ import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.admin.application.GatewayChatExecutionService;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthenticationService;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
 import com.prodigalgal.xaigateway.gateway.core.resource.GatewayAsyncResourceService;
 import org.springframework.http.MediaType;
 import org.springframework.http.HttpHeaders;
@@ -52,21 +52,21 @@ public class OpenAiResponsesController {
             @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
         @RequestBody JsonNode requestBody) {
         AuthenticatedDistributedKey distributedKey = distributedKeyAuthenticationService.authenticateBearerToken(authorization);
-        ChatExecutionRequest executionRequest = openAiResponsesRequestMapper.toExecutionRequest(distributedKey.keyPrefix(), requestBody);
+        CanonicalRequest canonicalRequest = openAiResponsesRequestMapper.toCanonicalRequest(distributedKey.keyPrefix(), requestBody);
 
         if (requestBody.path("stream").asBoolean(false)) {
-            var streamResponse = gatewayChatExecutionService.executeGatewayStream(executionRequest);
+            var streamResponse = gatewayChatExecutionService.executeGatewayStream(canonicalRequest);
             return ResponseEntity.ok()
                     .contentType(MediaType.TEXT_EVENT_STREAM)
                     .body(openAiResponsesEncoder.encodeStream(streamResponse));
         }
 
-        var response = gatewayChatExecutionService.executeGatewayResponse(executionRequest);
+        var response = gatewayChatExecutionService.executeGatewayResponse(canonicalRequest);
         OpenAiResponsesResponse payload = openAiResponsesEncoder.encode(response);
         if (requestBody.path("store").asBoolean(false)) {
             return ResponseEntity.ok(gatewayAsyncResourceService.storeResponse(
                     distributedKey.id(),
-                    executionRequest.requestedModel(),
+                    canonicalRequest.requestedModel(),
                     requestBody,
                     objectMapper.valueToTree(payload)
             ));

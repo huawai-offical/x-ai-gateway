@@ -10,8 +10,14 @@ import org.springframework.stereotype.Service;
 public class GatewayRequestFeatureService {
 
     public GatewayRequestSemantics describe(String requestPath, JsonNode body) {
+        return describe("POST", requestPath, body);
+    }
+
+    public GatewayRequestSemantics describe(String httpMethod, String requestPath, JsonNode body) {
+        String method = normalizeMethod(httpMethod);
+        String normalizedPath = normalizePath(requestPath);
         Set<InteropFeature> features = new LinkedHashSet<>();
-        if ("/v1/chat/completions".equals(requestPath)) {
+        if ("/v1/chat/completions".equals(normalizedPath)) {
             features.add(InteropFeature.CHAT_TEXT);
             collectChatFeatures(features, body);
             return new GatewayRequestSemantics(
@@ -21,7 +27,7 @@ public class GatewayRequestFeatureService {
                     true
             );
         }
-        if ("/v1/responses".equals(requestPath)) {
+        if ("/v1/responses".equals(normalizedPath)) {
             features.add(InteropFeature.RESPONSE_OBJECT);
             collectResponsesFeatures(features, body);
             return new GatewayRequestSemantics(
@@ -31,7 +37,7 @@ public class GatewayRequestFeatureService {
                     true
             );
         }
-        if ("/v1/messages".equals(requestPath)) {
+        if ("/v1/messages".equals(normalizedPath)) {
             features.add(InteropFeature.CHAT_TEXT);
             collectAnthropicFeatures(features, body);
             return new GatewayRequestSemantics(
@@ -41,9 +47,9 @@ public class GatewayRequestFeatureService {
                     true
             );
         }
-        if (requestPath != null
-                && requestPath.startsWith("/v1beta/models/")
-                && (requestPath.contains(":generateContent") || requestPath.contains(":streamGenerateContent"))) {
+        if (normalizedPath != null
+                && normalizedPath.startsWith("/v1beta/models/")
+                && (normalizedPath.contains(":generateContent") || normalizedPath.contains(":streamGenerateContent"))) {
             features.add(InteropFeature.CHAT_TEXT);
             collectGeminiFeatures(features, body);
             return new GatewayRequestSemantics(
@@ -53,7 +59,7 @@ public class GatewayRequestFeatureService {
                     true
             );
         }
-        if ("/v1/embeddings".equals(requestPath)) {
+        if ("POST".equals(method) && "/v1/embeddings".equals(normalizedPath)) {
             return new GatewayRequestSemantics(
                     TranslationResourceType.EMBEDDING,
                     TranslationOperation.EMBEDDING_CREATE,
@@ -61,15 +67,47 @@ public class GatewayRequestFeatureService {
                     true
             );
         }
-        if ("/v1/files".equals(requestPath)) {
+        if ("POST".equals(method) && "/v1/files".equals(normalizedPath)) {
             return new GatewayRequestSemantics(
                     TranslationResourceType.FILE,
                     TranslationOperation.FILE_CREATE,
                     List.of(InteropFeature.FILE_OBJECT),
+                    true
+            );
+        }
+        if ("GET".equals(method) && "/v1/files".equals(normalizedPath)) {
+            return new GatewayRequestSemantics(
+                    TranslationResourceType.FILE,
+                    TranslationOperation.FILE_LIST,
+                    List.of(InteropFeature.FILE_OBJECT),
                     false
             );
         }
-        if ("/v1/audio/transcriptions".equals(requestPath)) {
+        if ("GET".equals(method) && "/v1/files/{fileId}".equals(normalizedPath)) {
+            return new GatewayRequestSemantics(
+                    TranslationResourceType.FILE,
+                    TranslationOperation.FILE_GET,
+                    List.of(InteropFeature.FILE_OBJECT),
+                    false
+            );
+        }
+        if ("GET".equals(method) && "/v1/files/{fileId}/content".equals(normalizedPath)) {
+            return new GatewayRequestSemantics(
+                    TranslationResourceType.FILE,
+                    TranslationOperation.FILE_CONTENT_GET,
+                    List.of(InteropFeature.FILE_OBJECT),
+                    false
+            );
+        }
+        if ("DELETE".equals(method) && "/v1/files/{fileId}".equals(normalizedPath)) {
+            return new GatewayRequestSemantics(
+                    TranslationResourceType.FILE,
+                    TranslationOperation.FILE_DELETE,
+                    List.of(InteropFeature.FILE_OBJECT),
+                    true
+            );
+        }
+        if ("POST".equals(method) && "/v1/audio/transcriptions".equals(normalizedPath)) {
             return new GatewayRequestSemantics(
                     TranslationResourceType.AUDIO,
                     TranslationOperation.AUDIO_TRANSCRIPTION,
@@ -77,7 +115,7 @@ public class GatewayRequestFeatureService {
                     true
             );
         }
-        if ("/v1/audio/translations".equals(requestPath)) {
+        if ("POST".equals(method) && "/v1/audio/translations".equals(normalizedPath)) {
             return new GatewayRequestSemantics(
                     TranslationResourceType.AUDIO,
                     TranslationOperation.AUDIO_TRANSLATION,
@@ -85,7 +123,7 @@ public class GatewayRequestFeatureService {
                     true
             );
         }
-        if ("/v1/audio/speech".equals(requestPath)) {
+        if ("POST".equals(method) && "/v1/audio/speech".equals(normalizedPath)) {
             return new GatewayRequestSemantics(
                     TranslationResourceType.AUDIO,
                     TranslationOperation.AUDIO_SPEECH,
@@ -93,7 +131,7 @@ public class GatewayRequestFeatureService {
                     true
             );
         }
-        if ("/v1/images/generations".equals(requestPath)) {
+        if ("POST".equals(method) && "/v1/images/generations".equals(normalizedPath)) {
             return new GatewayRequestSemantics(
                     TranslationResourceType.IMAGE,
                     TranslationOperation.IMAGE_GENERATION,
@@ -101,7 +139,7 @@ public class GatewayRequestFeatureService {
                     true
             );
         }
-        if ("/v1/images/edits".equals(requestPath)) {
+        if ("POST".equals(method) && "/v1/images/edits".equals(normalizedPath)) {
             return new GatewayRequestSemantics(
                     TranslationResourceType.IMAGE,
                     TranslationOperation.IMAGE_EDIT,
@@ -109,7 +147,7 @@ public class GatewayRequestFeatureService {
                     true
             );
         }
-        if ("/v1/images/variations".equals(requestPath)) {
+        if ("POST".equals(method) && "/v1/images/variations".equals(normalizedPath)) {
             return new GatewayRequestSemantics(
                     TranslationResourceType.IMAGE,
                     TranslationOperation.IMAGE_VARIATION,
@@ -117,7 +155,7 @@ public class GatewayRequestFeatureService {
                     true
             );
         }
-        if ("/v1/moderations".equals(requestPath)) {
+        if ("POST".equals(method) && "/v1/moderations".equals(normalizedPath)) {
             return new GatewayRequestSemantics(
                     TranslationResourceType.MODERATION,
                     TranslationOperation.MODERATION_CREATE,
@@ -125,23 +163,31 @@ public class GatewayRequestFeatureService {
                     true
             );
         }
-        if ("/v1/uploads".equals(requestPath)) {
+        if ("POST".equals(method) && "/v1/uploads".equals(normalizedPath)) {
             return new GatewayRequestSemantics(
                     TranslationResourceType.UPLOAD,
                     TranslationOperation.UPLOAD_CREATE,
+                    List.of(InteropFeature.UPLOAD_CREATE, InteropFeature.FILE_OBJECT),
+                    true
+            );
+        }
+        if ("GET".equals(method) && "/v1/uploads/{uploadId}".equals(normalizedPath)) {
+            return new GatewayRequestSemantics(
+                    TranslationResourceType.UPLOAD,
+                    TranslationOperation.UPLOAD_GET,
                     List.of(InteropFeature.UPLOAD_CREATE),
                     false
             );
         }
-        if (requestPath != null && requestPath.matches("^/v1/uploads/[^/]+/parts$")) {
+        if ("POST".equals(method) && "/v1/uploads/{uploadId}/parts".equals(normalizedPath)) {
             return new GatewayRequestSemantics(
                     TranslationResourceType.UPLOAD,
                     TranslationOperation.UPLOAD_PART_ADD,
-                    List.of(InteropFeature.UPLOAD_CREATE),
-                    false
+                    List.of(InteropFeature.UPLOAD_CREATE, InteropFeature.FILE_OBJECT),
+                    true
             );
         }
-        if (requestPath != null && requestPath.matches("^/v1/uploads/[^/]+/complete$")) {
+        if ("POST".equals(method) && "/v1/uploads/{uploadId}/complete".equals(normalizedPath)) {
             return new GatewayRequestSemantics(
                     TranslationResourceType.UPLOAD,
                     TranslationOperation.UPLOAD_COMPLETE,
@@ -149,7 +195,7 @@ public class GatewayRequestFeatureService {
                     false
             );
         }
-        if (requestPath != null && requestPath.matches("^/v1/uploads/[^/]+/cancel$")) {
+        if ("POST".equals(method) && "/v1/uploads/{uploadId}/cancel".equals(normalizedPath)) {
             return new GatewayRequestSemantics(
                     TranslationResourceType.UPLOAD,
                     TranslationOperation.UPLOAD_CANCEL,
@@ -157,15 +203,23 @@ public class GatewayRequestFeatureService {
                     false
             );
         }
-        if ("/v1/batches".equals(requestPath)) {
+        if ("POST".equals(method) && "/v1/batches".equals(normalizedPath)) {
             return new GatewayRequestSemantics(
                     TranslationResourceType.BATCH,
                     TranslationOperation.BATCH_CREATE,
+                    List.of(InteropFeature.BATCH_CREATE, InteropFeature.FILE_OBJECT),
+                    true
+            );
+        }
+        if ("GET".equals(method) && "/v1/batches/{batchId}".equals(normalizedPath)) {
+            return new GatewayRequestSemantics(
+                    TranslationResourceType.BATCH,
+                    TranslationOperation.BATCH_GET,
                     List.of(InteropFeature.BATCH_CREATE),
                     false
             );
         }
-        if (requestPath != null && requestPath.matches("^/v1/batches/[^/]+/cancel$")) {
+        if ("POST".equals(method) && "/v1/batches/{batchId}/cancel".equals(normalizedPath)) {
             return new GatewayRequestSemantics(
                     TranslationResourceType.BATCH,
                     TranslationOperation.BATCH_CANCEL,
@@ -173,15 +227,23 @@ public class GatewayRequestFeatureService {
                     false
             );
         }
-        if ("/v1/fine_tuning/jobs".equals(requestPath)) {
+        if ("POST".equals(method) && "/v1/fine_tuning/jobs".equals(normalizedPath)) {
             return new GatewayRequestSemantics(
                     TranslationResourceType.TUNING,
                     TranslationOperation.TUNING_CREATE,
+                    List.of(InteropFeature.TUNING_CREATE, InteropFeature.FILE_OBJECT),
+                    true
+            );
+        }
+        if ("GET".equals(method) && "/v1/fine_tuning/jobs/{jobId}".equals(normalizedPath)) {
+            return new GatewayRequestSemantics(
+                    TranslationResourceType.TUNING,
+                    TranslationOperation.TUNING_GET,
                     List.of(InteropFeature.TUNING_CREATE),
                     false
             );
         }
-        if (requestPath != null && requestPath.matches("^/v1/fine_tuning/jobs/[^/]+/cancel$")) {
+        if ("POST".equals(method) && "/v1/fine_tuning/jobs/{jobId}/cancel".equals(normalizedPath)) {
             return new GatewayRequestSemantics(
                     TranslationResourceType.TUNING,
                     TranslationOperation.TUNING_CANCEL,
@@ -189,7 +251,7 @@ public class GatewayRequestFeatureService {
                     false
             );
         }
-        if ("/v1/realtime/client_secrets".equals(requestPath)) {
+        if ("POST".equals(method) && "/v1/realtime/client_secrets".equals(normalizedPath)) {
             return new GatewayRequestSemantics(
                     TranslationResourceType.REALTIME,
                     TranslationOperation.REALTIME_CLIENT_SECRET_CREATE,
@@ -203,6 +265,85 @@ public class GatewayRequestFeatureService {
                 List.of(InteropFeature.CHAT_TEXT),
                 true
         );
+    }
+
+    public String normalizePath(String requestPath) {
+        if (requestPath == null || requestPath.isBlank()) {
+            return requestPath;
+        }
+        if (requestPath.matches("^/v1/files/[^/]+/content$")) {
+            return "/v1/files/{fileId}/content";
+        }
+        if (requestPath.matches("^/v1/files/[^/]+$")) {
+            return "/v1/files/{fileId}";
+        }
+        if (requestPath.matches("^/v1/uploads/[^/]+/parts$")) {
+            return "/v1/uploads/{uploadId}/parts";
+        }
+        if (requestPath.matches("^/v1/uploads/[^/]+/complete$")) {
+            return "/v1/uploads/{uploadId}/complete";
+        }
+        if (requestPath.matches("^/v1/uploads/[^/]+/cancel$")) {
+            return "/v1/uploads/{uploadId}/cancel";
+        }
+        if (requestPath.matches("^/v1/uploads/[^/]+$")) {
+            return "/v1/uploads/{uploadId}";
+        }
+        if (requestPath.matches("^/v1/batches/[^/]+/cancel$")) {
+            return "/v1/batches/{batchId}/cancel";
+        }
+        if (requestPath.matches("^/v1/batches/[^/]+$")) {
+            return "/v1/batches/{batchId}";
+        }
+        if (requestPath.matches("^/v1/fine_tuning/jobs/[^/]+/cancel$")) {
+            return "/v1/fine_tuning/jobs/{jobId}/cancel";
+        }
+        if (requestPath.matches("^/v1/fine_tuning/jobs/[^/]+$")) {
+            return "/v1/fine_tuning/jobs/{jobId}";
+        }
+        return requestPath;
+    }
+
+    public java.util.Map<String, String> extractPathParams(String requestPath) {
+        if (requestPath == null || requestPath.isBlank()) {
+            return java.util.Map.of();
+        }
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("^/v1/files/([^/]+)/content$").matcher(requestPath);
+        if (matcher.matches()) {
+            return java.util.Map.of("fileId", matcher.group(1));
+        }
+        matcher = java.util.regex.Pattern.compile("^/v1/files/([^/]+)$").matcher(requestPath);
+        if (matcher.matches()) {
+            return java.util.Map.of("fileId", matcher.group(1));
+        }
+        matcher = java.util.regex.Pattern.compile("^/v1/uploads/([^/]+)/parts$").matcher(requestPath);
+        if (matcher.matches()) {
+            return java.util.Map.of("uploadId", matcher.group(1));
+        }
+        matcher = java.util.regex.Pattern.compile("^/v1/uploads/([^/]+)/(complete|cancel)$").matcher(requestPath);
+        if (matcher.matches()) {
+            return java.util.Map.of("uploadId", matcher.group(1));
+        }
+        matcher = java.util.regex.Pattern.compile("^/v1/uploads/([^/]+)$").matcher(requestPath);
+        if (matcher.matches()) {
+            return java.util.Map.of("uploadId", matcher.group(1));
+        }
+        matcher = java.util.regex.Pattern.compile("^/v1/batches/([^/]+)(?:/cancel)?$").matcher(requestPath);
+        if (matcher.matches()) {
+            return java.util.Map.of("batchId", matcher.group(1));
+        }
+        matcher = java.util.regex.Pattern.compile("^/v1/fine_tuning/jobs/([^/]+)(?:/cancel)?$").matcher(requestPath);
+        if (matcher.matches()) {
+            return java.util.Map.of("jobId", matcher.group(1));
+        }
+        return java.util.Map.of();
+    }
+
+    private String normalizeMethod(String httpMethod) {
+        if (httpMethod == null || httpMethod.isBlank()) {
+            return "POST";
+        }
+        return httpMethod.trim().toUpperCase();
     }
 
     public List<InteropFeature> detectRequiredFeatures(String requestPath, JsonNode body) {

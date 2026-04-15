@@ -2,9 +2,13 @@ package com.prodigalgal.xaigateway.gateway.core.execution;
 
 import tools.jackson.databind.JsonNode;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest;
+import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileContent;
+import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileService;
 import com.prodigalgal.xaigateway.gateway.core.shared.AuthStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend;
 import com.prodigalgal.xaigateway.gateway.core.shared.PathStrategy;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.multipart.FilePart;
@@ -15,9 +19,13 @@ import reactor.core.publisher.Mono;
 public class OpenAiImagesGatewayResourceExecutor implements GatewayResourceExecutor {
 
     private final GatewayOpenAiPassthroughService gatewayOpenAiPassthroughService;
+    private final GatewayFileService gatewayFileService;
 
-    public OpenAiImagesGatewayResourceExecutor(GatewayOpenAiPassthroughService gatewayOpenAiPassthroughService) {
+    public OpenAiImagesGatewayResourceExecutor(
+            GatewayOpenAiPassthroughService gatewayOpenAiPassthroughService,
+            GatewayFileService gatewayFileService) {
         this.gatewayOpenAiPassthroughService = gatewayOpenAiPassthroughService;
+        this.gatewayFileService = gatewayFileService;
     }
 
     @Override
@@ -26,9 +34,10 @@ public class OpenAiImagesGatewayResourceExecutor implements GatewayResourceExecu
     }
 
     @Override
-    public boolean supports(String requestPath, CatalogCandidateView candidate) {
-        return requestPath != null
-                && requestPath.startsWith("/v1/images/")
+    public boolean supports(CanonicalResourceRequest request, CatalogCandidateView candidate) {
+        return request != null
+                && request.normalizedPath() != null
+                && request.normalizedPath().startsWith("/v1/images/")
                 && candidate != null;
     }
 
@@ -67,7 +76,7 @@ public class OpenAiImagesGatewayResourceExecutor implements GatewayResourceExecu
                 context.apiKey(),
                 context.requestPath()
         );
-        return gatewayOpenAiPassthroughService.prepareMultipartBody(formFields, files)
+        return gatewayOpenAiPassthroughService.prepareMultipartBody(formFields, files, gatewayFiles(context))
                 .flatMap(body -> gatewayOpenAiPassthroughService.executePreparedMultipart(
                         context.selectionResult(),
                         context.credential(),
@@ -76,6 +85,14 @@ public class OpenAiImagesGatewayResourceExecutor implements GatewayResourceExecu
                         context.requestPath(),
                         body
                 ));
+    }
+
+    private Map<String, GatewayFileContent> gatewayFiles(GatewayResourceExecutionContext context) {
+        Map<String, GatewayFileContent> gatewayFiles = new LinkedHashMap<>();
+        for (var fileRef : context.request().fileRefs()) {
+            gatewayFiles.put(fileRef.fieldName(), gatewayFileService.getFileContent(fileRef.fileKey(), context.distributedKeyId()));
+        }
+        return gatewayFiles;
     }
 
     private void ensureCompatible(CatalogCandidateView candidate) {

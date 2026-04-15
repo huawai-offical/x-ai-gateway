@@ -3,7 +3,7 @@ package com.prodigalgal.xaigateway.protocol.ingress.openai;
 import tools.jackson.databind.JsonNode;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayTokenAuthenticationResolver;
-import com.prodigalgal.xaigateway.gateway.core.resource.GatewayAsyncResourceService;
+import com.prodigalgal.xaigateway.gateway.core.execution.GatewayResourceExecutionService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -18,13 +18,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class OpenAiBatchesController {
 
     private final GatewayTokenAuthenticationResolver gatewayTokenAuthenticationResolver;
-    private final GatewayAsyncResourceService gatewayAsyncResourceService;
+    private final GatewayResourceExecutionService gatewayResourceExecutionService;
 
     public OpenAiBatchesController(
             GatewayTokenAuthenticationResolver gatewayTokenAuthenticationResolver,
-            GatewayAsyncResourceService gatewayAsyncResourceService) {
+            GatewayResourceExecutionService gatewayResourceExecutionService) {
         this.gatewayTokenAuthenticationResolver = gatewayTokenAuthenticationResolver;
-        this.gatewayAsyncResourceService = gatewayAsyncResourceService;
+        this.gatewayResourceExecutionService = gatewayResourceExecutionService;
     }
 
     @PostMapping
@@ -32,7 +32,14 @@ public class OpenAiBatchesController {
             @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
             @RequestBody JsonNode requestBody) {
         AuthenticatedDistributedKey distributedKey = gatewayTokenAuthenticationResolver.authenticate(authorization, null, null, null);
-        return gatewayAsyncResourceService.createBatch(distributedKey.id(), requestBody);
+        return gatewayResourceExecutionService.executeLifecycleJson(
+                distributedKey.id(),
+                distributedKey.keyPrefix(),
+                "POST",
+                "/v1/batches",
+                "resource-orchestration",
+                requestBody
+        );
     }
 
     @GetMapping("/{batchId}")
@@ -40,7 +47,14 @@ public class OpenAiBatchesController {
             @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
             @PathVariable String batchId) {
         AuthenticatedDistributedKey distributedKey = gatewayTokenAuthenticationResolver.authenticate(authorization, null, null, null);
-        return gatewayAsyncResourceService.getBatch(batchId, distributedKey.id());
+        return gatewayResourceExecutionService.executeLifecycleJson(
+                distributedKey.id(),
+                distributedKey.keyPrefix(),
+                "GET",
+                "/v1/batches/" + batchId,
+                "resource-orchestration",
+                null
+        );
     }
 
     @PostMapping("/{batchId}/cancel")
@@ -48,6 +62,13 @@ public class OpenAiBatchesController {
             @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
             @PathVariable String batchId) {
         AuthenticatedDistributedKey distributedKey = gatewayTokenAuthenticationResolver.authenticate(authorization, null, null, null);
-        return gatewayAsyncResourceService.cancelBatch(batchId, distributedKey.id());
+        return gatewayResourceExecutionService.executeLifecycleJson(
+                distributedKey.id(),
+                distributedKey.keyPrefix(),
+                "POST",
+                "/v1/batches/" + batchId + "/cancel",
+                "resource-orchestration",
+                null
+        );
     }
 }

@@ -5,7 +5,7 @@ import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.admin.application.GatewayChatExecutionService;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthenticationService;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -50,8 +50,8 @@ public class GeminiGenerateContentController {
             @RequestParam(value = "key", required = false) String queryApiKey,
             @Valid @RequestBody GeminiGenerateContentRequest request) {
         AuthenticatedDistributedKey distributedKey = authenticate(headerApiKey, queryApiKey);
-        ChatExecutionRequest executionRequest = toExecutionRequest(distributedKey, model, request, false);
-        var response = gatewayChatExecutionService.executeGatewayResponse(executionRequest);
+        CanonicalRequest canonicalRequest = geminiGenerateContentRequestMapper.toCanonicalRequest(distributedKey, model, request, false);
+        var response = gatewayChatExecutionService.executeGatewayResponse(canonicalRequest);
         return ResponseEntity.ok(geminiGenerateContentEncoder.encode(response));
     }
 
@@ -62,8 +62,8 @@ public class GeminiGenerateContentController {
             @RequestParam(value = "key", required = false) String queryApiKey,
             @Valid @RequestBody GeminiGenerateContentRequest request) {
         AuthenticatedDistributedKey distributedKey = authenticate(headerApiKey, queryApiKey);
-        ChatExecutionRequest executionRequest = toExecutionRequest(distributedKey, model, request, true);
-        var streamResponse = gatewayChatExecutionService.executeGatewayStream(executionRequest);
+        CanonicalRequest canonicalRequest = geminiGenerateContentRequestMapper.toCanonicalRequest(distributedKey, model, request, true);
+        var streamResponse = gatewayChatExecutionService.executeGatewayStream(canonicalRequest);
         Flux<String> body = geminiGenerateContentEncoder.encodeStream(streamResponse);
         return ResponseEntity.ok()
                 .contentType(MediaType.TEXT_EVENT_STREAM)
@@ -74,13 +74,4 @@ public class GeminiGenerateContentController {
         String token = StringUtils.hasText(headerApiKey) ? headerApiKey : queryApiKey;
         return distributedKeyAuthenticationService.authenticateRawToken(token);
     }
-
-    private ChatExecutionRequest toExecutionRequest(
-            AuthenticatedDistributedKey distributedKey,
-            String model,
-            GeminiGenerateContentRequest request,
-            boolean stream) {
-        return geminiGenerateContentRequestMapper.toExecutionRequest(distributedKey, model, request, stream);
-    }
-
 }

@@ -5,11 +5,7 @@ import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResponse;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolCall;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalUsage;
-import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolCall;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.prodigalgal.xaigateway.gateway.core.response.GatewayResponse;
-import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageView;
-import com.prodigalgal.xaigateway.gateway.core.usage.GatewayUsage;
 import java.time.Instant;
 import java.util.List;
 
@@ -47,46 +43,6 @@ public record AnthropicMessagesResponse(
     ) {
     }
 
-    public static AnthropicMessagesResponse from(
-            String model,
-            String text,
-            GatewayUsage usage,
-            List<GatewayToolCall> toolCalls) {
-        return new AnthropicMessagesResponse(
-                "msg_" + Instant.now().toEpochMilli(),
-                "message",
-                "assistant",
-                model,
-                toContentBlocks(text, toolCalls),
-                toolCalls != null && !toolCalls.isEmpty() ? "tool_use" : "end_turn",
-                null,
-                new Usage(
-                        usage.promptTokens(),
-                        usage.completionTokens(),
-                        usage.cacheWriteTokens(),
-                        usage.cacheHitTokens()
-                )
-        );
-    }
-
-    public static AnthropicMessagesResponse from(GatewayResponse response) {
-        return new AnthropicMessagesResponse(
-                "msg_" + Instant.now().toEpochMilli(),
-                "message",
-                "assistant",
-                response.routeSelection().publicModel(),
-                toContentBlocks(response.outputText(), response.toolCalls()),
-                response.toolCalls() != null && !response.toolCalls().isEmpty() ? "tool_use" : "end_turn",
-                null,
-                new Usage(
-                        response.usage().promptTokens(),
-                        response.usage().completionTokens(),
-                        response.usage().cacheWriteTokens(),
-                        response.usage().cacheHitTokens()
-                )
-        );
-    }
-
     public static AnthropicMessagesResponse fromCanonical(CanonicalResponse response) {
         return new AnthropicMessagesResponse(
                 "msg_" + Instant.now().toEpochMilli(),
@@ -98,23 +54,6 @@ public record AnthropicMessagesResponse(
                 null,
                 toUsage(response.usage())
         );
-    }
-
-    private static List<ContentBlock> toContentBlocks(String text, List<GatewayToolCall> toolCalls) {
-        if (toolCalls != null && !toolCalls.isEmpty()) {
-            ObjectMapper mapper = new ObjectMapper();
-            return toolCalls.stream()
-                    .map(toolCall -> new ContentBlock(
-                            "tool_use",
-                            null,
-                            toolCall.id(),
-                            toolCall.name(),
-                            parseArguments(mapper, toolCall.arguments())
-                    ))
-                    .toList();
-        }
-
-        return List.of(new ContentBlock("text", text, null, null, null));
     }
 
     private static List<ContentBlock> toContentBlocksCanonical(String text, List<CanonicalToolCall> toolCalls) {
@@ -213,7 +152,7 @@ public record AnthropicMessagesResponse(
     ) {
     }
 
-    public static MessageStart messageStart(String model, GatewayUsage usage) {
+    public static MessageStart messageStart(String model, CanonicalUsage usage) {
         return new MessageStart(
                 "message_start",
                 new Message(
@@ -224,12 +163,7 @@ public record AnthropicMessagesResponse(
                         List.of(),
                         null,
                         null,
-                        new Usage(
-                                usage.promptTokens(),
-                                0,
-                                usage.cacheWriteTokens(),
-                                usage.cacheHitTokens()
-                        )
+                        toUsage(usage)
                 )
         );
     }
@@ -244,32 +178,6 @@ public record AnthropicMessagesResponse(
 
     public static ContentBlockStop contentBlockStop() {
         return new ContentBlockStop("content_block_stop", 0);
-    }
-
-    public static MessageDelta messageDelta(GatewayUsage usage, String stopReason) {
-        return new MessageDelta(
-                "message_delta",
-                new MessageDeltaContent(stopReason, null),
-                new Usage(
-                        usage.promptTokens(),
-                        usage.completionTokens(),
-                        usage.cacheWriteTokens(),
-                        usage.cacheHitTokens()
-                )
-        );
-    }
-
-    public static MessageDelta messageDelta(GatewayUsageView usage, String stopReason) {
-        return new MessageDelta(
-                "message_delta",
-                new MessageDeltaContent(stopReason, null),
-                new Usage(
-                        usage.promptTokens(),
-                        usage.completionTokens(),
-                        usage.cacheWriteTokens(),
-                        usage.cacheHitTokens()
-                )
-        );
     }
 
     public static MessageDelta messageDelta(CanonicalUsage usage, String stopReason) {

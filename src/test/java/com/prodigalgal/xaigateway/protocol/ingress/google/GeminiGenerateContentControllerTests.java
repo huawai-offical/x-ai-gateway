@@ -4,21 +4,28 @@ import com.prodigalgal.xaigateway.admin.application.GatewayChatExecutionService;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthenticationService;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionRequest;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionResult;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionStreamResult;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResponse;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEvent;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEventType;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolCall;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalUsage;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolCall;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayFinishReason;
-import com.prodigalgal.xaigateway.gateway.core.response.GatewayResponse;
-import com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamEvent;
-import com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamEventType;
-import com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamResponse;
-import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageCompleteness;
-import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageSource;
-import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageView;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionSource;
+import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.shared.ReasoningTransport;
+import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
+import com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
 import com.prodigalgal.xaigateway.gateway.core.usage.GatewayUsage;
 import com.prodigalgal.xaigateway.testsupport.PermitAllSecurityTestConfig;
 import java.util.List;
@@ -49,7 +56,7 @@ class GeminiGenerateContentControllerTests {
     void shouldExecuteMinimalGenerateContent() {
         Mockito.when(distributedKeyAuthenticationService.authenticateRawToken("sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<ChatExecutionRequest>any()))
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<CanonicalRequest>any()))
                 .thenReturn(gatewayResponse("req-gemini-1", "gemini back", new GatewayUsage(1000, 720, 350, 40, 280, 0, 280, 0, null, 1350, null), List.of()));
 
         webTestClient.post()
@@ -83,7 +90,7 @@ class GeminiGenerateContentControllerTests {
     void shouldReturnFunctionCallParts() {
         Mockito.when(distributedKeyAuthenticationService.authenticateRawToken("sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<ChatExecutionRequest>any()))
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<CanonicalRequest>any()))
                 .thenReturn(gatewayResponse(
                         "req-gemini-tool-1",
                         "",
@@ -132,7 +139,7 @@ class GeminiGenerateContentControllerTests {
     void shouldAcceptGeminiFileDataImageParts() {
         Mockito.when(distributedKeyAuthenticationService.authenticateRawToken("sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<ChatExecutionRequest>any()))
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<CanonicalRequest>any()))
                 .thenReturn(gatewayResponse("req-gemini-image-1", "image processed", GatewayUsage.empty(), List.of()));
 
         webTestClient.post()
@@ -162,7 +169,7 @@ class GeminiGenerateContentControllerTests {
     void shouldAcceptGeminiFileDataDocumentParts() {
         Mockito.when(distributedKeyAuthenticationService.authenticateRawToken("sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<ChatExecutionRequest>any()))
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<CanonicalRequest>any()))
                 .thenReturn(gatewayResponse("req-gemini-doc-1", "document processed", GatewayUsage.empty(), List.of()));
 
         webTestClient.post()
@@ -192,7 +199,7 @@ class GeminiGenerateContentControllerTests {
     void shouldAcceptGeminiGatewayFileIdParts() {
         Mockito.when(distributedKeyAuthenticationService.authenticateRawToken("sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<ChatExecutionRequest>any()))
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<CanonicalRequest>any()))
                 .thenReturn(gatewayResponse("req-gemini-fileid-1", "gateway file processed", GatewayUsage.empty(), List.of()));
 
         webTestClient.post()
@@ -221,7 +228,7 @@ class GeminiGenerateContentControllerTests {
     void shouldAcceptGeminiFileOnlyMessage() {
         Mockito.when(distributedKeyAuthenticationService.authenticateRawToken("sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<ChatExecutionRequest>any()))
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<CanonicalRequest>any()))
                 .thenReturn(gatewayResponse("req-gemini-file-only-1", "file only processed", GatewayUsage.empty(), List.of()));
 
         webTestClient.post()
@@ -250,10 +257,11 @@ class GeminiGenerateContentControllerTests {
     void shouldExecuteMinimalStreamGenerateContent() {
         Mockito.when(distributedKeyAuthenticationService.authenticateRawToken("sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayChatExecutionService.executeGatewayStream(Mockito.<ChatExecutionRequest>any()))
-                .thenReturn(new GatewayStreamResponse(
+        Mockito.when(gatewayChatExecutionService.executeGatewayStream(Mockito.<CanonicalRequest>any()))
+                .thenReturn(new CanonicalExecutionStreamResult(
                         "req-gemini-stream-1",
                         selectionResult(),
+                        plan(),
                         Flux.just(
                                 textEvent("hello"),
                                 textEvent(" world"),
@@ -346,61 +354,93 @@ class GeminiGenerateContentControllerTests {
         );
     }
 
-    private GatewayResponse gatewayResponse(String requestId, String text, GatewayUsage usage, List<GatewayToolCall> toolCalls) {
-        return new GatewayResponse(
+    private CanonicalExecutionResult gatewayResponse(String requestId, String text, GatewayUsage usage, List<GatewayToolCall> toolCalls) {
+        return new CanonicalExecutionResult(
                 requestId,
                 selectionResult(),
-                text,
-                new GatewayUsageView(
-                        usage.rawPromptTokens(),
-                        usage.promptTokens(),
-                        usage.completionTokens(),
-                        usage.reasoningTokens(),
-                        usage.cacheHitTokens(),
-                        usage.cacheWriteTokens(),
-                        usage.upstreamCacheHitTokens(),
-                        usage.upstreamCacheWriteTokens(),
-                        usage.savedInputTokens(),
-                        usage.cachedContentRef(),
-                        usage.totalTokens(),
-                        GatewayUsageCompleteness.FINAL,
-                        GatewayUsageSource.DIRECT_RESPONSE,
-                        usage.nativeUsagePayload()
-                ),
-                toolCalls,
-                null,
-                toolCalls.isEmpty() ? GatewayFinishReason.STOP : GatewayFinishReason.TOOL_CALLS,
-                null
+                plan(),
+                new CanonicalResponse(
+                        requestId,
+                        selectionResult().publicModel(),
+                        text,
+                        null,
+                        toCanonicalToolCalls(toolCalls),
+                        toCanonicalUsage(usage),
+                        toolCalls.isEmpty() ? GatewayFinishReason.STOP : GatewayFinishReason.TOOL_CALLS
+                )
         );
     }
 
-    private GatewayStreamEvent textEvent(String delta) {
-        return new GatewayStreamEvent(
-                GatewayStreamEventType.TEXT_DELTA,
+    private CanonicalStreamEvent textEvent(String delta) {
+        return new CanonicalStreamEvent(
+                CanonicalStreamEventType.TEXT_DELTA,
                 delta,
                 null,
                 List.of(),
-                GatewayUsageView.empty(),
+                CanonicalUsage.empty(),
                 false,
-                null,
                 null,
                 null,
                 null
         );
     }
 
-    private GatewayStreamEvent completedEvent(String text) {
-        return new GatewayStreamEvent(
-                GatewayStreamEventType.COMPLETED,
+    private CanonicalStreamEvent completedEvent(String text) {
+        return new CanonicalStreamEvent(
+                CanonicalStreamEventType.COMPLETED,
                 null,
                 null,
                 List.of(),
-                GatewayUsageView.empty(),
+                CanonicalUsage.empty(),
                 true,
                 GatewayFinishReason.STOP,
                 text,
-                null,
                 null
+        );
+    }
+
+    private CanonicalExecutionPlan plan() {
+        return new CanonicalExecutionPlan(
+                true,
+                CanonicalIngressProtocol.GOOGLE_NATIVE,
+                "/v1beta/models/gemini-2.5-pro:generateContent",
+                "gemini-2.5-pro",
+                "gemini-2.5-pro",
+                "gemini-2.5-pro",
+                TranslationResourceType.CHAT,
+                TranslationOperation.CHAT_COMPLETION,
+                ExecutionKind.NATIVE,
+                InteropCapabilityLevel.NATIVE,
+                InteropCapabilityLevel.NATIVE,
+                InteropCapabilityLevel.NATIVE,
+                List.of(InteropFeature.CHAT_TEXT),
+                java.util.Map.of("chat_text", InteropCapabilityLevel.NATIVE),
+                List.of(),
+                List.of()
+        );
+    }
+
+    private List<CanonicalToolCall> toCanonicalToolCalls(List<GatewayToolCall> toolCalls) {
+        if (toolCalls == null || toolCalls.isEmpty()) {
+            return List.of();
+        }
+        return toolCalls.stream()
+                .map(toolCall -> new CanonicalToolCall(toolCall.id(), toolCall.type(), toolCall.name(), toolCall.arguments()))
+                .toList();
+    }
+
+    private CanonicalUsage toCanonicalUsage(GatewayUsage usage) {
+        if (usage == null || usage.isEmpty()) {
+            return CanonicalUsage.empty();
+        }
+        return new CanonicalUsage(
+                true,
+                usage.promptTokens(),
+                usage.completionTokens(),
+                usage.totalTokens(),
+                usage.cacheHitTokens(),
+                usage.cacheWriteTokens(),
+                usage.reasoningTokens()
         );
     }
 }

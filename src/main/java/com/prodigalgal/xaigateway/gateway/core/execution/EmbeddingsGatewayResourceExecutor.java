@@ -5,6 +5,7 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest;
 import com.prodigalgal.xaigateway.gateway.core.shared.AuthStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend;
 import com.prodigalgal.xaigateway.gateway.core.shared.PathStrategy;
@@ -36,8 +37,8 @@ public class EmbeddingsGatewayResourceExecutor implements GatewayResourceExecuto
     }
 
     @Override
-    public boolean supports(String requestPath, CatalogCandidateView candidate) {
-        if (!"/v1/embeddings".equals(requestPath) || candidate == null) {
+    public boolean supports(CanonicalResourceRequest request, CatalogCandidateView candidate) {
+        if (request == null || !"/v1/embeddings".equals(request.normalizedPath()) || candidate == null) {
             return false;
         }
         return switch (candidate.providerType()) {

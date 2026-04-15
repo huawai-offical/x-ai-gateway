@@ -29,7 +29,10 @@ class OpenAiStyleResourceExecutorTests {
     @Test
     void shouldAllowOpenAiCompatibleAudioWhenPathAndAuthAreCompatible() {
         GatewayOpenAiPassthroughService passthroughService = Mockito.mock(GatewayOpenAiPassthroughService.class);
-        OpenAiAudioGatewayResourceExecutor executor = new OpenAiAudioGatewayResourceExecutor(passthroughService);
+        OpenAiAudioGatewayResourceExecutor executor = new OpenAiAudioGatewayResourceExecutor(
+                passthroughService,
+                Mockito.mock(com.prodigalgal.xaigateway.gateway.core.file.GatewayFileService.class)
+        );
         GatewayResourceExecutionContext context = context(ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC, AuthStrategy.BEARER, PathStrategy.OPENAI_V1, "/v1/audio/speech");
         GatewayOpenAiPassthroughService.CatalogSiteRequest siteRequest =
                 new GatewayOpenAiPassthroughService.CatalogSiteRequest(Mockito.mock(WebClient.class), "/v1/audio/speech");
@@ -45,7 +48,10 @@ class OpenAiStyleResourceExecutorTests {
 
     @Test
     void shouldRejectImagesWhenPathStrategyIsNotOpenAiV1() {
-        OpenAiImagesGatewayResourceExecutor executor = new OpenAiImagesGatewayResourceExecutor(Mockito.mock(GatewayOpenAiPassthroughService.class));
+        OpenAiImagesGatewayResourceExecutor executor = new OpenAiImagesGatewayResourceExecutor(
+                Mockito.mock(GatewayOpenAiPassthroughService.class),
+                Mockito.mock(com.prodigalgal.xaigateway.gateway.core.file.GatewayFileService.class)
+        );
         GatewayResourceExecutionContext context = context(
                 ProviderType.OPENAI_DIRECT,
                 UpstreamSiteKind.AZURE_OPENAI,

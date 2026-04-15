@@ -52,6 +52,12 @@ public class RequestLogEntity {
     @Column(name = "request_path", nullable = false, length = 256)
     private String requestPath;
 
+    @Column(name = "resource_type", length = 32)
+    private String resourceType;
+
+    @Column(name = "operation", length = 64)
+    private String operation;
+
     @Column(name = "requested_model", nullable = false, length = 256)
     private String requestedModel;
 
@@ -73,6 +79,12 @@ public class RequestLogEntity {
 
     @Column(name = "selection_source", nullable = false, length = 32)
     private String selectionSource;
+
+    @Column(name = "execution_backend", length = 32)
+    private String executionBackend;
+
+    @Column(name = "object_mode", length = 64)
+    private String objectMode;
 
     @Column(name = "prefix_hash", nullable = false, length = 128)
     private String prefixHash;
@@ -154,6 +166,22 @@ public class RequestLogEntity {
         this.requestPath = requestPath;
     }
 
+    public String getResourceType() {
+        return resourceType;
+    }
+
+    public void setResourceType(String resourceType) {
+        this.resourceType = resourceType;
+    }
+
+    public String getOperation() {
+        return operation;
+    }
+
+    public void setOperation(String operation) {
+        this.operation = operation;
+    }
+
     public String getRequestedModel() {
         return requestedModel;
     }
@@ -208,6 +236,22 @@ public class RequestLogEntity {
 
     public void setSelectionSource(String selectionSource) {
         this.selectionSource = selectionSource;
+    }
+
+    public String getExecutionBackend() {
+        return executionBackend;
+    }
+
+    public void setExecutionBackend(String executionBackend) {
+        this.executionBackend = executionBackend;
+    }
+
+    public String getObjectMode() {
+        return objectMode;
+    }
+
+    public void setObjectMode(String objectMode) {
+        this.objectMode = objectMode;
     }
 
     public String getPrefixHash() {

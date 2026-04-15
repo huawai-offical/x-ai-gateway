@@ -2,6 +2,7 @@ package com.prodigalgal.xaigateway.gateway.core.execution;
 
 import tools.jackson.databind.JsonNode;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest;
 import com.prodigalgal.xaigateway.gateway.core.shared.AuthStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend;
 import com.prodigalgal.xaigateway.gateway.core.shared.PathStrategy;
@@ -23,8 +24,9 @@ public class OpenAiModerationsGatewayResourceExecutor implements GatewayResource
     }
 
     @Override
-    public boolean supports(String requestPath, CatalogCandidateView candidate) {
-        return "/v1/moderations".equals(requestPath)
+    public boolean supports(CanonicalResourceRequest request, CatalogCandidateView candidate) {
+        return request != null
+                && "/v1/moderations".equals(request.normalizedPath())
                 && candidate != null;
     }
 

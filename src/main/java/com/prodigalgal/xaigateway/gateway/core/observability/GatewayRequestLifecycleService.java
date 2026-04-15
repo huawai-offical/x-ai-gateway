@@ -2,7 +2,9 @@ package com.prodigalgal.xaigateway.gateway.core.observability;
 
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageCompleteness;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageView;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
@@ -49,12 +51,47 @@ public class GatewayRequestLifecycleService {
             CanonicalRequest request,
             boolean stream,
             Instant startedAt) {
+        startRequest(requestId, selectionResult, request.requestPath(), null, null, null, null, stream, startedAt);
+    }
+
+    public void startRequest(
+            String requestId,
+            RouteSelectionResult selectionResult,
+            CanonicalResourceRequest request,
+            CanonicalExecutionPlan plan,
+            boolean stream,
+            Instant startedAt) {
+        startRequest(
+                requestId,
+                selectionResult,
+                request.requestPath(),
+                plan == null || plan.resourceType() == null ? null : plan.resourceType().wireName(),
+                plan == null || plan.operation() == null ? null : plan.operation().wireName(),
+                plan == null ? null : plan.executionBackend() == null ? null : plan.executionBackend().wireName(),
+                plan == null ? null : plan.objectMode(),
+                stream,
+                startedAt
+        );
+    }
+
+    private void startRequest(
+            String requestId,
+            RouteSelectionResult selectionResult,
+            String requestPath,
+            String resourceType,
+            String operation,
+            String executionBackend,
+            String objectMode,
+            boolean stream,
+            Instant startedAt) {
         RequestLogEntity entity = new RequestLogEntity();
         entity.setRequestId(requestId);
         entity.setDistributedKeyId(selectionResult.distributedKeyId());
         entity.setDistributedKeyPrefix(selectionResult.distributedKeyPrefix());
         entity.setProtocol(selectionResult.protocol());
-        entity.setRequestPath(request.requestPath());
+        entity.setRequestPath(requestPath);
+        entity.setResourceType(resourceType);
+        entity.setOperation(operation);
         entity.setRequestedModel(selectionResult.requestedModel());
         entity.setPublicModel(selectionResult.publicModel());
         entity.setResolvedModelKey(selectionResult.resolvedModelKey());
@@ -62,6 +99,8 @@ public class GatewayRequestLifecycleService {
         entity.setProviderType(selectionResult.selectedCandidate().candidate().providerType());
         entity.setCredentialId(selectionResult.selectedCandidate().candidate().credentialId());
         entity.setSelectionSource(selectionResult.selectionSource().name());
+        entity.setExecutionBackend(executionBackend);
+        entity.setObjectMode(objectMode);
         entity.setPrefixHash(selectionResult.prefixHash());
         entity.setFingerprint(selectionResult.fingerprint());
         entity.setStream(stream);
@@ -77,7 +116,46 @@ public class GatewayRequestLifecycleService {
             boolean stream,
             GatewayUsageView usage,
             Instant startedAt) {
-        finishRequest(requestId, selectionResult, request, stream, GatewayRequestStatus.COMPLETED, null, null, usage, startedAt);
+        finishRequest(
+                requestId,
+                selectionResult,
+                request.requestPath(),
+                null,
+                null,
+                null,
+                null,
+                stream,
+                GatewayRequestStatus.COMPLETED,
+                null,
+                null,
+                usage,
+                startedAt
+        );
+    }
+
+    public void completeRequest(
+            String requestId,
+            RouteSelectionResult selectionResult,
+            CanonicalResourceRequest request,
+            CanonicalExecutionPlan plan,
+            boolean stream,
+            GatewayUsageView usage,
+            Instant startedAt) {
+        finishRequest(
+                requestId,
+                selectionResult,
+                request.requestPath(),
+                plan == null || plan.resourceType() == null ? null : plan.resourceType().wireName(),
+                plan == null || plan.operation() == null ? null : plan.operation().wireName(),
+                plan == null || plan.executionBackend() == null ? null : plan.executionBackend().wireName(),
+                plan == null ? null : plan.objectMode(),
+                stream,
+                GatewayRequestStatus.COMPLETED,
+                null,
+                null,
+                usage,
+                startedAt
+        );
     }
 
     public void failRequest(
@@ -88,17 +166,11 @@ public class GatewayRequestLifecycleService {
             Throwable error,
             GatewayUsageView usage,
             Instant startedAt) {
-        finishRequest(
-                requestId,
-                selectionResult,
-                request,
-                stream,
-                GatewayRequestStatus.FAILED,
+        finishRequest(requestId, selectionResult, request.requestPath(), null, null, null, null, stream, GatewayRequestStatus.FAILED,
                 error == null ? null : error.getClass().getSimpleName(),
                 error == null ? null : error.getMessage(),
                 usage,
-                startedAt
-        );
+                startedAt);
         gatewayAuditLogService.recordGatewayEvent(
                 requestId,
                 "REQUEST_FAILED",
@@ -112,6 +184,32 @@ public class GatewayRequestLifecycleService {
         );
     }
 
+    public void failRequest(
+            String requestId,
+            RouteSelectionResult selectionResult,
+            CanonicalResourceRequest request,
+            CanonicalExecutionPlan plan,
+            boolean stream,
+            Throwable error,
+            GatewayUsageView usage,
+            Instant startedAt) {
+        finishRequest(
+                requestId,
+                selectionResult,
+                request.requestPath(),
+                plan == null || plan.resourceType() == null ? null : plan.resourceType().wireName(),
+                plan == null || plan.operation() == null ? null : plan.operation().wireName(),
+                plan == null || plan.executionBackend() == null ? null : plan.executionBackend().wireName(),
+                plan == null ? null : plan.objectMode(),
+                stream,
+                GatewayRequestStatus.FAILED,
+                error == null ? null : error.getClass().getSimpleName(),
+                error == null ? null : error.getMessage(),
+                usage,
+                startedAt
+        );
+    }
+
     public void cancelRequest(
             String requestId,
             RouteSelectionResult selectionResult,
@@ -119,17 +217,11 @@ public class GatewayRequestLifecycleService {
             boolean stream,
             GatewayUsageView usage,
             Instant startedAt) {
-        finishRequest(
-                requestId,
-                selectionResult,
-                request,
-                stream,
-                GatewayRequestStatus.CANCELED,
+        finishRequest(requestId, selectionResult, request.requestPath(), null, null, null, null, stream, GatewayRequestStatus.CANCELED,
                 "CLIENT_CANCELLED",
                 "Request stream cancelled by client",
                 usage,
-                startedAt
-        );
+                startedAt);
         gatewayAuditLogService.recordGatewayEvent(
                 requestId,
                 "REQUEST_CANCELLED",
@@ -145,7 +237,11 @@ public class GatewayRequestLifecycleService {
     private void finishRequest(
             String requestId,
             RouteSelectionResult selectionResult,
-            CanonicalRequest request,
+            String requestPath,
+            String resourceType,
+            String operation,
+            String executionBackend,
+            String objectMode,
             boolean stream,
             GatewayRequestStatus status,
             String errorCode,
@@ -159,6 +255,11 @@ public class GatewayRequestLifecycleService {
             entity.setProviderType(selectionResult.selectedCandidate().candidate().providerType());
             entity.setCredentialId(selectionResult.selectedCandidate().candidate().credentialId());
             entity.setSelectionSource(selectionResult.selectionSource().name());
+            entity.setRequestPath(requestPath);
+            entity.setResourceType(resourceType);
+            entity.setOperation(operation);
+            entity.setExecutionBackend(executionBackend);
+            entity.setObjectMode(objectMode);
             entity.setStatus(status);
             entity.setErrorCode(errorCode);
             entity.setErrorMessage(truncate(errorMessage));
@@ -167,14 +268,18 @@ public class GatewayRequestLifecycleService {
             requestLogRepository.save(entity);
         });
 
-        saveUsageRecord(requestId, selectionResult, request, stream, usage);
-        recordMetrics(selectionResult, request.requestPath(), stream, status, usage, durationMs);
+        saveUsageRecord(requestId, selectionResult, requestPath, resourceType, operation, executionBackend, objectMode, stream, usage);
+        recordMetrics(selectionResult, requestPath, stream, status, usage, durationMs);
     }
 
     private void saveUsageRecord(
             String requestId,
             RouteSelectionResult selectionResult,
-            CanonicalRequest request,
+            String requestPath,
+            String resourceType,
+            String operation,
+            String executionBackend,
+            String objectMode,
             boolean stream,
             GatewayUsageView usage) {
         if (usage == null || !usage.present()) {
@@ -185,7 +290,7 @@ public class GatewayRequestLifecycleService {
         entity.setRequestId(requestId);
         entity.setDistributedKeyId(selectionResult.distributedKeyId());
         entity.setProtocol(selectionResult.protocol());
-        entity.setRequestPath(request.requestPath());
+        entity.setRequestPath(requestPath);
         entity.setModelGroup(selectionResult.modelGroup());
         entity.setProviderType(selectionResult.selectedCandidate().candidate().providerType());
         entity.setCredentialId(selectionResult.selectedCandidate().candidate().credentialId());

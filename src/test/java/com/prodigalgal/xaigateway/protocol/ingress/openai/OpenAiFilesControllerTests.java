@@ -4,7 +4,7 @@ import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthenticationService;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileContent;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileResponse;
-import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileService;
+import com.prodigalgal.xaigateway.gateway.core.execution.GatewayResourceExecutionService;
 import com.prodigalgal.xaigateway.testsupport.PermitAllSecurityTestConfig;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -32,13 +32,13 @@ class OpenAiFilesControllerTests {
     private DistributedKeyAuthenticationService distributedKeyAuthenticationService;
 
     @MockitoBean
-    private GatewayFileService gatewayFileService;
+    private GatewayResourceExecutionService gatewayResourceExecutionService;
 
     @Test
     void shouldListFiles() {
         Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayFileService.listFiles(1L))
+        Mockito.when(gatewayResourceExecutionService.listFiles(1L))
                 .thenReturn(List.of(GatewayFileResponse.from(
                         "file-123",
                         "demo.txt",
@@ -62,7 +62,7 @@ class OpenAiFilesControllerTests {
     void shouldUploadFile() {
         Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayFileService.createFile(Mockito.eq(1L), Mockito.any(), Mockito.eq("assistants")))
+        Mockito.when(gatewayResourceExecutionService.createFile(Mockito.eq("sk-gw-test"), Mockito.eq(1L), Mockito.eq("assistants"), Mockito.any()))
                 .thenReturn(reactor.core.publisher.Mono.just(GatewayFileResponse.from(
                         "file-456",
                         "demo.txt",
@@ -97,7 +97,7 @@ class OpenAiFilesControllerTests {
     void shouldGetFileMetadata() {
         Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayFileService.getFile("file-789", 1L))
+        Mockito.when(gatewayResourceExecutionService.getFile("file-789", 1L))
                 .thenReturn(GatewayFileResponse.from(
                         "file-789",
                         "doc.pdf",
@@ -121,19 +121,10 @@ class OpenAiFilesControllerTests {
     void shouldGetFileContent() {
         Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayFileService.getFileContent("file-789", 1L))
-                .thenReturn(new GatewayFileContent(
-                        GatewayFileResponse.from(
-                                "file-789",
-                                "doc.pdf",
-                                "assistants",
-                                100,
-                                Instant.parse("2026-04-07T12:00:00Z"),
-                                "processed"
-                        ),
-                        "hello".getBytes(StandardCharsets.UTF_8),
-                        MediaType.TEXT_PLAIN_VALUE
-                ));
+        Mockito.when(gatewayResourceExecutionService.getFileContent("file-789", 1L))
+                .thenReturn(org.springframework.http.ResponseEntity.ok()
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .body("hello".getBytes(StandardCharsets.UTF_8)));
 
         webTestClient.get()
                 .uri("/v1/files/file-789/content")

@@ -1,19 +1,24 @@
 package com.prodigalgal.xaigateway.protocol;
 
 import tools.jackson.databind.ObjectMapper;
-import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
-import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolCall;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionResult;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionStreamResult;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResponse;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEvent;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEventType;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolCall;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalUsage;
+import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
+import com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayFinishReason;
-import com.prodigalgal.xaigateway.gateway.core.response.GatewayResponse;
-import com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamEvent;
-import com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamEventType;
-import com.prodigalgal.xaigateway.gateway.core.response.GatewayStreamResponse;
-import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageCompleteness;
-import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageSource;
-import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageView;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionSource;
+import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.shared.ReasoningTransport;
 import com.prodigalgal.xaigateway.protocol.ingress.anthropic.AnthropicMessagesEncoder;
@@ -38,15 +43,16 @@ class GatewayProtocolEncoderContractTests {
     @Test
     void shouldEncodeOpenAiChatCompletionContract() {
         OpenAiChatCompletionEncoder encoder = new OpenAiChatCompletionEncoder(objectMapper);
-        OpenAiChatCompletionResponse response = encoder.encode(gatewayResponse(
+        OpenAiChatCompletionResponse response = encoder.encode(canonicalResult(
                 "req-openai-contract",
+                ProviderType.OPENAI_DIRECT,
+                CanonicalIngressProtocol.OPENAI,
+                "gpt-4o",
                 "hello contract",
-                usageView(1000, 700, 200, 20, 300, 0, null),
+                canonicalUsage(700, 200, 900, 300, 0, 20),
                 List.of(),
                 null,
-                GatewayFinishReason.STOP,
-                ProviderType.OPENAI_DIRECT,
-                "openai"
+                GatewayFinishReason.STOP
         ));
 
         assertEquals("chat.completion", response.object());
@@ -58,14 +64,16 @@ class GatewayProtocolEncoderContractTests {
     @Test
     void shouldEncodeOpenAiResponsesStreamContract() {
         OpenAiResponsesEncoder encoder = new OpenAiResponsesEncoder(objectMapper);
-        GatewayStreamResponse streamResponse = new GatewayStreamResponse(
+        CanonicalExecutionStreamResult streamResponse = canonicalStreamResult(
                 "req-responses-contract",
-                selectionResult(ProviderType.OPENAI_DIRECT, "responses", "writer-fast"),
+                ProviderType.OPENAI_DIRECT,
+                CanonicalIngressProtocol.RESPONSES,
+                "writer-fast",
                 Flux.just(
-                        new GatewayStreamEvent(GatewayStreamEventType.REASONING_DELTA, null, "step 1", List.of(), GatewayUsageView.empty(), false, null, null, null, null),
-                        new GatewayStreamEvent(GatewayStreamEventType.TEXT_DELTA, "hello", null, List.of(), GatewayUsageView.empty(), false, null, null, null, null),
-                        new GatewayStreamEvent(GatewayStreamEventType.TOOL_CALLS, null, null, List.of(new GatewayToolCall("call_1", "function", "lookup_weather", "{\"city\":\"Shanghai\"}")), GatewayUsageView.empty(), false, null, null, null, null),
-                        new GatewayStreamEvent(GatewayStreamEventType.COMPLETED, null, null, List.of(), usageView(100, 40, 20, 5, 60, 0, null), true, GatewayFinishReason.TOOL_CALLS, "hello", "step 1", null)
+                        new CanonicalStreamEvent(CanonicalStreamEventType.REASONING_DELTA, null, "step 1", List.of(), CanonicalUsage.empty(), false, null, null, null),
+                        new CanonicalStreamEvent(CanonicalStreamEventType.TEXT_DELTA, "hello", null, List.of(), CanonicalUsage.empty(), false, null, null, null),
+                        new CanonicalStreamEvent(CanonicalStreamEventType.TOOL_CALLS, null, null, List.of(new CanonicalToolCall("call_1", "function", "lookup_weather", "{\"city\":\"Shanghai\"}")), CanonicalUsage.empty(), false, null, null, null),
+                        new CanonicalStreamEvent(CanonicalStreamEventType.COMPLETED, null, null, List.of(), canonicalUsage(40, 20, 60, 10, 0, 5), true, GatewayFinishReason.TOOL_CALLS, "hello", "step 1")
                 )
         );
 
@@ -79,15 +87,16 @@ class GatewayProtocolEncoderContractTests {
     @Test
     void shouldEncodeAnthropicMessageContract() {
         AnthropicMessagesEncoder encoder = new AnthropicMessagesEncoder(objectMapper);
-        AnthropicMessagesResponse response = encoder.encode(gatewayResponse(
+        AnthropicMessagesResponse response = encoder.encode(canonicalResult(
                 "req-anthropic-contract",
-                "",
-                usageView(900, 900, 200, 0, 300, 120, null),
-                List.of(new GatewayToolCall("toolu_1", "tool_use", "lookup_weather", "{\"city\":\"Shanghai\"}")),
-                null,
-                GatewayFinishReason.TOOL_CALLS,
                 ProviderType.ANTHROPIC_DIRECT,
-                "anthropic_native"
+                CanonicalIngressProtocol.ANTHROPIC_NATIVE,
+                "claude-sonnet-4",
+                "",
+                canonicalUsage(900, 200, 1100, 300, 120, 0),
+                List.of(new CanonicalToolCall("toolu_1", "tool_use", "lookup_weather", "{\"city\":\"Shanghai\"}")),
+                null,
+                GatewayFinishReason.TOOL_CALLS
         ));
 
         assertEquals("tool_use", response.stopReason());
@@ -100,15 +109,16 @@ class GatewayProtocolEncoderContractTests {
     @Test
     void shouldEncodeGeminiContract() {
         GeminiGenerateContentEncoder encoder = new GeminiGenerateContentEncoder(objectMapper);
-        GeminiGenerateContentResponse response = encoder.encode(gatewayResponse(
+        GeminiGenerateContentResponse response = encoder.encode(canonicalResult(
                 "req-gemini-contract",
-                "",
-                usageView(1000, 720, 350, 40, 280, 0, "cached-content-1"),
-                List.of(new GatewayToolCall("call_1", "function", "lookup_weather", "{\"city\":\"Shanghai\"}")),
-                null,
-                GatewayFinishReason.TOOL_CALLS,
                 ProviderType.GEMINI_DIRECT,
-                "google_native"
+                CanonicalIngressProtocol.GOOGLE_NATIVE,
+                "gemini-2.5-pro",
+                "",
+                canonicalUsage(720, 350, 1070, 280, 0, 40),
+                List.of(new CanonicalToolCall("call_1", "function", "lookup_weather", "{\"city\":\"Shanghai\"}")),
+                null,
+                GatewayFinishReason.TOOL_CALLS
         ));
 
         assertEquals("lookup_weather", response.candidates().get(0).content().parts().get(0).functionCall().name());
@@ -116,62 +126,81 @@ class GatewayProtocolEncoderContractTests {
         assertEquals(40, response.usageMetadata().thoughtsTokenCount());
     }
 
-    private GatewayResponse gatewayResponse(
+    private CanonicalExecutionResult canonicalResult(
             String requestId,
-            String text,
-            GatewayUsageView usage,
-            List<GatewayToolCall> toolCalls,
-            String reasoning,
-            GatewayFinishReason finishReason,
             ProviderType providerType,
-            String protocol) {
-        return new GatewayResponse(
+            CanonicalIngressProtocol protocol,
+            String model,
+            String text,
+            CanonicalUsage usage,
+            List<CanonicalToolCall> toolCalls,
+            String reasoning,
+            GatewayFinishReason finishReason) {
+        RouteSelectionResult selectionResult = selectionResult(providerType, protocol, model);
+        return new CanonicalExecutionResult(
                 requestId,
-                selectionResult(providerType, protocol, "gpt-4o"),
-                text,
-                usage,
-                toolCalls,
-                reasoning,
-                finishReason,
-                null
+                selectionResult,
+                plan(protocol, model),
+                new CanonicalResponse(requestId, selectionResult.publicModel(), text, reasoning, toolCalls, usage, finishReason)
         );
     }
 
-    private GatewayUsageView usageView(
-            int rawPromptTokens,
+    private CanonicalExecutionStreamResult canonicalStreamResult(
+            String requestId,
+            ProviderType providerType,
+            CanonicalIngressProtocol protocol,
+            String model,
+            Flux<CanonicalStreamEvent> events) {
+        RouteSelectionResult selectionResult = selectionResult(providerType, protocol, model);
+        return new CanonicalExecutionStreamResult(requestId, selectionResult, plan(protocol, model), events);
+    }
+
+    private CanonicalExecutionPlan plan(CanonicalIngressProtocol protocol, String model) {
+        return new CanonicalExecutionPlan(
+                true,
+                protocol,
+                switch (protocol) {
+                    case OPENAI -> "/v1/chat/completions";
+                    case RESPONSES -> "/v1/responses";
+                    case ANTHROPIC_NATIVE -> "/v1/messages";
+                    case GOOGLE_NATIVE -> "/v1beta/models/" + model + ":generateContent";
+                    case UNKNOWN -> "/unknown";
+                },
+                model,
+                model,
+                model,
+                protocol == CanonicalIngressProtocol.RESPONSES ? TranslationResourceType.RESPONSE : TranslationResourceType.CHAT,
+                protocol == CanonicalIngressProtocol.RESPONSES ? TranslationOperation.RESPONSE_CREATE : TranslationOperation.CHAT_COMPLETION,
+                ExecutionKind.NATIVE,
+                InteropCapabilityLevel.NATIVE,
+                InteropCapabilityLevel.NATIVE,
+                InteropCapabilityLevel.NATIVE,
+                List.of(InteropFeature.CHAT_TEXT),
+                java.util.Map.of("chat_text", InteropCapabilityLevel.NATIVE),
+                List.of(),
+                List.of()
+        );
+    }
+
+    private CanonicalUsage canonicalUsage(
             int promptTokens,
             int completionTokens,
-            int reasoningTokens,
+            int totalTokens,
             int cacheHitTokens,
             int cacheWriteTokens,
-            String cachedContentRef) {
-        return new GatewayUsageView(
-                rawPromptTokens,
-                promptTokens,
-                completionTokens,
-                reasoningTokens,
-                cacheHitTokens,
-                cacheWriteTokens,
-                cacheHitTokens,
-                cacheWriteTokens,
-                Math.max(rawPromptTokens - promptTokens - cacheWriteTokens, 0),
-                cachedContentRef,
-                rawPromptTokens + completionTokens,
-                GatewayUsageCompleteness.FINAL,
-                GatewayUsageSource.DIRECT_RESPONSE,
-                null
-        );
+            int reasoningTokens) {
+        return new CanonicalUsage(true, promptTokens, completionTokens, totalTokens, cacheHitTokens, cacheWriteTokens, reasoningTokens);
     }
 
-    private RouteSelectionResult selectionResult(ProviderType providerType, String protocol, String model) {
-        CatalogCandidateView candidate = new CatalogCandidateView(
+    private RouteSelectionResult selectionResult(ProviderType providerType, CanonicalIngressProtocol protocol, String model) {
+        com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView candidate = new com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView(
                 101L,
                 "contract-candidate",
                 providerType,
                 "https://api.example.com",
                 model,
                 model,
-                List.of(protocol),
+                List.of(protocol.name().toLowerCase()),
                 true,
                 true,
                 true,
@@ -187,7 +216,7 @@ class GatewayProtocolEncoderContractTests {
                 model,
                 model,
                 model,
-                protocol,
+                protocol.name().toLowerCase(),
                 "prefix",
                 "fingerprint",
                 model,

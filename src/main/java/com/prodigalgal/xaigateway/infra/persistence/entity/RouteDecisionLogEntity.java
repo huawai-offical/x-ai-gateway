@@ -60,6 +60,18 @@ public class RouteDecisionLogEntity {
     @Comment("请求协议。")
     private String protocol;
 
+    @Column(name = "request_path", length = 256)
+    @Comment("请求路径。")
+    private String requestPath;
+
+    @Column(name = "resource_type", length = 32)
+    @Comment("资源类型。")
+    private String resourceType;
+
+    @Column(name = "operation", length = 64)
+    @Comment("操作类型。")
+    private String operation;
+
     @Column(name = "model_group", nullable = false, length = 256)
     @Comment("模型分组。")
     private String modelGroup;
@@ -67,6 +79,14 @@ public class RouteDecisionLogEntity {
     @Column(name = "selection_source", nullable = false, length = 32)
     @Comment("选路来源，例如 PREFIX_AFFINITY、WEIGHTED_HASH。")
     private String selectionSource;
+
+    @Column(name = "execution_backend", length = 32)
+    @Comment("执行后端。")
+    private String executionBackend;
+
+    @Column(name = "object_mode", length = 64)
+    @Comment("对象模式。")
+    private String objectMode;
 
     @Column(name = "selected_credential_id", nullable = false)
     @Comment("选中的上游凭证主键。")
@@ -162,6 +182,30 @@ public class RouteDecisionLogEntity {
         this.protocol = protocol;
     }
 
+    public String getRequestPath() {
+        return requestPath;
+    }
+
+    public void setRequestPath(String requestPath) {
+        this.requestPath = requestPath;
+    }
+
+    public String getResourceType() {
+        return resourceType;
+    }
+
+    public void setResourceType(String resourceType) {
+        this.resourceType = resourceType;
+    }
+
+    public String getOperation() {
+        return operation;
+    }
+
+    public void setOperation(String operation) {
+        this.operation = operation;
+    }
+
     public String getModelGroup() {
         return modelGroup;
     }
@@ -176,6 +220,22 @@ public class RouteDecisionLogEntity {
 
     public void setSelectionSource(String selectionSource) {
         this.selectionSource = selectionSource;
+    }
+
+    public String getExecutionBackend() {
+        return executionBackend;
+    }
+
+    public void setExecutionBackend(String executionBackend) {
+        this.executionBackend = executionBackend;
+    }
+
+    public String getObjectMode() {
+        return objectMode;
+    }
+
+    public void setObjectMode(String objectMode) {
+        this.objectMode = objectMode;
     }
 
     public Long getSelectedCredentialId() {

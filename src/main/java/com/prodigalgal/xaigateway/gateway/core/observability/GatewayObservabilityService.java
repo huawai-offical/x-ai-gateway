@@ -2,6 +2,7 @@ package com.prodigalgal.xaigateway.gateway.core.observability;
 
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
+import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateEvaluation;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteExecutionAttempt;
@@ -47,6 +48,17 @@ public class GatewayObservabilityService {
     }
 
     public void recordRouteDecision(String requestId, RouteSelectionResult selectionResult) {
+        recordRouteDecision(requestId, selectionResult, null, null, null, null, null);
+    }
+
+    public void recordRouteDecision(
+            String requestId,
+            RouteSelectionResult selectionResult,
+            String requestPath,
+            String resourceType,
+            String operation,
+            ExecutionBackend executionBackend,
+            String objectMode) {
         RouteDecisionLogEntity entity = new RouteDecisionLogEntity();
         entity.setRequestId(requestId);
         entity.setDistributedKeyId(selectionResult.distributedKeyId());
@@ -55,8 +67,13 @@ public class GatewayObservabilityService {
         entity.setPublicModel(selectionResult.publicModel());
         entity.setResolvedModelKey(selectionResult.resolvedModelKey());
         entity.setProtocol(selectionResult.protocol());
+        entity.setRequestPath(requestPath);
+        entity.setResourceType(resourceType);
+        entity.setOperation(operation);
         entity.setModelGroup(selectionResult.modelGroup());
         entity.setSelectionSource(selectionResult.selectionSource().name());
+        entity.setExecutionBackend(executionBackend == null ? null : executionBackend.wireName());
+        entity.setObjectMode(objectMode);
         entity.setSelectedCredentialId(selectionResult.selectedCandidate().candidate().credentialId());
         entity.setSelectedProviderType(selectionResult.selectedCandidate().candidate().providerType());
         entity.setSelectedBaseUrl(selectionResult.selectedCandidate().candidate().baseUrl());
@@ -68,11 +85,26 @@ public class GatewayObservabilityService {
     }
 
     public void recordCacheUsage(String requestId, RouteSelectionResult selectionResult, GatewayUsage usage, String cacheKind, String cachedContentRef) {
+        recordCacheUsage(requestId, selectionResult, usage, cacheKind, cachedContentRef, null, null, null, null, null);
+    }
+
+    public void recordCacheUsage(
+            String requestId,
+            RouteSelectionResult selectionResult,
+            GatewayUsage usage,
+            String cacheKind,
+            String cachedContentRef,
+            String requestPath,
+            String resourceType,
+            String operation,
+            ExecutionBackend executionBackend,
+            String objectMode) {
         if (usage == null) {
             return;
         }
 
-        if (usage.cacheHitTokens() <= 0 && usage.cacheWriteTokens() <= 0) {
+        boolean structuredResourceLog = requestPath != null || resourceType != null || operation != null || executionBackend != null || objectMode != null;
+        if (!structuredResourceLog && usage.cacheHitTokens() <= 0 && usage.cacheWriteTokens() <= 0) {
             return;
         }
 
@@ -80,12 +112,17 @@ public class GatewayObservabilityService {
         entity.setRequestId(requestId);
         entity.setDistributedKeyId(selectionResult.distributedKeyId());
         entity.setProtocol(selectionResult.protocol());
+        entity.setRequestPath(requestPath);
+        entity.setResourceType(resourceType);
+        entity.setOperation(operation);
         entity.setProviderType(selectionResult.selectedCandidate().candidate().providerType());
         entity.setCredentialId(selectionResult.selectedCandidate().candidate().credentialId());
         entity.setModelGroup(selectionResult.modelGroup());
         entity.setPrefixHash(selectionResult.prefixHash());
         entity.setFingerprint(selectionResult.fingerprint());
         entity.setCacheKind(cacheKind);
+        entity.setExecutionBackend(executionBackend == null ? null : executionBackend.wireName());
+        entity.setObjectMode(objectMode);
         entity.setCacheHitTokens(usage.cacheHitTokens());
         entity.setCacheWriteTokens(usage.cacheWriteTokens());
         entity.setSavedInputTokens(usage.savedInputTokens());

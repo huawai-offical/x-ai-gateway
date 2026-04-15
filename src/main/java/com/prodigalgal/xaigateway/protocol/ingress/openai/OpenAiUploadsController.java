@@ -3,7 +3,7 @@ package com.prodigalgal.xaigateway.protocol.ingress.openai;
 import tools.jackson.databind.JsonNode;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayTokenAuthenticationResolver;
-import com.prodigalgal.xaigateway.gateway.core.resource.GatewayAsyncResourceService;
+import com.prodigalgal.xaigateway.gateway.core.execution.GatewayResourceExecutionService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.multipart.FilePart;
@@ -22,13 +22,13 @@ import reactor.core.publisher.Mono;
 public class OpenAiUploadsController {
 
     private final GatewayTokenAuthenticationResolver gatewayTokenAuthenticationResolver;
-    private final GatewayAsyncResourceService gatewayAsyncResourceService;
+    private final GatewayResourceExecutionService gatewayResourceExecutionService;
 
     public OpenAiUploadsController(
             GatewayTokenAuthenticationResolver gatewayTokenAuthenticationResolver,
-            GatewayAsyncResourceService gatewayAsyncResourceService) {
+            GatewayResourceExecutionService gatewayResourceExecutionService) {
         this.gatewayTokenAuthenticationResolver = gatewayTokenAuthenticationResolver;
-        this.gatewayAsyncResourceService = gatewayAsyncResourceService;
+        this.gatewayResourceExecutionService = gatewayResourceExecutionService;
     }
 
     @PostMapping
@@ -36,7 +36,14 @@ public class OpenAiUploadsController {
             @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
             @RequestBody JsonNode requestBody) {
         AuthenticatedDistributedKey distributedKey = gatewayTokenAuthenticationResolver.authenticate(authorization, null, null, null);
-        return gatewayAsyncResourceService.createUpload(distributedKey.id(), requestBody);
+        return gatewayResourceExecutionService.executeLifecycleJson(
+                distributedKey.id(),
+                distributedKey.keyPrefix(),
+                "POST",
+                "/v1/uploads",
+                requestBody == null ? null : requestBody.path("model").asText("resource-orchestration"),
+                requestBody
+        );
     }
 
     @GetMapping("/{uploadId}")
@@ -44,7 +51,14 @@ public class OpenAiUploadsController {
             @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
             @PathVariable String uploadId) {
         AuthenticatedDistributedKey distributedKey = gatewayTokenAuthenticationResolver.authenticate(authorization, null, null, null);
-        return gatewayAsyncResourceService.getUpload(uploadId, distributedKey.id());
+        return gatewayResourceExecutionService.executeLifecycleJson(
+                distributedKey.id(),
+                distributedKey.keyPrefix(),
+                "GET",
+                "/v1/uploads/" + uploadId,
+                "resource-orchestration",
+                null
+        );
     }
 
     @PostMapping(path = "/{uploadId}/parts", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -53,7 +67,16 @@ public class OpenAiUploadsController {
             @PathVariable String uploadId,
             @RequestPart("data") FilePart data) {
         AuthenticatedDistributedKey distributedKey = gatewayTokenAuthenticationResolver.authenticate(authorization, null, null, null);
-        return gatewayAsyncResourceService.addUploadPart(uploadId, distributedKey.id(), data);
+        return gatewayResourceExecutionService.executeLifecycleMultipart(
+                distributedKey.id(),
+                distributedKey.keyPrefix(),
+                "POST",
+                "/v1/uploads/" + uploadId + "/parts",
+                "resource-orchestration",
+                java.util.Map.of(),
+                java.util.List.of(),
+                java.util.Map.of("data", data)
+        );
     }
 
     @PostMapping("/{uploadId}/complete")
@@ -61,7 +84,14 @@ public class OpenAiUploadsController {
             @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
             @PathVariable String uploadId) {
         AuthenticatedDistributedKey distributedKey = gatewayTokenAuthenticationResolver.authenticate(authorization, null, null, null);
-        return gatewayAsyncResourceService.completeUpload(uploadId, distributedKey.id());
+        return gatewayResourceExecutionService.executeLifecycleJson(
+                distributedKey.id(),
+                distributedKey.keyPrefix(),
+                "POST",
+                "/v1/uploads/" + uploadId + "/complete",
+                "resource-orchestration",
+                null
+        );
     }
 
     @PostMapping("/{uploadId}/cancel")
@@ -69,6 +99,13 @@ public class OpenAiUploadsController {
             @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
             @PathVariable String uploadId) {
         AuthenticatedDistributedKey distributedKey = gatewayTokenAuthenticationResolver.authenticate(authorization, null, null, null);
-        return gatewayAsyncResourceService.cancelUpload(uploadId, distributedKey.id());
+        return gatewayResourceExecutionService.executeLifecycleJson(
+                distributedKey.id(),
+                distributedKey.keyPrefix(),
+                "POST",
+                "/v1/uploads/" + uploadId + "/cancel",
+                "resource-orchestration",
+                null
+        );
     }
 }

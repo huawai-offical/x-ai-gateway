@@ -64,6 +64,7 @@ public class GatewayInteropPlanService {
         CanonicalExecutionPlanCompilation compilation = translationExecutionPlanCompiler.compilePreview(
                 distributedKeyPrefix,
                 protocol,
+                request.method(),
                 requestPath,
                 request.requestedModel(),
                 degradationPolicy,
@@ -86,6 +87,7 @@ public class GatewayInteropPlanService {
         summary.put("executionBackend", executionPlan.executionBackend() == null
                 ? null
                 : executionPlan.executionBackend().wireName());
+        summary.put("objectMode", executionPlan.objectMode());
         summary.put("renderCapabilityLevel", executionPlan.renderCapabilityLevel() == null
                 ? null
                 : executionPlan.renderCapabilityLevel().name().toLowerCase(Locale.ROOT));
@@ -95,6 +97,7 @@ public class GatewayInteropPlanService {
         debug.put("canonicalExecutionPlan", executionPlan);
         debug.put("supportedBackends", executionPlan.supportedBackends().stream().map(item -> item.wireName()).toList());
         debug.put("backendReason", executionPlan.backendReason());
+        debug.put("objectMode", executionPlan.objectMode());
         if (compilation.selectionResult() != null) {
             debug.put("distributedKeyId", compilation.selectionResult().distributedKeyId());
             debug.put("publicModel", compilation.selectionResult().publicModel());

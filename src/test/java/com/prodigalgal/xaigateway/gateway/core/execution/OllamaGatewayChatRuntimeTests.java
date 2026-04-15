@@ -3,6 +3,13 @@ package com.prodigalgal.xaigateway.gateway.core.execution;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalContentPart;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalMessage;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalMessageRole;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalReasoningConfig;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolDefinition;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResponse;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEvent;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileContent;
@@ -78,23 +85,24 @@ class OllamaGatewayChatRuntimeTests {
         );
         ObjectNode metadata = objectMapper.createObjectNode();
         metadata.put("reasoning_effort", "high");
-        ChatExecutionRequest request = new ChatExecutionRequest(
+        CanonicalRequest request = new CanonicalRequest(
                 "sk-gw-test",
-                "openai",
+                CanonicalIngressProtocol.OPENAI,
                 "/v1/chat/completions",
                 "llama3",
-                List.of(new ChatExecutionRequest.MessageInput(
-                        "user",
-                        "describe",
-                        null,
-                        null,
-                        List.of(new ChatExecutionRequest.MediaInput("image", "image/png", "gateway://file-1", "photo.png"))
+                List.of(new CanonicalMessage(
+                        CanonicalMessageRole.USER,
+                        List.of(
+                                CanonicalContentPart.text("describe"),
+                                CanonicalContentPart.image("image/png", "gateway://file-1", "photo.png")
+                        )
                 )),
-                List.of(new GatewayToolDefinition("lookup_weather", "Lookup weather", objectMapper.createObjectNode().put("type", "object"), null)),
+                List.of(new CanonicalToolDefinition("lookup_weather", "Lookup weather", objectMapper.createObjectNode().put("type", "object"), null)),
                 null,
                 null,
                 null,
-                metadata
+                new CanonicalReasoningConfig(metadata, "high"),
+                null
         );
 
         CanonicalResponse result = runtime.execute(context(request));
@@ -110,19 +118,21 @@ class OllamaGatewayChatRuntimeTests {
     @Test
     void shouldRejectRemoteImageInputForOllama() {
         OllamaGatewayChatRuntime runtime = new OllamaGatewayChatRuntime(WebClient.builder(), objectMapper, Mockito.mock(GatewayFileService.class));
-        ChatExecutionRequest request = new ChatExecutionRequest(
+        CanonicalRequest request = new CanonicalRequest(
                 "sk-gw-test",
-                "openai",
+                CanonicalIngressProtocol.OPENAI,
                 "/v1/chat/completions",
                 "llama3",
-                List.of(new ChatExecutionRequest.MessageInput(
-                        "user",
-                        "hello",
-                        null,
-                        null,
-                        List.of(new ChatExecutionRequest.MediaInput("image", "image/png", "https://example.com/demo.png", "demo.png"))
+                List.of(new CanonicalMessage(
+                        CanonicalMessageRole.USER,
+                        List.of(
+                                CanonicalContentPart.text("hello"),
+                                CanonicalContentPart.image("image/png", "https://example.com/demo.png", "demo.png")
+                        )
                 )),
                 List.of(),
+                null,
+                null,
                 null,
                 null,
                 null
@@ -134,19 +144,21 @@ class OllamaGatewayChatRuntimeTests {
     @Test
     void shouldRejectDocumentInputForOllama() {
         OllamaGatewayChatRuntime runtime = new OllamaGatewayChatRuntime(WebClient.builder(), objectMapper, Mockito.mock(GatewayFileService.class));
-        ChatExecutionRequest request = new ChatExecutionRequest(
+        CanonicalRequest request = new CanonicalRequest(
                 "sk-gw-test",
-                "responses",
+                CanonicalIngressProtocol.RESPONSES,
                 "/v1/responses",
                 "llama3",
-                List.of(new ChatExecutionRequest.MessageInput(
-                        "user",
-                        "hello",
-                        null,
-                        null,
-                        List.of(new ChatExecutionRequest.MediaInput("file", "application/pdf", "gateway://file-1", "demo.pdf"))
+                List.of(new CanonicalMessage(
+                        CanonicalMessageRole.USER,
+                        List.of(
+                                CanonicalContentPart.text("hello"),
+                                CanonicalContentPart.file("application/pdf", "gateway://file-1", "demo.pdf")
+                        )
                 )),
                 List.of(),
+                null,
+                null,
                 null,
                 null,
                 null
@@ -171,13 +183,15 @@ class OllamaGatewayChatRuntimeTests {
                 objectMapper,
                 Mockito.mock(GatewayFileService.class)
         );
-        ChatExecutionRequest request = new ChatExecutionRequest(
+        CanonicalRequest request = new CanonicalRequest(
                 "sk-gw-test",
-                "openai",
+                CanonicalIngressProtocol.OPENAI,
                 "/v1/chat/completions",
                 "llama3",
-                List.of(new ChatExecutionRequest.MessageInput("user", "hello", null, null, List.of())),
+                List.of(new CanonicalMessage(CanonicalMessageRole.USER, List.of(CanonicalContentPart.text("hello")))),
                 List.of(),
+                null,
+                null,
                 null,
                 null,
                 null
@@ -197,7 +211,7 @@ class OllamaGatewayChatRuntimeTests {
         assertEquals(5, chunks.get(4).usage().totalTokens());
     }
 
-    private GatewayChatRuntimeContext context(ChatExecutionRequest request) {
+    private GatewayChatRuntimeContext context(CanonicalRequest request) {
         CatalogCandidateView candidate = new CatalogCandidateView(
                 101L,
                 "ollama",
@@ -239,6 +253,21 @@ class OllamaGatewayChatRuntimeTests {
         UpstreamCredentialEntity credential = new UpstreamCredentialEntity();
         credential.setBaseUrl("http://localhost:11434");
         credential.setProviderType(ProviderType.OLLAMA_DIRECT);
-        return new GatewayChatRuntimeContext(selectionResult, credential, (String) null, request);
+        return new GatewayChatRuntimeContext(
+                selectionResult,
+                credential,
+                new com.prodigalgal.xaigateway.gateway.core.credential.ResolvedCredentialMaterial(
+                        null,
+                        null,
+                        com.prodigalgal.xaigateway.gateway.core.credential.CredentialAuthKind.API_KEY,
+                        null,
+                        null,
+                        java.util.Map.of(),
+                        null,
+                        "test"
+                ),
+                request,
+                null
+        );
     }
 }

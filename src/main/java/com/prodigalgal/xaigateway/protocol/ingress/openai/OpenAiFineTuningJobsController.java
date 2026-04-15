@@ -3,7 +3,7 @@ package com.prodigalgal.xaigateway.protocol.ingress.openai;
 import tools.jackson.databind.JsonNode;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayTokenAuthenticationResolver;
-import com.prodigalgal.xaigateway.gateway.core.resource.GatewayAsyncResourceService;
+import com.prodigalgal.xaigateway.gateway.core.execution.GatewayResourceExecutionService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -18,13 +18,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class OpenAiFineTuningJobsController {
 
     private final GatewayTokenAuthenticationResolver gatewayTokenAuthenticationResolver;
-    private final GatewayAsyncResourceService gatewayAsyncResourceService;
+    private final GatewayResourceExecutionService gatewayResourceExecutionService;
 
     public OpenAiFineTuningJobsController(
             GatewayTokenAuthenticationResolver gatewayTokenAuthenticationResolver,
-            GatewayAsyncResourceService gatewayAsyncResourceService) {
+            GatewayResourceExecutionService gatewayResourceExecutionService) {
         this.gatewayTokenAuthenticationResolver = gatewayTokenAuthenticationResolver;
-        this.gatewayAsyncResourceService = gatewayAsyncResourceService;
+        this.gatewayResourceExecutionService = gatewayResourceExecutionService;
     }
 
     @PostMapping
@@ -32,7 +32,14 @@ public class OpenAiFineTuningJobsController {
             @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
             @RequestBody JsonNode requestBody) {
         AuthenticatedDistributedKey distributedKey = gatewayTokenAuthenticationResolver.authenticate(authorization, null, null, null);
-        return gatewayAsyncResourceService.createTuning(distributedKey.id(), requestBody);
+        return gatewayResourceExecutionService.executeLifecycleJson(
+                distributedKey.id(),
+                distributedKey.keyPrefix(),
+                "POST",
+                "/v1/fine_tuning/jobs",
+                "resource-orchestration",
+                requestBody
+        );
     }
 
     @GetMapping("/{jobId}")
@@ -40,7 +47,14 @@ public class OpenAiFineTuningJobsController {
             @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
             @PathVariable String jobId) {
         AuthenticatedDistributedKey distributedKey = gatewayTokenAuthenticationResolver.authenticate(authorization, null, null, null);
-        return gatewayAsyncResourceService.getTuning(jobId, distributedKey.id());
+        return gatewayResourceExecutionService.executeLifecycleJson(
+                distributedKey.id(),
+                distributedKey.keyPrefix(),
+                "GET",
+                "/v1/fine_tuning/jobs/" + jobId,
+                "resource-orchestration",
+                null
+        );
     }
 
     @PostMapping("/{jobId}/cancel")
@@ -48,6 +62,13 @@ public class OpenAiFineTuningJobsController {
             @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
             @PathVariable String jobId) {
         AuthenticatedDistributedKey distributedKey = gatewayTokenAuthenticationResolver.authenticate(authorization, null, null, null);
-        return gatewayAsyncResourceService.cancelTuning(jobId, distributedKey.id());
+        return gatewayResourceExecutionService.executeLifecycleJson(
+                distributedKey.id(),
+                distributedKey.keyPrefix(),
+                "POST",
+                "/v1/fine_tuning/jobs/" + jobId + "/cancel",
+                "resource-orchestration",
+                null
+        );
     }
 }

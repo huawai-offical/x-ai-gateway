@@ -39,6 +39,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.multipart.FilePart;
+import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileContent;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.LinkedMultiValueMap;
@@ -176,8 +177,12 @@ public class GatewayAsyncResourceService {
     }
 
     public JsonNode createUpload(Long distributedKeyId, JsonNode requestBody) {
+        return createUpload(distributedKeyId, requestBody, null);
+    }
+
+    public JsonNode createUpload(Long distributedKeyId, JsonNode requestBody, Long preferredCredentialId) {
         ObjectNode payload = requireObject(requestBody);
-        UpstreamTarget target = resolveUpstreamTarget(distributedKeyId, InteropFeature.UPLOAD_CREATE);
+        UpstreamTarget target = resolveUpstreamTarget(distributedKeyId, InteropFeature.UPLOAD_CREATE, preferredCredentialId);
         JsonNode upstreamResponse = invokeUpstreamJson(target, "/v1/uploads", rewriteFileRefs(payload, distributedKeyId));
         return persistUpstreamBackedResource(distributedKeyId, GatewayAsyncResourceType.UPLOAD, "upload_", payload, upstreamResponse, "upload", target);
     }
@@ -195,7 +200,25 @@ public class GatewayAsyncResourceService {
         }
         UpstreamTarget target = resolveUpstreamTargetForEntity(entity, metadata);
         return invokeUpstreamMultipart(target, target.path() + "/" + upstreamId + "/parts", dataPart)
-                .map(upstreamResponse -> persistUploadPart(entity, uploadId, dataPart, upstreamResponse));
+                .map(upstreamResponse -> persistUploadPart(entity, uploadId, dataPart.filename(), upstreamResponse));
+    }
+
+    public Mono<JsonNode> addUploadPartFromGatewayFile(String uploadId, Long distributedKeyId, String fileKey) {
+        GatewayAsyncResourceEntity entity = getRequired(uploadId, GatewayAsyncResourceType.UPLOAD, distributedKeyId);
+        GatewayFileContent fileContent = getGatewayFileContent(fileKey, distributedKeyId);
+        ObjectNode metadata = readObject(entity.getMetadataJson());
+        String upstreamId = metadata.path("upstream_object_id").asText(null);
+        if (upstreamId == null || upstreamId.isBlank()) {
+            return Mono.fromSupplier(() -> addLocalUploadPart(entity, fileContent.metadata().filename()));
+        }
+        UpstreamTarget target = resolveUpstreamTargetForEntity(entity, metadata);
+        return invokeUpstreamMultipart(
+                target,
+                target.path() + "/" + upstreamId + "/parts",
+                fileContent.metadata().filename(),
+                fileContent.mimeType(),
+                fileContent.bytes()
+        ).map(upstreamResponse -> persistUploadPart(entity, uploadId, fileContent.metadata().filename(), upstreamResponse));
     }
 
     public JsonNode completeUpload(String uploadId, Long distributedKeyId) {
@@ -207,8 +230,12 @@ public class GatewayAsyncResourceService {
     }
 
     public JsonNode createBatch(Long distributedKeyId, JsonNode requestBody) {
+        return createBatch(distributedKeyId, requestBody, null);
+    }
+
+    public JsonNode createBatch(Long distributedKeyId, JsonNode requestBody, Long preferredCredentialId) {
         ObjectNode payload = rewriteFileRefs(requireObject(requestBody), distributedKeyId);
-        UpstreamTarget target = resolveUpstreamTarget(distributedKeyId, InteropFeature.BATCH_CREATE);
+        UpstreamTarget target = resolveUpstreamTarget(distributedKeyId, InteropFeature.BATCH_CREATE, preferredCredentialId);
         JsonNode upstreamResponse = invokeUpstreamJson(target, "/v1/batches", payload);
         return persistUpstreamBackedResource(distributedKeyId, GatewayAsyncResourceType.BATCH, "batch_", payload, upstreamResponse, "batch", target);
     }
@@ -222,8 +249,12 @@ public class GatewayAsyncResourceService {
     }
 
     public JsonNode createTuning(Long distributedKeyId, JsonNode requestBody) {
+        return createTuning(distributedKeyId, requestBody, null);
+    }
+
+    public JsonNode createTuning(Long distributedKeyId, JsonNode requestBody, Long preferredCredentialId) {
         ObjectNode payload = rewriteFileRefs(requireObject(requestBody), distributedKeyId);
-        UpstreamTarget target = resolveUpstreamTarget(distributedKeyId, InteropFeature.TUNING_CREATE);
+        UpstreamTarget target = resolveUpstreamTarget(distributedKeyId, InteropFeature.TUNING_CREATE, preferredCredentialId);
         JsonNode upstreamResponse = invokeUpstreamJson(target, "/v1/fine_tuning/jobs", payload);
         return persistUpstreamBackedResource(distributedKeyId, GatewayAsyncResourceType.TUNING, "ftjob_", payload, upstreamResponse, "fine_tuning.job", target);
     }
@@ -237,8 +268,12 @@ public class GatewayAsyncResourceService {
     }
 
     public JsonNode createRealtimeClientSecret(Long distributedKeyId, JsonNode requestBody) {
+        return createRealtimeClientSecret(distributedKeyId, requestBody, null);
+    }
+
+    public JsonNode createRealtimeClientSecret(Long distributedKeyId, JsonNode requestBody, Long preferredCredentialId) {
         ObjectNode payload = requireObject(requestBody);
-        UpstreamTarget target = resolveUpstreamTarget(distributedKeyId, InteropFeature.REALTIME_CLIENT_SECRET);
+        UpstreamTarget target = resolveUpstreamTarget(distributedKeyId, InteropFeature.REALTIME_CLIENT_SECRET, preferredCredentialId);
         JsonNode upstreamResponse = invokeUpstreamJson(target, "/v1/realtime/client_secrets", payload);
         return persistUpstreamBackedResource(
                 distributedKeyId,
@@ -353,7 +388,7 @@ public class GatewayAsyncResourceService {
     private JsonNode persistUploadPart(
             GatewayAsyncResourceEntity entity,
             String uploadId,
-            FilePart dataPart,
+            String filename,
             JsonNode upstreamResponse) {
         ObjectNode response = copyObject(upstreamResponse);
         if (!response.has("object")) {
@@ -366,7 +401,7 @@ public class GatewayAsyncResourceService {
         metadata.withArray("parts").add(upstreamPartId);
         metadata.withArray("part_bindings").addObject()
                 .put("upstream_part_id", upstreamPartId)
-                .put("filename", dataPart.filename())
+                .put("filename", filename)
                 .put("synced_at", now().getEpochSecond());
         metadata.put("partsCount", metadata.withArray("parts").size());
         metadata.put("upstream_synced_at", now().getEpochSecond());
@@ -376,10 +411,19 @@ public class GatewayAsyncResourceService {
     }
 
     private JsonNode addLocalUploadPart(GatewayAsyncResourceEntity entity) {
+        return addLocalUploadPart(entity, null);
+    }
+
+    private JsonNode addLocalUploadPart(GatewayAsyncResourceEntity entity, String filename) {
         ObjectNode metadata = readObject(entity.getMetadataJson());
         String partId = "part_" + UUID.randomUUID().toString().replace("-", "");
         metadata.withArray("parts").add(partId);
         metadata.put("partsCount", metadata.withArray("parts").size());
+        if (filename != null && !filename.isBlank()) {
+            metadata.withArray("part_bindings").addObject()
+                    .put("filename", filename)
+                    .put("synced_at", now().getEpochSecond());
+        }
         entity.setMetadataJson(writeJson(appendEvent(metadata, "part_added", entity.getStatus())));
         gatewayAsyncResourceRepository.save(entity);
 
@@ -407,6 +451,10 @@ public class GatewayAsyncResourceService {
     }
 
     private UpstreamTarget resolveUpstreamTarget(Long distributedKeyId, InteropFeature feature) {
+        return resolveUpstreamTarget(distributedKeyId, feature, null);
+    }
+
+    private UpstreamTarget resolveUpstreamTarget(Long distributedKeyId, InteropFeature feature, Long preferredCredentialId) {
         DistributedKeyView distributedKey = distributedKeyQueryService.findActiveById(distributedKeyId)
                 .orElseThrow(() -> new IllegalArgumentException("未找到可用的 DistributedKey。"));
         Map<Long, UpstreamCredentialEntity> credentials = new LinkedHashMap<>();
@@ -414,6 +462,18 @@ public class GatewayAsyncResourceService {
                 distributedKey.bindings().stream().map(DistributedCredentialBindingView::credentialId).toList())) {
             if (credential.isActive()) {
                 credentials.put(credential.getId(), credential);
+            }
+        }
+
+        if (preferredCredentialId != null) {
+            UpstreamCredentialEntity preferred = credentials.get(preferredCredentialId);
+            if (preferred != null && preferred.getSiteProfileId() != null) {
+                UpstreamSiteProfileEntity siteProfile = upstreamSiteProfileRepository.findById(preferred.getSiteProfileId()).orElse(null);
+                SiteCapabilitySnapshotEntity snapshot = siteCapabilitySnapshotRepository.findBySiteProfile_Id(preferred.getSiteProfileId())
+                        .orElse(null);
+                if (siteProfile != null && siteCapabilityTruthService.supportsFeature(siteProfile, snapshot, feature)) {
+                    return new UpstreamTarget(preferred, siteProfile, buildClient(preferred, siteProfile, basePath(feature)));
+                }
             }
         }
 
@@ -504,6 +564,31 @@ public class GatewayAsyncResourceService {
                         .bodyToMono(JsonNode.class));
     }
 
+    private Mono<JsonNode> invokeUpstreamMultipart(
+            UpstreamTarget target,
+            String path,
+            String filename,
+            String mimeType,
+            byte[] bytes) {
+        MultiValueMap<String, HttpEntity<?>> body = new LinkedMultiValueMap<>();
+        HttpHeaders fileHeaders = new HttpHeaders();
+        fileHeaders.setContentType(mimeType == null || mimeType.isBlank()
+                ? MediaType.APPLICATION_OCTET_STREAM
+                : MediaType.parseMediaType(mimeType));
+        body.add("data", new HttpEntity<>(new ByteArrayResource(bytes) {
+            @Override
+            public String getFilename() {
+                return filename;
+            }
+        }, fileHeaders));
+        return target.client().post()
+                .uri(path.startsWith("/v1/") ? resolvePath(target.credential().getBaseUrl(), path) : path)
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .body(BodyInserters.fromMultipartData(body))
+                .retrieve()
+                .bodyToMono(JsonNode.class);
+    }
+
     private ObjectNode rewriteFileRefs(ObjectNode payload, Long distributedKeyId) {
         if (payload.hasNonNull("input_file_id")) {
             payload.put("input_file_id", resolveExternalFileId(payload.path("input_file_id").asText(), distributedKeyId));
@@ -524,6 +609,30 @@ public class GatewayAsyncResourceService {
                 .findFirst()
                 .map(GatewayFileBindingEntity::getExternalFileId)
                 .orElseThrow(() -> new IllegalArgumentException("文件对象尚未完成 upstream binding。"));
+    }
+
+    private GatewayFileContent getGatewayFileContent(String fileKey, Long distributedKeyId) {
+        GatewayFileEntity file = gatewayFileRepository.findByFileKeyAndDeletedFalse(fileKey)
+                .orElseThrow(() -> new IllegalArgumentException("未找到指定的网关文件对象。"));
+        if (!file.getDistributedKeyId().equals(distributedKeyId)) {
+            throw new IllegalArgumentException("文件对象不属于当前 DistributedKey。");
+        }
+        try {
+            return new GatewayFileContent(
+                    com.prodigalgal.xaigateway.gateway.core.file.GatewayFileResponse.from(
+                            file.getFileKey(),
+                            file.getFilename(),
+                            file.getPurpose(),
+                            file.getSizeBytes(),
+                            file.getCreatedAt(),
+                            file.getStatus()
+                    ),
+                    java.nio.file.Files.readAllBytes(java.nio.file.Path.of(file.getStoragePath())),
+                    file.getMimeType()
+            );
+        } catch (java.io.IOException exception) {
+            throw new IllegalStateException("读取网关文件失败。", exception);
+        }
     }
 
     private GatewayAsyncResourceEntity getRequired(String resourceKey, GatewayAsyncResourceType type, Long distributedKeyId) {

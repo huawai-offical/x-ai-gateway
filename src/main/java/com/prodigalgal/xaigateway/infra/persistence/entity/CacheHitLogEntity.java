@@ -44,6 +44,18 @@ public class CacheHitLogEntity {
     @Comment("请求协议。")
     private String protocol;
 
+    @Column(name = "request_path", length = 256)
+    @Comment("请求路径。")
+    private String requestPath;
+
+    @Column(name = "resource_type", length = 32)
+    @Comment("资源类型。")
+    private String resourceType;
+
+    @Column(name = "operation", length = 64)
+    @Comment("操作类型。")
+    private String operation;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "provider_type", nullable = false, length = 32)
     @Comment("厂商类型。")
@@ -68,6 +80,14 @@ public class CacheHitLogEntity {
     @Column(name = "cache_kind", nullable = false, length = 64)
     @Comment("缓存种类，例如 prompt_cache、cached_content。")
     private String cacheKind;
+
+    @Column(name = "execution_backend", length = 32)
+    @Comment("执行后端。")
+    private String executionBackend;
+
+    @Column(name = "object_mode", length = 64)
+    @Comment("对象模式。")
+    private String objectMode;
 
     @Column(name = "cache_hit_tokens", nullable = false)
     @Comment("缓存命中的 token 数。")
@@ -118,6 +138,30 @@ public class CacheHitLogEntity {
         this.protocol = protocol;
     }
 
+    public String getRequestPath() {
+        return requestPath;
+    }
+
+    public void setRequestPath(String requestPath) {
+        this.requestPath = requestPath;
+    }
+
+    public String getResourceType() {
+        return resourceType;
+    }
+
+    public void setResourceType(String resourceType) {
+        this.resourceType = resourceType;
+    }
+
+    public String getOperation() {
+        return operation;
+    }
+
+    public void setOperation(String operation) {
+        this.operation = operation;
+    }
+
     public ProviderType getProviderType() {
         return providerType;
     }
@@ -164,6 +208,22 @@ public class CacheHitLogEntity {
 
     public void setCacheKind(String cacheKind) {
         this.cacheKind = cacheKind;
+    }
+
+    public String getExecutionBackend() {
+        return executionBackend;
+    }
+
+    public void setExecutionBackend(String executionBackend) {
+        this.executionBackend = executionBackend;
+    }
+
+    public String getObjectMode() {
+        return objectMode;
+    }
+
+    public void setObjectMode(String objectMode) {
+        this.objectMode = objectMode;
     }
 
     public int getCacheHitTokens() {

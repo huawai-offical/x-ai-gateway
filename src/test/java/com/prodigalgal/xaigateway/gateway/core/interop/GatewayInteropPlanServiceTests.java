@@ -29,6 +29,7 @@ class GatewayInteropPlanServiceTests {
         Mockito.when(translationExecutionPlanCompiler.compilePreview(
                         Mockito.eq("sk-gw-test"),
                         Mockito.eq("openai"),
+                        Mockito.isNull(),
                         Mockito.eq("/v1/responses"),
                         Mockito.isNull(),
                         Mockito.eq(GatewayDegradationPolicy.STRICT),
@@ -84,6 +85,7 @@ class GatewayInteropPlanServiceTests {
         Mockito.when(translationExecutionPlanCompiler.compilePreview(
                         Mockito.eq("sk-gw-test"),
                         Mockito.eq("openai"),
+                        Mockito.isNull(),
                         Mockito.eq("/v1/audio/transcriptions"),
                         Mockito.isNull(),
                         Mockito.eq(GatewayDegradationPolicy.STRICT),

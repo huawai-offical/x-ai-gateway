@@ -7,10 +7,8 @@ import com.prodigalgal.xaigateway.gateway.core.cache.AffinityBindingStore;
 import com.prodigalgal.xaigateway.gateway.core.credential.CredentialAuthKind;
 import com.prodigalgal.xaigateway.gateway.core.credential.CredentialMaterialResolver;
 import com.prodigalgal.xaigateway.gateway.core.credential.ResolvedCredentialMaterial;
-import com.prodigalgal.xaigateway.gateway.core.execution.ChatExecutionStreamChunk;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayChatRuntime;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayChatRuntimeContext;
-import com.prodigalgal.xaigateway.gateway.core.execution.GatewayChatRuntimeResult;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
 import com.prodigalgal.xaigateway.gateway.core.routing.CredentialHealthState;
 import com.prodigalgal.xaigateway.gateway.core.routing.HealthStateStore;
@@ -663,7 +661,7 @@ class GatewayEndToEndSmokeTests {
             if (failNext.getAndSet(false)) {
                 throw new IllegalStateException("forced fake runtime failure");
             }
-            String protocol = context.request().protocol();
+            String protocol = context.canonicalRequest().ingressProtocol().name().toLowerCase();
             if ("anthropic_native".equals(protocol)) {
                 return new com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResponse(
                         null,

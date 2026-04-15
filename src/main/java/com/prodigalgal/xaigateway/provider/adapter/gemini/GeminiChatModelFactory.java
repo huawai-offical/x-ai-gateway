@@ -23,21 +23,23 @@ public class GeminiChatModelFactory {
     }
 
     public GoogleGenAiChatModel create(String baseUrl, String apiKey, GoogleGenAiChatOptions options) {
-        HttpOptions.Builder httpOptionsBuilder = HttpOptions.builder();
-        if (baseUrl != null && !baseUrl.isBlank()) {
-            httpOptionsBuilder.baseUrl(baseUrl);
-        }
-
-        Client client = Client.builder()
-                .apiKey(apiKey)
-                .vertexAI(false)
-                .httpOptions(httpOptionsBuilder.build())
-                .build();
-
+        Client client = createClient(baseUrl, apiKey);
         return GoogleGenAiChatModel.builder()
                 .genAiClient(client)
                 .defaultOptions(options)
                 .observationRegistry(observationRegistry)
+                .build();
+    }
+
+    public Client createClient(String baseUrl, String apiKey) {
+        HttpOptions.Builder httpOptionsBuilder = HttpOptions.builder();
+        if (baseUrl != null && !baseUrl.isBlank()) {
+            httpOptionsBuilder.baseUrl(baseUrl);
+        }
+        return Client.builder()
+                .apiKey(apiKey)
+                .vertexAI(false)
+                .httpOptions(httpOptionsBuilder.build())
                 .build();
     }
 
@@ -46,6 +48,18 @@ public class GeminiChatModelFactory {
             String baseUrl,
             ResolvedCredentialMaterial credentialMaterial,
             GoogleGenAiChatOptions options) {
+        Client client = createClient(siteKind, baseUrl, credentialMaterial);
+        return GoogleGenAiChatModel.builder()
+                .genAiClient(client)
+                .defaultOptions(options)
+                .observationRegistry(observationRegistry)
+                .build();
+    }
+
+    public Client createClient(
+            UpstreamSiteKind siteKind,
+            String baseUrl,
+            ResolvedCredentialMaterial credentialMaterial) {
         if (siteKind == UpstreamSiteKind.VERTEX_AI) {
             String projectId = requireMetadata(credentialMaterial.projectId(), "projectId");
             String location = requireMetadata(credentialMaterial.location(), "location");
@@ -53,19 +67,14 @@ public class GeminiChatModelFactory {
                     credentialMaterial.secret(),
                     Date.from(Instant.now().plusSeconds(3000))
             ));
-            Client client = Client.builder()
+            return Client.builder()
                     .credentials(credentials)
                     .project(projectId)
                     .location(location)
                     .vertexAI(true)
                     .build();
-            return GoogleGenAiChatModel.builder()
-                    .genAiClient(client)
-                    .defaultOptions(options)
-                    .observationRegistry(observationRegistry)
-                    .build();
         }
-        return create(baseUrl, credentialMaterial.secret(), options);
+        return createClient(baseUrl, credentialMaterial.secret());
     }
 
     private String requireMetadata(String value, String key) {

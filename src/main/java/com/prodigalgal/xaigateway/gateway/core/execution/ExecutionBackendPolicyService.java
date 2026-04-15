@@ -24,13 +24,21 @@ import org.springframework.stereotype.Service;
 @Service
 public class ExecutionBackendPolicyService {
 
+    public ExecutionBackendDecision forSemantics(GatewayRequestSemantics semantics) {
+        return new ExecutionBackendDecision(
+                preferredBackendForSemantics(semantics),
+                supportedBackendsForSemantics(semantics),
+                backendReason(preferredBackendForSemantics(semantics), semantics, null, null)
+        );
+    }
+
     public ExecutionBackendDecision forCandidate(
             CatalogCandidateView candidate,
             GatewayRequestSemantics semantics,
             CanonicalRequest canonicalRequest,
             JsonNode requestBody) {
         if (candidate == null) {
-            return new ExecutionBackendDecision(ExecutionBackend.PASSTHROUGH, List.of(), "当前没有可用候选。");
+            return forSemantics(semantics);
         }
         List<ExecutionBackend> supportedBackends = supportedBackends(candidate.providerType(), candidate.siteKind(), semantics);
         if (supportedBackends.isEmpty()) {
@@ -71,6 +79,9 @@ public class ExecutionBackendPolicyService {
             ProviderType providerType,
             UpstreamSiteKind siteKind,
             GatewayRequestSemantics semantics) {
+        if (providerType == null || siteKind == null) {
+            return supportedBackendsForSemantics(semantics);
+        }
         if (semantics == null) {
             return List.of();
         }
@@ -81,7 +92,10 @@ public class ExecutionBackendPolicyService {
                         ExecutionBackend.SPRING_AI,
                         ExecutionBackend.NATIVE
                 );
-                case ANTHROPIC_DIRECT, GEMINI_DIRECT -> List.of(ExecutionBackend.SPRING_AI);
+                case ANTHROPIC_DIRECT, GEMINI_DIRECT -> List.of(
+                        ExecutionBackend.SPRING_AI,
+                        ExecutionBackend.NATIVE
+                );
                 case OLLAMA_DIRECT -> List.of(ExecutionBackend.NATIVE);
             };
         }
@@ -93,15 +107,34 @@ public class ExecutionBackendPolicyService {
         }
         if (semantics.resourceType() == TranslationResourceType.AUDIO
                 || semantics.resourceType() == TranslationResourceType.IMAGE
-                || semantics.resourceType() == TranslationResourceType.MODERATION
-                || semantics.resourceType() == TranslationResourceType.FILE
+                || semantics.resourceType() == TranslationResourceType.MODERATION) {
+            return List.of(ExecutionBackend.PASSTHROUGH);
+        }
+        if (semantics.resourceType() == TranslationResourceType.FILE
                 || semantics.resourceType() == TranslationResourceType.UPLOAD
                 || semantics.resourceType() == TranslationResourceType.BATCH
                 || semantics.resourceType() == TranslationResourceType.TUNING
                 || semantics.resourceType() == TranslationResourceType.REALTIME) {
-            return List.of(ExecutionBackend.PASSTHROUGH);
+            return List.of(ExecutionBackend.ORCHESTRATION);
         }
         return List.of();
+    }
+
+    private List<ExecutionBackend> supportedBackendsForSemantics(GatewayRequestSemantics semantics) {
+        if (semantics == null) {
+            return List.of();
+        }
+        return switch (semantics.resourceType()) {
+            case EMBEDDING -> List.of(ExecutionBackend.NATIVE);
+            case AUDIO, IMAGE, MODERATION -> List.of(ExecutionBackend.PASSTHROUGH);
+            case FILE, UPLOAD, BATCH, TUNING, REALTIME -> List.of(ExecutionBackend.ORCHESTRATION);
+            case CHAT, RESPONSE, UNKNOWN -> List.of();
+        };
+    }
+
+    private ExecutionBackend preferredBackendForSemantics(GatewayRequestSemantics semantics) {
+        List<ExecutionBackend> supportedBackends = supportedBackendsForSemantics(semantics);
+        return supportedBackends.isEmpty() ? ExecutionBackend.PASSTHROUGH : supportedBackends.getFirst();
     }
 
     private ExecutionBackend preferredBackend(
@@ -173,6 +206,7 @@ public class ExecutionBackendPolicyService {
         return switch (backend) {
             case SPRING_AI -> "默认聊天链使用 Spring AI executor。";
             case NATIVE -> nativeReason(semantics, canonicalRequest, requestBody);
+            case ORCHESTRATION -> "当前对象生命周期接口采用统一 orchestration executor。";
             case PASSTHROUGH -> "当前资源接口采用高保真 passthrough/orchestration。";
         };
     }
