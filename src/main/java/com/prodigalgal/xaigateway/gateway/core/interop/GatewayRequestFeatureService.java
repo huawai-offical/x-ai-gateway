@@ -4,10 +4,22 @@ import tools.jackson.databind.JsonNode;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import com.prodigalgal.xaigateway.protocol.ingress.google.GeminiGenerateContentModeResolver;
+import com.prodigalgal.xaigateway.protocol.ingress.google.GeminiGenerateContentRequest;
 import org.springframework.stereotype.Service;
 
 @Service
 public class GatewayRequestFeatureService {
+
+    private final GeminiGenerateContentModeResolver geminiGenerateContentModeResolver;
+
+    public GatewayRequestFeatureService() {
+        this(new GeminiGenerateContentModeResolver());
+    }
+
+    public GatewayRequestFeatureService(GeminiGenerateContentModeResolver geminiGenerateContentModeResolver) {
+        this.geminiGenerateContentModeResolver = geminiGenerateContentModeResolver;
+    }
 
     public GatewayRequestSemantics describe(String requestPath, JsonNode body) {
         return describe("POST", requestPath, body);
@@ -20,17 +32,17 @@ public class GatewayRequestFeatureService {
         if ("/v1/chat/completions".equals(normalizedPath)) {
             features.add(InteropFeature.CHAT_TEXT);
             collectChatFeatures(features, body);
-            return semantics("chat.completions", normalizedPath, TranslationResourceType.CHAT, TranslationOperation.CHAT_COMPLETION, features, true);
+            return semantics("chat.completions", normalizedPath, TranslationResourceType.CHAT, TranslationOperation.CHAT_COMPLETION, features, RouteSelectionMode.CATALOG_SELECTION);
         }
         if ("/v1/responses".equals(normalizedPath)) {
             features.add(InteropFeature.RESPONSE_OBJECT);
             collectResponsesFeatures(features, body);
-            return semantics("responses", normalizedPath, TranslationResourceType.RESPONSE, TranslationOperation.RESPONSE_CREATE, features, true);
+            return semantics("responses", normalizedPath, TranslationResourceType.RESPONSE, TranslationOperation.RESPONSE_CREATE, features, RouteSelectionMode.CATALOG_SELECTION);
         }
         if ("/v1/messages".equals(normalizedPath)) {
             features.add(InteropFeature.CHAT_TEXT);
             collectAnthropicFeatures(features, body);
-            return semantics("messages", normalizedPath, TranslationResourceType.CHAT, TranslationOperation.CHAT_COMPLETION, features, true);
+            return semantics("messages", normalizedPath, TranslationResourceType.CHAT, TranslationOperation.CHAT_COMPLETION, features, RouteSelectionMode.CATALOG_SELECTION);
         }
         if ("POST".equals(method) && "/v1/messages/batches".equals(normalizedPath)) {
             return semantics(
@@ -39,7 +51,7 @@ public class GatewayRequestFeatureService {
                     TranslationResourceType.BATCH,
                     TranslationOperation.ANTHROPIC_MESSAGE_BATCH_CREATE,
                     List.of(InteropFeature.ANTHROPIC_MESSAGE_BATCH),
-                    true
+                    RouteSelectionMode.CATALOG_SELECTION
             );
         }
         if ("GET".equals(method) && "/v1/messages/batches/{messageBatchId}".equals(normalizedPath)) {
@@ -49,7 +61,7 @@ public class GatewayRequestFeatureService {
                     TranslationResourceType.BATCH,
                     TranslationOperation.ANTHROPIC_MESSAGE_BATCH_GET,
                     List.of(InteropFeature.ANTHROPIC_MESSAGE_BATCH),
-                    false
+                    RouteSelectionMode.STORED_LINEAGE
             );
         }
         if ("POST".equals(method) && "/v1/messages/batches/{messageBatchId}/cancel".equals(normalizedPath)) {
@@ -59,92 +71,210 @@ public class GatewayRequestFeatureService {
                     TranslationResourceType.BATCH,
                     TranslationOperation.ANTHROPIC_MESSAGE_BATCH_CANCEL,
                     List.of(InteropFeature.ANTHROPIC_MESSAGE_BATCH),
-                    false
+                    RouteSelectionMode.STORED_LINEAGE
             );
         }
         if (normalizedPath != null
                 && normalizedPath.startsWith("/v1beta/models/")
                 && normalizedPath.contains(":generateContent")) {
-            features.add(InteropFeature.CHAT_TEXT);
-            collectGeminiFeatures(features, body);
-            return semantics("generateContent", normalizedPath, TranslationResourceType.CHAT, TranslationOperation.CHAT_COMPLETION, features, true);
+            GeminiGenerateContentModeResolver.GeminiGenerateContentMode mode = resolveGeminiGenerateContentMode(body);
+            return switch (mode) {
+                case IMAGE_GENERATION -> semantics(
+                        "generateContent",
+                        normalizedPath,
+                        TranslationResourceType.IMAGE,
+                        TranslationOperation.IMAGE_GENERATION,
+                        List.of(InteropFeature.IMAGE_GENERATION),
+                        RouteSelectionMode.CATALOG_SELECTION
+                );
+                case AUDIO_SPEECH -> semantics(
+                        "generateContent",
+                        normalizedPath,
+                        TranslationResourceType.AUDIO,
+                        TranslationOperation.AUDIO_SPEECH,
+                        List.of(InteropFeature.AUDIO_SPEECH),
+                        RouteSelectionMode.CATALOG_SELECTION
+                );
+                case CHAT -> {
+                    features.add(InteropFeature.CHAT_TEXT);
+                    collectGeminiFeatures(features, body);
+                    yield semantics(
+                            "generateContent",
+                            normalizedPath,
+                            TranslationResourceType.CHAT,
+                            TranslationOperation.CHAT_COMPLETION,
+                            features,
+                            RouteSelectionMode.CATALOG_SELECTION
+                    );
+                }
+            };
+        }
+        if ("POST".equals(method) && "/v1beta/models/{model}:embedContent".equals(normalizedPath)) {
+            return semantics(
+                    "embeddings",
+                    normalizedPath,
+                    TranslationResourceType.EMBEDDING,
+                    TranslationOperation.EMBEDDING_CREATE,
+                    List.of(InteropFeature.EMBEDDINGS),
+                    RouteSelectionMode.CATALOG_SELECTION
+            );
+        }
+        if ("POST".equals(method) && "/v1beta/models/{model}:batchEmbedContents".equals(normalizedPath)) {
+            return semantics(
+                    "embeddings",
+                    normalizedPath,
+                    TranslationResourceType.EMBEDDING,
+                    TranslationOperation.EMBEDDING_CREATE,
+                    List.of(InteropFeature.EMBEDDINGS),
+                    RouteSelectionMode.CATALOG_SELECTION
+            );
+        }
+        if ("POST".equals(method) && "/upload/v1beta/files".equals(normalizedPath)) {
+            return semantics(
+                    "files",
+                    normalizedPath,
+                    TranslationResourceType.FILE,
+                    TranslationOperation.FILE_CREATE,
+                    List.of(InteropFeature.FILE_OBJECT),
+                    RouteSelectionMode.CATALOG_SELECTION
+            );
+        }
+        if ("GET".equals(method) && "/v1beta/files".equals(normalizedPath)) {
+            return semantics(
+                    "files",
+                    normalizedPath,
+                    TranslationResourceType.FILE,
+                    TranslationOperation.FILE_LIST,
+                    List.of(InteropFeature.FILE_OBJECT),
+                    RouteSelectionMode.LOCAL_CATALOG
+            );
+        }
+        if ("GET".equals(method) && "/v1beta/files/{fileName}".equals(normalizedPath)) {
+            return semantics(
+                    "files",
+                    normalizedPath,
+                    TranslationResourceType.FILE,
+                    TranslationOperation.FILE_GET,
+                    List.of(InteropFeature.FILE_OBJECT),
+                    RouteSelectionMode.STORED_LINEAGE
+            );
+        }
+        if ("DELETE".equals(method) && "/v1beta/files/{fileName}".equals(normalizedPath)) {
+            return semantics(
+                    "files",
+                    normalizedPath,
+                    TranslationResourceType.FILE,
+                    TranslationOperation.FILE_DELETE,
+                    List.of(InteropFeature.FILE_OBJECT),
+                    RouteSelectionMode.STORED_LINEAGE
+            );
+        }
+        if ("POST".equals(method) && "/v1beta/models/{model}:batchGenerateContent".equals(normalizedPath)) {
+            return semantics(
+                    "batches",
+                    normalizedPath,
+                    TranslationResourceType.BATCH,
+                    TranslationOperation.BATCH_CREATE,
+                    List.of(InteropFeature.BATCH_CREATE, InteropFeature.FILE_OBJECT),
+                    RouteSelectionMode.CATALOG_SELECTION
+            );
+        }
+        if ("GET".equals(method) && "/v1beta/batches/{batchName}".equals(normalizedPath)) {
+            return semantics(
+                    "batches",
+                    normalizedPath,
+                    TranslationResourceType.BATCH,
+                    TranslationOperation.BATCH_GET,
+                    List.of(InteropFeature.BATCH_CREATE),
+                    RouteSelectionMode.STORED_LINEAGE
+            );
+        }
+        if ("POST".equals(method) && "/v1beta/batches/{batchName}:cancel".equals(normalizedPath)) {
+            return semantics(
+                    "batches",
+                    normalizedPath,
+                    TranslationResourceType.BATCH,
+                    TranslationOperation.BATCH_CANCEL,
+                    List.of(InteropFeature.BATCH_CREATE),
+                    RouteSelectionMode.STORED_LINEAGE
+            );
         }
         if ("POST".equals(method) && "/v1/embeddings".equals(normalizedPath)) {
-            return semantics("embeddings", normalizedPath, TranslationResourceType.EMBEDDING, TranslationOperation.EMBEDDING_CREATE, List.of(InteropFeature.EMBEDDINGS), true);
+            return semantics("embeddings", normalizedPath, TranslationResourceType.EMBEDDING, TranslationOperation.EMBEDDING_CREATE, List.of(InteropFeature.EMBEDDINGS), RouteSelectionMode.CATALOG_SELECTION);
         }
         if ("POST".equals(method) && "/v1/files".equals(normalizedPath)) {
-            return semantics("files", normalizedPath, TranslationResourceType.FILE, TranslationOperation.FILE_CREATE, List.of(InteropFeature.FILE_OBJECT), true);
+            return semantics("files", normalizedPath, TranslationResourceType.FILE, TranslationOperation.FILE_CREATE, List.of(InteropFeature.FILE_OBJECT), RouteSelectionMode.CATALOG_SELECTION);
         }
         if ("GET".equals(method) && "/v1/files".equals(normalizedPath)) {
-            return semantics("files", normalizedPath, TranslationResourceType.FILE, TranslationOperation.FILE_LIST, List.of(InteropFeature.FILE_OBJECT), false);
+            return semantics("files", normalizedPath, TranslationResourceType.FILE, TranslationOperation.FILE_LIST, List.of(InteropFeature.FILE_OBJECT), RouteSelectionMode.LOCAL_CATALOG);
         }
         if ("GET".equals(method) && "/v1/files/{fileId}".equals(normalizedPath)) {
-            return semantics("files", normalizedPath, TranslationResourceType.FILE, TranslationOperation.FILE_GET, List.of(InteropFeature.FILE_OBJECT), false);
+            return semantics("files", normalizedPath, TranslationResourceType.FILE, TranslationOperation.FILE_GET, List.of(InteropFeature.FILE_OBJECT), RouteSelectionMode.STORED_LINEAGE);
         }
         if ("GET".equals(method) && "/v1/files/{fileId}/content".equals(normalizedPath)) {
-            return semantics("files", normalizedPath, TranslationResourceType.FILE, TranslationOperation.FILE_CONTENT_GET, List.of(InteropFeature.FILE_OBJECT), false);
+            return semantics("files", normalizedPath, TranslationResourceType.FILE, TranslationOperation.FILE_CONTENT_GET, List.of(InteropFeature.FILE_OBJECT), RouteSelectionMode.STORED_LINEAGE);
         }
         if ("DELETE".equals(method) && "/v1/files/{fileId}".equals(normalizedPath)) {
-            return semantics("files", normalizedPath, TranslationResourceType.FILE, TranslationOperation.FILE_DELETE, List.of(InteropFeature.FILE_OBJECT), true);
+            return semantics("files", normalizedPath, TranslationResourceType.FILE, TranslationOperation.FILE_DELETE, List.of(InteropFeature.FILE_OBJECT), RouteSelectionMode.STORED_LINEAGE);
         }
         if ("POST".equals(method) && "/v1/audio/transcriptions".equals(normalizedPath)) {
-            return semantics("audio", normalizedPath, TranslationResourceType.AUDIO, TranslationOperation.AUDIO_TRANSCRIPTION, List.of(InteropFeature.AUDIO_TRANSCRIPTION), true);
+            return semantics("audio", normalizedPath, TranslationResourceType.AUDIO, TranslationOperation.AUDIO_TRANSCRIPTION, List.of(InteropFeature.AUDIO_TRANSCRIPTION), RouteSelectionMode.CATALOG_SELECTION);
         }
         if ("POST".equals(method) && "/v1/audio/translations".equals(normalizedPath)) {
-            return semantics("audio", normalizedPath, TranslationResourceType.AUDIO, TranslationOperation.AUDIO_TRANSLATION, List.of(InteropFeature.AUDIO_TRANSLATION), true);
+            return semantics("audio", normalizedPath, TranslationResourceType.AUDIO, TranslationOperation.AUDIO_TRANSLATION, List.of(InteropFeature.AUDIO_TRANSLATION), RouteSelectionMode.CATALOG_SELECTION);
         }
         if ("POST".equals(method) && "/v1/audio/speech".equals(normalizedPath)) {
-            return semantics("audio", normalizedPath, TranslationResourceType.AUDIO, TranslationOperation.AUDIO_SPEECH, List.of(InteropFeature.AUDIO_SPEECH), true);
+            return semantics("audio", normalizedPath, TranslationResourceType.AUDIO, TranslationOperation.AUDIO_SPEECH, List.of(InteropFeature.AUDIO_SPEECH), RouteSelectionMode.CATALOG_SELECTION);
         }
         if ("POST".equals(method) && "/v1/images/generations".equals(normalizedPath)) {
-            return semantics("images", normalizedPath, TranslationResourceType.IMAGE, TranslationOperation.IMAGE_GENERATION, List.of(InteropFeature.IMAGE_GENERATION), true);
+            return semantics("images", normalizedPath, TranslationResourceType.IMAGE, TranslationOperation.IMAGE_GENERATION, List.of(InteropFeature.IMAGE_GENERATION), RouteSelectionMode.CATALOG_SELECTION);
         }
         if ("POST".equals(method) && "/v1/images/edits".equals(normalizedPath)) {
-            return semantics("images", normalizedPath, TranslationResourceType.IMAGE, TranslationOperation.IMAGE_EDIT, List.of(InteropFeature.IMAGE_EDIT), true);
+            return semantics("images", normalizedPath, TranslationResourceType.IMAGE, TranslationOperation.IMAGE_EDIT, List.of(InteropFeature.IMAGE_EDIT), RouteSelectionMode.CATALOG_SELECTION);
         }
         if ("POST".equals(method) && "/v1/images/variations".equals(normalizedPath)) {
-            return semantics("images", normalizedPath, TranslationResourceType.IMAGE, TranslationOperation.IMAGE_VARIATION, List.of(InteropFeature.IMAGE_VARIATION), true);
+            return semantics("images", normalizedPath, TranslationResourceType.IMAGE, TranslationOperation.IMAGE_VARIATION, List.of(InteropFeature.IMAGE_VARIATION), RouteSelectionMode.CATALOG_SELECTION);
         }
         if ("POST".equals(method) && "/v1/moderations".equals(normalizedPath)) {
-            return semantics("moderations", normalizedPath, TranslationResourceType.MODERATION, TranslationOperation.MODERATION_CREATE, List.of(InteropFeature.MODERATION), true);
+            return semantics("moderations", normalizedPath, TranslationResourceType.MODERATION, TranslationOperation.MODERATION_CREATE, List.of(InteropFeature.MODERATION), RouteSelectionMode.CATALOG_SELECTION);
         }
         if ("POST".equals(method) && "/v1/uploads".equals(normalizedPath)) {
-            return semantics("uploads", normalizedPath, TranslationResourceType.UPLOAD, TranslationOperation.UPLOAD_CREATE, List.of(InteropFeature.UPLOAD_CREATE, InteropFeature.FILE_OBJECT), true);
+            return semantics("uploads", normalizedPath, TranslationResourceType.UPLOAD, TranslationOperation.UPLOAD_CREATE, List.of(InteropFeature.UPLOAD_CREATE, InteropFeature.FILE_OBJECT), RouteSelectionMode.CATALOG_SELECTION);
         }
         if ("GET".equals(method) && "/v1/uploads/{uploadId}".equals(normalizedPath)) {
-            return semantics("uploads", normalizedPath, TranslationResourceType.UPLOAD, TranslationOperation.UPLOAD_GET, List.of(InteropFeature.UPLOAD_CREATE), false);
+            return semantics("uploads", normalizedPath, TranslationResourceType.UPLOAD, TranslationOperation.UPLOAD_GET, List.of(InteropFeature.UPLOAD_CREATE), RouteSelectionMode.STORED_LINEAGE);
         }
         if ("POST".equals(method) && "/v1/uploads/{uploadId}/parts".equals(normalizedPath)) {
-            return semantics("uploads", normalizedPath, TranslationResourceType.UPLOAD, TranslationOperation.UPLOAD_PART_ADD, List.of(InteropFeature.UPLOAD_CREATE, InteropFeature.FILE_OBJECT), false);
+            return semantics("uploads", normalizedPath, TranslationResourceType.UPLOAD, TranslationOperation.UPLOAD_PART_ADD, List.of(InteropFeature.UPLOAD_CREATE, InteropFeature.FILE_OBJECT), RouteSelectionMode.STORED_LINEAGE);
         }
         if ("POST".equals(method) && "/v1/uploads/{uploadId}/complete".equals(normalizedPath)) {
-            return semantics("uploads", normalizedPath, TranslationResourceType.UPLOAD, TranslationOperation.UPLOAD_COMPLETE, List.of(InteropFeature.UPLOAD_CREATE), false);
+            return semantics("uploads", normalizedPath, TranslationResourceType.UPLOAD, TranslationOperation.UPLOAD_COMPLETE, List.of(InteropFeature.UPLOAD_CREATE), RouteSelectionMode.STORED_LINEAGE);
         }
         if ("POST".equals(method) && "/v1/uploads/{uploadId}/cancel".equals(normalizedPath)) {
-            return semantics("uploads", normalizedPath, TranslationResourceType.UPLOAD, TranslationOperation.UPLOAD_CANCEL, List.of(InteropFeature.UPLOAD_CREATE), false);
+            return semantics("uploads", normalizedPath, TranslationResourceType.UPLOAD, TranslationOperation.UPLOAD_CANCEL, List.of(InteropFeature.UPLOAD_CREATE), RouteSelectionMode.STORED_LINEAGE);
         }
         if ("POST".equals(method) && "/v1/batches".equals(normalizedPath)) {
-            return semantics("batches", normalizedPath, TranslationResourceType.BATCH, TranslationOperation.BATCH_CREATE, List.of(InteropFeature.BATCH_CREATE, InteropFeature.FILE_OBJECT), true);
+            return semantics("batches", normalizedPath, TranslationResourceType.BATCH, TranslationOperation.BATCH_CREATE, List.of(InteropFeature.BATCH_CREATE, InteropFeature.FILE_OBJECT), RouteSelectionMode.CATALOG_SELECTION);
         }
         if ("GET".equals(method) && "/v1/batches/{batchId}".equals(normalizedPath)) {
-            return semantics("batches", normalizedPath, TranslationResourceType.BATCH, TranslationOperation.BATCH_GET, List.of(InteropFeature.BATCH_CREATE), false);
+            return semantics("batches", normalizedPath, TranslationResourceType.BATCH, TranslationOperation.BATCH_GET, List.of(InteropFeature.BATCH_CREATE), RouteSelectionMode.STORED_LINEAGE);
         }
         if ("POST".equals(method) && "/v1/batches/{batchId}/cancel".equals(normalizedPath)) {
-            return semantics("batches", normalizedPath, TranslationResourceType.BATCH, TranslationOperation.BATCH_CANCEL, List.of(InteropFeature.BATCH_CREATE), false);
+            return semantics("batches", normalizedPath, TranslationResourceType.BATCH, TranslationOperation.BATCH_CANCEL, List.of(InteropFeature.BATCH_CREATE), RouteSelectionMode.STORED_LINEAGE);
         }
         if ("POST".equals(method) && "/v1/fine_tuning/jobs".equals(normalizedPath)) {
-            return semantics("fine_tuning", normalizedPath, TranslationResourceType.TUNING, TranslationOperation.TUNING_CREATE, List.of(InteropFeature.TUNING_CREATE, InteropFeature.FILE_OBJECT), true);
+            return semantics("fine_tuning", normalizedPath, TranslationResourceType.TUNING, TranslationOperation.TUNING_CREATE, List.of(InteropFeature.TUNING_CREATE, InteropFeature.FILE_OBJECT), RouteSelectionMode.CATALOG_SELECTION);
         }
         if ("GET".equals(method) && "/v1/fine_tuning/jobs/{jobId}".equals(normalizedPath)) {
-            return semantics("fine_tuning", normalizedPath, TranslationResourceType.TUNING, TranslationOperation.TUNING_GET, List.of(InteropFeature.TUNING_CREATE), false);
+            return semantics("fine_tuning", normalizedPath, TranslationResourceType.TUNING, TranslationOperation.TUNING_GET, List.of(InteropFeature.TUNING_CREATE), RouteSelectionMode.STORED_LINEAGE);
         }
         if ("POST".equals(method) && "/v1/fine_tuning/jobs/{jobId}/cancel".equals(normalizedPath)) {
-            return semantics("fine_tuning", normalizedPath, TranslationResourceType.TUNING, TranslationOperation.TUNING_CANCEL, List.of(InteropFeature.TUNING_CREATE), false);
+            return semantics("fine_tuning", normalizedPath, TranslationResourceType.TUNING, TranslationOperation.TUNING_CANCEL, List.of(InteropFeature.TUNING_CREATE), RouteSelectionMode.STORED_LINEAGE);
         }
         if ("POST".equals(method) && "/v1/realtime/client_secrets".equals(normalizedPath)) {
-            return semantics("realtime", normalizedPath, TranslationResourceType.REALTIME, TranslationOperation.REALTIME_CLIENT_SECRET_CREATE, List.of(InteropFeature.REALTIME_CLIENT_SECRET), false);
+            return semantics("realtime", normalizedPath, TranslationResourceType.REALTIME, TranslationOperation.REALTIME_CLIENT_SECRET_CREATE, List.of(InteropFeature.REALTIME_CLIENT_SECRET), RouteSelectionMode.DISTRIBUTED_TARGET);
         }
-        return semantics("unknown", normalizedPath, TranslationResourceType.UNKNOWN, TranslationOperation.UNKNOWN, List.of(InteropFeature.CHAT_TEXT), true);
+        return semantics("unknown", normalizedPath, TranslationResourceType.UNKNOWN, TranslationOperation.UNKNOWN, List.of(InteropFeature.CHAT_TEXT), RouteSelectionMode.CATALOG_SELECTION);
     }
 
     public String normalizePath(String requestPath) {
@@ -153,6 +283,26 @@ public class GatewayRequestFeatureService {
         }
         if (requestPath.matches("^/v1beta/models/[^/:]+:(generateContent|streamGenerateContent)$")) {
             return "/v1beta/models/{model}:generateContent";
+        }
+        if (requestPath.matches("^/v1beta/models/[^/:]+:(embedContent|batchEmbedContents)$")) {
+            return requestPath.contains(":batchEmbedContents")
+                    ? "/v1beta/models/{model}:batchEmbedContents"
+                    : "/v1beta/models/{model}:embedContent";
+        }
+        if (requestPath.matches("^/v1beta/models/[^/:]+:batchGenerateContent$")) {
+            return "/v1beta/models/{model}:batchGenerateContent";
+        }
+        if (requestPath.matches("^/upload/v1beta/files$")) {
+            return "/upload/v1beta/files";
+        }
+        if (requestPath.matches("^/v1beta/files/[^/]+$")) {
+            return "/v1beta/files/{fileName}";
+        }
+        if (requestPath.matches("^/v1beta/batches/[^/]+:cancel$")) {
+            return "/v1beta/batches/{batchName}:cancel";
+        }
+        if (requestPath.matches("^/v1beta/batches/[^/]+$")) {
+            return "/v1beta/batches/{batchName}";
         }
         if (requestPath.matches("^/v1/files/[^/]+/content$")) {
             return "/v1/files/{fileId}/content";
@@ -200,6 +350,18 @@ public class GatewayRequestFeatureService {
         java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("^/v1beta/models/([^/:]+):(generateContent|streamGenerateContent)$").matcher(requestPath);
         if (matcher.matches()) {
             return java.util.Map.of("model", matcher.group(1));
+        }
+        matcher = java.util.regex.Pattern.compile("^/v1beta/models/([^/:]+):(embedContent|batchEmbedContents|batchGenerateContent)$").matcher(requestPath);
+        if (matcher.matches()) {
+            return java.util.Map.of("model", matcher.group(1));
+        }
+        matcher = java.util.regex.Pattern.compile("^/v1beta/files/([^/]+)$").matcher(requestPath);
+        if (matcher.matches()) {
+            return java.util.Map.of("fileName", matcher.group(1));
+        }
+        matcher = java.util.regex.Pattern.compile("^/v1beta/batches/([^/:]+)(?::cancel)?$").matcher(requestPath);
+        if (matcher.matches()) {
+            return java.util.Map.of("batchName", matcher.group(1));
         }
         matcher = java.util.regex.Pattern.compile("^/v1/files/([^/]+)/content$").matcher(requestPath);
         if (matcher.matches()) {
@@ -253,15 +415,25 @@ public class GatewayRequestFeatureService {
             TranslationResourceType resourceType,
             TranslationOperation operation,
             java.util.Collection<InteropFeature> requiredFeatures,
-            boolean requiresRouteSelection) {
+            RouteSelectionMode routeSelectionMode) {
         return new GatewayRequestSemantics(
                 resourceType,
                 operation,
                 surface,
                 normalizedPath,
                 requiredFeatures == null ? List.of() : List.copyOf(requiredFeatures),
-                requiresRouteSelection
+                routeSelectionMode
         );
+    }
+
+    private GeminiGenerateContentModeResolver.GeminiGenerateContentMode resolveGeminiGenerateContentMode(JsonNode body) {
+        return geminiGenerateContentModeResolver.resolve(new GeminiGenerateContentRequest(
+                body == null ? null : body.path("contents"),
+                body == null ? null : body.path("systemInstruction"),
+                body == null ? null : body.path("generationConfig"),
+                body == null ? null : body.path("tools"),
+                body == null ? null : body.path("toolConfig")
+        ));
     }
 
     private void collectChatFeatures(Set<InteropFeature> features, JsonNode body) {

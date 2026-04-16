@@ -4,6 +4,7 @@ import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthenticationService;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest;
+import com.prodigalgal.xaigateway.gateway.core.canonical.NonChatCanonicalRenderService;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayResourceExecutionService;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
@@ -31,17 +32,17 @@ public class GeminiEmbeddingsController {
     private final DistributedKeyAuthenticationService distributedKeyAuthenticationService;
     private final GatewayResourceExecutionService gatewayResourceExecutionService;
     private final GeminiEmbeddingsRequestMapper geminiEmbeddingsRequestMapper;
-    private final GeminiEmbeddingsEncoder geminiEmbeddingsEncoder;
+    private final NonChatCanonicalRenderService nonChatCanonicalRenderService;
 
     public GeminiEmbeddingsController(
             DistributedKeyAuthenticationService distributedKeyAuthenticationService,
             GatewayResourceExecutionService gatewayResourceExecutionService,
             GeminiEmbeddingsRequestMapper geminiEmbeddingsRequestMapper,
-            GeminiEmbeddingsEncoder geminiEmbeddingsEncoder) {
+            NonChatCanonicalRenderService nonChatCanonicalRenderService) {
         this.distributedKeyAuthenticationService = distributedKeyAuthenticationService;
         this.gatewayResourceExecutionService = gatewayResourceExecutionService;
         this.geminiEmbeddingsRequestMapper = geminiEmbeddingsRequestMapper;
-        this.geminiEmbeddingsEncoder = geminiEmbeddingsEncoder;
+        this.nonChatCanonicalRenderService = nonChatCanonicalRenderService;
     }
 
     @PostMapping("/{model}:embedContent")
@@ -57,8 +58,9 @@ public class GeminiEmbeddingsController {
                 "/v1beta/models/" + model + ":embedContent",
                 geminiEmbeddingsRequestMapper.toEmbedRequest(model, requestBody)
         );
-        JsonNode response = gatewayResourceExecutionService.executeDetailedJson(request, distributedKey.id(), model).responseJson();
-        return ResponseEntity.ok(geminiEmbeddingsEncoder.encodeSingle(response));
+        return (ResponseEntity<JsonNode>) nonChatCanonicalRenderService
+                .render(request, null, gatewayResourceExecutionService.executeDetailedJson(request, distributedKey.id(), model))
+                .response();
     }
 
     @PostMapping("/{model}:batchEmbedContents")
@@ -74,8 +76,9 @@ public class GeminiEmbeddingsController {
                 "/v1beta/models/" + model + ":batchEmbedContents",
                 geminiEmbeddingsRequestMapper.toBatchEmbedRequest(model, requestBody)
         );
-        JsonNode response = gatewayResourceExecutionService.executeDetailedJson(request, distributedKey.id(), model).responseJson();
-        return ResponseEntity.ok(geminiEmbeddingsEncoder.encodeBatch(response));
+        return (ResponseEntity<JsonNode>) nonChatCanonicalRenderService
+                .render(request, null, gatewayResourceExecutionService.executeDetailedJson(request, distributedKey.id(), model))
+                .response();
     }
 
     private CanonicalResourceRequest buildEmbeddingsRequest(

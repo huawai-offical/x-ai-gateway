@@ -2,7 +2,12 @@ package com.prodigalgal.xaigateway.protocol.ingress.google;
 
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthenticationService;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest;
+import com.prodigalgal.xaigateway.gateway.core.canonical.NonChatCanonicalRenderService;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileService;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.multipart.FilePart;
@@ -28,17 +33,17 @@ public class GeminiFilesController {
 
     private final DistributedKeyAuthenticationService distributedKeyAuthenticationService;
     private final GatewayFileService gatewayFileService;
-    private final GeminiFilesEncoder geminiFilesEncoder;
+    private final NonChatCanonicalRenderService nonChatCanonicalRenderService;
     private final ObjectMapper objectMapper;
 
     public GeminiFilesController(
             DistributedKeyAuthenticationService distributedKeyAuthenticationService,
             GatewayFileService gatewayFileService,
-            GeminiFilesEncoder geminiFilesEncoder,
+            NonChatCanonicalRenderService nonChatCanonicalRenderService,
             ObjectMapper objectMapper) {
         this.distributedKeyAuthenticationService = distributedKeyAuthenticationService;
         this.gatewayFileService = gatewayFileService;
-        this.geminiFilesEncoder = geminiFilesEncoder;
+        this.nonChatCanonicalRenderService = nonChatCanonicalRenderService;
         this.objectMapper = objectMapper;
     }
 
@@ -50,7 +55,11 @@ public class GeminiFilesController {
             @RequestPart(value = "metadata", required = false) String metadata) {
         AuthenticatedDistributedKey distributedKey = authenticate(headerApiKey, queryApiKey);
         return gatewayFileService.createGoogleNativeFile(distributedKey.id(), file, null, extractDisplayName(metadata))
-                .map(geminiFilesEncoder::encode);
+                .map(view -> (JsonNode) nonChatCanonicalRenderService.renderNativeView(
+                        buildRequest(distributedKey.keyPrefix(), "POST", "/upload/v1beta/files", "/upload/v1beta/files", TranslationOperation.FILE_CREATE),
+                        null,
+                        view
+                ).response().getBody());
     }
 
     @GetMapping("/v1beta/files")
@@ -58,7 +67,11 @@ public class GeminiFilesController {
             @RequestHeader(value = API_KEY_HEADER, required = false) String headerApiKey,
             @RequestParam(value = "key", required = false) String queryApiKey) {
         AuthenticatedDistributedKey distributedKey = authenticate(headerApiKey, queryApiKey);
-        return geminiFilesEncoder.encodeList(gatewayFileService.listGoogleNativeFiles(distributedKey.id()));
+        return (JsonNode) nonChatCanonicalRenderService.renderNativeView(
+                buildRequest(distributedKey.keyPrefix(), "GET", "/v1beta/files", "/v1beta/files", TranslationOperation.FILE_LIST),
+                null,
+                gatewayFileService.listGoogleNativeFiles(distributedKey.id())
+        ).response().getBody();
     }
 
     @GetMapping({"/v1beta/files/{fileName}", "/v1beta/files/files/{fileName}"})
@@ -67,7 +80,17 @@ public class GeminiFilesController {
             @RequestParam(value = "key", required = false) String queryApiKey,
             @PathVariable String fileName) {
         AuthenticatedDistributedKey distributedKey = authenticate(headerApiKey, queryApiKey);
-        return geminiFilesEncoder.encode(gatewayFileService.getGoogleNativeFile(normalizeFileName(fileName), distributedKey.id()));
+        return (JsonNode) nonChatCanonicalRenderService.renderNativeView(
+                buildRequest(
+                        distributedKey.keyPrefix(),
+                        "GET",
+                        "/v1beta/files/" + fileName,
+                        "/v1beta/files/{fileName}",
+                        TranslationOperation.FILE_GET
+                ),
+                null,
+                gatewayFileService.getGoogleNativeFile(normalizeFileName(fileName), distributedKey.id())
+        ).response().getBody();
     }
 
     @DeleteMapping({"/v1beta/files/{fileName}", "/v1beta/files/files/{fileName}"})
@@ -104,5 +127,30 @@ public class GeminiFilesController {
         } catch (Exception ignored) {
             return null;
         }
+    }
+
+    private CanonicalResourceRequest buildRequest(
+            String distributedKeyPrefix,
+            String httpMethod,
+            String requestPath,
+            String normalizedPath,
+            TranslationOperation operation
+    ) {
+        return new CanonicalResourceRequest(
+                distributedKeyPrefix,
+                CanonicalIngressProtocol.GOOGLE_NATIVE,
+                httpMethod,
+                requestPath,
+                normalizedPath,
+                java.util.Map.of(),
+                "resource-orchestration",
+                TranslationResourceType.FILE,
+                operation,
+                null,
+                java.util.Map.of(),
+                java.util.List.of(),
+                false,
+                false
+        );
     }
 }

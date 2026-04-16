@@ -2,7 +2,12 @@ package com.prodigalgal.xaigateway.protocol.ingress.google;
 
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthenticationService;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest;
+import com.prodigalgal.xaigateway.gateway.core.canonical.NonChatCanonicalRenderService;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileService;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation;
+import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
 import com.prodigalgal.xaigateway.gateway.core.resource.GatewayAsyncResourceService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
@@ -26,19 +31,19 @@ public class GeminiBatchesController {
     private final GatewayFileService gatewayFileService;
     private final GatewayAsyncResourceService gatewayAsyncResourceService;
     private final GeminiBatchesRequestMapper geminiBatchesRequestMapper;
-    private final GeminiBatchesEncoder geminiBatchesEncoder;
+    private final NonChatCanonicalRenderService nonChatCanonicalRenderService;
 
     public GeminiBatchesController(
             DistributedKeyAuthenticationService distributedKeyAuthenticationService,
             GatewayFileService gatewayFileService,
             GatewayAsyncResourceService gatewayAsyncResourceService,
             GeminiBatchesRequestMapper geminiBatchesRequestMapper,
-            GeminiBatchesEncoder geminiBatchesEncoder) {
+            NonChatCanonicalRenderService nonChatCanonicalRenderService) {
         this.distributedKeyAuthenticationService = distributedKeyAuthenticationService;
         this.gatewayFileService = gatewayFileService;
         this.gatewayAsyncResourceService = gatewayAsyncResourceService;
         this.geminiBatchesRequestMapper = geminiBatchesRequestMapper;
-        this.geminiBatchesEncoder = geminiBatchesEncoder;
+        this.nonChatCanonicalRenderService = nonChatCanonicalRenderService;
     }
 
     @PostMapping("/v1beta/models/{model}:batchGenerateContent")
@@ -56,7 +61,18 @@ public class GeminiBatchesController {
                 geminiBatchesRequestMapper.toBatchCreatePayload(model, requestBody, gatewayFileKey),
                 preferredCredentialId
         );
-        return geminiBatchesEncoder.encode(gatewayAsyncResourceService.getBatchView(response.path("id").asText(), distributedKey.id()));
+        return (JsonNode) nonChatCanonicalRenderService.renderNativeView(
+                buildRequest(
+                        distributedKey.keyPrefix(),
+                        "POST",
+                        "/v1beta/models/" + model + ":batchGenerateContent",
+                        "/v1beta/models/{model}:batchGenerateContent",
+                        TranslationOperation.BATCH_CREATE,
+                        model
+                ),
+                null,
+                gatewayAsyncResourceService.getBatchView(response.path("id").asText(), distributedKey.id())
+        ).response().getBody();
     }
 
     @GetMapping({"/v1beta/batches/{batchName}", "/v1beta/batches/batches/{batchName}"})
@@ -65,9 +81,18 @@ public class GeminiBatchesController {
             @RequestParam(value = "key", required = false) String queryApiKey,
             @PathVariable String batchName) {
         AuthenticatedDistributedKey distributedKey = authenticate(headerApiKey, queryApiKey);
-        return geminiBatchesEncoder.encode(
+        return (JsonNode) nonChatCanonicalRenderService.renderNativeView(
+                buildRequest(
+                        distributedKey.keyPrefix(),
+                        "GET",
+                        "/v1beta/batches/" + batchName,
+                        "/v1beta/batches/{batchName}",
+                        TranslationOperation.BATCH_GET,
+                        "resource-orchestration"
+                ),
+                null,
                 gatewayAsyncResourceService.getBatchByUpstreamObjectId(normalizeBatchName(batchName), distributedKey.id())
-        );
+        ).response().getBody();
     }
 
     @PostMapping({"/v1beta/batches/{batchName}:cancel", "/v1beta/batches/batches/{batchName}:cancel"})
@@ -76,9 +101,18 @@ public class GeminiBatchesController {
             @RequestParam(value = "key", required = false) String queryApiKey,
             @PathVariable String batchName) {
         AuthenticatedDistributedKey distributedKey = authenticate(headerApiKey, queryApiKey);
-        return geminiBatchesEncoder.encode(
+        return (JsonNode) nonChatCanonicalRenderService.renderNativeView(
+                buildRequest(
+                        distributedKey.keyPrefix(),
+                        "POST",
+                        "/v1beta/batches/" + batchName + ":cancel",
+                        "/v1beta/batches/{batchName}:cancel",
+                        TranslationOperation.BATCH_CANCEL,
+                        "resource-orchestration"
+                ),
+                null,
                 gatewayAsyncResourceService.cancelBatchByUpstreamObjectId(normalizeBatchName(batchName), distributedKey.id())
-        );
+        ).response().getBody();
     }
 
     private AuthenticatedDistributedKey authenticate(String headerApiKey, String queryApiKey) {
@@ -92,5 +126,31 @@ public class GeminiBatchesController {
 
     private String normalizeBatchName(String batchName) {
         return batchName.startsWith("batches/") ? batchName : "batches/" + batchName;
+    }
+
+    private CanonicalResourceRequest buildRequest(
+            String distributedKeyPrefix,
+            String httpMethod,
+            String requestPath,
+            String normalizedPath,
+            TranslationOperation operation,
+            String requestedModel
+    ) {
+        return new CanonicalResourceRequest(
+                distributedKeyPrefix,
+                CanonicalIngressProtocol.GOOGLE_NATIVE,
+                httpMethod,
+                requestPath,
+                normalizedPath,
+                java.util.Map.of(),
+                requestedModel,
+                TranslationResourceType.BATCH,
+                operation,
+                null,
+                java.util.Map.of(),
+                java.util.List.of(),
+                false,
+                false
+        );
     }
 }

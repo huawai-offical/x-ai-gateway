@@ -80,9 +80,17 @@ class GatewayInteropPlanServiceTests {
         assertEquals("responses", response.plan().surface());
         assertEquals(SupportStatus.BLOCKED, response.plan().supportStatus());
         assertEquals(InteropCapabilityLevel.UNSUPPORTED, response.plan().degradationLevel());
+        assertEquals(RouteSelectionMode.CATALOG_SELECTION, response.plan().routeSelectionMode());
+        assertEquals("catalog_selection", response.summary().get("routeSelectionMode"));
+        assertEquals("", response.summary().get("routePolicyReason"));
+        assertEquals("", response.summary().get("renderPolicyReason"));
+        assertEquals("", response.summary().get("fallbackPolicyReason"));
         assertEquals("responses", response.summary().get("surface"));
         assertEquals("/v1/responses", response.summary().get("normalizedPath"));
         assertEquals("blocked", response.summary().get("supportStatus"));
+        assertEquals("catalog_selection", response.debug().get("routeSelectionMode"));
+        assertEquals("", response.debug().get("renderPolicyReason"));
+        assertEquals("", response.debug().get("fallbackPolicyReason"));
         assertTrue(response.plan().blockers().stream().anyMatch(item -> item.contains("emulated")));
     }
 
@@ -143,9 +151,16 @@ class GatewayInteropPlanServiceTests {
         assertEquals("audio", response.plan().surface());
         assertEquals(SupportStatus.NATIVE, response.plan().supportStatus());
         assertEquals(InteropCapabilityLevel.NATIVE, response.plan().degradationLevel());
+        assertEquals(RouteSelectionMode.CATALOG_SELECTION, response.plan().routeSelectionMode());
+        assertEquals("catalog_selection", response.summary().get("routeSelectionMode"));
+        assertEquals("", response.summary().get("renderPolicyReason"));
+        assertEquals("", response.summary().get("fallbackPolicyReason"));
         assertEquals("audio", response.summary().get("surface"));
         assertEquals("/v1/audio/transcriptions", response.summary().get("normalizedPath"));
         assertEquals("native", response.summary().get("supportStatus"));
+        assertEquals("", response.debug().get("routePolicyReason"));
+        assertEquals("", response.debug().get("renderPolicyReason"));
+        assertEquals("", response.debug().get("fallbackPolicyReason"));
         assertTrue(response.plan().blockers().isEmpty());
     }
 }

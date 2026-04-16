@@ -28,7 +28,12 @@ public final class CanonicalRenderCapabilitySupport {
             case "anthropic_native" -> isAnthropicNativePath(requestPath, resourceType)
                     ? InteropCapabilityLevel.NATIVE
                     : InteropCapabilityLevel.UNSUPPORTED;
-            case "google_native" -> isGeminiContentPath(requestPath) || resourceType == TranslationResourceType.CHAT
+            case "google_native" -> isGeminiContentPath(requestPath)
+                    || isGeminiEmbeddingsPath(requestPath)
+                    || isGeminiFilesPath(requestPath)
+                    || isGeminiBatchesPath(requestPath)
+                    || isGeminiResourceMode(requestPath, resourceType)
+                    || resourceType == TranslationResourceType.CHAT
                     ? InteropCapabilityLevel.NATIVE
                     : InteropCapabilityLevel.UNSUPPORTED;
             default -> InteropCapabilityLevel.UNSUPPORTED;
@@ -70,6 +75,32 @@ public final class CanonicalRenderCapabilitySupport {
         return requestPath != null
                 && requestPath.startsWith("/v1beta/models/")
                 && (requestPath.contains(":generateContent") || requestPath.contains(":streamGenerateContent"));
+    }
+
+    private static boolean isGeminiEmbeddingsPath(String requestPath) {
+        return requestPath != null
+                && requestPath.startsWith("/v1beta/models/")
+                && (requestPath.contains(":embedContent") || requestPath.contains(":batchEmbedContents"));
+    }
+
+    private static boolean isGeminiFilesPath(String requestPath) {
+        return requestPath != null
+                && ("/upload/v1beta/files".equals(requestPath)
+                || "/v1beta/files".equals(requestPath)
+                || requestPath.startsWith("/v1beta/files/"));
+    }
+
+    private static boolean isGeminiBatchesPath(String requestPath) {
+        return requestPath != null
+                && (requestPath.startsWith("/v1beta/models/") && requestPath.contains(":batchGenerateContent")
+                || requestPath.startsWith("/v1beta/batches/"));
+    }
+
+    private static boolean isGeminiResourceMode(String requestPath, TranslationResourceType resourceType) {
+        if (!isGeminiContentPath(requestPath)) {
+            return false;
+        }
+        return resourceType == TranslationResourceType.IMAGE || resourceType == TranslationResourceType.AUDIO;
     }
 
     private static boolean isAnthropicNativePath(String requestPath, TranslationResourceType resourceType) {

@@ -4,6 +4,8 @@ import com.prodigalgal.xaigateway.admin.application.GatewayChatExecutionService;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthenticationService;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
+import com.prodigalgal.xaigateway.gateway.core.canonical.GoogleNativeNonChatCanonicalRenderer;
+import com.prodigalgal.xaigateway.gateway.core.canonical.NonChatCanonicalRenderService;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionResult;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionStreamResult;
@@ -52,7 +54,12 @@ import reactor.core.publisher.Flux;
         GeminiGenerateContentEncoder.class,
         GeminiGenerateContentModeResolver.class,
         GeminiGenerateContentResourceMapper.class,
-        GeminiGenerateContentResourceEncoder.class
+        GeminiGenerateContentResourceEncoder.class,
+        GeminiEmbeddingsEncoder.class,
+        GeminiFilesEncoder.class,
+        GeminiBatchesEncoder.class,
+        GoogleNativeNonChatCanonicalRenderer.class,
+        NonChatCanonicalRenderService.class
 })
 class GeminiGenerateContentControllerTests {
 

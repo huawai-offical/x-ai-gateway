@@ -4,6 +4,7 @@ import com.prodigalgal.xaigateway.admin.application.GatewayChatExecutionService;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthenticationService;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
+import com.prodigalgal.xaigateway.gateway.core.canonical.NonChatCanonicalRenderService;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayResourceExecutionService;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
@@ -33,7 +34,7 @@ public class GeminiGenerateContentController {
     private final GeminiGenerateContentEncoder geminiGenerateContentEncoder;
     private final GeminiGenerateContentModeResolver geminiGenerateContentModeResolver;
     private final GeminiGenerateContentResourceMapper geminiGenerateContentResourceMapper;
-    private final GeminiGenerateContentResourceEncoder geminiGenerateContentResourceEncoder;
+    private final NonChatCanonicalRenderService nonChatCanonicalRenderService;
 
     public GeminiGenerateContentController(
             DistributedKeyAuthenticationService distributedKeyAuthenticationService,
@@ -43,7 +44,7 @@ public class GeminiGenerateContentController {
             GatewayResourceExecutionService gatewayResourceExecutionService,
             GeminiGenerateContentModeResolver geminiGenerateContentModeResolver,
             GeminiGenerateContentResourceMapper geminiGenerateContentResourceMapper,
-            GeminiGenerateContentResourceEncoder geminiGenerateContentResourceEncoder) {
+            NonChatCanonicalRenderService nonChatCanonicalRenderService) {
         this.distributedKeyAuthenticationService = distributedKeyAuthenticationService;
         this.gatewayChatExecutionService = gatewayChatExecutionService;
         this.gatewayResourceExecutionService = gatewayResourceExecutionService;
@@ -51,11 +52,11 @@ public class GeminiGenerateContentController {
         this.geminiGenerateContentEncoder = geminiGenerateContentEncoder;
         this.geminiGenerateContentModeResolver = geminiGenerateContentModeResolver;
         this.geminiGenerateContentResourceMapper = geminiGenerateContentResourceMapper;
-        this.geminiGenerateContentResourceEncoder = geminiGenerateContentResourceEncoder;
+        this.nonChatCanonicalRenderService = nonChatCanonicalRenderService;
     }
 
     @PostMapping("/{model}:generateContent")
-    public ResponseEntity<GeminiGenerateContentResponse> generateContent(
+    public ResponseEntity<?> generateContent(
             @PathVariable String model,
             @RequestHeader(value = API_KEY_HEADER, required = false) String headerApiKey,
             @RequestParam(value = "key", required = false) String queryApiKey,
@@ -64,13 +65,19 @@ public class GeminiGenerateContentController {
         GeminiGenerateContentModeResolver.GeminiGenerateContentMode mode = geminiGenerateContentModeResolver.resolve(request);
         if (mode == GeminiGenerateContentModeResolver.GeminiGenerateContentMode.IMAGE_GENERATION) {
             var resourceRequest = geminiGenerateContentResourceMapper.toImageGenerationRequest(distributedKey, model, request);
-            var result = gatewayResourceExecutionService.executeDetailedJson(resourceRequest, distributedKey.id(), model);
-            return ResponseEntity.ok(geminiGenerateContentResourceEncoder.encodeImageGeneration(result));
+            return nonChatCanonicalRenderService.render(
+                    resourceRequest,
+                    null,
+                    gatewayResourceExecutionService.executeDetailedJson(resourceRequest, distributedKey.id(), model)
+            ).response();
         }
         if (mode == GeminiGenerateContentModeResolver.GeminiGenerateContentMode.AUDIO_SPEECH) {
             var resourceRequest = geminiGenerateContentResourceMapper.toAudioSpeechRequest(distributedKey, model, request);
-            var result = gatewayResourceExecutionService.executeDetailedBinaryJson(resourceRequest, distributedKey.id(), model);
-            return ResponseEntity.ok(geminiGenerateContentResourceEncoder.encodeAudioSpeech(result));
+            return nonChatCanonicalRenderService.render(
+                    resourceRequest,
+                    null,
+                    gatewayResourceExecutionService.executeDetailedBinaryJson(resourceRequest, distributedKey.id(), model)
+            ).response();
         }
         CanonicalRequest canonicalRequest = geminiGenerateContentRequestMapper.toCanonicalRequest(distributedKey, model, request, false);
         var response = gatewayChatExecutionService.executeGatewayResponse(canonicalRequest);

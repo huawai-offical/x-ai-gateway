@@ -204,7 +204,11 @@ public record TranslationExecutionPlan(
                 requiredFeatures == null ? List.of() : List.copyOf(requiredFeatures),
                 featureLevels == null ? Map.of() : Map.copyOf(featureLevels),
                 lossReasons == null ? List.of() : List.copyOf(lossReasons),
-                blockedReasons == null ? List.of() : List.copyOf(blockedReasons)
+                blockedReasons == null ? List.of() : List.copyOf(blockedReasons),
+                semantics.routeSelectionMode(),
+                "legacy_translation_plan",
+                "legacy_translation_plan",
+                "legacy_translation_plan"
         );
     }
 }

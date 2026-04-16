@@ -79,7 +79,7 @@ public class RedisRouteCacheStore implements RouteCacheStore {
                 + "|" + requestedModel
                 + "|" + semantics.resourceType()
                 + "|" + semantics.operation()
-                + "|" + semantics.requiresRouteSelection()
+                + "|" + semantics.routeSelectionMode()
                 + "|" + semantics.requiredFeatures().stream().map(Enum::name).sorted().collect(Collectors.joining(","));
         return gatewayProperties.getCache().getKeyPrefix() + ":route:plan:" + digest(signature);
     }

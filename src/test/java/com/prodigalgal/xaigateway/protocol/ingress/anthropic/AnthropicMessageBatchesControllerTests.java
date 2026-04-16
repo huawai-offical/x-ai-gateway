@@ -2,6 +2,8 @@ package com.prodigalgal.xaigateway.protocol.ingress.anthropic;
 
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthenticationService;
+import com.prodigalgal.xaigateway.gateway.core.canonical.AnthropicNativeNonChatCanonicalRenderer;
+import com.prodigalgal.xaigateway.gateway.core.canonical.NonChatCanonicalRenderService;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceResponse;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayResourceExecutionResult;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayResourceExecutionService;
@@ -20,7 +22,13 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 @WebFluxTest(controllers = AnthropicMessageBatchesController.class)
-@Import({PermitAllSecurityTestConfig.class, AnthropicMessageBatchesRequestMapper.class, AnthropicMessageBatchesEncoder.class})
+@Import({
+        PermitAllSecurityTestConfig.class,
+        AnthropicMessageBatchesRequestMapper.class,
+        AnthropicMessageBatchesEncoder.class,
+        AnthropicNativeNonChatCanonicalRenderer.class,
+        NonChatCanonicalRenderService.class
+})
 class AnthropicMessageBatchesControllerTests {
 
     @Autowired

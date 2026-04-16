@@ -2,6 +2,8 @@ package com.prodigalgal.xaigateway.protocol.ingress.google;
 
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthenticationService;
+import com.prodigalgal.xaigateway.gateway.core.canonical.GoogleNativeNonChatCanonicalRenderer;
+import com.prodigalgal.xaigateway.gateway.core.canonical.NonChatCanonicalRenderService;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileResponse;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileService;
 import com.prodigalgal.xaigateway.testsupport.PermitAllSecurityTestConfig;
@@ -22,7 +24,15 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Mono;
 
 @WebFluxTest(controllers = GeminiFilesController.class)
-@Import({PermitAllSecurityTestConfig.class, GeminiFilesEncoder.class})
+@Import({
+        PermitAllSecurityTestConfig.class,
+        GeminiEmbeddingsEncoder.class,
+        GeminiGenerateContentResourceEncoder.class,
+        GeminiFilesEncoder.class,
+        GeminiBatchesEncoder.class,
+        GoogleNativeNonChatCanonicalRenderer.class,
+        NonChatCanonicalRenderService.class
+})
 class GeminiFilesControllerTests {
 
     @Autowired

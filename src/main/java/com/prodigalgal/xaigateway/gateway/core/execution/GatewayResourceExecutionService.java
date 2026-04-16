@@ -320,7 +320,7 @@ public class GatewayResourceExecutionService {
             Long distributedKeyId,
             String defaultModel) {
         GatewayRequestSemantics semantics = describeRequest(request, request.jsonBody());
-        if (!semantics.requiresRouteSelection()) {
+        if (semantics.routeSelectionMode() != com.prodigalgal.xaigateway.gateway.core.interop.RouteSelectionMode.CATALOG_SELECTION) {
             GatewayResourceExecutionContext context = prepareNoRouteContext(distributedKeyId, request);
             JsonNode payload = request.jsonBody() == null ? objectMapper.createObjectNode() : request.jsonBody();
             return jsonResult(request, context.executionPlan(), resolveExecutor(context).executeJson(context, payload, defaultModel));
@@ -465,7 +465,7 @@ public class GatewayResourceExecutionService {
             Long distributedKeyId,
             String defaultModel) {
         GatewayRequestSemantics semantics = describeRequest(request, request.jsonBody());
-        if (!semantics.requiresRouteSelection()) {
+        if (semantics.routeSelectionMode() != com.prodigalgal.xaigateway.gateway.core.interop.RouteSelectionMode.CATALOG_SELECTION) {
             GatewayResourceExecutionContext context = prepareNoRouteContext(distributedKeyId, request);
             JsonNode payload = request.jsonBody() == null ? objectMapper.createObjectNode() : request.jsonBody();
             return binaryResult(request, context.executionPlan(), resolveExecutor(context).executeBinary(context, payload, defaultModel));
@@ -611,7 +611,7 @@ public class GatewayResourceExecutionService {
             Map<String, FilePart> files) {
         ObjectNode routePayload = objectPayloadForMultipart(request, requestedModel);
         GatewayRequestSemantics semantics = describeRequest(request, routePayload);
-        if (!semantics.requiresRouteSelection()) {
+        if (semantics.routeSelectionMode() != com.prodigalgal.xaigateway.gateway.core.interop.RouteSelectionMode.CATALOG_SELECTION) {
             GatewayResourceExecutionContext context = prepareNoRouteContext(distributedKeyId, request);
             return resolveExecutor(context).executeMultipart(context, requestedModel, request.formFields(), files)
                     .map(response -> jsonResult(request, context.executionPlan(), response));
@@ -774,7 +774,7 @@ public class GatewayResourceExecutionService {
                 request.resourceType(),
                 request.operation(),
                 describeRequest(request, requestBody).requiredFeatures(),
-                true
+                describeRequest(request, requestBody).routeSelectionMode()
         );
         var executionPlanCompilation = translationExecutionPlanCompiler.compileSelected(
                 selectionResult,
@@ -788,7 +788,7 @@ public class GatewayResourceExecutionService {
                 credential,
                 credentialMaterial,
                 request,
-                executionPlanCompilation.canonicalPlan()
+                ensureExecutable(executionPlanCompilation.canonicalPlan())
         );
     }
 
@@ -802,7 +802,7 @@ public class GatewayResourceExecutionService {
                 request.distributedKeyPrefix(),
                 request.ingressProtocol().name().toLowerCase(),
                 request.httpMethod(),
-                selectionPath(request),
+                request.requestPath(),
                 request.requestedModel(),
                 GatewayDegradationPolicy.ALLOW_LOSSY,
                 GatewayClientFamily.GENERIC_OPENAI,
@@ -814,7 +814,7 @@ public class GatewayResourceExecutionService {
                 null,
                 (ResolvedCredentialMaterial) null,
                 normalizedRequest,
-                compilation.canonicalPlan()
+                ensureExecutable(compilation.canonicalPlan())
         );
     }
 
@@ -827,6 +827,19 @@ public class GatewayResourceExecutionService {
                 .filter(executor -> executor.supports(context.request(), candidate))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("当前站点不支持该资源执行。"));
+    }
+
+    private CanonicalExecutionPlan ensureExecutable(CanonicalExecutionPlan executionPlan) {
+        if (executionPlan == null) {
+            return null;
+        }
+        if (executionPlan.executable()) {
+            return executionPlan;
+        }
+        if (!executionPlan.blockerReasons().isEmpty()) {
+            throw new IllegalArgumentException(String.join("；", executionPlan.blockerReasons()));
+        }
+        throw new IllegalArgumentException("当前请求在 planner 阶段被阻止执行。");
     }
 
     private CanonicalResourceRequest buildResourceRequest(
@@ -897,6 +910,10 @@ public class GatewayResourceExecutionService {
     }
 
     private GatewayRequestSemantics describeRequest(CanonicalResourceRequest request, JsonNode requestBody) {
+        GatewayRequestSemantics semantics = gatewayRequestFeatureService.describe(request.httpMethod(), request.requestPath(), requestBody);
+        if (semantics != null) {
+            return semantics;
+        }
         return gatewayRequestFeatureService.describe(request.httpMethod(), selectionPath(request), requestBody);
     }
 

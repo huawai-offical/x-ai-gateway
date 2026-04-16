@@ -91,6 +91,12 @@ public class GatewayInteropPlanService {
                 : executionPlan.executionBackend().wireName());
         summary.put("supportStatus", executionPlan.supportStatus() == null ? null : executionPlan.supportStatus().wireName());
         summary.put("objectMode", executionPlan.objectMode());
+        summary.put("routeSelectionMode", executionPlan.routeSelectionMode() == null
+                ? null
+                : executionPlan.routeSelectionMode().name().toLowerCase(Locale.ROOT));
+        summary.put("routePolicyReason", executionPlan.routePolicyReason());
+        summary.put("renderPolicyReason", executionPlan.renderPolicyReason());
+        summary.put("fallbackPolicyReason", executionPlan.fallbackPolicyReason());
         summary.put("degradationLevel", executionPlan.degradationLevel() == null
                 ? null
                 : executionPlan.degradationLevel().name().toLowerCase(Locale.ROOT));
@@ -105,6 +111,12 @@ public class GatewayInteropPlanService {
         debug.put("supportedBackends", executionPlan.supportedBackends().stream().map(item -> item.wireName()).toList());
         debug.put("backendReason", executionPlan.backendReason());
         debug.put("objectMode", executionPlan.objectMode());
+        debug.put("routeSelectionMode", executionPlan.routeSelectionMode() == null
+                ? null
+                : executionPlan.routeSelectionMode().name().toLowerCase(Locale.ROOT));
+        debug.put("routePolicyReason", executionPlan.routePolicyReason());
+        debug.put("renderPolicyReason", executionPlan.renderPolicyReason());
+        debug.put("fallbackPolicyReason", executionPlan.fallbackPolicyReason());
         debug.put("supportStatus", executionPlan.supportStatus() == null ? null : executionPlan.supportStatus().wireName());
         debug.put("degradationLevel", executionPlan.degradationLevel() == null
                 ? null

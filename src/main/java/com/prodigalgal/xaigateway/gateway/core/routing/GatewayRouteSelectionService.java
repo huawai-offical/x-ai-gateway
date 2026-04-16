@@ -9,14 +9,18 @@ import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
 import com.prodigalgal.xaigateway.gateway.core.cache.AffinityBindingType;
 import com.prodigalgal.xaigateway.gateway.core.cache.AffinityCacheService;
 import com.prodigalgal.xaigateway.gateway.core.cache.PromptFingerprintService;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRenderCapabilitySupport;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
+import com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendPolicyService;
 import com.prodigalgal.xaigateway.gateway.core.catalog.ModelCatalogQueryService;
 import com.prodigalgal.xaigateway.gateway.core.catalog.ResolvedModelView;
-import com.prodigalgal.xaigateway.gateway.core.interop.CapabilityResolutionReport;
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestFeatureService;
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
+import com.prodigalgal.xaigateway.gateway.core.interop.NonChatRoutePolicyDecision;
+import com.prodigalgal.xaigateway.gateway.core.interop.NonChatRoutePolicyService;
 import com.prodigalgal.xaigateway.gateway.core.interop.SiteCapabilityTruthService;
 import com.prodigalgal.xaigateway.gateway.core.shared.ModelIdNormalizer;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
@@ -53,6 +57,7 @@ public class GatewayRouteSelectionService {
     private final AccountSelectionService accountSelectionService;
     private final GatewayRequestFeatureService gatewayRequestFeatureService;
     private final SiteCapabilityTruthService siteCapabilityTruthService;
+    private final NonChatRoutePolicyService nonChatRoutePolicyService;
     private final RouteCacheStore routeCacheStore;
     private final HealthStateStore healthStateStore;
 
@@ -68,6 +73,7 @@ public class GatewayRouteSelectionService {
             AccountSelectionService accountSelectionService,
             GatewayRequestFeatureService gatewayRequestFeatureService,
             SiteCapabilityTruthService siteCapabilityTruthService,
+            NonChatRoutePolicyService nonChatRoutePolicyService,
             RouteCacheStore routeCacheStore,
             HealthStateStore healthStateStore) {
         this.distributedKeyQueryService = distributedKeyQueryService;
@@ -80,6 +86,7 @@ public class GatewayRouteSelectionService {
         this.accountSelectionService = accountSelectionService;
         this.gatewayRequestFeatureService = gatewayRequestFeatureService;
         this.siteCapabilityTruthService = siteCapabilityTruthService;
+        this.nonChatRoutePolicyService = nonChatRoutePolicyService;
         this.routeCacheStore = routeCacheStore;
         this.healthStateStore = healthStateStore;
     }
@@ -106,6 +113,7 @@ public class GatewayRouteSelectionService {
                 accountSelectionService,
                 gatewayRequestFeatureService,
                 siteCapabilityTruthService,
+                NonChatRoutePolicyService.forTests(siteCapabilityTruthService, new ExecutionBackendPolicyService()),
                 new RouteCacheStore() {
                     @Override
                     public Optional<RoutePlanSnapshot> get(Long distributedKeyId, String protocol, String requestPath, String requestedModel, GatewayRequestSemantics semantics) {
@@ -134,6 +142,36 @@ public class GatewayRouteSelectionService {
                     public void clear(Long credentialId) {
                     }
                 }
+        );
+    }
+
+    public GatewayRouteSelectionService(
+            DistributedKeyQueryService distributedKeyQueryService,
+            ModelCatalogQueryService modelCatalogQueryService,
+            PromptFingerprintService promptFingerprintService,
+            AffinityCacheService affinityCacheService,
+            DistributedKeyGovernanceService distributedKeyGovernanceService,
+            UpstreamCredentialRepository upstreamCredentialRepository,
+            NetworkProxyRepository networkProxyRepository,
+            AccountSelectionService accountSelectionService,
+            GatewayRequestFeatureService gatewayRequestFeatureService,
+            SiteCapabilityTruthService siteCapabilityTruthService,
+            RouteCacheStore routeCacheStore,
+            HealthStateStore healthStateStore) {
+        this(
+                distributedKeyQueryService,
+                modelCatalogQueryService,
+                promptFingerprintService,
+                affinityCacheService,
+                distributedKeyGovernanceService,
+                upstreamCredentialRepository,
+                networkProxyRepository,
+                accountSelectionService,
+                gatewayRequestFeatureService,
+                siteCapabilityTruthService,
+                NonChatRoutePolicyService.forTests(siteCapabilityTruthService, new ExecutionBackendPolicyService()),
+                routeCacheStore,
+                healthStateStore
         );
     }
 
@@ -297,7 +335,7 @@ public class GatewayRouteSelectionService {
         }
 
         List<StaticCandidateResolution> resolutions = mergedCandidates.stream()
-                .map(candidate -> resolveStaticCandidate(distributedKey, normalizedProtocol, request.requestPath(), candidate, semantics))
+                .map(candidate -> resolveStaticCandidate(distributedKey, normalizedProtocol, request, candidate, semantics))
                 .toList();
 
         boolean anyProviderAllowed = resolutions.stream().anyMatch(item -> !item.providerBlocked());
@@ -331,26 +369,42 @@ public class GatewayRouteSelectionService {
     private StaticCandidateResolution resolveStaticCandidate(
             DistributedKeyView distributedKey,
             String normalizedProtocol,
-            String requestPath,
+            RouteSelectionRequest request,
             RouteCandidateView candidate,
             GatewayRequestSemantics semantics) {
         boolean providerBlocked = !isProviderAllowed(distributedKey, candidate);
-        CapabilityResolutionReport report = providerBlocked ? null : siteCapabilityTruthService.resolve(candidate.candidate(), semantics);
-        InteropCapabilityLevel renderLevel = providerBlocked
+        NonChatRoutePolicyDecision policyDecision = providerBlocked
+                ? null
+                : nonChatRoutePolicyService.evaluateCandidate(
+                        normalizedProtocol,
+                        request.requestPath(),
+                        semantics,
+                        candidate.candidate(),
+                        new CanonicalRequest(
+                                request.distributedKeyPrefix(),
+                                CanonicalIngressProtocol.from(normalizedProtocol),
+                                request.requestPath(),
+                                request.requestedModel(),
+                                List.of(),
+                                List.of(),
+                                null,
+                                null,
+                                null,
+                                null,
+                                request.requestBody() instanceof tools.jackson.databind.JsonNode jsonNode ? jsonNode : null
+                        ),
+                        request.requestBody() instanceof tools.jackson.databind.JsonNode jsonNode ? jsonNode : null
+                );
+        InteropCapabilityLevel renderLevel = providerBlocked || policyDecision == null
                 ? InteropCapabilityLevel.UNSUPPORTED
-                : CanonicalRenderCapabilitySupport.renderLevel(normalizedProtocol, requestPath, semantics);
-        boolean gatewayUploadSurfaceEligible = isGatewayUploadSurfaceEligible(candidate, semantics, report);
-        InteropCapabilityLevel combinedLevel = gatewayUploadSurfaceEligible
-                ? renderLevel
-                : report == null
-                ? InteropCapabilityLevel.UNSUPPORTED
-                : CanonicalRenderCapabilitySupport.minimum(report.overallEffectiveLevel(), renderLevel);
-        boolean featureBlocked = report == null
-                || (!supportsRequiredFeatures(report) && !gatewayUploadSurfaceEligible)
-                || combinedLevel == InteropCapabilityLevel.UNSUPPORTED;
+                : policyDecision.renderCapabilityLevel();
+        boolean featureBlocked = providerBlocked
+                || policyDecision == null
+                || !policyDecision.blockedReasons().isEmpty()
+                || policyDecision.overallCapabilityLevel() == InteropCapabilityLevel.UNSUPPORTED;
         boolean renderBlocked = renderLevel == InteropCapabilityLevel.UNSUPPORTED;
-        int capabilityRank = featureBlocked ? 0 : capabilityRank(combinedLevel);
-        String capabilityLevel = featureBlocked ? null : combinedLevel.name();
+        int capabilityRank = featureBlocked ? 0 : capabilityRank(policyDecision.overallCapabilityLevel());
+        String capabilityLevel = featureBlocked ? null : policyDecision.overallCapabilityLevel().name();
 
         return new StaticCandidateResolution(
                 new RouteCandidateView(
@@ -582,35 +636,6 @@ public class GatewayRouteSelectionService {
 
     private boolean hasHealthyAccountIfBound(Long distributedKeyId, ProviderType providerType, GatewayClientFamily clientFamily) {
         return accountSelectionService.hasHealthyAccountBinding(distributedKeyId, providerType, clientFamily);
-    }
-
-    private boolean supportsRequiredFeatures(CapabilityResolutionReport report) {
-        if (report == null) {
-            return false;
-        }
-        return report.blockedReasons().isEmpty() && report.overallEffectiveLevel() != InteropCapabilityLevel.UNSUPPORTED;
-    }
-
-    private boolean isGatewayUploadSurfaceEligible(
-            RouteCandidateView candidate,
-            GatewayRequestSemantics semantics,
-            CapabilityResolutionReport report) {
-        if (candidate == null || semantics == null || report == null) {
-            return false;
-        }
-        if (candidate.candidate().providerType() != ProviderType.GEMINI_DIRECT) {
-            return false;
-        }
-        if (semantics.operation() != com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation.UPLOAD_CREATE
-                || semantics.resourceType() != com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType.UPLOAD) {
-            return false;
-        }
-        var fileObject = report.featureResolutions().get("file_object");
-        var uploadCreate = report.featureResolutions().get("upload_create");
-        return fileObject != null
-                && fileObject.effectiveLevel() != InteropCapabilityLevel.UNSUPPORTED
-                && uploadCreate != null
-                && uploadCreate.effectiveLevel() == InteropCapabilityLevel.UNSUPPORTED;
     }
 
     private int capabilityRank(InteropCapabilityLevel level) {

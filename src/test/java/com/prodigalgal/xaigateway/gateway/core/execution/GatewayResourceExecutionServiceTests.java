@@ -15,6 +15,7 @@ import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileService;
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestFeatureService;
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics;
+import com.prodigalgal.xaigateway.gateway.core.interop.RouteSelectionMode;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlanCompiler;
 import com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityService;
 import com.prodigalgal.xaigateway.gateway.core.observability.GatewayRequestLifecycleService;
@@ -393,6 +394,114 @@ class GatewayResourceExecutionServiceTests {
         assertEquals("binary", result.canonicalResponse().responseKind());
         assertEquals("file.content", result.canonicalResponse().objectType());
         assertEquals("file_123", result.canonicalResponse().objectId());
+        Mockito.verify(gatewayRouteSelectionService, Mockito.never()).select(any());
+    }
+
+    @Test
+    void shouldStopExecutionWhenPlannerMarksNoRouteRequestAsBlocked() {
+        GatewayRouteSelectionService gatewayRouteSelectionService = Mockito.mock(GatewayRouteSelectionService.class);
+        UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        CredentialCryptoService credentialCryptoService = Mockito.mock(CredentialCryptoService.class);
+        DistributedKeyGovernanceService distributedKeyGovernanceService = Mockito.mock(DistributedKeyGovernanceService.class);
+        DistributedKeyQueryService distributedKeyQueryService = Mockito.mock(DistributedKeyQueryService.class);
+        AccountSelectionService accountSelectionService = Mockito.mock(AccountSelectionService.class);
+        GatewayRequestFeatureService gatewayRequestFeatureService = Mockito.mock(GatewayRequestFeatureService.class);
+        TranslationExecutionPlanCompiler translationExecutionPlanCompiler = Mockito.mock(TranslationExecutionPlanCompiler.class);
+        GatewayResourceExecutor realtimeExecutor = Mockito.mock(GatewayResourceExecutor.class);
+
+        GatewayResourceExecutionService service = service(
+                gatewayRouteSelectionService,
+                upstreamCredentialRepository,
+                credentialCryptoService,
+                distributedKeyGovernanceService,
+                distributedKeyQueryService,
+                accountSelectionService,
+                gatewayRequestFeatureService,
+                translationExecutionPlanCompiler,
+                List.of(realtimeExecutor),
+                Mockito.mock(GatewayObservabilityService.class),
+                Mockito.mock(GatewayRequestLifecycleService.class),
+                Mockito.mock(GatewayFileService.class)
+        );
+
+        ObjectNode requestBody = new ObjectMapper().createObjectNode();
+        requestBody.put("session", "demo");
+        com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest request =
+                new com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest(
+                        "sk-gw-test",
+                        CanonicalIngressProtocol.OPENAI,
+                        "POST",
+                        "/v1/realtime/client_secrets",
+                        "/v1/realtime/client_secrets",
+                        java.util.Map.of(),
+                        "resource-orchestration",
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType.REALTIME,
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation.REALTIME_CLIENT_SECRET_CREATE,
+                        requestBody,
+                        java.util.Map.of(),
+                        java.util.List.of(),
+                        false,
+                        false
+                );
+
+        Mockito.when(gatewayRequestFeatureService.describe(eq("POST"), eq("/v1/realtime/client_secrets"), any()))
+                .thenReturn(new GatewayRequestSemantics(
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType.REALTIME,
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation.REALTIME_CLIENT_SECRET_CREATE,
+                        "realtime",
+                        "/v1/realtime/client_secrets",
+                        List.of(com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature.REALTIME_CLIENT_SECRET),
+                        RouteSelectionMode.DISTRIBUTED_TARGET
+                ));
+        Mockito.when(translationExecutionPlanCompiler.compilePreview(any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(new CanonicalExecutionPlanCompilation(
+                        new CanonicalExecutionPlan(
+                                false,
+                                CanonicalIngressProtocol.OPENAI,
+                                "/v1/realtime/client_secrets",
+                                "/v1/realtime/client_secrets",
+                                "realtime",
+                                "resource-orchestration",
+                                null,
+                                null,
+                                com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType.REALTIME,
+                                com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation.REALTIME_CLIENT_SECRET_CREATE,
+                                com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind.BLOCKED,
+                                com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend.ORCHESTRATION,
+                                com.prodigalgal.xaigateway.gateway.core.interop.SupportStatus.BLOCKED,
+                                "blocked",
+                                java.util.List.of(com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend.ORCHESTRATION),
+                                "selection_mode=distributed_target",
+                                com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel.UNSUPPORTED,
+                                com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel.UNSUPPORTED,
+                                com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel.UNSUPPORTED,
+                                com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel.UNSUPPORTED,
+                                List.of("当前 ingress 尚无可用 render shape。"),
+                                List.of(com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature.REALTIME_CLIENT_SECRET),
+                                java.util.Map.of(),
+                                List.of(),
+                                List.of("当前 ingress 尚无可用 render shape。"),
+                                RouteSelectionMode.DISTRIBUTED_TARGET,
+                                "selection_mode=distributed_target",
+                                "render_capability=unsupported",
+                                "fallback=blocked_before_execution(render_unsupported)"
+                        ),
+                        null,
+                        new GatewayRequestSemantics(
+                                com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType.REALTIME,
+                                com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation.REALTIME_CLIENT_SECRET_CREATE,
+                                List.of(com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature.REALTIME_CLIENT_SECRET),
+                                RouteSelectionMode.DISTRIBUTED_TARGET
+                        ),
+                        new CanonicalRequest("sk-gw-test", CanonicalIngressProtocol.OPENAI, "/v1/realtime/client_secrets", "resource-orchestration", List.of(), List.of(), null, null, null, null, requestBody)
+                ));
+
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class, () ->
+                service.executeDetailedJson(request, 1L, "resource-orchestration"));
+
+        assertEquals("当前 ingress 尚无可用 render shape。", error.getMessage());
+        Mockito.verify(realtimeExecutor, Mockito.never()).executeJson(any(), any(), any());
+        Mockito.verify(gatewayRouteSelectionService, Mockito.never()).select(any());
     }
 
     private RouteSelectionResult selectionResult(ProviderType providerType, UpstreamSiteKind siteKind) {

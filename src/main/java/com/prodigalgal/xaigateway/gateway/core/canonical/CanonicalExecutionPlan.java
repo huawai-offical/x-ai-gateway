@@ -2,6 +2,7 @@ package com.prodigalgal.xaigateway.gateway.core.canonical;
 
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature;
+import com.prodigalgal.xaigateway.gateway.core.interop.RouteSelectionMode;
 import com.prodigalgal.xaigateway.gateway.core.interop.SupportStatus;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
@@ -35,7 +36,11 @@ public record CanonicalExecutionPlan(
         List<InteropFeature> requiredFeatures,
         Map<String, InteropCapabilityLevel> featureLevels,
         List<String> degradations,
-        List<String> blockers
+        List<String> blockers,
+        RouteSelectionMode routeSelectionMode,
+        String routePolicyReason,
+        String renderPolicyReason,
+        String fallbackPolicyReason
 ) {
     public CanonicalExecutionPlan {
         resourceType = resourceType == null ? TranslationResourceType.UNKNOWN : resourceType;
@@ -50,6 +55,10 @@ public record CanonicalExecutionPlan(
         featureLevels = featureLevels == null ? Map.of() : Map.copyOf(featureLevels);
         degradations = degradations == null ? List.of() : List.copyOf(degradations);
         blockers = blockers == null ? List.of() : List.copyOf(blockers);
+        routeSelectionMode = routeSelectionMode == null ? RouteSelectionMode.CATALOG_SELECTION : routeSelectionMode;
+        routePolicyReason = routePolicyReason == null ? "" : routePolicyReason;
+        renderPolicyReason = renderPolicyReason == null ? "" : renderPolicyReason;
+        fallbackPolicyReason = fallbackPolicyReason == null ? "" : fallbackPolicyReason;
         degradationLevel = degradationLevel == null
                 ? SupportStatus.normalizeDegradationLevel(overallCapabilityLevel, blockerReasons)
                 : degradationLevel;
@@ -101,7 +110,11 @@ public record CanonicalExecutionPlan(
                 requiredFeatures,
                 featureLevels,
                 degradations,
-                blockers
+                blockers,
+                RouteSelectionMode.CATALOG_SELECTION,
+                "",
+                "",
+                ""
         );
     }
 
@@ -151,7 +164,11 @@ public record CanonicalExecutionPlan(
                 requiredFeatures,
                 featureLevels,
                 degradations,
-                blockers
+                blockers,
+                RouteSelectionMode.CATALOG_SELECTION,
+                "",
+                "",
+                ""
         );
     }
 
@@ -204,7 +221,71 @@ public record CanonicalExecutionPlan(
                 requiredFeatures,
                 featureLevels,
                 degradations,
-                blockers
+                blockers,
+                RouteSelectionMode.CATALOG_SELECTION,
+                "",
+                "",
+                ""
+        );
+    }
+
+    public CanonicalExecutionPlan(
+            boolean executable,
+            CanonicalIngressProtocol ingressProtocol,
+            String requestPath,
+            String normalizedPath,
+            String surface,
+            String requestedModel,
+            String publicModel,
+            String resolvedModel,
+            TranslationResourceType resourceType,
+            TranslationOperation operation,
+            ExecutionKind executionKind,
+            ExecutionBackend executionBackend,
+            SupportStatus supportStatus,
+            String objectMode,
+            List<ExecutionBackend> supportedBackends,
+            String backendReason,
+            InteropCapabilityLevel degradationLevel,
+            InteropCapabilityLevel executionCapabilityLevel,
+            InteropCapabilityLevel renderCapabilityLevel,
+            InteropCapabilityLevel overallCapabilityLevel,
+            List<String> blockerReasons,
+            List<InteropFeature> requiredFeatures,
+            Map<String, InteropCapabilityLevel> featureLevels,
+            List<String> degradations,
+            List<String> blockers
+    ) {
+        this(
+                executable,
+                ingressProtocol,
+                requestPath,
+                normalizedPath,
+                surface,
+                requestedModel,
+                publicModel,
+                resolvedModel,
+                resourceType,
+                operation,
+                executionKind,
+                executionBackend,
+                supportStatus,
+                objectMode,
+                supportedBackends,
+                backendReason,
+                degradationLevel,
+                executionCapabilityLevel,
+                renderCapabilityLevel,
+                overallCapabilityLevel,
+                blockerReasons,
+                requiredFeatures,
+                featureLevels,
+                degradations,
+                blockers,
+                RouteSelectionMode.CATALOG_SELECTION,
+                "",
+                "",
+                ""
         );
     }
 

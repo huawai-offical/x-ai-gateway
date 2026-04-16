@@ -4,6 +4,7 @@ import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthenticationService;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest;
+import com.prodigalgal.xaigateway.gateway.core.canonical.NonChatCanonicalRenderService;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayResourceExecutionService;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
@@ -30,17 +31,17 @@ public class AnthropicMessageBatchesController {
     private final DistributedKeyAuthenticationService distributedKeyAuthenticationService;
     private final GatewayResourceExecutionService gatewayResourceExecutionService;
     private final AnthropicMessageBatchesRequestMapper anthropicMessageBatchesRequestMapper;
-    private final AnthropicMessageBatchesEncoder anthropicMessageBatchesEncoder;
+    private final NonChatCanonicalRenderService nonChatCanonicalRenderService;
 
     public AnthropicMessageBatchesController(
             DistributedKeyAuthenticationService distributedKeyAuthenticationService,
             GatewayResourceExecutionService gatewayResourceExecutionService,
             AnthropicMessageBatchesRequestMapper anthropicMessageBatchesRequestMapper,
-            AnthropicMessageBatchesEncoder anthropicMessageBatchesEncoder) {
+            NonChatCanonicalRenderService nonChatCanonicalRenderService) {
         this.distributedKeyAuthenticationService = distributedKeyAuthenticationService;
         this.gatewayResourceExecutionService = gatewayResourceExecutionService;
         this.anthropicMessageBatchesRequestMapper = anthropicMessageBatchesRequestMapper;
-        this.anthropicMessageBatchesEncoder = anthropicMessageBatchesEncoder;
+        this.nonChatCanonicalRenderService = nonChatCanonicalRenderService;
     }
 
     @PostMapping
@@ -66,8 +67,9 @@ public class AnthropicMessageBatchesController {
                 false,
                 false
         );
-        JsonNode response = gatewayResourceExecutionService.executeDetailedJson(request, distributedKey.id(), model).responseJson();
-        return ResponseEntity.ok(anthropicMessageBatchesEncoder.encode(response));
+        return (ResponseEntity<JsonNode>) nonChatCanonicalRenderService
+                .render(request, null, gatewayResourceExecutionService.executeDetailedJson(request, distributedKey.id(), model))
+                .response();
     }
 
     @GetMapping("/{messageBatchId}")
@@ -91,8 +93,9 @@ public class AnthropicMessageBatchesController {
                 false,
                 false
         );
-        JsonNode response = gatewayResourceExecutionService.executeDetailedJson(request, distributedKey.id(), "resource-orchestration").responseJson();
-        return ResponseEntity.ok(anthropicMessageBatchesEncoder.encode(response));
+        return (ResponseEntity<JsonNode>) nonChatCanonicalRenderService
+                .render(request, null, gatewayResourceExecutionService.executeDetailedJson(request, distributedKey.id(), "resource-orchestration"))
+                .response();
     }
 
     @PostMapping("/{messageBatchId}/cancel")
@@ -116,7 +119,8 @@ public class AnthropicMessageBatchesController {
                 false,
                 false
         );
-        JsonNode response = gatewayResourceExecutionService.executeDetailedJson(request, distributedKey.id(), "resource-orchestration").responseJson();
-        return ResponseEntity.ok(anthropicMessageBatchesEncoder.encode(response));
+        return (ResponseEntity<JsonNode>) nonChatCanonicalRenderService
+                .render(request, null, gatewayResourceExecutionService.executeDetailedJson(request, distributedKey.id(), "resource-orchestration"))
+                .response();
     }
 }

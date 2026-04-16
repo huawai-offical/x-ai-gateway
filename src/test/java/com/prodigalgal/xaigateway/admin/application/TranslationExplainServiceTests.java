@@ -11,6 +11,7 @@ import com.prodigalgal.xaigateway.gateway.core.interop.GatewayDegradationPolicy;
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature;
+import com.prodigalgal.xaigateway.gateway.core.interop.RouteSelectionMode;
 import com.prodigalgal.xaigateway.gateway.core.interop.SupportStatus;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlanCompiler;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation;
@@ -80,5 +81,9 @@ class TranslationExplainServiceTests {
         assertEquals("chat.completions", result.surface());
         assertEquals(SupportStatus.NATIVE, result.supportStatus());
         assertEquals(InteropCapabilityLevel.NATIVE, result.degradationLevel());
+        assertEquals(RouteSelectionMode.CATALOG_SELECTION, result.routeSelectionMode());
+        assertEquals("", result.routePolicyReason());
+        assertEquals("", result.renderPolicyReason());
+        assertEquals("", result.fallbackPolicyReason());
     }
 }

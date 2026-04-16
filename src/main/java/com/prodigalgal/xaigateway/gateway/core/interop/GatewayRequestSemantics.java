@@ -8,8 +8,26 @@ public record GatewayRequestSemantics(
         String surface,
         String normalizedPath,
         List<InteropFeature> requiredFeatures,
-        boolean requiresRouteSelection
+        RouteSelectionMode routeSelectionMode
 ) {
+    public GatewayRequestSemantics(
+            TranslationResourceType resourceType,
+            TranslationOperation operation,
+            String surface,
+            String normalizedPath,
+            List<InteropFeature> requiredFeatures,
+            boolean requiresRouteSelection
+    ) {
+        this(
+                resourceType,
+                operation,
+                surface,
+                normalizedPath,
+                requiredFeatures,
+                deriveSelectionMode(resourceType, operation, requiresRouteSelection)
+        );
+    }
+
     public GatewayRequestSemantics(
             TranslationResourceType resourceType,
             TranslationOperation operation,
@@ -22,7 +40,23 @@ public record GatewayRequestSemantics(
                 defaultSurface(resourceType, operation),
                 defaultNormalizedPath(operation),
                 requiredFeatures,
-                requiresRouteSelection
+                deriveSelectionMode(resourceType, operation, requiresRouteSelection)
+        );
+    }
+
+    public GatewayRequestSemantics(
+            TranslationResourceType resourceType,
+            TranslationOperation operation,
+            List<InteropFeature> requiredFeatures,
+            RouteSelectionMode routeSelectionMode
+    ) {
+        this(
+                resourceType,
+                operation,
+                defaultSurface(resourceType, operation),
+                defaultNormalizedPath(operation),
+                requiredFeatures,
+                routeSelectionMode
         );
     }
 
@@ -34,6 +68,13 @@ public record GatewayRequestSemantics(
                 ? defaultNormalizedPath(operation)
                 : normalizedPath;
         requiredFeatures = requiredFeatures == null ? List.of() : List.copyOf(requiredFeatures);
+        routeSelectionMode = routeSelectionMode == null
+                ? defaultSelectionMode(resourceType, operation)
+                : routeSelectionMode;
+    }
+
+    public boolean requiresRouteSelection() {
+        return routeSelectionMode == RouteSelectionMode.CATALOG_SELECTION;
     }
 
     private static String defaultSurface(TranslationResourceType resourceType, TranslationOperation operation) {
@@ -85,6 +126,34 @@ public record GatewayRequestSemantics(
             case TUNING_CANCEL -> "/v1/fine_tuning/jobs/{jobId}/cancel";
             case REALTIME_CLIENT_SECRET_CREATE -> "/v1/realtime/client_secrets";
             case UNKNOWN -> null;
+        };
+    }
+
+    private static RouteSelectionMode deriveSelectionMode(
+            TranslationResourceType resourceType,
+            TranslationOperation operation,
+            boolean requiresRouteSelection) {
+        if (requiresRouteSelection) {
+            return RouteSelectionMode.CATALOG_SELECTION;
+        }
+        return defaultSelectionMode(resourceType, operation);
+    }
+
+    private static RouteSelectionMode defaultSelectionMode(
+            TranslationResourceType resourceType,
+            TranslationOperation operation) {
+        return switch (operation == null ? TranslationOperation.UNKNOWN : operation) {
+            case FILE_LIST -> RouteSelectionMode.LOCAL_CATALOG;
+            case FILE_GET, FILE_DELETE, FILE_CONTENT_GET,
+                    UPLOAD_GET, UPLOAD_PART_ADD, UPLOAD_COMPLETE, UPLOAD_CANCEL,
+                    BATCH_GET, BATCH_CANCEL,
+                    ANTHROPIC_MESSAGE_BATCH_GET, ANTHROPIC_MESSAGE_BATCH_CANCEL,
+                    TUNING_GET, TUNING_CANCEL -> RouteSelectionMode.STORED_LINEAGE;
+            case REALTIME_CLIENT_SECRET_CREATE -> RouteSelectionMode.DISTRIBUTED_TARGET;
+            case UNKNOWN -> resourceType == TranslationResourceType.FILE
+                    ? RouteSelectionMode.LOCAL_CATALOG
+                    : RouteSelectionMode.CATALOG_SELECTION;
+            default -> RouteSelectionMode.CATALOG_SELECTION;
         };
     }
 }

@@ -2,6 +2,8 @@ package com.prodigalgal.xaigateway.protocol.ingress.google;
 
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthenticationService;
+import com.prodigalgal.xaigateway.gateway.core.canonical.GoogleNativeNonChatCanonicalRenderer;
+import com.prodigalgal.xaigateway.gateway.core.canonical.NonChatCanonicalRenderService;
 import com.prodigalgal.xaigateway.gateway.core.resource.GatewayAsyncResourceService;
 import com.prodigalgal.xaigateway.gateway.core.resource.GatewayAsyncResourceType;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileService;
@@ -20,7 +22,16 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 @WebFluxTest(controllers = GeminiBatchesController.class)
-@Import({PermitAllSecurityTestConfig.class, GeminiBatchesRequestMapper.class, GeminiBatchesEncoder.class})
+@Import({
+        PermitAllSecurityTestConfig.class,
+        GeminiBatchesRequestMapper.class,
+        GeminiEmbeddingsEncoder.class,
+        GeminiGenerateContentResourceEncoder.class,
+        GeminiFilesEncoder.class,
+        GeminiBatchesEncoder.class,
+        GoogleNativeNonChatCanonicalRenderer.class,
+        NonChatCanonicalRenderService.class
+})
 class GeminiBatchesControllerTests {
 
     @Autowired

@@ -4,11 +4,8 @@ import tools.jackson.databind.JsonNode;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlanCompilation;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
-import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRenderCapabilitySupport;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
-import com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendDecision;
-import com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendPolicyService;
 import com.prodigalgal.xaigateway.gateway.core.routing.GatewayRouteSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionRequest;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
@@ -16,6 +13,7 @@ import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -25,18 +23,39 @@ public class TranslationExecutionPlanCompiler {
     private final GatewayRouteSelectionService gatewayRouteSelectionService;
     private final GatewayRequestFeatureService gatewayRequestFeatureService;
     private final SiteCapabilityTruthService siteCapabilityTruthService;
-    private final ExecutionBackendPolicyService executionBackendPolicyService;
+    private final NonChatRoutePolicyService nonChatRoutePolicyService;
+    private final NonChatTargetResolutionService nonChatTargetResolutionService;
+    private final NonChatDegradationPolicyService nonChatDegradationPolicyService;
 
     @Autowired
     public TranslationExecutionPlanCompiler(
             GatewayRouteSelectionService gatewayRouteSelectionService,
             GatewayRequestFeatureService gatewayRequestFeatureService,
             SiteCapabilityTruthService siteCapabilityTruthService,
-            ExecutionBackendPolicyService executionBackendPolicyService) {
+            NonChatRoutePolicyService nonChatRoutePolicyService,
+            NonChatTargetResolutionService nonChatTargetResolutionService,
+            NonChatDegradationPolicyService nonChatDegradationPolicyService) {
         this.gatewayRouteSelectionService = gatewayRouteSelectionService;
         this.gatewayRequestFeatureService = gatewayRequestFeatureService;
         this.siteCapabilityTruthService = siteCapabilityTruthService;
-        this.executionBackendPolicyService = executionBackendPolicyService;
+        this.nonChatRoutePolicyService = nonChatRoutePolicyService;
+        this.nonChatTargetResolutionService = nonChatTargetResolutionService;
+        this.nonChatDegradationPolicyService = nonChatDegradationPolicyService;
+    }
+
+    public TranslationExecutionPlanCompiler(
+            GatewayRouteSelectionService gatewayRouteSelectionService,
+            GatewayRequestFeatureService gatewayRequestFeatureService,
+            SiteCapabilityTruthService siteCapabilityTruthService,
+            com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendPolicyService executionBackendPolicyService) {
+        this(
+                gatewayRouteSelectionService,
+                gatewayRequestFeatureService,
+                siteCapabilityTruthService,
+                NonChatRoutePolicyService.forTests(siteCapabilityTruthService, executionBackendPolicyService),
+                NonChatTargetResolutionService.createDefault(),
+                new NonChatDegradationPolicyService()
+        );
     }
 
     public TranslationExecutionPlanCompiler(
@@ -47,7 +66,7 @@ public class TranslationExecutionPlanCompiler {
                 gatewayRouteSelectionService,
                 gatewayRequestFeatureService,
                 siteCapabilityTruthService,
-                new ExecutionBackendPolicyService()
+                new com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendPolicyService()
         );
     }
 
@@ -81,54 +100,14 @@ public class TranslationExecutionPlanCompiler {
             GatewayClientFamily clientFamily,
             JsonNode body) {
         String normalizedProtocol = normalizeProtocol(protocol);
-        String normalizedRequestPath = normalizeRequestPath(requestPath, normalizedProtocol);
-        GatewayRequestSemantics semantics = gatewayRequestFeatureService.describe(httpMethod, normalizedRequestPath, body);
-        String resolvedRequestedModel = resolveRequestedModel(requestedModel, normalizedRequestPath, semantics, body);
+        String effectiveRequestPath = normalizeRequestPath(requestPath, normalizedProtocol);
+        GatewayRequestSemantics semantics = gatewayRequestFeatureService.describe(httpMethod, effectiveRequestPath, body);
+        String resolvedRequestedModel = resolveRequestedModel(requestedModel, effectiveRequestPath, semantics, body);
         List<String> blockedReasons = new ArrayList<>();
-        List<String> lossReasons = new ArrayList<>();
-
-        RouteSelectionResult selectionResult = null;
-        if (semantics.requiresRouteSelection()) {
-            try {
-                selectionResult = gatewayRouteSelectionService.select(new RouteSelectionRequest(
-                        distributedKeyPrefix,
-                        normalizedProtocol,
-                        normalizedRequestPath,
-                        resolvedRequestedModel,
-                        body,
-                        clientFamily == null ? GatewayClientFamily.GENERIC_OPENAI : clientFamily,
-                        false
-                ));
-            } catch (IllegalArgumentException exception) {
-                blockedReasons.add(exception.getMessage());
-            }
-        }
-
-        CapabilityResolutionReport report = selectionResult == null
-                ? new CapabilityResolutionReport(
-                        java.util.Map.of(),
-                        semantics.requiresRouteSelection() ? InteropCapabilityLevel.UNSUPPORTED : InteropCapabilityLevel.NATIVE,
-                        semantics.requiresRouteSelection() ? InteropCapabilityLevel.UNSUPPORTED : InteropCapabilityLevel.NATIVE,
-                        semantics.requiresRouteSelection() ? InteropCapabilityLevel.UNSUPPORTED : InteropCapabilityLevel.NATIVE,
-                        semantics.requiresRouteSelection() ? ExecutionKind.BLOCKED : ExecutionKind.NATIVE,
-                        semantics.requiresRouteSelection() ? "blocked" : "resource-orchestration",
-                        List.of(),
-                        List.of()
-                )
-                : siteCapabilityTruthService.resolve(selectionResult.selectedCandidate().candidate(), semantics);
-
-        if (selectionResult != null) {
-            blockedReasons.addAll(report.blockedReasons());
-            lossReasons.addAll(report.lossReasons());
-        }
-        if (selectionResult != null && degradationPolicy != null && !degradationPolicy.allows(report.overallEffectiveLevel())) {
-            blockedReasons.add("当前策略不允许 " + report.overallEffectiveLevel().name().toLowerCase(Locale.ROOT) + " 执行。");
-        }
-
         CanonicalRequest canonicalRequest = new CanonicalRequest(
                 distributedKeyPrefix,
                 CanonicalIngressProtocol.from(normalizedProtocol),
-                normalizedRequestPath,
+                effectiveRequestPath,
                 resolvedRequestedModel,
                 List.of(),
                 List.of(),
@@ -138,24 +117,95 @@ public class TranslationExecutionPlanCompiler {
                 null,
                 body
         );
+
+        RouteSelectionResult selectionResult = null;
+        NonChatRoutePolicyDecision policyDecision;
+        Map<String, InteropCapabilityLevel> featureLevels = Map.of();
+        if (semantics.routeSelectionMode() == RouteSelectionMode.CATALOG_SELECTION) {
+            try {
+                selectionResult = gatewayRouteSelectionService.select(new RouteSelectionRequest(
+                        distributedKeyPrefix,
+                        normalizedProtocol,
+                        effectiveRequestPath,
+                        resolvedRequestedModel,
+                        body,
+                        clientFamily == null ? GatewayClientFamily.GENERIC_OPENAI : clientFamily,
+                        false
+                ));
+            } catch (IllegalArgumentException exception) {
+                blockedReasons.add(exception.getMessage());
+            }
+            if (selectionResult != null) {
+                featureLevels = effectiveFeatureLevels(selectionResult.selectedCandidate().candidate(), semantics);
+            }
+            policyDecision = selectionResult == null
+                    ? nonChatRoutePolicyService.evaluateWithoutCandidate(
+                            normalizedProtocol,
+                            effectiveRequestPath,
+                            semantics,
+                            canonicalRequest,
+                            body,
+                            "catalog_selection_unresolved",
+                            blockedReasons
+                    )
+                    : nonChatRoutePolicyService.evaluateCandidate(
+                            normalizedProtocol,
+                            effectiveRequestPath,
+                            semantics,
+                            selectionResult.selectedCandidate().candidate(),
+                            canonicalRequest,
+                            body
+                    );
+        } else {
+            NonChatTargetResolution targetResolution = nonChatTargetResolutionService.resolve(
+                    distributedKeyPrefix,
+                    null,
+                    semantics,
+                    gatewayRequestFeatureService.extractPathParams(effectiveRequestPath)
+            );
+            blockedReasons.addAll(targetResolution.blockedReasons());
+            if (targetResolution.candidate() != null) {
+                featureLevels = effectiveFeatureLevels(targetResolution.candidate(), semantics);
+            }
+            policyDecision = targetResolution.candidate() == null
+                    ? nonChatRoutePolicyService.evaluateWithoutCandidate(
+                            normalizedProtocol,
+                            effectiveRequestPath,
+                            semantics,
+                            canonicalRequest,
+                            body,
+                            targetResolution.policyReason(),
+                            blockedReasons
+                    )
+                    : nonChatRoutePolicyService.evaluateResolvedTarget(
+                            normalizedProtocol,
+                            effectiveRequestPath,
+                            semantics,
+                            targetResolution.candidate(),
+                            canonicalRequest,
+                            body,
+                            targetResolution.policyReason(),
+                            blockedReasons
+                    );
+        }
+
+        NonChatDegradationOutcome degradationOutcome = nonChatDegradationPolicyService.evaluate(
+                semantics,
+                degradationPolicy,
+                policyDecision
+        );
         CanonicalExecutionPlan plan = buildPlan(
                 normalizedProtocol,
-                normalizedRequestPath,
+                effectiveRequestPath,
                 resolvedRequestedModel,
-                clientFamily == null ? GatewayClientFamily.GENERIC_OPENAI : clientFamily,
                 semantics,
                 selectionResult,
-                report,
-                blockedReasons.isEmpty()
-                        ? report.executionKind()
-                        : ExecutionKind.BLOCKED,
-                blockedReasons.isEmpty()
-                        ? report.upstreamObjectMode()
-                        : "blocked",
                 canonicalRequest,
-                body,
-                List.copyOf(lossReasons),
-                List.copyOf(blockedReasons)
+                policyDecision,
+                degradationOutcome,
+                featureLevels,
+                degradationOutcome.lossReasons(),
+                degradationOutcome.blockedReasons()
         );
         return new CanonicalExecutionPlanCompilation(plan, selectionResult, semantics, canonicalRequest);
     }
@@ -165,21 +215,31 @@ public class TranslationExecutionPlanCompiler {
             CanonicalRequest canonicalRequest,
             GatewayRequestSemantics semantics,
             JsonNode body) {
-        CapabilityResolutionReport report = siteCapabilityTruthService.resolve(selectionResult.selectedCandidate().candidate(), semantics);
+        NonChatRoutePolicyDecision policyDecision = nonChatRoutePolicyService.evaluateCandidate(
+                selectionResult.protocol(),
+                canonicalRequest.requestPath(),
+                semantics,
+                selectionResult.selectedCandidate().candidate(),
+                canonicalRequest,
+                body
+        );
+        NonChatDegradationOutcome degradationOutcome = nonChatDegradationPolicyService.evaluate(
+                semantics,
+                GatewayDegradationPolicy.ALLOW_LOSSY,
+                policyDecision
+        );
         CanonicalExecutionPlan plan = buildPlan(
                 selectionResult.protocol(),
                 canonicalRequest.requestPath(),
                 selectionResult.requestedModel(),
-                selectionResult.clientFamily(),
                 semantics,
                 selectionResult,
-                report,
-                report.executionKind(),
-                report.upstreamObjectMode(),
                 canonicalRequest,
-                body,
-                report.lossReasons(),
-                report.blockedReasons()
+                policyDecision,
+                degradationOutcome,
+                effectiveFeatureLevels(selectionResult.selectedCandidate().candidate(), semantics),
+                degradationOutcome.lossReasons(),
+                degradationOutcome.blockedReasons()
         );
         return new CanonicalExecutionPlanCompilation(plan, selectionResult, semantics, canonicalRequest);
     }
@@ -209,28 +269,16 @@ public class TranslationExecutionPlanCompiler {
             String protocol,
             String requestPath,
             String requestedModel,
-            GatewayClientFamily clientFamily,
             GatewayRequestSemantics semantics,
             RouteSelectionResult selectionResult,
-            CapabilityResolutionReport resolutionReport,
-            ExecutionKind executionKind,
-            String upstreamObjectMode,
             CanonicalRequest canonicalRequest,
-            JsonNode requestBody,
+            NonChatRoutePolicyDecision policyDecision,
+            NonChatDegradationOutcome degradationOutcome,
+            Map<String, InteropCapabilityLevel> featureLevels,
             List<String> lossReasons,
             List<String> blockedReasons) {
-        java.util.Map<String, InteropCapabilityLevel> featureLevels = new java.util.LinkedHashMap<>();
-        resolutionReport.featureResolutions().forEach((key, value) -> featureLevels.put(key, value.effectiveLevel()));
-        InteropCapabilityLevel executionCapabilityLevel = resolutionReport.overallEffectiveLevel();
-        InteropCapabilityLevel renderCapabilityLevel = CanonicalRenderCapabilitySupport.renderLevel(protocol, requestPath, semantics);
-        ExecutionBackendDecision backendDecision = executionBackendPolicyService.forCandidate(
-                selectionResult == null ? null : selectionResult.selectedCandidate().candidate(),
-                semantics,
-                canonicalRequest,
-                requestBody
-        );
         return new CanonicalExecutionPlan(
-                blockedReasons.isEmpty() && (!semantics.requiresRouteSelection() || selectionResult != null),
+                blockedReasons.isEmpty() && (semantics.routeSelectionMode() != RouteSelectionMode.CATALOG_SELECTION || selectionResult != null),
                 CanonicalIngressProtocol.from(protocol),
                 requestPath,
                 semantics.normalizedPath(),
@@ -240,21 +288,25 @@ public class TranslationExecutionPlanCompiler {
                 selectionResult == null ? null : selectionResult.resolvedModelKey(),
                 semantics.resourceType(),
                 semantics.operation(),
-                executionKind,
-                backendDecision.preferredBackend(),
-                executionSupportStatus(backendDecision.preferredBackend(), CanonicalRenderCapabilitySupport.minimum(executionCapabilityLevel, renderCapabilityLevel), blockedReasons),
-                objectMode(semantics, backendDecision.preferredBackend(), upstreamObjectMode),
-                backendDecision.supportedBackends(),
-                backendDecision.reason(),
-                SupportStatus.normalizeDegradationLevel(CanonicalRenderCapabilitySupport.minimum(executionCapabilityLevel, renderCapabilityLevel), blockedReasons),
-                executionCapabilityLevel,
-                renderCapabilityLevel,
-                CanonicalRenderCapabilitySupport.minimum(executionCapabilityLevel, renderCapabilityLevel),
+                blockedReasons.isEmpty() ? policyDecision.executionKind() : ExecutionKind.BLOCKED,
+                policyDecision.preferredBackend(),
+                degradationOutcome.supportStatus(),
+                blockedReasons.isEmpty() ? policyDecision.objectMode() : "blocked",
+                policyDecision.supportedBackends(),
+                policyDecision.policyReason(),
+                degradationOutcome.degradationLevel(),
+                policyDecision.executionCapabilityLevel(),
+                policyDecision.renderCapabilityLevel(),
+                policyDecision.overallCapabilityLevel(),
                 List.copyOf(blockedReasons),
                 semantics.requiredFeatures(),
-                java.util.Map.copyOf(featureLevels),
+                Map.copyOf(featureLevels),
                 List.copyOf(lossReasons),
-                List.copyOf(blockedReasons)
+                List.copyOf(blockedReasons),
+                semantics.routeSelectionMode(),
+                policyDecision.policyReason(),
+                degradationOutcome.renderPolicyReason(),
+                degradationOutcome.fallbackPolicyReason()
         );
     }
 
@@ -326,27 +378,15 @@ public class TranslationExecutionPlanCompiler {
         };
     }
 
-    private String objectMode(
-            GatewayRequestSemantics semantics,
-            com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend backend,
-            String upstreamObjectMode) {
-        if (semantics == null || backend == null) {
-            return upstreamObjectMode;
+    private Map<String, InteropCapabilityLevel> effectiveFeatureLevels(
+            com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView candidate,
+            GatewayRequestSemantics semantics) {
+        if (candidate == null || semantics == null) {
+            return Map.of();
         }
-        return switch (backend) {
-            case NATIVE -> semantics.resourceType() == TranslationResourceType.CHAT || semantics.resourceType() == TranslationResourceType.RESPONSE
-                    ? upstreamObjectMode
-                    : "native-resource";
-            case PASSTHROUGH -> "passthrough-resource";
-            case ORCHESTRATION -> "gateway-object-lineage";
-            case SPRING_AI -> upstreamObjectMode;
-        };
-    }
-
-    private SupportStatus executionSupportStatus(
-            com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend backend,
-            InteropCapabilityLevel overallCapabilityLevel,
-            List<String> blockedReasons) {
-        return SupportStatus.resolve(backend, overallCapabilityLevel, blockedReasons);
+        java.util.LinkedHashMap<String, InteropCapabilityLevel> levels = new java.util.LinkedHashMap<>();
+        siteCapabilityTruthService.resolve(candidate, semantics).featureResolutions()
+                .forEach((key, value) -> levels.put(key, value.effectiveLevel()));
+        return Map.copyOf(levels);
     }
 }
