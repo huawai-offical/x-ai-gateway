@@ -89,7 +89,7 @@ public class GeminiAudioGatewayResourceExecutor implements GatewayResourceExecut
 
     @Override
     public boolean supports(CanonicalResourceRequest request, CatalogCandidateView candidate) {
-        return GeminiGatewayResourceSupport.supportsGeminiDirectCandidate(
+        return GeminiGatewayResourceSupport.supportsGoogleGenAiCandidate(
                 request,
                 candidate,
                 SUPPORTED_PATHS.toArray(String[]::new)

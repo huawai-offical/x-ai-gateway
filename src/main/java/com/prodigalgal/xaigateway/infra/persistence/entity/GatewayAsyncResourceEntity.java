@@ -25,7 +25,8 @@ import java.time.Instant;
         },
         indexes = {
                 @Index(name = "idx_gateway_async_resource_scope", columnList = "distributed_key_id,resource_type,created_at"),
-                @Index(name = "idx_gateway_async_resource_status_created", columnList = "status,created_at")
+                @Index(name = "idx_gateway_async_resource_status_created", columnList = "status,created_at"),
+                @Index(name = "idx_gateway_async_resource_upstream_object", columnList = "distributed_key_id,resource_type,upstream_object_id")
         }
 )
 @Comment("网关异步资源与会话对象表。")
@@ -60,6 +61,9 @@ public class GatewayAsyncResourceEntity {
 
     @Column(name = "metadata_json", columnDefinition = "text")
     private String metadataJson;
+
+    @Column(name = "upstream_object_id", length = 256)
+    private String upstreamObjectId;
 
     @Column(name = "deleted", nullable = false)
     private boolean deleted = false;
@@ -138,6 +142,14 @@ public class GatewayAsyncResourceEntity {
 
     public void setMetadataJson(String metadataJson) {
         this.metadataJson = metadataJson;
+    }
+
+    public String getUpstreamObjectId() {
+        return upstreamObjectId;
+    }
+
+    public void setUpstreamObjectId(String upstreamObjectId) {
+        this.upstreamObjectId = upstreamObjectId;
     }
 
     public boolean isDeleted() {

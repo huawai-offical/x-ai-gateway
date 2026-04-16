@@ -76,11 +76,16 @@ public class SiteCapabilityTruthService {
         java.util.ArrayList<String> blockedReasons = new java.util.ArrayList<>();
         java.util.ArrayList<String> lossReasons = new java.util.ArrayList<>();
         if (effectiveLevel == InteropCapabilityLevel.UNSUPPORTED) {
-            if (declaredLevel == InteropCapabilityLevel.UNSUPPORTED) {
-                blockedReasons.add(feature.wireName() + " 当前站点声明不支持。");
-            }
-            if (implementedLevel == InteropCapabilityLevel.UNSUPPORTED) {
-                blockedReasons.add(feature.wireName() + " 当前实现尚未落地。");
+            String providerSpecificReason = providerSpecificBlockedReason(siteProfile.getSiteKind(), feature);
+            if (providerSpecificReason != null) {
+                blockedReasons.add(providerSpecificReason);
+            } else {
+                if (declaredLevel == InteropCapabilityLevel.UNSUPPORTED) {
+                    blockedReasons.add(feature.wireName() + " 当前站点声明不支持。");
+                }
+                if (implementedLevel == InteropCapabilityLevel.UNSUPPORTED) {
+                    blockedReasons.add(feature.wireName() + " 当前实现尚未落地。");
+                }
             }
         } else if (effectiveLevel == InteropCapabilityLevel.EMULATED) {
             lossReasons.add(feature.wireName() + " 以 emulated 执行。");
@@ -223,7 +228,7 @@ public class SiteCapabilityTruthService {
                 .distinct()
                 .toList();
 
-        if (supportsGatewayOrchestrationSurface(backendDecision, semantics)) {
+        if (supportsGatewayOrchestrationSurface(siteProfile, backendDecision, semantics)) {
             return new SurfaceCompatibilityReport(
                     Map.copyOf(featureResolutions),
                     InteropCapabilityLevel.NATIVE,
@@ -265,14 +270,19 @@ public class SiteCapabilityTruthService {
         java.util.ArrayList<String> blockedReasons = new java.util.ArrayList<>();
         java.util.ArrayList<String> lossReasons = new java.util.ArrayList<>();
         if (effectiveLevel == InteropCapabilityLevel.UNSUPPORTED) {
-            if (declaredLevel == InteropCapabilityLevel.UNSUPPORTED) {
-                blockedReasons.add(feature.wireName() + " 当前站点声明不支持。");
-            }
-            if (modelLevel == InteropCapabilityLevel.UNSUPPORTED) {
-                blockedReasons.add(feature.wireName() + " 当前模型不支持。");
-            }
-            if (implementedLevel == InteropCapabilityLevel.UNSUPPORTED) {
-                blockedReasons.add(feature.wireName() + " 当前实现尚未落地。");
+            String providerSpecificReason = providerSpecificBlockedReason(candidate.siteKind(), feature);
+            if (providerSpecificReason != null) {
+                blockedReasons.add(providerSpecificReason);
+            } else {
+                if (declaredLevel == InteropCapabilityLevel.UNSUPPORTED) {
+                    blockedReasons.add(feature.wireName() + " 当前站点声明不支持。");
+                }
+                if (modelLevel == InteropCapabilityLevel.UNSUPPORTED) {
+                    blockedReasons.add(feature.wireName() + " 当前模型不支持。");
+                }
+                if (implementedLevel == InteropCapabilityLevel.UNSUPPORTED) {
+                    blockedReasons.add(feature.wireName() + " 当前实现尚未落地。");
+                }
             }
         } else if (effectiveLevel == InteropCapabilityLevel.EMULATED) {
             lossReasons.add(feature.wireName() + " 以 emulated 执行。");
@@ -442,19 +452,23 @@ public class SiteCapabilityTruthService {
                     ? InteropCapabilityLevel.NATIVE
                     : InteropCapabilityLevel.UNSUPPORTED;
             case UPLOAD_CREATE -> hasSnapshotCapability(snapshot, SiteCapabilitySnapshotEntity::isSupportsUploads)
-                    && supportsUpstreamAsyncObjects(siteKind)
+                    && supportsUpstreamUploads(siteKind)
                     ? InteropCapabilityLevel.NATIVE
                     : InteropCapabilityLevel.UNSUPPORTED;
             case BATCH_CREATE -> hasSnapshotCapability(snapshot, SiteCapabilitySnapshotEntity::isSupportsBatches)
-                    && supportsUpstreamAsyncObjects(siteKind)
+                    && supportsUpstreamBatches(siteKind)
+                    ? InteropCapabilityLevel.NATIVE
+                    : InteropCapabilityLevel.UNSUPPORTED;
+            case ANTHROPIC_MESSAGE_BATCH -> hasSnapshotCapability(snapshot, SiteCapabilitySnapshotEntity::isSupportsBatches)
+                    && supportsUpstreamAnthropicMessageBatches(siteKind)
                     ? InteropCapabilityLevel.NATIVE
                     : InteropCapabilityLevel.UNSUPPORTED;
             case TUNING_CREATE -> hasSnapshotCapability(snapshot, SiteCapabilitySnapshotEntity::isSupportsTuning)
-                    && supportsUpstreamAsyncObjects(siteKind)
+                    && supportsUpstreamTunings(siteKind)
                     ? InteropCapabilityLevel.NATIVE
                     : InteropCapabilityLevel.UNSUPPORTED;
             case REALTIME_CLIENT_SECRET -> hasSnapshotCapability(snapshot, SiteCapabilitySnapshotEntity::isSupportsRealtime)
-                    && supportsUpstreamAsyncObjects(siteKind)
+                    && supportsUpstreamRealtime(siteKind)
                     ? InteropCapabilityLevel.NATIVE
                     : InteropCapabilityLevel.UNSUPPORTED;
         };
@@ -469,17 +483,17 @@ public class SiteCapabilityTruthService {
     private boolean supportsUpstreamEmbeddings(UpstreamSiteKind siteKind) {
         return switch (siteKind) {
             case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, GROK, MISTRAL, TOGETHER, FIREWORKS,
-                    OPENROUTER, COHERE, GEMINI_DIRECT, AZURE_OPENAI -> true;
+                    OPENROUTER, COHERE, GEMINI_DIRECT, VERTEX_AI, AZURE_OPENAI -> true;
             default -> false;
         };
     }
 
     private boolean supportsUpstreamAudio(UpstreamSiteKind siteKind) {
-        return supportsOpenAiStyleResources(siteKind) || siteKind == UpstreamSiteKind.GEMINI_DIRECT;
+        return supportsOpenAiStyleResources(siteKind) || supportsGoogleGenAiSite(siteKind);
     }
 
     private boolean supportsUpstreamImageGeneration(UpstreamSiteKind siteKind) {
-        return supportsOpenAiStyleResources(siteKind) || siteKind == UpstreamSiteKind.GEMINI_DIRECT;
+        return supportsOpenAiStyleResources(siteKind) || supportsGoogleGenAiSite(siteKind);
     }
 
     private boolean supportsUpstreamImageEditing(UpstreamSiteKind siteKind) {
@@ -487,7 +501,7 @@ public class SiteCapabilityTruthService {
     }
 
     private boolean supportsUpstreamModeration(UpstreamSiteKind siteKind) {
-        return supportsOpenAiStyleResources(siteKind) || siteKind == UpstreamSiteKind.GEMINI_DIRECT;
+        return supportsOpenAiStyleResources(siteKind) || supportsGoogleGenAiSite(siteKind);
     }
 
     private boolean supportsOpenAiStyleResources(UpstreamSiteKind siteKind) {
@@ -499,29 +513,93 @@ public class SiteCapabilityTruthService {
 
     private boolean supportsUpstreamFileObjects(UpstreamSiteKind siteKind) {
         return switch (siteKind) {
-            case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, OPENROUTER, TOGETHER, FIREWORKS, DEEPSEEK, GROK, MISTRAL, COHERE, GEMINI_DIRECT -> true;
+            case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, OPENROUTER, TOGETHER, FIREWORKS, DEEPSEEK, GROK,
+                    MISTRAL, COHERE, ANTHROPIC_DIRECT, GEMINI_DIRECT, VERTEX_AI -> true;
             default -> false;
         };
     }
 
-    private boolean supportsUpstreamAsyncObjects(UpstreamSiteKind siteKind) {
-        return siteKind == UpstreamSiteKind.OPENAI_DIRECT || siteKind == UpstreamSiteKind.GEMINI_DIRECT;
+    private boolean supportsUpstreamUploads(UpstreamSiteKind siteKind) {
+        return siteKind == UpstreamSiteKind.OPENAI_DIRECT;
+    }
+
+    private boolean supportsUpstreamBatches(UpstreamSiteKind siteKind) {
+        return siteKind == UpstreamSiteKind.OPENAI_DIRECT || supportsGoogleGenAiSite(siteKind);
+    }
+
+    private boolean supportsUpstreamAnthropicMessageBatches(UpstreamSiteKind siteKind) {
+        return siteKind == UpstreamSiteKind.ANTHROPIC_DIRECT;
+    }
+
+    private boolean supportsUpstreamTunings(UpstreamSiteKind siteKind) {
+        return siteKind == UpstreamSiteKind.OPENAI_DIRECT || supportsGoogleGenAiSite(siteKind);
+    }
+
+    private boolean supportsUpstreamRealtime(UpstreamSiteKind siteKind) {
+        return siteKind == UpstreamSiteKind.OPENAI_DIRECT;
+    }
+
+    private boolean supportsGoogleGenAiSite(UpstreamSiteKind siteKind) {
+        return siteKind == UpstreamSiteKind.GEMINI_DIRECT || siteKind == UpstreamSiteKind.VERTEX_AI;
     }
 
     private boolean supportsGatewayOrchestrationSurface(
+            UpstreamSiteProfileEntity siteProfile,
             ExecutionBackendDecision backendDecision,
             GatewayRequestSemantics semantics) {
-        if (backendDecision == null || semantics == null) {
+        if (siteProfile == null || backendDecision == null || semantics == null) {
             return false;
         }
         if (backendDecision.preferredBackend() != ExecutionBackend.ORCHESTRATION) {
             return false;
         }
-        return semantics.resourceType() == TranslationResourceType.FILE
-                || semantics.resourceType() == TranslationResourceType.UPLOAD
-                || semantics.resourceType() == TranslationResourceType.BATCH
-                || semantics.resourceType() == TranslationResourceType.TUNING
-                || semantics.resourceType() == TranslationResourceType.REALTIME;
+        return switch (siteProfile.getSiteKind()) {
+            case GEMINI_DIRECT, VERTEX_AI -> semantics.resourceType() == TranslationResourceType.FILE
+                    || semantics.resourceType() == TranslationResourceType.UPLOAD
+                    || semantics.resourceType() == TranslationResourceType.BATCH
+                    || semantics.resourceType() == TranslationResourceType.TUNING;
+            case ANTHROPIC_DIRECT -> semantics.resourceType() == TranslationResourceType.FILE
+                    || semantics.operation() == TranslationOperation.ANTHROPIC_MESSAGE_BATCH_CREATE
+                    || semantics.operation() == TranslationOperation.ANTHROPIC_MESSAGE_BATCH_GET
+                    || semantics.operation() == TranslationOperation.ANTHROPIC_MESSAGE_BATCH_CANCEL;
+            default -> semantics.resourceType() == TranslationResourceType.FILE
+                    || semantics.resourceType() == TranslationResourceType.UPLOAD
+                    || semantics.resourceType() == TranslationResourceType.BATCH
+                    || semantics.resourceType() == TranslationResourceType.TUNING
+                    || semantics.resourceType() == TranslationResourceType.REALTIME;
+        };
+    }
+
+    private String providerSpecificBlockedReason(UpstreamSiteKind siteKind, InteropFeature feature) {
+        return switch (siteKind) {
+            case GEMINI_DIRECT -> switch (feature) {
+                case UPLOAD_CREATE ->
+                        "Gemini Files API 存在，但不等价于 OpenAI /v1/uploads 的 create/parts/complete/cancel contract，因此仅开放 gateway-local orchestration surface。";
+                case REALTIME_CLIENT_SECRET ->
+                        "Gemini ephemeral/live token 不等价于 OpenAI realtime client_secret object，因此当前不开放。";
+                default -> null;
+            };
+            case ANTHROPIC_DIRECT -> switch (feature) {
+                case EMBEDDINGS ->
+                        "Anthropic 当前没有稳定的原生 embeddings API，因此当前不开放。";
+                case AUDIO_TRANSCRIPTION, AUDIO_TRANSLATION, AUDIO_SPEECH ->
+                        "Anthropic 当前没有稳定的原生 audio API，因此当前不开放。";
+                case IMAGE_GENERATION, IMAGE_EDIT, IMAGE_VARIATION ->
+                        "Anthropic 当前没有稳定的原生 image API，因此当前不开放。";
+                case MODERATION ->
+                        "Anthropic 当前没有稳定的原生 moderation API，因此当前不开放。";
+                case UPLOAD_CREATE ->
+                        "Anthropic Files API beta 不等价于 OpenAI /v1/uploads 的 create/parts/complete/cancel contract，因此当前不开放。";
+                case BATCH_CREATE ->
+                        "Anthropic Message Batches 是原生 messages request array 语义，不等价于当前 file-driven /v1/batches contract，因此当前不开放。";
+                case TUNING_CREATE ->
+                        "Anthropic 当前没有稳定的原生 tuning API，因此当前不开放。";
+                case REALTIME_CLIENT_SECRET ->
+                        "Anthropic 当前没有与 OpenAI realtime client_secret 等价的稳定原生对象，因此当前不开放。";
+                default -> null;
+            };
+            default -> null;
+        };
     }
 
     private String upstreamObjectMode(TranslationResourceType resourceType, ExecutionKind executionKind) {

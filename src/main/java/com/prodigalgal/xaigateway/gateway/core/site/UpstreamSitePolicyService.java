@@ -153,8 +153,8 @@ public class UpstreamSitePolicyService {
                     false,
                     false,
                     false,
-                    false,
-                    false,
+                    true,
+                    true,
                     false,
                     false,
                     "sse",
@@ -232,14 +232,14 @@ public class UpstreamSitePolicyService {
                     ErrorSchemaStrategy.GEMINI_ERROR,
                     List.of("google_native"),
                     false,
+                    true,
+                    true,
+                    true,
+                    true,
+                    true,
                     false,
-                    false,
-                    false,
-                    false,
-                    false,
-                    false,
-                    false,
-                    false,
+                    true,
+                    true,
                     false,
                     "sse",
                     "vertex-google-native",
@@ -291,7 +291,12 @@ public class UpstreamSitePolicyService {
             case UPLOAD_CREATE -> policy.supportsUploads()
                     ? InteropCapabilityLevel.NATIVE
                     : InteropCapabilityLevel.UNSUPPORTED;
-            case BATCH_CREATE -> policy.supportsBatches()
+            case BATCH_CREATE -> siteKind == UpstreamSiteKind.ANTHROPIC_DIRECT
+                    ? InteropCapabilityLevel.UNSUPPORTED
+                    : policy.supportsBatches()
+                    ? InteropCapabilityLevel.NATIVE
+                    : InteropCapabilityLevel.UNSUPPORTED;
+            case ANTHROPIC_MESSAGE_BATCH -> siteKind == UpstreamSiteKind.ANTHROPIC_DIRECT && policy.supportsBatches()
                     ? InteropCapabilityLevel.NATIVE
                     : InteropCapabilityLevel.UNSUPPORTED;
             case TUNING_CREATE -> policy.supportsTuning()

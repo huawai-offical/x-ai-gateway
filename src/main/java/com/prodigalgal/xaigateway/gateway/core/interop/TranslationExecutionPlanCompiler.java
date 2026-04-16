@@ -319,6 +319,7 @@ public class TranslationExecutionPlanCompiler {
             case FILE_CREATE, FILE_LIST, FILE_GET, FILE_CONTENT_GET, FILE_DELETE,
                     UPLOAD_CREATE, UPLOAD_GET, UPLOAD_PART_ADD, UPLOAD_COMPLETE, UPLOAD_CANCEL,
                     BATCH_CREATE, BATCH_GET, BATCH_CANCEL,
+                    ANTHROPIC_MESSAGE_BATCH_CREATE, ANTHROPIC_MESSAGE_BATCH_GET, ANTHROPIC_MESSAGE_BATCH_CANCEL,
                     TUNING_CREATE, TUNING_GET, TUNING_CANCEL,
                     REALTIME_CLIENT_SECRET_CREATE -> "resource-orchestration";
             default -> throw new IllegalArgumentException("预检请求缺少 model。");

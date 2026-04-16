@@ -339,10 +339,15 @@ public class GatewayRouteSelectionService {
         InteropCapabilityLevel renderLevel = providerBlocked
                 ? InteropCapabilityLevel.UNSUPPORTED
                 : CanonicalRenderCapabilitySupport.renderLevel(normalizedProtocol, requestPath, semantics);
-        InteropCapabilityLevel combinedLevel = report == null
+        boolean gatewayUploadSurfaceEligible = isGatewayUploadSurfaceEligible(candidate, semantics, report);
+        InteropCapabilityLevel combinedLevel = gatewayUploadSurfaceEligible
+                ? renderLevel
+                : report == null
                 ? InteropCapabilityLevel.UNSUPPORTED
                 : CanonicalRenderCapabilitySupport.minimum(report.overallEffectiveLevel(), renderLevel);
-        boolean featureBlocked = report == null || !supportsRequiredFeatures(report) || combinedLevel == InteropCapabilityLevel.UNSUPPORTED;
+        boolean featureBlocked = report == null
+                || (!supportsRequiredFeatures(report) && !gatewayUploadSurfaceEligible)
+                || combinedLevel == InteropCapabilityLevel.UNSUPPORTED;
         boolean renderBlocked = renderLevel == InteropCapabilityLevel.UNSUPPORTED;
         int capabilityRank = featureBlocked ? 0 : capabilityRank(combinedLevel);
         String capabilityLevel = featureBlocked ? null : combinedLevel.name();
@@ -584,6 +589,28 @@ public class GatewayRouteSelectionService {
             return false;
         }
         return report.blockedReasons().isEmpty() && report.overallEffectiveLevel() != InteropCapabilityLevel.UNSUPPORTED;
+    }
+
+    private boolean isGatewayUploadSurfaceEligible(
+            RouteCandidateView candidate,
+            GatewayRequestSemantics semantics,
+            CapabilityResolutionReport report) {
+        if (candidate == null || semantics == null || report == null) {
+            return false;
+        }
+        if (candidate.candidate().providerType() != ProviderType.GEMINI_DIRECT) {
+            return false;
+        }
+        if (semantics.operation() != com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation.UPLOAD_CREATE
+                || semantics.resourceType() != com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType.UPLOAD) {
+            return false;
+        }
+        var fileObject = report.featureResolutions().get("file_object");
+        var uploadCreate = report.featureResolutions().get("upload_create");
+        return fileObject != null
+                && fileObject.effectiveLevel() != InteropCapabilityLevel.UNSUPPORTED
+                && uploadCreate != null
+                && uploadCreate.effectiveLevel() == InteropCapabilityLevel.UNSUPPORTED;
     }
 
     private int capabilityRank(InteropCapabilityLevel level) {

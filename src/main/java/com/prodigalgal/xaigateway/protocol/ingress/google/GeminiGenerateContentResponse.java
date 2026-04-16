@@ -30,7 +30,16 @@ public record GeminiGenerateContentResponse(
     public record Part(
             String text,
             @JsonProperty("functionCall")
-            FunctionCall functionCall
+            FunctionCall functionCall,
+            @JsonProperty("inlineData")
+            InlineData inlineData
+    ) {
+    }
+
+    public record InlineData(
+            @JsonProperty("mimeType")
+            String mimeType,
+            String data
     ) {
     }
 
@@ -73,12 +82,13 @@ public record GeminiGenerateContentResponse(
                             new FunctionCall(
                                     toolCall.name(),
                                     parseArguments(mapper, toolCall.arguments())
-                            )
+                            ),
+                            null
                     ))
                     .toList();
         }
 
-        return List.of(new Part(text, null));
+        return List.of(new Part(text, null, null));
     }
 
     private static JsonNode parseArguments(ObjectMapper mapper, String arguments) {

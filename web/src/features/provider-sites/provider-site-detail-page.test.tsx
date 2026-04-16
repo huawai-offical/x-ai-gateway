@@ -355,7 +355,7 @@ const sampleSite = {
           effectiveLevel: 'UNSUPPORTED',
           supportStatus: 'BLOCKED',
           degradationLevel: 'UNSUPPORTED',
-          blockedReasons: ['upload_create 当前站点声明不支持。'],
+          blockedReasons: ['Gemini Files API 存在，但不等价于 OpenAI /v1/uploads 的 create/parts/complete/cancel contract，因此仅开放 gateway-local orchestration surface。'],
           lossReasons: [],
         },
       },

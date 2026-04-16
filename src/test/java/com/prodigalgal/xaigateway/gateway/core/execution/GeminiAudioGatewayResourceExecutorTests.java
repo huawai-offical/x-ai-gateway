@@ -49,7 +49,7 @@ class GeminiAudioGatewayResourceExecutorTests {
 
         assertTrue(executor.supports(request(TranslationOperation.AUDIO_TRANSCRIPTION, "/v1/audio/transcriptions"), candidate(UpstreamSiteKind.GEMINI_DIRECT)));
         assertTrue(executor.supports(request(TranslationOperation.AUDIO_SPEECH, "/v1/audio/speech"), candidate(UpstreamSiteKind.GEMINI_DIRECT)));
-        assertFalse(executor.supports(request(TranslationOperation.AUDIO_TRANSCRIPTION, "/v1/audio/transcriptions"), candidate(UpstreamSiteKind.VERTEX_AI)));
+        assertTrue(executor.supports(request(TranslationOperation.AUDIO_TRANSCRIPTION, "/v1/audio/transcriptions"), candidate(UpstreamSiteKind.VERTEX_AI)));
         assertFalse(executor.supports(request(TranslationOperation.AUDIO_TRANSCRIPTION, "/v1/audio/unknown"), candidate(UpstreamSiteKind.GEMINI_DIRECT)));
     }
 

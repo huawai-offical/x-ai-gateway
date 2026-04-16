@@ -1,16 +1,16 @@
 package com.prodigalgal.xaigateway.gateway.core.execution;
 
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.node.ArrayNode;
-import tools.jackson.databind.node.ObjectNode;
+import com.google.genai.Client;
+import com.google.genai.types.ContentEmbedding;
+import com.google.genai.types.EmbedContentConfig;
+import com.google.genai.types.EmbedContentResponse;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest;
 import com.prodigalgal.xaigateway.gateway.core.shared.AuthStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend;
 import com.prodigalgal.xaigateway.gateway.core.shared.PathStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
-import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
+import com.prodigalgal.xaigateway.provider.adapter.gemini.GeminiChatModelFactory;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -20,6 +20,10 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 
 @Component
 public class EmbeddingsGatewayResourceExecutor implements GatewayResourceExecutor {
@@ -27,9 +31,13 @@ public class EmbeddingsGatewayResourceExecutor implements GatewayResourceExecuto
     private static final String DEFAULT_AZURE_API_VERSION = "2024-10-21";
 
     private final ObjectMapper objectMapper;
+    private final GeminiChatModelFactory geminiChatModelFactory;
 
-    public EmbeddingsGatewayResourceExecutor(ObjectMapper objectMapper) {
+    public EmbeddingsGatewayResourceExecutor(
+            ObjectMapper objectMapper,
+            GeminiChatModelFactory geminiChatModelFactory) {
         this.objectMapper = objectMapper;
+        this.geminiChatModelFactory = geminiChatModelFactory;
     }
 
     @Override
@@ -44,7 +52,7 @@ public class EmbeddingsGatewayResourceExecutor implements GatewayResourceExecuto
         }
         return switch (candidate.providerType()) {
             case OPENAI_DIRECT, OPENAI_COMPATIBLE -> true;
-            case GEMINI_DIRECT -> supportsGeminiEmbeddingsCandidate(candidate);
+            case GEMINI_DIRECT -> supportsGoogleGenAiEmbeddingsCandidate(candidate);
             case ANTHROPIC_DIRECT, OLLAMA_DIRECT -> false;
         };
     }
@@ -57,7 +65,7 @@ public class EmbeddingsGatewayResourceExecutor implements GatewayResourceExecuto
         ObjectNode payload = requireObjectPayload(requestBody, defaultModel);
         return switch (context.selectionResult().selectedCandidate().candidate().providerType()) {
             case OPENAI_DIRECT, OPENAI_COMPATIBLE -> executeOpenAiCompatibleEmbeddings(context, payload);
-            case GEMINI_DIRECT -> executeGeminiEmbeddings(context, payload);
+            case GEMINI_DIRECT -> executeGoogleGenAiEmbeddings(context, payload);
             case ANTHROPIC_DIRECT, OLLAMA_DIRECT ->
                     throw new IllegalArgumentException("当前站点不支持 embeddings 执行。");
         };
@@ -90,58 +98,33 @@ public class EmbeddingsGatewayResourceExecutor implements GatewayResourceExecuto
                 .body(body);
     }
 
-    private ResponseEntity<JsonNode> executeGeminiEmbeddings(
+    private ResponseEntity<JsonNode> executeGoogleGenAiEmbeddings(
             GatewayResourceExecutionContext context,
             ObjectNode payload) {
         List<String> inputs = readEmbeddingInputs(payload.path("input"));
-        CatalogSiteRequest siteRequest = buildSiteRequest(context);
-        boolean batch = inputs.size() > 1;
-        ObjectNode geminiPayload = objectMapper.createObjectNode();
-        if (batch) {
-            ArrayNode requests = geminiPayload.putArray("requests");
-            for (String input : inputs) {
-                requests.addObject()
-                        .putObject("content")
-                        .putArray("parts")
-                        .addObject()
-                        .put("text", input);
-            }
-        } else {
-            geminiPayload.putObject("content")
-                    .putArray("parts")
-                    .addObject()
-                    .put("text", inputs.isEmpty() ? "" : inputs.get(0));
+        EmbedContentResponse response;
+        try (Client client = GeminiGatewayResourceSupport.createClient(geminiChatModelFactory, context)) {
+            response = client.models.embedContent(
+                    context.selectionResult().resolvedModelKey(),
+                    inputs,
+                    EmbedContentConfig.builder().build()
+            );
         }
-
-        String path = batch
-                ? "/v1beta/models/" + encodePath(context.selectionResult().resolvedModelKey()) + ":batchEmbedContents?key=" + encodeQuery(context.apiKey())
-                : "/v1beta/models/" + encodePath(context.selectionResult().resolvedModelKey()) + ":embedContent?key=" + encodeQuery(context.apiKey());
-
-        JsonNode response = siteRequest.client().post()
-                .uri(path)
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(geminiPayload)
-                .retrieve()
-                .bodyToMono(JsonNode.class)
-                .block();
-
-        if (response == null) {
-            throw new IllegalStateException("Gemini embeddings 响应为空。");
+        List<ContentEmbedding> embeddings = response == null ? List.of() : response.embeddings().orElse(List.of());
+        if (embeddings.isEmpty()) {
+            throw new IllegalStateException("Google GenAI embeddings 响应为空。");
         }
 
         ObjectNode openAiResponse = objectMapper.createObjectNode();
         openAiResponse.put("object", "list");
-        openAiResponse.put("model", context.selectionResult().publicModel());
+        openAiResponse.put("model", GeminiGatewayResourceSupport.responseModel(context));
         ArrayNode data = openAiResponse.putArray("data");
-        if (batch) {
-            int index = 0;
-            for (JsonNode item : response.path("embeddings")) {
-                data.add(buildEmbeddingItem(index++, item.path("values")));
-            }
-        } else {
-            data.add(buildEmbeddingItem(0, response.path("embedding").path("values")));
+        for (int index = 0; index < embeddings.size(); index++) {
+            data.add(buildEmbeddingItem(index, embeddings.get(index).values().orElse(List.of())));
         }
-        int promptTokens = response.path("usageMetadata").path("promptTokenCount").asInt(0);
+        int promptTokens = response.metadata()
+                .flatMap(metadata -> metadata.billableCharacterCount())
+                .orElse(0);
         openAiResponse.putObject("usage")
                 .put("prompt_tokens", promptTokens)
                 .put("total_tokens", promptTokens);
@@ -198,13 +181,13 @@ public class EmbeddingsGatewayResourceExecutor implements GatewayResourceExecuto
         throw new IllegalArgumentException("当前 embeddings 仅支持文本输入。");
     }
 
-    private ObjectNode buildEmbeddingItem(int index, JsonNode valuesNode) {
+    private ObjectNode buildEmbeddingItem(int index, List<Float> values) {
         ObjectNode item = objectMapper.createObjectNode();
         item.put("object", "embedding");
         item.put("index", index);
         ArrayNode embedding = item.putArray("embedding");
-        for (JsonNode value : valuesNode) {
-            embedding.add(value.asDouble());
+        for (Float value : values) {
+            embedding.add(value == null ? 0.0d : value.doubleValue());
         }
         return item;
     }
@@ -213,14 +196,9 @@ public class EmbeddingsGatewayResourceExecutor implements GatewayResourceExecuto
         return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
     }
 
-    private String encodeQuery(String value) {
-        return URLEncoder.encode(value, StandardCharsets.UTF_8);
-    }
-
-    private boolean supportsGeminiEmbeddingsCandidate(CatalogCandidateView candidate) {
-        return candidate.siteKind() == UpstreamSiteKind.GEMINI_DIRECT
-                && candidate.pathStrategy() == PathStrategy.GEMINI_V1BETA_MODELS
-                && candidate.authStrategy() == AuthStrategy.API_KEY_QUERY;
+    private boolean supportsGoogleGenAiEmbeddingsCandidate(CatalogCandidateView candidate) {
+        return GeminiGatewayResourceSupport.supportsGoogleGenAiSite(candidate.siteKind(), candidate.authStrategy())
+                && candidate.pathStrategy() == PathStrategy.GEMINI_V1BETA_MODELS;
     }
 
     private record CatalogSiteRequest(

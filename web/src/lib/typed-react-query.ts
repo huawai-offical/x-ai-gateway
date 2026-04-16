@@ -20,6 +20,7 @@ export type TypedMutationResult<TData, TVariables> = {
   isPending: boolean
   mutate: (variables: TVariables) => void
   mutateAsync: (variables: TVariables) => Promise<TData>
+  reset: () => void
 }
 
 export const useTypedQuery = useQuery as unknown as <TData>(options: QueryOptions<TData>) => TypedQueryResult<TData>

@@ -126,9 +126,9 @@ describe('TranslationDebugPage', () => {
     )
 
     fireEvent.click(screen.getByRole('button', { name: '查看 Explain' }))
-    expect(await screen.findByText('protocol: OPENAI')).toBeInTheDocument()
-    expect(screen.getByText('supportStatus: NATIVE')).toBeInTheDocument()
-    expect(screen.getByText('surface: chat.completions')).toBeInTheDocument()
+    expect(await screen.findByText('chat.completions')).toBeInTheDocument()
+    expect(screen.getByText('CHAT_COMPLETION')).toBeInTheDocument()
+    expect(screen.getAllByText((_, node) => node?.textContent?.includes('"ingressProtocol": "OPENAI"') ?? false).length).toBeGreaterThan(0)
 
     fireEvent.click(screen.getByRole('button', { name: '执行 Chat 调试' }))
     expect(await screen.findByText('hello from runtime')).toBeInTheDocument()
@@ -148,10 +148,10 @@ describe('TranslationDebugPage', () => {
     )
 
     fireEvent.click(screen.getByRole('button', { name: '查看 Explain' }))
-    expect(await screen.findByText('normalizedPath: /v1/files/{fileId}/content')).toBeInTheDocument()
+    expect(await screen.findByText('/v1/files/{fileId}/content')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: '执行资源调试' }))
-    expect(await screen.findByText('binaryLength: 128')).toBeInTheDocument()
+    expect(await screen.findByText('128')).toBeInTheDocument()
     expect(screen.getByText('responseKind: binary')).toBeInTheDocument()
     expect(screen.getByText('objectType: file.content')).toBeInTheDocument()
   })
@@ -172,6 +172,46 @@ describe('TranslationDebugPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/JSON 解析失败/)).toBeInTheDocument()
+    })
+  })
+
+  it('applies debug preset and reveals multipart helpers', async () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter>
+          <TranslationDebugPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Audio' }))
+
+    expect(screen.getByDisplayValue('/v1/audio/transcriptions')).toBeInTheDocument()
+    expect(screen.getByLabelText('formFields JSON')).toBeInTheDocument()
+    expect(screen.getByLabelText('fileRefs JSON')).toBeInTheDocument()
+  })
+
+  it('clears explain and execute panels when reset is requested', async () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter>
+          <TranslationDebugPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '查看 Explain' }))
+    expect(await screen.findByText('chat.completions')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '执行 Chat 调试' }))
+    expect(await screen.findByText('hello from runtime')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '清空结果' }))
+
+    await waitFor(() => {
+      expect(screen.queryByText('hello from runtime')).not.toBeInTheDocument()
+      expect(screen.getByText('提交请求后查看 explain 结果。')).toBeInTheDocument()
+      expect(screen.getByText('执行调试后可在这里对照 explain、backend 与真实 route/result。')).toBeInTheDocument()
     })
   })
 })

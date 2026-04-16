@@ -1,11 +1,10 @@
 package com.prodigalgal.xaigateway.protocol.ingress.google;
 
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.admin.application.GatewayChatExecutionService;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthenticationService;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
+import com.prodigalgal.xaigateway.gateway.core.execution.GatewayResourceExecutionService;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -29,18 +28,30 @@ public class GeminiGenerateContentController {
 
     private final DistributedKeyAuthenticationService distributedKeyAuthenticationService;
     private final GatewayChatExecutionService gatewayChatExecutionService;
+    private final GatewayResourceExecutionService gatewayResourceExecutionService;
     private final GeminiGenerateContentRequestMapper geminiGenerateContentRequestMapper;
     private final GeminiGenerateContentEncoder geminiGenerateContentEncoder;
+    private final GeminiGenerateContentModeResolver geminiGenerateContentModeResolver;
+    private final GeminiGenerateContentResourceMapper geminiGenerateContentResourceMapper;
+    private final GeminiGenerateContentResourceEncoder geminiGenerateContentResourceEncoder;
 
     public GeminiGenerateContentController(
             DistributedKeyAuthenticationService distributedKeyAuthenticationService,
             GatewayChatExecutionService gatewayChatExecutionService,
             GeminiGenerateContentRequestMapper geminiGenerateContentRequestMapper,
-            ObjectMapper objectMapper) {
+            GeminiGenerateContentEncoder geminiGenerateContentEncoder,
+            GatewayResourceExecutionService gatewayResourceExecutionService,
+            GeminiGenerateContentModeResolver geminiGenerateContentModeResolver,
+            GeminiGenerateContentResourceMapper geminiGenerateContentResourceMapper,
+            GeminiGenerateContentResourceEncoder geminiGenerateContentResourceEncoder) {
         this.distributedKeyAuthenticationService = distributedKeyAuthenticationService;
         this.gatewayChatExecutionService = gatewayChatExecutionService;
+        this.gatewayResourceExecutionService = gatewayResourceExecutionService;
         this.geminiGenerateContentRequestMapper = geminiGenerateContentRequestMapper;
-        this.geminiGenerateContentEncoder = new GeminiGenerateContentEncoder(objectMapper);
+        this.geminiGenerateContentEncoder = geminiGenerateContentEncoder;
+        this.geminiGenerateContentModeResolver = geminiGenerateContentModeResolver;
+        this.geminiGenerateContentResourceMapper = geminiGenerateContentResourceMapper;
+        this.geminiGenerateContentResourceEncoder = geminiGenerateContentResourceEncoder;
     }
 
     @PostMapping("/{model}:generateContent")
@@ -50,6 +61,17 @@ public class GeminiGenerateContentController {
             @RequestParam(value = "key", required = false) String queryApiKey,
             @Valid @RequestBody GeminiGenerateContentRequest request) {
         AuthenticatedDistributedKey distributedKey = authenticate(headerApiKey, queryApiKey);
+        GeminiGenerateContentModeResolver.GeminiGenerateContentMode mode = geminiGenerateContentModeResolver.resolve(request);
+        if (mode == GeminiGenerateContentModeResolver.GeminiGenerateContentMode.IMAGE_GENERATION) {
+            var resourceRequest = geminiGenerateContentResourceMapper.toImageGenerationRequest(distributedKey, model, request);
+            var result = gatewayResourceExecutionService.executeDetailedJson(resourceRequest, distributedKey.id(), model);
+            return ResponseEntity.ok(geminiGenerateContentResourceEncoder.encodeImageGeneration(result));
+        }
+        if (mode == GeminiGenerateContentModeResolver.GeminiGenerateContentMode.AUDIO_SPEECH) {
+            var resourceRequest = geminiGenerateContentResourceMapper.toAudioSpeechRequest(distributedKey, model, request);
+            var result = gatewayResourceExecutionService.executeDetailedBinaryJson(resourceRequest, distributedKey.id(), model);
+            return ResponseEntity.ok(geminiGenerateContentResourceEncoder.encodeAudioSpeech(result));
+        }
         CanonicalRequest canonicalRequest = geminiGenerateContentRequestMapper.toCanonicalRequest(distributedKey, model, request, false);
         var response = gatewayChatExecutionService.executeGatewayResponse(canonicalRequest);
         return ResponseEntity.ok(geminiGenerateContentEncoder.encode(response));
@@ -62,6 +84,10 @@ public class GeminiGenerateContentController {
             @RequestParam(value = "key", required = false) String queryApiKey,
             @Valid @RequestBody GeminiGenerateContentRequest request) {
         AuthenticatedDistributedKey distributedKey = authenticate(headerApiKey, queryApiKey);
+        GeminiGenerateContentModeResolver.GeminiGenerateContentMode mode = geminiGenerateContentModeResolver.resolve(request);
+        if (mode != GeminiGenerateContentModeResolver.GeminiGenerateContentMode.CHAT) {
+            throw new IllegalArgumentException("resource-mode 当前不支持 streamGenerateContent。");
+        }
         CanonicalRequest canonicalRequest = geminiGenerateContentRequestMapper.toCanonicalRequest(distributedKey, model, request, true);
         var streamResponse = gatewayChatExecutionService.executeGatewayStream(canonicalRequest);
         Flux<String> body = geminiGenerateContentEncoder.encodeStream(streamResponse);

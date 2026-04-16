@@ -42,32 +42,38 @@ public class ExecutionSupportMatrixService {
             };
             case EMBEDDINGS -> switch (providerType) {
                 case OPENAI_DIRECT, OPENAI_COMPATIBLE -> InteropCapabilityLevel.NATIVE;
-                case GEMINI_DIRECT -> siteKind == UpstreamSiteKind.VERTEX_AI
-                        ? InteropCapabilityLevel.UNSUPPORTED
-                        : InteropCapabilityLevel.NATIVE;
+                case GEMINI_DIRECT -> supportsGoogleGenAiSite(siteKind)
+                        ? InteropCapabilityLevel.NATIVE
+                        : InteropCapabilityLevel.UNSUPPORTED;
                 default -> InteropCapabilityLevel.UNSUPPORTED;
             };
             case AUDIO_TRANSCRIPTION, AUDIO_TRANSLATION, AUDIO_SPEECH ->
-                    supportsGeminiDirectAudio(siteKind) || supportsOpenAiStyleSite(siteKind)
+                    supportsGoogleGenAiAudio(siteKind) || supportsOpenAiStyleSite(siteKind)
                             ? InteropCapabilityLevel.NATIVE
                             : InteropCapabilityLevel.UNSUPPORTED;
             case IMAGE_GENERATION ->
-                    supportsGeminiDirectImages(siteKind) || supportsOpenAiStyleSite(siteKind)
+                    supportsGoogleGenAiImages(siteKind) || supportsOpenAiStyleSite(siteKind)
                             ? InteropCapabilityLevel.NATIVE
                             : InteropCapabilityLevel.UNSUPPORTED;
             case IMAGE_EDIT, IMAGE_VARIATION ->
                     supportsOpenAiStyleSite(siteKind) ? InteropCapabilityLevel.NATIVE : InteropCapabilityLevel.UNSUPPORTED;
             case MODERATION ->
-                    supportsGeminiDirectModeration(siteKind) || supportsOpenAiStyleSite(siteKind)
+                    supportsGoogleGenAiModeration(siteKind) || supportsOpenAiStyleSite(siteKind)
                             ? InteropCapabilityLevel.NATIVE
                             : InteropCapabilityLevel.UNSUPPORTED;
-            case FILE_OBJECT -> (siteKind == UpstreamSiteKind.OPENAI_DIRECT || siteKind == UpstreamSiteKind.GEMINI_DIRECT)
+            case FILE_OBJECT -> (siteKind == UpstreamSiteKind.OPENAI_DIRECT
+                    || siteKind == UpstreamSiteKind.ANTHROPIC_DIRECT
+                    || supportsGoogleGenAiSite(siteKind))
                     ? InteropCapabilityLevel.NATIVE
                     : InteropCapabilityLevel.UNSUPPORTED;
             case UPLOAD_CREATE, REALTIME_CLIENT_SECRET ->
                     siteKind == UpstreamSiteKind.OPENAI_DIRECT ? InteropCapabilityLevel.NATIVE : InteropCapabilityLevel.UNSUPPORTED;
             case BATCH_CREATE, TUNING_CREATE ->
-                    (siteKind == UpstreamSiteKind.OPENAI_DIRECT || siteKind == UpstreamSiteKind.GEMINI_DIRECT)
+                    (siteKind == UpstreamSiteKind.OPENAI_DIRECT || supportsGoogleGenAiSite(siteKind))
+                            ? InteropCapabilityLevel.NATIVE
+                            : InteropCapabilityLevel.UNSUPPORTED;
+            case ANTHROPIC_MESSAGE_BATCH ->
+                    siteKind == UpstreamSiteKind.ANTHROPIC_DIRECT
                             ? InteropCapabilityLevel.NATIVE
                             : InteropCapabilityLevel.UNSUPPORTED;
         };
@@ -93,15 +99,19 @@ public class ExecutionSupportMatrixService {
         };
     }
 
-    private boolean supportsGeminiDirectAudio(UpstreamSiteKind siteKind) {
-        return siteKind == UpstreamSiteKind.GEMINI_DIRECT;
+    private boolean supportsGoogleGenAiAudio(UpstreamSiteKind siteKind) {
+        return supportsGoogleGenAiSite(siteKind);
     }
 
-    private boolean supportsGeminiDirectImages(UpstreamSiteKind siteKind) {
-        return siteKind == UpstreamSiteKind.GEMINI_DIRECT;
+    private boolean supportsGoogleGenAiImages(UpstreamSiteKind siteKind) {
+        return supportsGoogleGenAiSite(siteKind);
     }
 
-    private boolean supportsGeminiDirectModeration(UpstreamSiteKind siteKind) {
-        return siteKind == UpstreamSiteKind.GEMINI_DIRECT;
+    private boolean supportsGoogleGenAiModeration(UpstreamSiteKind siteKind) {
+        return supportsGoogleGenAiSite(siteKind);
+    }
+
+    private boolean supportsGoogleGenAiSite(UpstreamSiteKind siteKind) {
+        return siteKind == UpstreamSiteKind.GEMINI_DIRECT || siteKind == UpstreamSiteKind.VERTEX_AI;
     }
 }

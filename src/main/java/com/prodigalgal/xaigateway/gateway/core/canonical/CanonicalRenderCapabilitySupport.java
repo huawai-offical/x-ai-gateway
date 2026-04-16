@@ -25,7 +25,7 @@ public final class CanonicalRenderCapabilitySupport {
                     || operation == TranslationOperation.RESPONSE_CREATE
                     ? InteropCapabilityLevel.EMULATED
                     : InteropCapabilityLevel.UNSUPPORTED;
-            case "anthropic_native" -> "/v1/messages".equals(requestPath) || resourceType == TranslationResourceType.CHAT
+            case "anthropic_native" -> isAnthropicNativePath(requestPath, resourceType)
                     ? InteropCapabilityLevel.NATIVE
                     : InteropCapabilityLevel.UNSUPPORTED;
             case "google_native" -> isGeminiContentPath(requestPath) || resourceType == TranslationResourceType.CHAT
@@ -70,5 +70,14 @@ public final class CanonicalRenderCapabilitySupport {
         return requestPath != null
                 && requestPath.startsWith("/v1beta/models/")
                 && (requestPath.contains(":generateContent") || requestPath.contains(":streamGenerateContent"));
+    }
+
+    private static boolean isAnthropicNativePath(String requestPath, TranslationResourceType resourceType) {
+        if ("/v1/messages".equals(requestPath) || resourceType == TranslationResourceType.CHAT) {
+            return true;
+        }
+        return "/v1/messages/batches".equals(requestPath)
+                || "/v1/messages/batches/{messageBatchId}".equals(requestPath)
+                || "/v1/messages/batches/{messageBatchId}/cancel".equals(requestPath);
     }
 }

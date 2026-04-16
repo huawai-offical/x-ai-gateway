@@ -1,5 +1,12 @@
 package com.prodigalgal.xaigateway.gateway.core.resource;
 
+import com.anthropic.client.AnthropicClient;
+import com.anthropic.models.beta.AnthropicBeta;
+import com.anthropic.models.beta.messages.BetaMessageParam;
+import com.anthropic.models.beta.messages.batches.BatchCancelParams;
+import com.anthropic.models.beta.messages.batches.BatchCreateParams;
+import com.anthropic.models.beta.messages.batches.BatchRetrieveParams;
+import com.anthropic.models.beta.messages.batches.BetaMessageBatch;
 import com.google.genai.Client;
 import com.google.genai.types.BatchJob;
 import com.google.genai.types.BatchJobSource;
@@ -43,6 +50,7 @@ import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayFileReposi
 import com.prodigalgal.xaigateway.infra.persistence.repository.SiteCapabilitySnapshotRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamSiteProfileRepository;
+import com.prodigalgal.xaigateway.provider.adapter.anthropic.AnthropicChatModelFactory;
 import com.prodigalgal.xaigateway.provider.adapter.gemini.GeminiChatModelFactory;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -83,6 +91,7 @@ public class GatewayAsyncResourceService {
     private final CredentialCryptoService credentialCryptoService;
     private final CredentialMaterialResolver credentialMaterialResolver;
     private final SiteCapabilityTruthService siteCapabilityTruthService;
+    private final AnthropicChatModelFactory anthropicChatModelFactory;
     private final GeminiChatModelFactory geminiChatModelFactory;
     private final ObjectMapper objectMapper;
     private final Clock clock;
@@ -100,6 +109,7 @@ public class GatewayAsyncResourceService {
             CredentialCryptoService credentialCryptoService,
             CredentialMaterialResolver credentialMaterialResolver,
             SiteCapabilityTruthService siteCapabilityTruthService,
+            AnthropicChatModelFactory anthropicChatModelFactory,
             GeminiChatModelFactory geminiChatModelFactory,
             ObjectMapper objectMapper,
             Clock clock,
@@ -114,10 +124,45 @@ public class GatewayAsyncResourceService {
         this.credentialCryptoService = credentialCryptoService;
         this.credentialMaterialResolver = credentialMaterialResolver;
         this.siteCapabilityTruthService = siteCapabilityTruthService;
+        this.anthropicChatModelFactory = anthropicChatModelFactory;
         this.geminiChatModelFactory = geminiChatModelFactory;
         this.objectMapper = objectMapper;
         this.clock = clock;
         this.webClientBuilder = webClientBuilder;
+    }
+
+    public GatewayAsyncResourceService(
+            GatewayAsyncResourceRepository gatewayAsyncResourceRepository,
+            DistributedKeyQueryService distributedKeyQueryService,
+            UpstreamCredentialRepository upstreamCredentialRepository,
+            UpstreamSiteProfileRepository upstreamSiteProfileRepository,
+            SiteCapabilitySnapshotRepository siteCapabilitySnapshotRepository,
+            GatewayFileRepository gatewayFileRepository,
+            GatewayFileBindingRepository gatewayFileBindingRepository,
+            CredentialCryptoService credentialCryptoService,
+            CredentialMaterialResolver credentialMaterialResolver,
+            SiteCapabilityTruthService siteCapabilityTruthService,
+            GeminiChatModelFactory geminiChatModelFactory,
+            ObjectMapper objectMapper,
+            Clock clock,
+            WebClient.Builder webClientBuilder) {
+        this(
+                gatewayAsyncResourceRepository,
+                distributedKeyQueryService,
+                upstreamCredentialRepository,
+                upstreamSiteProfileRepository,
+                siteCapabilitySnapshotRepository,
+                gatewayFileRepository,
+                gatewayFileBindingRepository,
+                credentialCryptoService,
+                credentialMaterialResolver,
+                siteCapabilityTruthService,
+                new AnthropicChatModelFactory(ObservationRegistry.NOOP),
+                geminiChatModelFactory,
+                objectMapper,
+                clock,
+                webClientBuilder
+        );
     }
 
     public GatewayAsyncResourceService(
@@ -149,6 +194,7 @@ public class GatewayAsyncResourceService {
                         null
                 ), credentialCryptoService, objectMapper),
                 siteCapabilityTruthService,
+                new AnthropicChatModelFactory(ObservationRegistry.NOOP),
                 new GeminiChatModelFactory(ObservationRegistry.NOOP),
                 objectMapper,
                 clock,
@@ -207,7 +253,10 @@ public class GatewayAsyncResourceService {
 
     public JsonNode createUpload(Long distributedKeyId, JsonNode requestBody, Long preferredCredentialId) {
         ObjectNode payload = requireObject(requestBody);
-        UpstreamTarget target = resolveUpstreamTarget(distributedKeyId, InteropFeature.UPLOAD_CREATE, preferredCredentialId);
+        UpstreamTarget target = resolveUploadTarget(distributedKeyId, preferredCredentialId);
+        if (target.siteProfile().getSiteKind() == UpstreamSiteKind.GEMINI_DIRECT) {
+            return persistLocalUploadResource(distributedKeyId, payload, target);
+        }
         JsonNode upstreamResponse = invokeUpstreamJson(target, "/v1/uploads", rewriteFileRefs(payload, distributedKeyId, target));
         return persistUpstreamBackedResource(distributedKeyId, GatewayAsyncResourceType.UPLOAD, "upload_", payload, upstreamResponse, "upload", target);
     }
@@ -262,7 +311,7 @@ public class GatewayAsyncResourceService {
         ObjectNode sourcePayload = copyObject(requireObject(requestBody));
         UpstreamTarget target = resolveUpstreamTarget(distributedKeyId, InteropFeature.BATCH_CREATE, preferredCredentialId);
         ObjectNode payload = rewriteFileRefs(copyObject(sourcePayload), distributedKeyId, target);
-        if (target.siteProfile().getSiteKind() == UpstreamSiteKind.GEMINI_DIRECT) {
+        if (supportsGoogleGenAiBatching(target.siteProfile().getSiteKind())) {
             return createGeminiBatch(distributedKeyId, sourcePayload, payload, target);
         }
         JsonNode upstreamResponse = invokeUpstreamJson(target, "/v1/batches", payload);
@@ -273,8 +322,77 @@ public class GatewayAsyncResourceService {
         return readOrSyncResource(batchId, distributedKeyId, GatewayAsyncResourceType.BATCH, "batch");
     }
 
+    @Transactional(readOnly = true)
+    public GoogleNativeBatchView getBatchView(String batchId, Long distributedKeyId) {
+        GatewayAsyncResourceEntity entity = getRequired(batchId, GatewayAsyncResourceType.BATCH, distributedKeyId);
+        return toGoogleNativeBatchView(entity);
+    }
+
+    public GoogleNativeBatchView getBatchByUpstreamObjectId(String upstreamObjectId, Long distributedKeyId) {
+        GatewayAsyncResourceEntity entity = gatewayAsyncResourceRepository
+                .findByDistributedKeyIdAndResourceTypeAndUpstreamObjectIdAndDeletedFalse(
+                        distributedKeyId,
+                        GatewayAsyncResourceType.BATCH,
+                        upstreamObjectId
+                )
+                .orElseThrow(() -> new IllegalArgumentException("未找到指定的 Google batch 对象。"));
+        getBatch(entity.getResourceKey(), distributedKeyId);
+        return toGoogleNativeBatchView(entity);
+    }
+
     public JsonNode cancelBatch(String batchId, Long distributedKeyId) {
         return completeRemoteStatus(batchId, distributedKeyId, GatewayAsyncResourceType.BATCH, InteropFeature.BATCH_CREATE, "/cancel");
+    }
+
+    public JsonNode createAnthropicMessageBatch(Long distributedKeyId, JsonNode requestBody, Long preferredCredentialId) {
+        ObjectNode payload = copyObject(requireObject(requestBody));
+        UpstreamTarget target = resolveAnthropicMessageBatchTarget(distributedKeyId, preferredCredentialId);
+        AnthropicClient client = createAnthropicClient(target);
+        try {
+            BetaMessageBatch batch = client.beta().messages().batches().create(toAnthropicBatchCreateParams(payload));
+            return persistAnthropicMessageBatchResource(distributedKeyId, payload, batch, target);
+        } finally {
+            client.close();
+        }
+    }
+
+    public JsonNode getAnthropicMessageBatch(String messageBatchId, Long distributedKeyId) {
+        GatewayAsyncResourceEntity entity = gatewayAsyncResourceRepository
+                .findByDistributedKeyIdAndResourceTypeAndUpstreamObjectIdAndDeletedFalse(
+                        distributedKeyId,
+                        GatewayAsyncResourceType.BATCH,
+                        messageBatchId
+                )
+                .orElseThrow(() -> new IllegalArgumentException("未找到指定的 Anthropic message batch 对象。"));
+        ObjectNode metadata = readObject(entity.getMetadataJson());
+        UpstreamTarget target = resolveAnthropicMessageBatchTargetForEntity(entity, metadata);
+        return syncAnthropicMessageBatchResource(entity, fetchAnthropicMessageBatch(metadata, target));
+    }
+
+    public JsonNode cancelAnthropicMessageBatch(String messageBatchId, Long distributedKeyId) {
+        GatewayAsyncResourceEntity entity = gatewayAsyncResourceRepository
+                .findByDistributedKeyIdAndResourceTypeAndUpstreamObjectIdAndDeletedFalse(
+                        distributedKeyId,
+                        GatewayAsyncResourceType.BATCH,
+                        messageBatchId
+                )
+                .orElseThrow(() -> new IllegalArgumentException("未找到指定的 Anthropic message batch 对象。"));
+        ObjectNode metadata = readObject(entity.getMetadataJson());
+        UpstreamTarget target = resolveAnthropicMessageBatchTargetForEntity(entity, metadata);
+        cancelAnthropicMessageBatch(metadata, target);
+        return syncAnthropicMessageBatchResource(entity, fetchAnthropicMessageBatch(metadata, target));
+    }
+
+    public GoogleNativeBatchView cancelBatchByUpstreamObjectId(String upstreamObjectId, Long distributedKeyId) {
+        GatewayAsyncResourceEntity entity = gatewayAsyncResourceRepository
+                .findByDistributedKeyIdAndResourceTypeAndUpstreamObjectIdAndDeletedFalse(
+                        distributedKeyId,
+                        GatewayAsyncResourceType.BATCH,
+                        upstreamObjectId
+                )
+                .orElseThrow(() -> new IllegalArgumentException("未找到指定的 Google batch 对象。"));
+        cancelBatch(entity.getResourceKey(), distributedKeyId);
+        return toGoogleNativeBatchView(entity);
     }
 
     public JsonNode createTuning(Long distributedKeyId, JsonNode requestBody) {
@@ -285,7 +403,7 @@ public class GatewayAsyncResourceService {
         ObjectNode sourcePayload = copyObject(requireObject(requestBody));
         UpstreamTarget target = resolveUpstreamTarget(distributedKeyId, InteropFeature.TUNING_CREATE, preferredCredentialId);
         ObjectNode payload = rewriteFileRefs(copyObject(sourcePayload), distributedKeyId, target);
-        if (target.siteProfile().getSiteKind() == UpstreamSiteKind.GEMINI_DIRECT) {
+        if (supportsGoogleGenAiBatching(target.siteProfile().getSiteKind())) {
             return createGeminiTuning(distributedKeyId, sourcePayload, payload, target);
         }
         JsonNode upstreamResponse = invokeUpstreamJson(target, "/v1/fine_tuning/jobs", payload);
@@ -306,7 +424,16 @@ public class GatewayAsyncResourceService {
 
     public JsonNode createRealtimeClientSecret(Long distributedKeyId, JsonNode requestBody, Long preferredCredentialId) {
         ObjectNode payload = requireObject(requestBody);
-        UpstreamTarget target = resolveUpstreamTarget(distributedKeyId, InteropFeature.REALTIME_CLIENT_SECRET, preferredCredentialId);
+        UpstreamTarget target;
+        try {
+            target = resolveUpstreamTarget(distributedKeyId, InteropFeature.REALTIME_CLIENT_SECRET, preferredCredentialId);
+        } catch (IllegalArgumentException ex) {
+            String blockedReason = geminiRealtimeBlockedReason(distributedKeyId, preferredCredentialId);
+            if (blockedReason != null) {
+                throw new IllegalArgumentException(blockedReason);
+            }
+            throw ex;
+        }
         JsonNode upstreamResponse = invokeUpstreamJson(target, "/v1/realtime/client_secrets", payload);
         return persistUpstreamBackedResource(
                 distributedKeyId,
@@ -330,11 +457,15 @@ public class GatewayAsyncResourceService {
         if (upstreamId == null || upstreamId.isBlank()) {
             return readJson(entity.getResponsePayloadJson());
         }
+        if (isAnthropicNativeBatch(metadata, resourceType)) {
+            UpstreamTarget target = resolveAnthropicMessageBatchTargetForEntity(entity, metadata);
+            return syncAnthropicMessageBatchResource(entity, fetchAnthropicMessageBatch(metadata, target));
+        }
         UpstreamTarget target = resolveUpstreamTargetForEntity(entity, metadata);
-        if (target.siteProfile().getSiteKind() == UpstreamSiteKind.GEMINI_DIRECT && resourceType == GatewayAsyncResourceType.BATCH) {
+        if (supportsGoogleGenAiBatching(target.siteProfile().getSiteKind()) && resourceType == GatewayAsyncResourceType.BATCH) {
             return syncPersistedResource(entity, fetchGeminiBatch(entity, metadata, target), objectName);
         }
-        if (target.siteProfile().getSiteKind() == UpstreamSiteKind.GEMINI_DIRECT && resourceType == GatewayAsyncResourceType.TUNING) {
+        if (supportsGoogleGenAiBatching(target.siteProfile().getSiteKind()) && resourceType == GatewayAsyncResourceType.TUNING) {
             return syncPersistedResource(entity, fetchGeminiTuning(entity, metadata, target), objectName);
         }
         JsonNode upstreamResponse = target.client()
@@ -358,12 +489,17 @@ public class GatewayAsyncResourceService {
         if (upstreamId == null || upstreamId.isBlank()) {
             return updateLocalStatus(resourceKey, distributedKeyId, resourceType, suffix.contains("cancel") ? "cancelled" : "completed");
         }
+        if (isAnthropicNativeBatch(metadata, resourceType)) {
+            UpstreamTarget target = resolveAnthropicMessageBatchTargetForEntity(entity, metadata);
+            cancelAnthropicMessageBatch(metadata, target);
+            return syncAnthropicMessageBatchResource(entity, fetchAnthropicMessageBatch(metadata, target));
+        }
         UpstreamTarget target = resolveUpstreamTargetForEntity(entity, metadata);
-        if (target.siteProfile().getSiteKind() == UpstreamSiteKind.GEMINI_DIRECT && resourceType == GatewayAsyncResourceType.BATCH) {
+        if (supportsGoogleGenAiBatching(target.siteProfile().getSiteKind()) && resourceType == GatewayAsyncResourceType.BATCH) {
             cancelGeminiBatch(metadata, target);
             return syncPersistedResource(entity, fetchGeminiBatch(entity, metadata, target), inferObjectName(resourceType));
         }
-        if (target.siteProfile().getSiteKind() == UpstreamSiteKind.GEMINI_DIRECT && resourceType == GatewayAsyncResourceType.TUNING) {
+        if (supportsGoogleGenAiBatching(target.siteProfile().getSiteKind()) && resourceType == GatewayAsyncResourceType.TUNING) {
             cancelGeminiTuning(metadata, target);
             return syncPersistedResource(entity, fetchGeminiTuning(entity, metadata, target), inferObjectName(resourceType));
         }
@@ -459,6 +595,42 @@ public class GatewayAsyncResourceService {
                     target,
                     upstreamObjectId
             );
+        }
+    }
+
+    private BetaMessageBatch fetchAnthropicMessageBatch(
+            ObjectNode metadata,
+            UpstreamTarget target) {
+        String upstreamObjectId = requireUpstreamObjectId(metadata, "Anthropic message batch 对象缺少 upstream_object_id。");
+        AnthropicClient client = createAnthropicClient(target);
+        try {
+            return client.beta().messages().batches().retrieve(
+                    upstreamObjectId,
+                    BatchRetrieveParams.builder()
+                            .messageBatchId(upstreamObjectId)
+                            .addBeta(AnthropicBeta.MESSAGE_BATCHES_2024_09_24)
+                            .build()
+            );
+        } finally {
+            client.close();
+        }
+    }
+
+    private void cancelAnthropicMessageBatch(
+            ObjectNode metadata,
+            UpstreamTarget target) {
+        String upstreamObjectId = requireUpstreamObjectId(metadata, "Anthropic message batch 对象缺少 upstream_object_id。");
+        AnthropicClient client = createAnthropicClient(target);
+        try {
+            client.beta().messages().batches().cancel(
+                    upstreamObjectId,
+                    BatchCancelParams.builder()
+                            .messageBatchId(upstreamObjectId)
+                            .addBeta(AnthropicBeta.MESSAGE_BATCHES_2024_09_24)
+                            .build()
+            );
+        } finally {
+            client.close();
         }
     }
 
@@ -649,6 +821,225 @@ public class GatewayAsyncResourceService {
         return upstreamObjectId;
     }
 
+    private BatchCreateParams toAnthropicBatchCreateParams(ObjectNode payload) {
+        JsonNode requests = payload.path("requests");
+        if (!requests.isArray() || requests.isEmpty()) {
+            throw new IllegalArgumentException("Anthropic message batches 至少需要一条 request。");
+        }
+        BatchCreateParams.Builder builder = BatchCreateParams.builder()
+                .addBeta(AnthropicBeta.MESSAGE_BATCHES_2024_09_24);
+        int index = 0;
+        for (JsonNode requestNode : requests) {
+            index++;
+            builder.addRequest(toAnthropicBatchRequest(requestNode, index));
+        }
+        return builder.build();
+    }
+
+    private BatchCreateParams.Request toAnthropicBatchRequest(JsonNode requestNode, int index) {
+        if (requestNode == null || !requestNode.isObject()) {
+            throw new IllegalArgumentException("Anthropic message batch request 必须是 JSON object。");
+        }
+        JsonNode paramsNode = requestNode.path("params");
+        if (!paramsNode.isObject()) {
+            throw new IllegalArgumentException("Anthropic message batch request.params 必须是 JSON object。");
+        }
+        String customId = text(requestNode, "custom_id");
+        if (customId == null || customId.isBlank()) {
+            customId = "request-" + index;
+        }
+        return BatchCreateParams.Request.builder()
+                .customId(customId)
+                .params(toAnthropicMessageBatchParams((ObjectNode) paramsNode))
+                .build();
+    }
+
+    private BatchCreateParams.Request.Params toAnthropicMessageBatchParams(ObjectNode paramsNode) {
+        BatchCreateParams.Request.Params.Builder builder = BatchCreateParams.Request.Params.builder()
+                .model(requireText(paramsNode, "model", "Anthropic message batch request.params.model 不能为空。"));
+        long maxTokens = paramsNode.path("max_tokens").asLong(0L);
+        if (maxTokens <= 0) {
+            throw new IllegalArgumentException("Anthropic message batch request.params.max_tokens 必须大于 0。");
+        }
+        builder.maxTokens(maxTokens);
+        String system = extractAnthropicTextContent(paramsNode.path("system"));
+        if (system != null && !system.isBlank()) {
+            builder.system(system);
+        }
+        if (paramsNode.hasNonNull("temperature")) {
+            builder.temperature(paramsNode.path("temperature").asDouble());
+        }
+        if (paramsNode.path("stream").isBoolean()) {
+            builder.stream(paramsNode.path("stream").asBoolean(false));
+        }
+        JsonNode stopSequences = paramsNode.path("stop_sequences");
+        if (stopSequences.isArray()) {
+            List<String> values = new ArrayList<>();
+            for (JsonNode item : stopSequences) {
+                String value = item.asText(null);
+                if (value != null && !value.isBlank()) {
+                    values.add(value);
+                }
+            }
+            if (!values.isEmpty()) {
+                builder.stopSequences(values);
+            }
+        }
+        JsonNode messages = paramsNode.path("messages");
+        if (!messages.isArray() || messages.isEmpty()) {
+            throw new IllegalArgumentException("Anthropic message batch request.params.messages 不能为空。");
+        }
+        for (JsonNode messageNode : messages) {
+            builder.addMessage(toAnthropicBetaMessageParam(messageNode));
+        }
+        return builder.build();
+    }
+
+    private BetaMessageParam toAnthropicBetaMessageParam(JsonNode messageNode) {
+        if (messageNode == null || !messageNode.isObject()) {
+            throw new IllegalArgumentException("Anthropic message batch message 必须是 JSON object。");
+        }
+        String role = requireText(messageNode, "role", "Anthropic message batch message.role 不能为空。");
+        BetaMessageParam.Builder builder = BetaMessageParam.builder()
+                .role(switch (role) {
+                    case "user" -> BetaMessageParam.Role.USER;
+                    case "assistant" -> BetaMessageParam.Role.ASSISTANT;
+                    default -> throw new IllegalArgumentException("Anthropic message batch 目前仅支持 user/assistant role。");
+                });
+        String content = extractAnthropicTextContent(messageNode.path("content"));
+        if (content == null || content.isBlank()) {
+            throw new IllegalArgumentException("Anthropic message batch 目前仅支持 text content。");
+        }
+        builder.content(content);
+        return builder.build();
+    }
+
+    private String extractAnthropicTextContent(JsonNode contentNode) {
+        if (contentNode == null || contentNode.isMissingNode() || contentNode.isNull()) {
+            return null;
+        }
+        if (contentNode.isTextual()) {
+            String value = contentNode.asText(null);
+            return value == null || value.isBlank() ? null : value;
+        }
+        if (contentNode.isArray()) {
+            List<String> parts = new ArrayList<>();
+            for (JsonNode part : contentNode) {
+                if ("text".equalsIgnoreCase(text(part, "type"))) {
+                    String value = text(part, "text");
+                    if (value != null && !value.isBlank()) {
+                        parts.add(value);
+                    }
+                }
+            }
+            return parts.isEmpty() ? null : String.join("\n", parts);
+        }
+        return firstText(contentNode, "text");
+    }
+
+    private JsonNode persistAnthropicMessageBatchResource(
+            Long distributedKeyId,
+            ObjectNode requestPayload,
+            BetaMessageBatch batch,
+            UpstreamTarget target) {
+        ObjectNode response = mapAnthropicMessageBatch(batch);
+        String resourceKey = "batch_" + UUID.randomUUID().toString().replace("-", "");
+        String upstreamObjectId = batch.id();
+        String status = response.path("status").asText("created");
+
+        ObjectNode metadata = objectMapper.createObjectNode();
+        metadata.put("object_mode", "upstream_object_with_local_lineage");
+        metadata.put("batch_protocol", "anthropic_native");
+        metadata.put("upstream_object_id", upstreamObjectId);
+        metadata.put("credential_id", target.credential().getId());
+        metadata.put("site_profile_id", target.siteProfile().getId());
+        metadata.put("upstream_status", response.path("processing_status").asText(status));
+        metadata.put("upstream_synced_at", now().getEpochSecond());
+        appendEvent(metadata, "created", status);
+
+        GatewayAsyncResourceEntity entity = new GatewayAsyncResourceEntity();
+        entity.setResourceKey(resourceKey);
+        entity.setDistributedKeyId(distributedKeyId);
+        entity.setResourceType(GatewayAsyncResourceType.BATCH);
+        entity.setRequestModel(extractAnthropicBatchModel(requestPayload));
+        entity.setStatus(status);
+        entity.setUpstreamObjectId(upstreamObjectId);
+        entity.setRequestPayloadJson(writeJson(requestPayload));
+        entity.setResponsePayloadJson(writeJson(response));
+        entity.setMetadataJson(writeJson(metadata));
+        gatewayAsyncResourceRepository.save(entity);
+        return response;
+    }
+
+    private JsonNode syncAnthropicMessageBatchResource(
+            GatewayAsyncResourceEntity entity,
+            BetaMessageBatch batch) {
+        ObjectNode response = mapAnthropicMessageBatch(batch);
+        String status = response.path("status").asText(entity.getStatus());
+        entity.setStatus(status);
+        entity.setUpstreamObjectId(batch.id());
+        entity.setResponsePayloadJson(writeJson(response));
+        ObjectNode metadata = readObject(entity.getMetadataJson());
+        metadata.put("upstream_object_id", batch.id());
+        metadata.put("upstream_status", response.path("processing_status").asText(status));
+        metadata.put("upstream_synced_at", now().getEpochSecond());
+        entity.setMetadataJson(writeJson(appendEvent(metadata, "synced", status)));
+        gatewayAsyncResourceRepository.save(entity);
+        return response;
+    }
+
+    private ObjectNode mapAnthropicMessageBatch(BetaMessageBatch batch) {
+        ObjectNode response = objectMapper.createObjectNode();
+        response.put("id", batch.id());
+        response.put("object", "message_batch");
+        String processingStatus = batch.processingStatus().toString().toLowerCase(java.util.Locale.ROOT);
+        response.put("processing_status", processingStatus);
+        response.put("status", normalizeAnthropicMessageBatchStatus(processingStatus, batch));
+        response.put("created_at", batch.createdAt().toInstant().getEpochSecond());
+        response.put("expires_at", batch.expiresAt().toInstant().getEpochSecond());
+        batch.endedAt().ifPresent(value -> response.put("ended_at", value.toInstant().getEpochSecond()));
+        batch.cancelInitiatedAt().ifPresent(value -> response.put("cancel_initiated_at", value.toInstant().getEpochSecond()));
+        batch.archivedAt().ifPresent(value -> response.put("archived_at", value.toInstant().getEpochSecond()));
+        batch.resultsUrl().ifPresent(value -> response.put("results_url", value));
+        ObjectNode requestCounts = response.putObject("request_counts");
+        requestCounts.put("processing", batch.requestCounts().processing());
+        requestCounts.put("succeeded", batch.requestCounts().succeeded());
+        requestCounts.put("errored", batch.requestCounts().errored());
+        requestCounts.put("canceled", batch.requestCounts().canceled());
+        requestCounts.put("expired", batch.requestCounts().expired());
+        return response;
+    }
+
+    private String normalizeAnthropicMessageBatchStatus(String processingStatus, BetaMessageBatch batch) {
+        if (processingStatus == null || processingStatus.isBlank()) {
+            return "queued";
+        }
+        return switch (processingStatus) {
+            case "in_progress" -> "running";
+            case "canceling" -> "cancelling";
+            case "ended" -> batch.requestCounts().succeeded() > 0 ? "completed"
+                    : batch.requestCounts().errored() > 0 ? "failed" : "completed";
+            case "canceled" -> "cancelled";
+            case "archived" -> "completed";
+            default -> processingStatus;
+        };
+    }
+
+    private String extractAnthropicBatchModel(ObjectNode requestPayload) {
+        JsonNode requests = requestPayload.path("requests");
+        if (!requests.isArray() || requests.isEmpty()) {
+            return null;
+        }
+        return text(requests.get(0).path("params"), "model");
+    }
+
+    private boolean isAnthropicNativeBatch(
+            ObjectNode metadata,
+            GatewayAsyncResourceType resourceType) {
+        return resourceType == GatewayAsyncResourceType.BATCH
+                && "anthropic_native".equalsIgnoreCase(text(metadata, "batch_protocol"));
+    }
+
     private String requireText(JsonNode payload, String fieldName, String message) {
         String value = text(payload, fieldName);
         if (value == null || value.isBlank()) {
@@ -721,6 +1112,7 @@ public class GatewayAsyncResourceService {
         entity.setResourceType(type);
         entity.setRequestModel(requestPayload.path("model").asText(null));
         entity.setStatus(status);
+        entity.setUpstreamObjectId(upstreamObjectId);
         entity.setRequestPayloadJson(writeJson(requestPayload));
         entity.setResponsePayloadJson(writeJson(response));
         entity.setMetadataJson(writeJson(metadata));
@@ -741,6 +1133,10 @@ public class GatewayAsyncResourceService {
         entity.setStatus(status);
         entity.setResponsePayloadJson(writeJson(response));
         ObjectNode metadata = readObject(entity.getMetadataJson());
+        String upstreamObjectId = metadata.path("upstream_object_id").asText(entity.getUpstreamObjectId());
+        if (upstreamObjectId != null && !upstreamObjectId.isBlank()) {
+            entity.setUpstreamObjectId(upstreamObjectId);
+        }
         metadata.put("upstream_status", upstreamResponse.path("status").asText(status));
         metadata.put("upstream_synced_at", now().getEpochSecond());
         entity.setMetadataJson(writeJson(appendEvent(metadata, "synced", status)));
@@ -771,6 +1167,14 @@ public class GatewayAsyncResourceService {
         entity.setMetadataJson(writeJson(appendEvent(metadata, "part_added", entity.getStatus())));
         gatewayAsyncResourceRepository.save(entity);
         return response;
+    }
+
+    private GoogleNativeBatchView toGoogleNativeBatchView(GatewayAsyncResourceEntity entity) {
+        return new GoogleNativeBatchView(
+                entity,
+                readObject(entity.getResponsePayloadJson()),
+                readObject(entity.getMetadataJson())
+        );
     }
 
     private JsonNode addLocalUploadPart(GatewayAsyncResourceEntity entity) {
@@ -811,6 +1215,205 @@ public class GatewayAsyncResourceService {
         entity.setMetadataJson(writeJson(appendEvent(readObject(entity.getMetadataJson()), "status_changed", status)));
         gatewayAsyncResourceRepository.save(entity);
         return response;
+    }
+
+    private JsonNode persistLocalUploadResource(
+            Long distributedKeyId,
+            ObjectNode requestPayload,
+            UpstreamTarget target) {
+        String resourceKey = "upload_" + UUID.randomUUID().toString().replace("-", "");
+        ObjectNode response = objectMapper.createObjectNode();
+        response.put("id", resourceKey);
+        response.put("object", "upload");
+        response.put("status", "created");
+        response.put("created_at", now().getEpochSecond());
+        copyIfPresent(requestPayload, response, "filename");
+        copyIfPresent(requestPayload, response, "purpose");
+        copyIfPresent(requestPayload, response, "bytes");
+        copyIfPresent(requestPayload, response, "mime_type");
+
+        ObjectNode metadata = objectMapper.createObjectNode();
+        metadata.put("object_mode", "gateway_upload_object");
+        metadata.put("credential_id", target.credential().getId());
+        metadata.put("site_profile_id", target.siteProfile().getId());
+        metadata.putArray("parts");
+        metadata.putArray("part_bindings");
+        metadata.put("partsCount", 0);
+        appendEvent(metadata, "created", "created");
+
+        GatewayAsyncResourceEntity entity = new GatewayAsyncResourceEntity();
+        entity.setResourceKey(resourceKey);
+        entity.setDistributedKeyId(distributedKeyId);
+        entity.setResourceType(GatewayAsyncResourceType.UPLOAD);
+        entity.setStatus("created");
+        entity.setRequestPayloadJson(writeJson(requestPayload));
+        entity.setResponsePayloadJson(writeJson(response));
+        entity.setMetadataJson(writeJson(metadata));
+        gatewayAsyncResourceRepository.save(entity);
+        return response;
+    }
+
+    private void copyIfPresent(ObjectNode source, ObjectNode target, String fieldName) {
+        if (source.has(fieldName) && !source.path(fieldName).isNull()) {
+            target.set(fieldName, source.get(fieldName).deepCopy());
+        }
+    }
+
+    private UpstreamTarget resolveUploadTarget(Long distributedKeyId, Long preferredCredentialId) {
+        DistributedKeyView distributedKey = distributedKeyQueryService.findActiveById(distributedKeyId)
+                .orElseThrow(() -> new IllegalArgumentException("未找到可用的 DistributedKey。"));
+        Map<Long, UpstreamCredentialEntity> credentials = new LinkedHashMap<>();
+        for (UpstreamCredentialEntity credential : upstreamCredentialRepository.findAllByIdInAndDeletedFalse(
+                distributedKey.bindings().stream().map(DistributedCredentialBindingView::credentialId).toList())) {
+            if (credential.isActive()) {
+                credentials.put(credential.getId(), credential);
+            }
+        }
+
+        if (preferredCredentialId != null) {
+            UpstreamTarget preferred = resolveUploadTarget(distributedKey, credentials, preferredCredentialId);
+            if (preferred != null) {
+                return preferred;
+            }
+        }
+
+        for (DistributedCredentialBindingView binding : distributedKey.bindings()) {
+            UpstreamTarget candidate = resolveUploadTarget(distributedKey, credentials, binding.credentialId());
+            if (candidate != null) {
+                return candidate;
+            }
+        }
+        throw new IllegalArgumentException("当前 DistributedKey 没有可用的上传编排站点。");
+    }
+
+    private UpstreamTarget resolveUploadTarget(
+            DistributedKeyView distributedKey,
+            Map<Long, UpstreamCredentialEntity> credentials,
+            Long credentialId) {
+        UpstreamCredentialEntity credential = credentials.get(credentialId);
+        if (credential == null || credential.getSiteProfileId() == null) {
+            return null;
+        }
+        UpstreamSiteProfileEntity siteProfile = resolveSiteProfile(credential.getSiteProfileId()).orElse(null);
+        SiteCapabilitySnapshotEntity snapshot = siteCapabilitySnapshotRepository.findBySiteProfile_Id(credential.getSiteProfileId())
+                .orElse(null);
+        if (siteProfile == null || (!siteCapabilityTruthService.supportsFeature(siteProfile, snapshot, InteropFeature.UPLOAD_CREATE)
+                && !supportsLocalGeminiUploadSurface(siteProfile, snapshot))) {
+            return null;
+        }
+        return buildUpstreamTarget(credential, siteProfile, basePath(InteropFeature.UPLOAD_CREATE));
+    }
+
+    private UpstreamTarget resolveAnthropicMessageBatchTarget(Long distributedKeyId, Long preferredCredentialId) {
+        DistributedKeyView distributedKey = distributedKeyQueryService.findActiveById(distributedKeyId)
+                .orElseThrow(() -> new IllegalArgumentException("未找到可用的 DistributedKey。"));
+        Map<Long, UpstreamCredentialEntity> credentials = new LinkedHashMap<>();
+        for (UpstreamCredentialEntity credential : upstreamCredentialRepository.findAllByIdInAndDeletedFalse(
+                distributedKey.bindings().stream().map(DistributedCredentialBindingView::credentialId).toList())) {
+            if (credential.isActive()) {
+                credentials.put(credential.getId(), credential);
+            }
+        }
+
+        if (preferredCredentialId != null) {
+            UpstreamTarget preferred = resolveAnthropicMessageBatchTarget(credentials, preferredCredentialId);
+            if (preferred != null) {
+                return preferred;
+            }
+        }
+
+        for (DistributedCredentialBindingView binding : distributedKey.bindings()) {
+            UpstreamTarget candidate = resolveAnthropicMessageBatchTarget(credentials, binding.credentialId());
+            if (candidate != null) {
+                return candidate;
+            }
+        }
+        throw new IllegalArgumentException("当前 DistributedKey 没有可用的 Anthropic message batch 上游站点。");
+    }
+
+    private UpstreamTarget resolveAnthropicMessageBatchTarget(
+            Map<Long, UpstreamCredentialEntity> credentials,
+            Long credentialId) {
+        UpstreamCredentialEntity credential = credentials.get(credentialId);
+        if (credential == null || credential.getSiteProfileId() == null) {
+            return null;
+        }
+        UpstreamSiteProfileEntity siteProfile = resolveSiteProfile(credential.getSiteProfileId()).orElse(null);
+        SiteCapabilitySnapshotEntity snapshot = siteCapabilitySnapshotRepository.findBySiteProfile_Id(credential.getSiteProfileId())
+                .orElse(null);
+        if (siteProfile == null
+                || !supportsAnthropicMessageBatches(siteProfile.getSiteKind())
+                || !siteCapabilityTruthService.supportsFeature(siteProfile, snapshot, InteropFeature.ANTHROPIC_MESSAGE_BATCH)) {
+            return null;
+        }
+        ResolvedCredentialMaterial credentialMaterial = credentialMaterialResolver.resolveStored(credential);
+        return new UpstreamTarget(credential, siteProfile, credentialMaterial, null);
+    }
+
+    private UpstreamTarget resolveAnthropicMessageBatchTargetForEntity(
+            GatewayAsyncResourceEntity entity,
+            ObjectNode metadata) {
+        Long credentialId = metadata.has("credential_id") ? metadata.path("credential_id").asLong() : null;
+        if (credentialId == null) {
+            throw new IllegalArgumentException("Anthropic message batch 缺少 credential_id。");
+        }
+        UpstreamCredentialEntity credential = upstreamCredentialRepository.findById(credentialId)
+                .orElseThrow(() -> new IllegalArgumentException("未找到 Anthropic message batch 绑定的上游凭证。"));
+        Long siteProfileId = metadata.has("site_profile_id") && !metadata.path("site_profile_id").isNull()
+                ? metadata.path("site_profile_id").asLong()
+                : credential.getSiteProfileId();
+        UpstreamSiteProfileEntity siteProfile = resolveSiteProfile(siteProfileId)
+                .orElseThrow(() -> new IllegalArgumentException("未找到 Anthropic message batch 绑定的站点档案。"));
+        if (!supportsAnthropicMessageBatches(siteProfile.getSiteKind())) {
+            throw new IllegalArgumentException("当前站点不支持 Anthropic message batches。");
+        }
+        ResolvedCredentialMaterial credentialMaterial = credentialMaterialResolver.resolveStored(credential);
+        return new UpstreamTarget(credential, siteProfile, credentialMaterial, null);
+    }
+
+    private boolean supportsLocalGeminiUploadSurface(
+            UpstreamSiteProfileEntity siteProfile,
+            SiteCapabilitySnapshotEntity snapshot) {
+        return siteProfile != null
+                && siteProfile.getSiteKind() == UpstreamSiteKind.GEMINI_DIRECT
+                && siteCapabilityTruthService.supportsFeature(siteProfile, snapshot, InteropFeature.FILE_OBJECT);
+    }
+
+    private String geminiRealtimeBlockedReason(Long distributedKeyId, Long preferredCredentialId) {
+        DistributedKeyView distributedKey = distributedKeyQueryService.findActiveById(distributedKeyId)
+                .orElseThrow(() -> new IllegalArgumentException("未找到可用的 DistributedKey。"));
+        Map<Long, UpstreamCredentialEntity> credentials = new LinkedHashMap<>();
+        for (UpstreamCredentialEntity credential : upstreamCredentialRepository.findAllByIdInAndDeletedFalse(
+                distributedKey.bindings().stream().map(DistributedCredentialBindingView::credentialId).toList())) {
+            if (credential.isActive()) {
+                credentials.put(credential.getId(), credential);
+            }
+        }
+
+        if (preferredCredentialId != null) {
+            String preferredReason = geminiRealtimeBlockedReason(credentials.get(preferredCredentialId));
+            if (preferredReason != null) {
+                return preferredReason;
+            }
+        }
+        for (DistributedCredentialBindingView binding : distributedKey.bindings()) {
+            String reason = geminiRealtimeBlockedReason(credentials.get(binding.credentialId()));
+            if (reason != null) {
+                return reason;
+            }
+        }
+        return null;
+    }
+
+    private String geminiRealtimeBlockedReason(UpstreamCredentialEntity credential) {
+        if (credential == null || credential.getSiteProfileId() == null) {
+            return null;
+        }
+        UpstreamSiteProfileEntity siteProfile = resolveSiteProfile(credential.getSiteProfileId()).orElse(null);
+        if (siteProfile == null || siteProfile.getSiteKind() != UpstreamSiteKind.GEMINI_DIRECT) {
+            return null;
+        }
+        return "Gemini ephemeral/live token 不等价于 OpenAI realtime client_secret object，因此当前不开放。";
     }
 
     private UpstreamTarget resolveUpstreamTarget(Long distributedKeyId, InteropFeature feature) {
@@ -883,7 +1486,7 @@ public class GatewayAsyncResourceService {
             UpstreamSiteProfileEntity siteProfile,
             String requestPath) {
         ResolvedCredentialMaterial credentialMaterial = credentialMaterialResolver.resolveStored(credential);
-        SiteClient request = siteProfile.getSiteKind() == UpstreamSiteKind.GEMINI_DIRECT
+        SiteClient request = supportsGoogleGenAiBatching(siteProfile.getSiteKind())
                 ? null
                 : buildClient(credential, siteProfile, requestPath, credentialMaterial);
         return new UpstreamTarget(credential, siteProfile, credentialMaterial, request);
@@ -917,6 +1520,21 @@ public class GatewayAsyncResourceService {
                 target.credential().getBaseUrl(),
                 target.credentialMaterial()
         );
+    }
+
+    private AnthropicClient createAnthropicClient(UpstreamTarget target) {
+        return anthropicChatModelFactory.createClient(
+                target.credential().getBaseUrl(),
+                target.credentialMaterial().secret()
+        );
+    }
+
+    private boolean supportsGoogleGenAiBatching(UpstreamSiteKind siteKind) {
+        return siteKind == UpstreamSiteKind.GEMINI_DIRECT || siteKind == UpstreamSiteKind.VERTEX_AI;
+    }
+
+    private boolean supportsAnthropicMessageBatches(UpstreamSiteKind siteKind) {
+        return siteKind == UpstreamSiteKind.ANTHROPIC_DIRECT;
     }
 
     private JsonNode invokeUpstreamJson(UpstreamTarget target, String path, JsonNode payload) {
@@ -1166,6 +1784,13 @@ public class GatewayAsyncResourceService {
             case REALTIME_SESSION -> "realtime.session";
             case RESPONSE -> "response";
         };
+    }
+
+    public record GoogleNativeBatchView(
+            GatewayAsyncResourceEntity entity,
+            ObjectNode responsePayload,
+            ObjectNode metadata
+    ) {
     }
 
     private record SiteClient(

@@ -32,6 +32,36 @@ public class GatewayRequestFeatureService {
             collectAnthropicFeatures(features, body);
             return semantics("messages", normalizedPath, TranslationResourceType.CHAT, TranslationOperation.CHAT_COMPLETION, features, true);
         }
+        if ("POST".equals(method) && "/v1/messages/batches".equals(normalizedPath)) {
+            return semantics(
+                    "messages.batches",
+                    normalizedPath,
+                    TranslationResourceType.BATCH,
+                    TranslationOperation.ANTHROPIC_MESSAGE_BATCH_CREATE,
+                    List.of(InteropFeature.ANTHROPIC_MESSAGE_BATCH),
+                    true
+            );
+        }
+        if ("GET".equals(method) && "/v1/messages/batches/{messageBatchId}".equals(normalizedPath)) {
+            return semantics(
+                    "messages.batches",
+                    normalizedPath,
+                    TranslationResourceType.BATCH,
+                    TranslationOperation.ANTHROPIC_MESSAGE_BATCH_GET,
+                    List.of(InteropFeature.ANTHROPIC_MESSAGE_BATCH),
+                    false
+            );
+        }
+        if ("POST".equals(method) && "/v1/messages/batches/{messageBatchId}/cancel".equals(normalizedPath)) {
+            return semantics(
+                    "messages.batches",
+                    normalizedPath,
+                    TranslationResourceType.BATCH,
+                    TranslationOperation.ANTHROPIC_MESSAGE_BATCH_CANCEL,
+                    List.of(InteropFeature.ANTHROPIC_MESSAGE_BATCH),
+                    false
+            );
+        }
         if (normalizedPath != null
                 && normalizedPath.startsWith("/v1beta/models/")
                 && normalizedPath.contains(":generateContent")) {
@@ -85,7 +115,7 @@ public class GatewayRequestFeatureService {
             return semantics("uploads", normalizedPath, TranslationResourceType.UPLOAD, TranslationOperation.UPLOAD_GET, List.of(InteropFeature.UPLOAD_CREATE), false);
         }
         if ("POST".equals(method) && "/v1/uploads/{uploadId}/parts".equals(normalizedPath)) {
-            return semantics("uploads", normalizedPath, TranslationResourceType.UPLOAD, TranslationOperation.UPLOAD_PART_ADD, List.of(InteropFeature.UPLOAD_CREATE, InteropFeature.FILE_OBJECT), true);
+            return semantics("uploads", normalizedPath, TranslationResourceType.UPLOAD, TranslationOperation.UPLOAD_PART_ADD, List.of(InteropFeature.UPLOAD_CREATE, InteropFeature.FILE_OBJECT), false);
         }
         if ("POST".equals(method) && "/v1/uploads/{uploadId}/complete".equals(normalizedPath)) {
             return semantics("uploads", normalizedPath, TranslationResourceType.UPLOAD, TranslationOperation.UPLOAD_COMPLETE, List.of(InteropFeature.UPLOAD_CREATE), false);
@@ -130,6 +160,12 @@ public class GatewayRequestFeatureService {
         if (requestPath.matches("^/v1/files/[^/]+$")) {
             return "/v1/files/{fileId}";
         }
+        if (requestPath.matches("^/v1/messages/batches/[^/]+/cancel$")) {
+            return "/v1/messages/batches/{messageBatchId}/cancel";
+        }
+        if (requestPath.matches("^/v1/messages/batches/[^/]+$")) {
+            return "/v1/messages/batches/{messageBatchId}";
+        }
         if (requestPath.matches("^/v1/uploads/[^/]+/parts$")) {
             return "/v1/uploads/{uploadId}/parts";
         }
@@ -172,6 +208,10 @@ public class GatewayRequestFeatureService {
         matcher = java.util.regex.Pattern.compile("^/v1/files/([^/]+)$").matcher(requestPath);
         if (matcher.matches()) {
             return java.util.Map.of("fileId", matcher.group(1));
+        }
+        matcher = java.util.regex.Pattern.compile("^/v1/messages/batches/([^/]+)(?:/cancel)?$").matcher(requestPath);
+        if (matcher.matches()) {
+            return java.util.Map.of("messageBatchId", matcher.group(1));
         }
         matcher = java.util.regex.Pattern.compile("^/v1/uploads/([^/]+)/parts$").matcher(requestPath);
         if (matcher.matches()) {

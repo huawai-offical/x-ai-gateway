@@ -1,5 +1,13 @@
 package com.prodigalgal.xaigateway.gateway.core.file;
 
+import com.anthropic.client.AnthropicClient;
+import com.anthropic.core.http.HttpResponse;
+import com.anthropic.models.beta.AnthropicBeta;
+import com.anthropic.models.beta.files.FileDeleteParams;
+import com.anthropic.models.beta.files.FileDownloadParams;
+import com.anthropic.models.beta.files.FileMetadata;
+import com.anthropic.models.beta.files.FileRetrieveMetadataParams;
+import com.anthropic.models.beta.files.FileUploadParams;
 import com.google.genai.Client;
 import com.google.genai.types.DeleteFileConfig;
 import com.google.genai.types.DownloadFileConfig;
@@ -31,6 +39,7 @@ import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayFileReposi
 import com.prodigalgal.xaigateway.infra.persistence.repository.SiteCapabilitySnapshotRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamSiteProfileRepository;
+import com.prodigalgal.xaigateway.provider.adapter.anthropic.AnthropicChatModelFactory;
 import com.prodigalgal.xaigateway.provider.adapter.gemini.GeminiChatModelFactory;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -44,6 +53,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
@@ -73,6 +83,7 @@ public class GatewayFileService {
     private final SiteCapabilityTruthService siteCapabilityTruthService;
     private final CredentialCryptoService credentialCryptoService;
     private final CredentialMaterialResolver credentialMaterialResolver;
+    private final AnthropicChatModelFactory anthropicChatModelFactory;
     private final GeminiChatModelFactory geminiChatModelFactory;
     private final GatewayProperties gatewayProperties;
     private final WebClient.Builder webClientBuilder;
@@ -89,6 +100,7 @@ public class GatewayFileService {
             SiteCapabilityTruthService siteCapabilityTruthService,
             CredentialCryptoService credentialCryptoService,
             CredentialMaterialResolver credentialMaterialResolver,
+            AnthropicChatModelFactory anthropicChatModelFactory,
             GeminiChatModelFactory geminiChatModelFactory,
             GatewayProperties gatewayProperties,
             WebClient.Builder webClientBuilder,
@@ -102,10 +114,43 @@ public class GatewayFileService {
         this.siteCapabilityTruthService = siteCapabilityTruthService;
         this.credentialCryptoService = credentialCryptoService;
         this.credentialMaterialResolver = credentialMaterialResolver;
+        this.anthropicChatModelFactory = anthropicChatModelFactory;
         this.geminiChatModelFactory = geminiChatModelFactory;
         this.gatewayProperties = gatewayProperties;
         this.webClientBuilder = webClientBuilder;
         this.objectMapper = objectMapper;
+    }
+
+    public GatewayFileService(
+            GatewayFileRepository gatewayFileRepository,
+            GatewayFileBindingRepository gatewayFileBindingRepository,
+            DistributedKeyQueryService distributedKeyQueryService,
+            UpstreamCredentialRepository upstreamCredentialRepository,
+            UpstreamSiteProfileRepository upstreamSiteProfileRepository,
+            SiteCapabilitySnapshotRepository siteCapabilitySnapshotRepository,
+            SiteCapabilityTruthService siteCapabilityTruthService,
+            CredentialCryptoService credentialCryptoService,
+            CredentialMaterialResolver credentialMaterialResolver,
+            GeminiChatModelFactory geminiChatModelFactory,
+            GatewayProperties gatewayProperties,
+            WebClient.Builder webClientBuilder,
+            ObjectMapper objectMapper) {
+        this(
+                gatewayFileRepository,
+                gatewayFileBindingRepository,
+                distributedKeyQueryService,
+                upstreamCredentialRepository,
+                upstreamSiteProfileRepository,
+                siteCapabilitySnapshotRepository,
+                siteCapabilityTruthService,
+                credentialCryptoService,
+                credentialMaterialResolver,
+                new AnthropicChatModelFactory(ObservationRegistry.NOOP),
+                geminiChatModelFactory,
+                gatewayProperties,
+                webClientBuilder,
+                objectMapper
+        );
     }
 
     public GatewayFileService(
@@ -135,6 +180,7 @@ public class GatewayFileService {
                         null,
                         null
                 ), credentialCryptoService, objectMapper),
+                new AnthropicChatModelFactory(ObservationRegistry.NOOP),
                 new GeminiChatModelFactory(ObservationRegistry.NOOP),
                 gatewayProperties,
                 webClientBuilder,
@@ -149,6 +195,27 @@ public class GatewayFileService {
     public Mono<GatewayFileResponse> createFile(Long distributedKeyId, FilePart filePart, String purpose, Long preferredCredentialId) {
         UpstreamFileTarget upstreamTarget = resolveUpstreamFileTarget(distributedKeyId, preferredCredentialId)
                 .orElseThrow(() -> new IllegalArgumentException("当前 DistributedKey 没有可用的 files 上游编排站点。"));
+        return createFile(distributedKeyId, filePart, purpose, upstreamTarget, filePart.filename());
+    }
+
+    public Mono<GoogleNativeFileView> createGoogleNativeFile(
+            Long distributedKeyId,
+            FilePart filePart,
+            String purpose,
+            String displayName) {
+        UpstreamFileTarget upstreamTarget = resolveGoogleNativeFileTarget(distributedKeyId)
+                .orElseThrow(() -> new IllegalArgumentException("当前 DistributedKey 没有可用的 Google files 上游站点。"));
+        String targetFilename = sanitizeGoogleDisplayName(displayName, filePart.filename());
+        return createFile(distributedKeyId, filePart, purpose, upstreamTarget, targetFilename)
+                .map(response -> getGoogleNativeFileByGatewayFileKey(response.id(), distributedKeyId));
+    }
+
+    private Mono<GatewayFileResponse> createFile(
+            Long distributedKeyId,
+            FilePart filePart,
+            String purpose,
+            UpstreamFileTarget upstreamTarget,
+            String targetFilename) {
         String fileKey = "file-" + UUID.randomUUID().toString().replace("-", "");
         Path directory = ensureStorageDirectory();
         Path storagePath = directory.resolve(fileKey + "-" + sanitizeFilename(filePart.filename()));
@@ -159,7 +226,7 @@ public class GatewayFileService {
                             distributedKeyId,
                             fileKey,
                             storagePath,
-                            filePart.filename(),
+                            targetFilename,
                             filePart.headers().getContentType() == null ? "application/octet-stream" : filePart.headers().getContentType().toString(),
                             purpose
                     );
@@ -205,10 +272,35 @@ public class GatewayFileService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<GoogleNativeFileView> listGoogleNativeFiles(Long distributedKeyId) {
+        Set<Long> activeCredentialIds = activeCredentialIds(distributedKeyId);
+        return gatewayFileRepository.findTop100ByDistributedKeyIdAndDeletedFalseOrderByCreatedAtDesc(distributedKeyId)
+                .stream()
+                .map(file -> latestAccessibleGoogleBinding(file.getId(), activeCredentialIds)
+                        .map(binding -> toGoogleNativeView(file, binding)))
+                .flatMap(Optional::stream)
+                .toList();
+    }
+
     public GatewayFileResponse getFile(String fileKey, Long distributedKeyId) {
         GatewayFileEntity entity = getRequired(fileKey, distributedKeyId);
         latestBinding(entity.getId()).ifPresent(binding -> refreshUpstreamFile(entity, binding));
         return toResponse(entity);
+    }
+
+    public GoogleNativeFileView getGoogleNativeFile(String externalFileId, Long distributedKeyId) {
+        GoogleBindingResolution resolution = resolveGoogleBinding(externalFileId, distributedKeyId);
+        refreshUpstreamFile(resolution.entity(), resolution.binding());
+        return toGoogleNativeView(resolution.entity(), resolution.binding());
+    }
+
+    public GoogleNativeFileView getGoogleNativeFileByGatewayFileKey(String fileKey, Long distributedKeyId) {
+        GatewayFileEntity entity = getRequired(fileKey, distributedKeyId);
+        GatewayFileBindingEntity binding = latestAccessibleGoogleBinding(entity.getId(), activeCredentialIds(distributedKeyId))
+                .orElseThrow(() -> new IllegalArgumentException("未找到指定文件对应的 Google native 绑定。"));
+        refreshUpstreamFile(entity, binding);
+        return toGoogleNativeView(entity, binding);
     }
 
     public GatewayFileContent getFileContent(String fileKey, Long distributedKeyId) {
@@ -216,6 +308,23 @@ public class GatewayFileService {
         return latestBinding(entity.getId())
                 .map(binding -> readUpstreamFileContent(entity, binding))
                 .orElseGet(() -> readLocalFileContent(entity));
+    }
+
+    @Transactional(readOnly = true)
+    public String resolveGatewayFileKeyByGoogleFileName(String externalFileId, Long distributedKeyId) {
+        return resolveGoogleBinding(externalFileId, distributedKeyId).entity().getFileKey();
+    }
+
+    @Transactional(readOnly = true)
+    public Long resolveGoogleCredentialIdForFileName(String externalFileId, Long distributedKeyId) {
+        return resolveGoogleBinding(externalFileId, distributedKeyId).binding().getCredentialId();
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<String> resolveAnthropicExternalFileId(String fileKey, Long distributedKeyId) {
+        GatewayFileEntity entity = getRequired(fileKey, distributedKeyId);
+        return latestAccessibleAnthropicBinding(entity.getId(), activeCredentialIds(distributedKeyId))
+                .map(GatewayFileBindingEntity::getExternalFileId);
     }
 
     @Transactional(readOnly = true)
@@ -242,9 +351,17 @@ public class GatewayFileService {
         }
     }
 
+    public void deleteGoogleNativeFile(String externalFileId, Long distributedKeyId) {
+        deleteFile(resolveGatewayFileKeyByGoogleFileName(externalFileId, distributedKeyId), distributedKeyId);
+    }
+
     private void synchronizeUpstreamFile(GatewayFileEntity file, UpstreamFileTarget upstreamTarget) {
-        if (upstreamTarget.siteProfile().getSiteKind() == UpstreamSiteKind.GEMINI_DIRECT) {
+        if (supportsGoogleGenAiFiles(upstreamTarget.siteProfile().getSiteKind())) {
             synchronizeGeminiFile(file, upstreamTarget);
+            return;
+        }
+        if (supportsAnthropicFiles(upstreamTarget.siteProfile().getSiteKind())) {
+            synchronizeAnthropicFile(file, upstreamTarget);
             return;
         }
         synchronizeOpenAiStyleFile(file, upstreamTarget);
@@ -339,59 +456,160 @@ public class GatewayFileService {
         gatewayFileBindingRepository.save(binding);
     }
 
+    private void synchronizeAnthropicFile(GatewayFileEntity file, UpstreamFileTarget upstreamTarget) {
+        try {
+            byte[] bytes = Files.readAllBytes(Path.of(file.getStoragePath()));
+            FileUploadParams params = FileUploadParams.builder()
+                    .file(bytes)
+                    .addBeta(AnthropicBeta.FILES_API_2025_04_14)
+                    .build();
+            AnthropicClient client = anthropicChatModelFactory.createClient(
+                    upstreamTarget.credential().getBaseUrl(),
+                    upstreamTarget.credentialMaterial().secret()
+            );
+            try {
+                FileMetadata upstreamFile = client.beta().files().upload(params);
+                saveAnthropicBinding(file, upstreamTarget, upstreamFile);
+                refreshAnthropicFileEntity(file, upstreamFile);
+            } finally {
+                client.close();
+            }
+        } catch (IOException exception) {
+            throw new IllegalStateException("读取本地文件失败。", exception);
+        }
+    }
+
+    private void saveAnthropicBinding(
+            GatewayFileEntity file,
+            UpstreamFileTarget upstreamTarget,
+            FileMetadata upstreamFile) {
+        GatewayFileBindingEntity binding = new GatewayFileBindingEntity();
+        binding.setGatewayFileId(file.getId());
+        binding.setProviderType(upstreamTarget.credential().getProviderType());
+        binding.setCredentialId(upstreamTarget.credential().getId());
+        binding.setSiteProfileId(upstreamTarget.siteProfile().getId());
+        binding.setExternalFileId(upstreamFile.id());
+        binding.setExternalFilename(upstreamFile.filename());
+        binding.setStatus(anthropicBindingStatus(upstreamFile));
+        binding.setLastSyncedAt(Instant.now());
+        gatewayFileBindingRepository.save(binding);
+    }
+
     private void refreshUpstreamFile(GatewayFileEntity entity, GatewayFileBindingEntity binding) {
         BindingContext bindingContext = resolveBindingContext(binding).orElse(null);
-        if (bindingContext == null || bindingContext.siteProfile().getSiteKind() != UpstreamSiteKind.GEMINI_DIRECT) {
+        if (bindingContext == null) {
             return;
         }
-        try (Client client = geminiChatModelFactory.createClient(
-                bindingContext.siteProfile().getSiteKind(),
-                bindingContext.credential().getBaseUrl(),
-                bindingContext.credentialMaterial()
-        )) {
-            com.google.genai.types.File upstreamFile = client.files.get(
-                    binding.getExternalFileId(),
-                    GetFileConfig.builder().build()
+        if (supportsGoogleGenAiFiles(bindingContext.siteProfile().getSiteKind())) {
+            try (Client client = geminiChatModelFactory.createClient(
+                    bindingContext.siteProfile().getSiteKind(),
+                    bindingContext.credential().getBaseUrl(),
+                    bindingContext.credentialMaterial()
+            )) {
+                com.google.genai.types.File upstreamFile = client.files.get(
+                        binding.getExternalFileId(),
+                        GetFileConfig.builder().build()
+                );
+                refreshGeminiFileEntity(entity, upstreamFile);
+                binding.setExternalFilename(upstreamFile.displayName().orElse(binding.getExternalFilename()));
+                binding.setStatus(geminiBindingStatus(upstreamFile));
+                binding.setLastSyncedAt(Instant.now());
+                gatewayFileBindingRepository.save(binding);
+            } catch (RuntimeException ignored) {
+                // 刷新失败时保留本地结果，避免 metadata 查询阻塞读取。
+            }
+            return;
+        }
+        if (supportsAnthropicFiles(bindingContext.siteProfile().getSiteKind())) {
+            AnthropicClient client = anthropicChatModelFactory.createClient(
+                    bindingContext.credential().getBaseUrl(),
+                    bindingContext.credentialMaterial().secret()
             );
-            refreshGeminiFileEntity(entity, upstreamFile);
-            binding.setExternalFilename(upstreamFile.displayName().orElse(binding.getExternalFilename()));
-            binding.setStatus(geminiBindingStatus(upstreamFile));
-            binding.setLastSyncedAt(Instant.now());
-            gatewayFileBindingRepository.save(binding);
-        } catch (RuntimeException ignored) {
-            // 刷新失败时保留本地结果，避免 metadata 查询阻塞读取。
+            try {
+                FileMetadata upstreamFile = client.beta().files().retrieveMetadata(
+                        binding.getExternalFileId(),
+                        FileRetrieveMetadataParams.builder()
+                                .addBeta(AnthropicBeta.FILES_API_2025_04_14)
+                                .build()
+                );
+                refreshAnthropicFileEntity(entity, upstreamFile);
+                binding.setExternalFilename(upstreamFile.filename());
+                binding.setStatus(anthropicBindingStatus(upstreamFile));
+                binding.setLastSyncedAt(Instant.now());
+                gatewayFileBindingRepository.save(binding);
+            } catch (RuntimeException ignored) {
+                // 刷新失败时保留本地结果，避免 metadata 查询阻塞读取。
+            } finally {
+                client.close();
+            }
         }
     }
 
     private GatewayFileContent readUpstreamFileContent(GatewayFileEntity entity, GatewayFileBindingEntity binding) {
         BindingContext bindingContext = resolveBindingContext(binding).orElse(null);
-        if (bindingContext == null || bindingContext.siteProfile().getSiteKind() != UpstreamSiteKind.GEMINI_DIRECT) {
+        if (bindingContext == null) {
             return readLocalFileContent(entity);
         }
         Path tempFile = null;
-        try (Client client = geminiChatModelFactory.createClient(
-                bindingContext.siteProfile().getSiteKind(),
-                bindingContext.credential().getBaseUrl(),
-                bindingContext.credentialMaterial()
-        )) {
-            com.google.genai.types.File upstreamFile = client.files.get(
-                    binding.getExternalFileId(),
-                    GetFileConfig.builder().build()
-            );
-            refreshGeminiFileEntity(entity, upstreamFile);
-            tempFile = Files.createTempFile(ensureStorageDirectory(), "gemini-file-", ".bin");
-            client.files.download(
-                    binding.getExternalFileId(),
-                    tempFile.toString(),
-                    DownloadFileConfig.builder().build()
-            );
-            byte[] bytes = Files.readAllBytes(tempFile);
-            String mimeType = upstreamFile.mimeType().orElse(entity.getMimeType());
-            return new GatewayFileContent(
-                    toResponse(entity),
-                    bytes,
-                    mimeType == null || mimeType.isBlank() ? MediaType.APPLICATION_OCTET_STREAM_VALUE : mimeType
-            );
+        try {
+            if (supportsGoogleGenAiFiles(bindingContext.siteProfile().getSiteKind())) {
+                try (Client client = geminiChatModelFactory.createClient(
+                        bindingContext.siteProfile().getSiteKind(),
+                        bindingContext.credential().getBaseUrl(),
+                        bindingContext.credentialMaterial()
+                )) {
+                    com.google.genai.types.File upstreamFile = client.files.get(
+                            binding.getExternalFileId(),
+                            GetFileConfig.builder().build()
+                    );
+                    refreshGeminiFileEntity(entity, upstreamFile);
+                    tempFile = Files.createTempFile(ensureStorageDirectory(), "gemini-file-", ".bin");
+                    client.files.download(
+                            binding.getExternalFileId(),
+                            tempFile.toString(),
+                            DownloadFileConfig.builder().build()
+                    );
+                    byte[] bytes = Files.readAllBytes(tempFile);
+                    String mimeType = upstreamFile.mimeType().orElse(entity.getMimeType());
+                    return new GatewayFileContent(
+                            toResponse(entity),
+                            bytes,
+                            mimeType == null || mimeType.isBlank() ? MediaType.APPLICATION_OCTET_STREAM_VALUE : mimeType
+                    );
+                }
+            }
+            if (supportsAnthropicFiles(bindingContext.siteProfile().getSiteKind())) {
+                AnthropicClient client = anthropicChatModelFactory.createClient(
+                        bindingContext.credential().getBaseUrl(),
+                        bindingContext.credentialMaterial().secret()
+                );
+                try {
+                    FileMetadata upstreamFile = client.beta().files().retrieveMetadata(
+                            binding.getExternalFileId(),
+                            FileRetrieveMetadataParams.builder()
+                                    .addBeta(AnthropicBeta.FILES_API_2025_04_14)
+                                    .build()
+                    );
+                    refreshAnthropicFileEntity(entity, upstreamFile);
+                    try (HttpResponse response = client.beta().files().download(
+                            binding.getExternalFileId(),
+                            FileDownloadParams.builder()
+                                    .addBeta(AnthropicBeta.FILES_API_2025_04_14)
+                                    .build()
+                    )) {
+                        byte[] bytes = response.body().readAllBytes();
+                        String mimeType = upstreamFile.mimeType();
+                        return new GatewayFileContent(
+                                toResponse(entity),
+                                bytes,
+                                mimeType == null || mimeType.isBlank() ? MediaType.APPLICATION_OCTET_STREAM_VALUE : mimeType
+                        );
+                    }
+                } finally {
+                    client.close();
+                }
+            }
+            return readLocalFileContent(entity);
         } catch (IOException | RuntimeException exception) {
             return readLocalFileContent(entity);
         } finally {
@@ -419,13 +637,28 @@ public class GatewayFileService {
             return;
         }
         try {
-            if (bindingContext.siteProfile().getSiteKind() == UpstreamSiteKind.GEMINI_DIRECT) {
+            if (supportsGoogleGenAiFiles(bindingContext.siteProfile().getSiteKind())) {
                 try (Client client = geminiChatModelFactory.createClient(
                         bindingContext.siteProfile().getSiteKind(),
                         bindingContext.credential().getBaseUrl(),
                         bindingContext.credentialMaterial()
                 )) {
                     client.files.delete(binding.getExternalFileId(), DeleteFileConfig.builder().build());
+                }
+            } else if (supportsAnthropicFiles(bindingContext.siteProfile().getSiteKind())) {
+                AnthropicClient client = anthropicChatModelFactory.createClient(
+                        bindingContext.credential().getBaseUrl(),
+                        bindingContext.credentialMaterial().secret()
+                );
+                try {
+                    client.beta().files().delete(
+                            binding.getExternalFileId(),
+                            FileDeleteParams.builder()
+                                    .addBeta(AnthropicBeta.FILES_API_2025_04_14)
+                                    .build()
+                    );
+                } finally {
+                    client.close();
                 }
             } else {
                 SiteClientRequest request = buildSiteClient(bindingContext.credential(), bindingContext.siteProfile(), "/v1/files/" + binding.getExternalFileId());
@@ -444,6 +677,14 @@ public class GatewayFileService {
         entity.setMimeType(upstreamFile.mimeType().orElse(entity.getMimeType()));
         entity.setStatus(geminiFileStatus(upstreamFile));
         entity.setSizeBytes(upstreamFile.sizeBytes().orElse(entity.getSizeBytes()));
+        gatewayFileRepository.save(entity);
+    }
+
+    private void refreshAnthropicFileEntity(GatewayFileEntity entity, FileMetadata upstreamFile) {
+        entity.setFilename(upstreamFile.filename());
+        entity.setMimeType(upstreamFile.mimeType());
+        entity.setStatus(anthropicFileStatus(upstreamFile));
+        entity.setSizeBytes(upstreamFile.sizeBytes());
         gatewayFileRepository.save(entity);
     }
 
@@ -473,6 +714,14 @@ public class GatewayFileService {
         };
     }
 
+    private String anthropicFileStatus(FileMetadata upstreamFile) {
+        return upstreamFile.downloadable().orElse(false) ? "processed" : "uploaded";
+    }
+
+    private String anthropicBindingStatus(FileMetadata upstreamFile) {
+        return upstreamFile.downloadable().orElse(false) ? "ACTIVE" : "SYNCED";
+    }
+
     private Optional<UpstreamFileTarget> resolveUpstreamFileTarget(Long distributedKeyId) {
         return resolveUpstreamFileTarget(distributedKeyId, null);
     }
@@ -480,13 +729,7 @@ public class GatewayFileService {
     private Optional<UpstreamFileTarget> resolveUpstreamFileTarget(Long distributedKeyId, Long preferredCredentialId) {
         DistributedKeyView distributedKey = distributedKeyQueryService.findActiveById(distributedKeyId)
                 .orElseThrow(() -> new IllegalArgumentException("未找到可用的 DistributedKey。"));
-        Map<Long, UpstreamCredentialEntity> credentials = new LinkedHashMap<>();
-        for (UpstreamCredentialEntity credential : upstreamCredentialRepository.findAllByIdInAndDeletedFalse(
-                distributedKey.bindings().stream().map(DistributedCredentialBindingView::credentialId).toList())) {
-            if (credential.isActive()) {
-                credentials.put(credential.getId(), credential);
-            }
-        }
+        Map<Long, UpstreamCredentialEntity> credentials = activeCredentials(distributedKey);
 
         if (preferredCredentialId != null) {
             UpstreamCredentialEntity preferred = credentials.get(preferredCredentialId);
@@ -516,6 +759,28 @@ public class GatewayFileService {
         return Optional.empty();
     }
 
+    private Optional<UpstreamFileTarget> resolveGoogleNativeFileTarget(Long distributedKeyId) {
+        DistributedKeyView distributedKey = distributedKeyQueryService.findActiveById(distributedKeyId)
+                .orElseThrow(() -> new IllegalArgumentException("未找到可用的 DistributedKey。"));
+        Map<Long, UpstreamCredentialEntity> credentials = activeCredentials(distributedKey);
+        for (DistributedCredentialBindingView binding : distributedKey.bindings()) {
+            UpstreamCredentialEntity credential = credentials.get(binding.credentialId());
+            if (credential == null || credential.getSiteProfileId() == null) {
+                continue;
+            }
+            UpstreamSiteProfileEntity siteProfile = resolveSiteProfile(credential.getSiteProfileId()).orElse(null);
+            SiteCapabilitySnapshotEntity snapshot = siteCapabilitySnapshotRepository.findBySiteProfile_Id(credential.getSiteProfileId())
+                    .orElse(null);
+            if (siteProfile == null
+                    || !supportsGoogleGenAiFiles(siteProfile.getSiteKind())
+                    || !siteCapabilityTruthService.supportsFeature(siteProfile, snapshot, InteropFeature.FILE_OBJECT)) {
+                continue;
+            }
+            return Optional.of(buildUpstreamFileTarget(credential, siteProfile));
+        }
+        return Optional.empty();
+    }
+
     private Optional<UpstreamSiteProfileEntity> resolveSiteProfile(Long siteProfileId) {
         if (siteProfileId == null) {
             return Optional.empty();
@@ -527,10 +792,19 @@ public class GatewayFileService {
             UpstreamCredentialEntity credential,
             UpstreamSiteProfileEntity siteProfile) {
         ResolvedCredentialMaterial credentialMaterial = credentialMaterialResolver.resolveStored(credential);
-        SiteClientRequest request = siteProfile.getSiteKind() == UpstreamSiteKind.GEMINI_DIRECT
+        SiteClientRequest request = supportsGoogleGenAiFiles(siteProfile.getSiteKind())
+                || supportsAnthropicFiles(siteProfile.getSiteKind())
                 ? null
                 : buildSiteClient(credential, siteProfile, "/v1/files");
         return new UpstreamFileTarget(credential, siteProfile, credentialMaterial, request);
+    }
+
+    private boolean supportsGoogleGenAiFiles(UpstreamSiteKind siteKind) {
+        return siteKind == UpstreamSiteKind.GEMINI_DIRECT || siteKind == UpstreamSiteKind.VERTEX_AI;
+    }
+
+    private boolean supportsAnthropicFiles(UpstreamSiteKind siteKind) {
+        return siteKind == UpstreamSiteKind.ANTHROPIC_DIRECT;
     }
 
     private SiteClientRequest buildSiteClient(
@@ -573,6 +847,85 @@ public class GatewayFileService {
     private Optional<GatewayFileBindingEntity> latestBinding(Long gatewayFileId) {
         return gatewayFileBindingRepository.findAllByGatewayFileIdOrderByCreatedAtDesc(gatewayFileId).stream()
                 .findFirst();
+    }
+
+    private Optional<GatewayFileBindingEntity> latestAccessibleGoogleBinding(Long gatewayFileId, Set<Long> activeCredentialIds) {
+        return gatewayFileBindingRepository.findAllByGatewayFileIdOrderByCreatedAtDesc(gatewayFileId).stream()
+                .filter(binding -> activeCredentialIds.contains(binding.getCredentialId()))
+                .filter(binding -> resolveBindingContext(binding)
+                        .map(context -> supportsGoogleGenAiFiles(context.siteProfile().getSiteKind()))
+                        .orElse(false))
+                .findFirst();
+    }
+
+    private Optional<GatewayFileBindingEntity> latestAccessibleAnthropicBinding(Long gatewayFileId, Set<Long> activeCredentialIds) {
+        return gatewayFileBindingRepository.findAllByGatewayFileIdOrderByCreatedAtDesc(gatewayFileId).stream()
+                .filter(binding -> activeCredentialIds.contains(binding.getCredentialId()))
+                .filter(binding -> resolveBindingContext(binding)
+                        .map(context -> supportsAnthropicFiles(context.siteProfile().getSiteKind()))
+                        .orElse(false))
+                .findFirst();
+    }
+
+    private GoogleBindingResolution resolveGoogleBinding(String externalFileId, Long distributedKeyId) {
+        DistributedKeyView distributedKey = distributedKeyQueryService.findActiveById(distributedKeyId)
+                .orElseThrow(() -> new IllegalArgumentException("未找到可用的 DistributedKey。"));
+        Map<Long, UpstreamCredentialEntity> credentials = activeCredentials(distributedKey);
+        for (DistributedCredentialBindingView distributedBinding : distributedKey.bindings()) {
+            UpstreamCredentialEntity credential = credentials.get(distributedBinding.credentialId());
+            if (credential == null || credential.getSiteProfileId() == null) {
+                continue;
+            }
+            UpstreamSiteProfileEntity siteProfile = resolveSiteProfile(credential.getSiteProfileId()).orElse(null);
+            if (siteProfile == null || !supportsGoogleGenAiFiles(siteProfile.getSiteKind())) {
+                continue;
+            }
+            List<GatewayFileBindingEntity> bindings = gatewayFileBindingRepository
+                    .findAllBySiteProfileIdAndExternalFileIdOrderByCreatedAtDesc(siteProfile.getId(), externalFileId);
+            for (GatewayFileBindingEntity binding : bindings) {
+                if (!credentials.containsKey(binding.getCredentialId())) {
+                    continue;
+                }
+                GatewayFileEntity entity = gatewayFileRepository.findById(binding.getGatewayFileId()).orElse(null);
+                if (entity == null || entity.isDeleted() || !entity.getDistributedKeyId().equals(distributedKeyId)) {
+                    continue;
+                }
+                return new GoogleBindingResolution(entity, binding);
+            }
+        }
+        throw new IllegalArgumentException("未找到指定的 Google native 文件对象。");
+    }
+
+    private GoogleNativeFileView toGoogleNativeView(GatewayFileEntity entity, GatewayFileBindingEntity binding) {
+        return new GoogleNativeFileView(
+                toResponse(entity),
+                binding.getExternalFileId(),
+                binding.getExternalFilename(),
+                entity.getMimeType(),
+                entity.getCreatedAt(),
+                entity.getUpdatedAt(),
+                entity.getSha256(),
+                binding.getCredentialId(),
+                binding.getSiteProfileId(),
+                entity.getStatus()
+        );
+    }
+
+    private Map<Long, UpstreamCredentialEntity> activeCredentials(DistributedKeyView distributedKey) {
+        Map<Long, UpstreamCredentialEntity> credentials = new LinkedHashMap<>();
+        for (UpstreamCredentialEntity credential : upstreamCredentialRepository.findAllByIdInAndDeletedFalse(
+                distributedKey.bindings().stream().map(DistributedCredentialBindingView::credentialId).toList())) {
+            if (credential.isActive()) {
+                credentials.put(credential.getId(), credential);
+            }
+        }
+        return credentials;
+    }
+
+    private Set<Long> activeCredentialIds(Long distributedKeyId) {
+        DistributedKeyView distributedKey = distributedKeyQueryService.findActiveById(distributedKeyId)
+                .orElseThrow(() -> new IllegalArgumentException("未找到可用的 DistributedKey。"));
+        return activeCredentials(distributedKey).keySet();
     }
 
     private GatewayFileEntity persistFile(
@@ -640,6 +993,11 @@ public class GatewayFileService {
         return filename.replaceAll("[^a-zA-Z0-9._-]", "_");
     }
 
+    private String sanitizeGoogleDisplayName(String displayName, String fallbackFilename) {
+        String value = displayName == null || displayName.isBlank() ? fallbackFilename : displayName;
+        return sanitizeFilename(value);
+    }
+
     private String sha256(byte[] bytes) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -689,6 +1047,26 @@ public class GatewayFileService {
             UpstreamCredentialEntity credential,
             UpstreamSiteProfileEntity siteProfile,
             ResolvedCredentialMaterial credentialMaterial
+    ) {
+    }
+
+    private record GoogleBindingResolution(
+            GatewayFileEntity entity,
+            GatewayFileBindingEntity binding
+    ) {
+    }
+
+    public record GoogleNativeFileView(
+            GatewayFileResponse response,
+            String externalFileId,
+            String displayName,
+            String mimeType,
+            Instant createdAt,
+            Instant updatedAt,
+            String sha256,
+            Long credentialId,
+            Long siteProfileId,
+            String status
     ) {
     }
 }

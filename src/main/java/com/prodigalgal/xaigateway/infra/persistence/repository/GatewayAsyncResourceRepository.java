@@ -18,6 +18,16 @@ public interface GatewayAsyncResourceRepository extends JpaRepository<GatewayAsy
             String resourceKey,
             GatewayAsyncResourceType resourceType);
 
+    Optional<GatewayAsyncResourceEntity> findByResourceKeyAndResourceTypeAndDistributedKeyIdAndDeletedFalse(
+            String resourceKey,
+            GatewayAsyncResourceType resourceType,
+            Long distributedKeyId);
+
+    Optional<GatewayAsyncResourceEntity> findByDistributedKeyIdAndResourceTypeAndUpstreamObjectIdAndDeletedFalse(
+            Long distributedKeyId,
+            GatewayAsyncResourceType resourceType,
+            String upstreamObjectId);
+
     @Query("""
             select entity
             from GatewayAsyncResourceEntity entity

@@ -49,7 +49,7 @@ public class GeminiModerationsGatewayResourceExecutor implements GatewayResource
 
     @Override
     public boolean supports(CanonicalResourceRequest request, CatalogCandidateView candidate) {
-        return GeminiGatewayResourceSupport.supportsGeminiDirectCandidate(
+        return GeminiGatewayResourceSupport.supportsGoogleGenAiCandidate(
                 request,
                 candidate,
                 "/v1/moderations"

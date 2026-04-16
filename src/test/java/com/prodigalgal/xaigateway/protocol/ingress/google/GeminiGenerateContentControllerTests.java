@@ -9,11 +9,14 @@ import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionResul
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionStreamResult;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceResponse;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResponse;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEvent;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEventType;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolCall;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalUsage;
+import com.prodigalgal.xaigateway.gateway.core.execution.GatewayResourceExecutionResult;
+import com.prodigalgal.xaigateway.gateway.core.execution.GatewayResourceExecutionService;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolCall;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayFinishReason;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateView;
@@ -34,13 +37,23 @@ import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webflux.test.autoconfigure.WebFluxTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 import reactor.core.publisher.Flux;
 
 @WebFluxTest(controllers = GeminiGenerateContentController.class)
-@Import({PermitAllSecurityTestConfig.class, GeminiGenerateContentRequestMapper.class})
+@Import({
+        PermitAllSecurityTestConfig.class,
+        GeminiGenerateContentRequestMapper.class,
+        GeminiGenerateContentEncoder.class,
+        GeminiGenerateContentModeResolver.class,
+        GeminiGenerateContentResourceMapper.class,
+        GeminiGenerateContentResourceEncoder.class
+})
 class GeminiGenerateContentControllerTests {
 
     @Autowired
@@ -51,6 +64,9 @@ class GeminiGenerateContentControllerTests {
 
     @MockitoBean
     private GatewayChatExecutionService gatewayChatExecutionService;
+
+    @MockitoBean
+    private GatewayResourceExecutionService gatewayResourceExecutionService;
 
     @Test
     void shouldExecuteMinimalGenerateContent() {
@@ -318,6 +334,106 @@ class GeminiGenerateContentControllerTests {
                 .expectBody()
                 .jsonPath("$.code").isEqualTo("INVALID_ARGUMENT")
                 .jsonPath("$.message").isEqualTo("至少需要一条带 text 的 user content。");
+    }
+
+    @Test
+    void shouldRouteGenerateContentImageModeToResourceExecution() {
+        Mockito.when(distributedKeyAuthenticationService.authenticateRawToken("sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        ObjectMapper mapper = new ObjectMapper();
+        ObjectNode response = mapper.createObjectNode();
+        response.putArray("data").addObject().put("b64_json", "aGVsbG8=");
+        Mockito.when(gatewayResourceExecutionService.executeDetailedJson(Mockito.any(), Mockito.eq(1L), Mockito.eq("gemini-2.5-pro")))
+                .thenReturn(GatewayResourceExecutionResult.json(
+                        ResponseEntity.ok(response),
+                        new CanonicalResourceResponse(null, null, null, null, null, null, List.of(), List.of(), response, null, java.util.Map.of())
+                ));
+
+        webTestClient.post()
+                .uri("/v1beta/models/gemini-2.5-pro:generateContent")
+                .header("x-goog-api-key", "sk-gw-test.secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "contents": [
+                            {
+                              "role":"user",
+                              "parts":[{"text":"画一只猫"}]
+                            }
+                          ],
+                          "generationConfig": {
+                            "responseModalities": ["IMAGE"]
+                          }
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.candidates[0].content.parts[0].inlineData.mimeType").isEqualTo("image/png")
+                .jsonPath("$.candidates[0].content.parts[0].inlineData.data").isEqualTo("aGVsbG8=");
+    }
+
+    @Test
+    void shouldRouteGenerateContentAudioModeToResourceExecution() {
+        Mockito.when(distributedKeyAuthenticationService.authenticateRawToken("sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        byte[] audio = "hello".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        Mockito.when(gatewayResourceExecutionService.executeDetailedBinaryJson(Mockito.any(), Mockito.eq(1L), Mockito.eq("gemini-2.5-pro")))
+                .thenReturn(GatewayResourceExecutionResult.binary(
+                        ResponseEntity.ok().contentType(MediaType.parseMediaType("audio/wav")).body(audio),
+                        new CanonicalResourceResponse(null, null, "binary", null, null, null, List.of(), List.of(), null, audio.length, java.util.Map.of())
+                ));
+
+        webTestClient.post()
+                .uri("/v1beta/models/gemini-2.5-pro:generateContent")
+                .header("x-goog-api-key", "sk-gw-test.secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "contents": [
+                            {
+                              "role":"user",
+                              "parts":[{"text":"读出来"}]
+                            }
+                          ],
+                          "generationConfig": {
+                            "responseModalities": ["AUDIO"]
+                          }
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.candidates[0].content.parts[0].inlineData.mimeType").isEqualTo("audio/wav")
+                .jsonPath("$.candidates[0].content.parts[0].inlineData.data").isEqualTo("aGVsbG8=");
+    }
+
+    @Test
+    void shouldRejectStreamGenerateContentForResourceMode() {
+        Mockito.when(distributedKeyAuthenticationService.authenticateRawToken("sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+
+        webTestClient.post()
+                .uri("/v1beta/models/gemini-2.5-pro:streamGenerateContent")
+                .header("x-goog-api-key", "sk-gw-test.secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "contents": [
+                            {
+                              "role":"user",
+                              "parts":[{"text":"画一只猫"}]
+                            }
+                          ],
+                          "generationConfig": {
+                            "responseModalities": ["IMAGE"]
+                          }
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.message").isEqualTo("resource-mode 当前不支持 streamGenerateContent。");
     }
 
     private RouteSelectionResult selectionResult() {

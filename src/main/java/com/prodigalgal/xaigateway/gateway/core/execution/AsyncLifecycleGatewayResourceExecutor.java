@@ -38,6 +38,7 @@ public class AsyncLifecycleGatewayResourceExecutor implements GatewayResourceExe
         }
         return request.normalizedPath().startsWith("/v1/uploads")
                 || request.normalizedPath().startsWith("/v1/batches")
+                || request.normalizedPath().startsWith("/v1/messages/batches")
                 || request.normalizedPath().startsWith("/v1/fine_tuning/jobs")
                 || "/v1/realtime/client_secrets".equals(request.normalizedPath());
     }
@@ -56,6 +57,9 @@ public class AsyncLifecycleGatewayResourceExecutor implements GatewayResourceExe
             case "/v1/batches" -> gatewayAsyncResourceService.createBatch(context.distributedKeyId(), requestBody, preferredCredentialId);
             case "/v1/batches/{batchId}" -> gatewayAsyncResourceService.getBatch(requirePathParam(context, "batchId"), context.distributedKeyId());
             case "/v1/batches/{batchId}/cancel" -> gatewayAsyncResourceService.cancelBatch(requirePathParam(context, "batchId"), context.distributedKeyId());
+            case "/v1/messages/batches" -> gatewayAsyncResourceService.createAnthropicMessageBatch(context.distributedKeyId(), requestBody, preferredCredentialId);
+            case "/v1/messages/batches/{messageBatchId}" -> gatewayAsyncResourceService.getAnthropicMessageBatch(requirePathParam(context, "messageBatchId"), context.distributedKeyId());
+            case "/v1/messages/batches/{messageBatchId}/cancel" -> gatewayAsyncResourceService.cancelAnthropicMessageBatch(requirePathParam(context, "messageBatchId"), context.distributedKeyId());
             case "/v1/fine_tuning/jobs" -> gatewayAsyncResourceService.createTuning(context.distributedKeyId(), requestBody, preferredCredentialId);
             case "/v1/fine_tuning/jobs/{jobId}" -> gatewayAsyncResourceService.getTuning(requirePathParam(context, "jobId"), context.distributedKeyId());
             case "/v1/fine_tuning/jobs/{jobId}/cancel" -> gatewayAsyncResourceService.cancelTuning(requirePathParam(context, "jobId"), context.distributedKeyId());

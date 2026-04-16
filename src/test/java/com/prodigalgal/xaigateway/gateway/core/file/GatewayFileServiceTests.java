@@ -201,6 +201,151 @@ class GatewayFileServiceTests {
     }
 
     @Test
+    void shouldCreateGatewayFileAndVertexBinding() {
+        GatewayFileRepository gatewayFileRepository = Mockito.mock(GatewayFileRepository.class);
+        GatewayFileBindingRepository gatewayFileBindingRepository = Mockito.mock(GatewayFileBindingRepository.class);
+        DistributedKeyQueryService distributedKeyQueryService = Mockito.mock(DistributedKeyQueryService.class);
+        UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        UpstreamSiteProfileRepository upstreamSiteProfileRepository = Mockito.mock(UpstreamSiteProfileRepository.class);
+        SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        CredentialCryptoService credentialCryptoService = Mockito.mock(CredentialCryptoService.class);
+        CredentialMaterialResolver credentialMaterialResolver = Mockito.mock(CredentialMaterialResolver.class);
+        GeminiChatModelFactory geminiChatModelFactory = Mockito.mock(GeminiChatModelFactory.class);
+
+        GatewayProperties properties = new GatewayProperties();
+        properties.getStorage().setFileRoot(tempDir.toString());
+
+        GatewayFileService service = new GatewayFileService(
+                gatewayFileRepository,
+                gatewayFileBindingRepository,
+                distributedKeyQueryService,
+                upstreamCredentialRepository,
+                upstreamSiteProfileRepository,
+                snapshotRepository,
+                new SiteCapabilityTruthService(new UpstreamSitePolicyService(), snapshotRepository),
+                credentialCryptoService,
+                credentialMaterialResolver,
+                geminiChatModelFactory,
+                properties,
+                WebClient.builder(),
+                new ObjectMapper()
+        );
+
+        UpstreamCredentialEntity credential = credential(
+                301L,
+                ProviderType.GEMINI_DIRECT,
+                3L,
+                "https://aiplatform.googleapis.com"
+        );
+        UpstreamSiteProfileEntity siteProfile = googleGenAiSiteProfile(3L, UpstreamSiteKind.VERTEX_AI, AuthStrategy.BEARER);
+        ResolvedCredentialMaterial credentialMaterial = resolvedMaterial(
+                301L,
+                3L,
+                "vertex-token",
+                Map.of("projectId", "demo-project", "location", "us-central1")
+        );
+
+        Mockito.when(distributedKeyQueryService.findActiveById(1L))
+                .thenReturn(Optional.of(distributedKey(ProviderType.GEMINI_DIRECT, 301L, credential.getBaseUrl())));
+        Mockito.when(upstreamCredentialRepository.findAllByIdInAndDeletedFalse(List.of(301L)))
+                .thenReturn(List.of(credential));
+        Mockito.when(upstreamSiteProfileRepository.findById(3L)).thenReturn(Optional.of(siteProfile));
+        Mockito.when(snapshotRepository.findBySiteProfile_Id(3L))
+                .thenReturn(Optional.of(snapshot(true, false, false, AuthStrategy.BEARER, PathStrategy.GEMINI_V1BETA_MODELS)));
+        Mockito.when(credentialMaterialResolver.resolveStored(credential)).thenReturn(credentialMaterial);
+        Mockito.when(gatewayFileRepository.save(any())).thenAnswer(invocation -> {
+            GatewayFileEntity entity = invocation.getArgument(0);
+            if (entity.getCreatedAt() == null) {
+                ReflectionTestUtils.setField(entity, "id", 12L);
+                ReflectionTestUtils.setField(entity, "createdAt", Instant.parse("2026-04-12T04:00:00Z"));
+            }
+            return entity;
+        });
+        Mockito.when(gatewayFileBindingRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        com.google.genai.Files filesFacade = Mockito.mock(com.google.genai.Files.class);
+        Client client = geminiClient(filesFacade);
+        Mockito.when(geminiChatModelFactory.createClient(UpstreamSiteKind.VERTEX_AI, credential.getBaseUrl(), credentialMaterial))
+                .thenReturn(client);
+        com.google.genai.types.File uploadedFile = geminiFile("files/vertex-upstream-1", "vertex-demo.txt", "text/plain", 5L);
+        Mockito.when(filesFacade.upload(any(byte[].class), any(com.google.genai.types.UploadFileConfig.class)))
+                .thenReturn(uploadedFile);
+
+        GatewayFileResponse response = service.createFile(1L, textFilePart("vertex-demo.txt", "hello", MediaType.TEXT_PLAIN), "assistants").block();
+
+        assertEquals("uploaded", response.status());
+        ArgumentCaptor<GatewayFileBindingEntity> bindingCaptor = ArgumentCaptor.forClass(GatewayFileBindingEntity.class);
+        Mockito.verify(gatewayFileBindingRepository).save(bindingCaptor.capture());
+        assertEquals("files/vertex-upstream-1", bindingCaptor.getValue().getExternalFileId());
+        assertEquals(3L, bindingCaptor.getValue().getSiteProfileId());
+        Mockito.verify(filesFacade).upload(any(byte[].class), any(com.google.genai.types.UploadFileConfig.class));
+    }
+
+    @Test
+    void shouldResolveGoogleNativeFileByExternalId() {
+        GatewayFileRepository gatewayFileRepository = Mockito.mock(GatewayFileRepository.class);
+        GatewayFileBindingRepository gatewayFileBindingRepository = Mockito.mock(GatewayFileBindingRepository.class);
+        DistributedKeyQueryService distributedKeyQueryService = Mockito.mock(DistributedKeyQueryService.class);
+        UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        UpstreamSiteProfileRepository upstreamSiteProfileRepository = Mockito.mock(UpstreamSiteProfileRepository.class);
+        SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        CredentialCryptoService credentialCryptoService = Mockito.mock(CredentialCryptoService.class);
+        CredentialMaterialResolver credentialMaterialResolver = Mockito.mock(CredentialMaterialResolver.class);
+        GeminiChatModelFactory geminiChatModelFactory = Mockito.mock(GeminiChatModelFactory.class);
+
+        GatewayProperties properties = new GatewayProperties();
+        properties.getStorage().setFileRoot(tempDir.toString());
+
+        GatewayFileService service = new GatewayFileService(
+                gatewayFileRepository,
+                gatewayFileBindingRepository,
+                distributedKeyQueryService,
+                upstreamCredentialRepository,
+                upstreamSiteProfileRepository,
+                snapshotRepository,
+                new SiteCapabilityTruthService(new UpstreamSitePolicyService(), snapshotRepository),
+                credentialCryptoService,
+                credentialMaterialResolver,
+                geminiChatModelFactory,
+                properties,
+                WebClient.builder(),
+                new ObjectMapper()
+        );
+
+        GatewayFileEntity file = gatewayFileEntity(51L, "file-google-1", tempDir.resolve("google.txt"), "google.txt", "text/plain", 1L);
+        GatewayFileBindingEntity binding = geminiBinding(51L, 201L, 2L, "files/google-upstream-1");
+        UpstreamCredentialEntity credential = credential(201L, ProviderType.GEMINI_DIRECT, 2L, "https://generativelanguage.googleapis.com");
+        UpstreamSiteProfileEntity siteProfile = geminiSiteProfile(2L);
+        ResolvedCredentialMaterial credentialMaterial = resolvedMaterial(201L, 2L, "api-key");
+
+        Mockito.when(distributedKeyQueryService.findActiveById(1L))
+                .thenReturn(Optional.of(distributedKey(ProviderType.GEMINI_DIRECT, 201L, credential.getBaseUrl())));
+        Mockito.when(upstreamCredentialRepository.findAllByIdInAndDeletedFalse(List.of(201L))).thenReturn(List.of(credential));
+        Mockito.when(upstreamCredentialRepository.findById(201L)).thenReturn(Optional.of(credential));
+        Mockito.when(upstreamSiteProfileRepository.findById(2L)).thenReturn(Optional.of(siteProfile));
+        Mockito.when(gatewayFileBindingRepository.findAllBySiteProfileIdAndExternalFileIdOrderByCreatedAtDesc(2L, "files/google-upstream-1"))
+                .thenReturn(List.of(binding));
+        Mockito.when(gatewayFileRepository.findById(51L)).thenReturn(Optional.of(file));
+        Mockito.when(credentialMaterialResolver.resolveStored(credential)).thenReturn(credentialMaterial);
+        Mockito.when(gatewayFileRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        Mockito.when(gatewayFileBindingRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        com.google.genai.Files filesFacade = Mockito.mock(com.google.genai.Files.class);
+        Client client = geminiClient(filesFacade);
+        com.google.genai.types.File upstreamFile = geminiFile("files/google-upstream-1", "google-updated.txt", "text/plain", 9L);
+        Mockito.when(geminiChatModelFactory.createClient(UpstreamSiteKind.GEMINI_DIRECT, credential.getBaseUrl(), credentialMaterial))
+                .thenReturn(client);
+        Mockito.when(filesFacade.get(Mockito.eq("files/google-upstream-1"), any(com.google.genai.types.GetFileConfig.class)))
+                .thenReturn(upstreamFile);
+
+        GatewayFileService.GoogleNativeFileView view = service.getGoogleNativeFile("files/google-upstream-1", 1L);
+
+        assertEquals("files/google-upstream-1", view.externalFileId());
+        assertEquals("google-updated.txt", view.displayName());
+        assertEquals("file-google-1", view.response().id());
+    }
+
+    @Test
     void shouldReadGeminiFileContentUsingUpstreamBinding() throws Exception {
         GatewayFileRepository gatewayFileRepository = Mockito.mock(GatewayFileRepository.class);
         GatewayFileBindingRepository gatewayFileBindingRepository = Mockito.mock(GatewayFileBindingRepository.class);
@@ -443,10 +588,14 @@ class GatewayFileServiceTests {
     }
 
     private UpstreamSiteProfileEntity geminiSiteProfile(Long id) {
+        return googleGenAiSiteProfile(id, UpstreamSiteKind.GEMINI_DIRECT, AuthStrategy.API_KEY_QUERY);
+    }
+
+    private UpstreamSiteProfileEntity googleGenAiSiteProfile(Long id, UpstreamSiteKind siteKind, AuthStrategy authStrategy) {
         UpstreamSiteProfileEntity entity = new UpstreamSiteProfileEntity();
         ReflectionTestUtils.setField(entity, "id", id);
-        entity.setSiteKind(UpstreamSiteKind.GEMINI_DIRECT);
-        entity.setAuthStrategy(AuthStrategy.API_KEY_QUERY);
+        entity.setSiteKind(siteKind);
+        entity.setAuthStrategy(authStrategy);
         entity.setPathStrategy(PathStrategy.GEMINI_V1BETA_MODELS);
         entity.setErrorSchemaStrategy(ErrorSchemaStrategy.GEMINI_ERROR);
         entity.setActive(true);
@@ -472,13 +621,17 @@ class GatewayFileServiceTests {
     }
 
     private ResolvedCredentialMaterial resolvedMaterial(Long credentialId, Long siteProfileId, String secret) {
+        return resolvedMaterial(credentialId, siteProfileId, secret, Map.of());
+    }
+
+    private ResolvedCredentialMaterial resolvedMaterial(Long credentialId, Long siteProfileId, String secret, Map<String, Object> metadata) {
         return new ResolvedCredentialMaterial(
                 credentialId,
                 siteProfileId,
                 null,
                 secret,
                 "fp",
-                Map.of(),
+                metadata,
                 null,
                 "credential"
         );

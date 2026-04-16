@@ -13,19 +13,52 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   --mono: 'IBM Plex Mono', 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
+  --scrollbar-size: 0.82rem;
+  --scrollbar-track: rgba(203, 213, 225, 0.48);
+  --scrollbar-thumb: rgba(100, 116, 139, 0.72);
+  --scrollbar-thumb-hover: rgba(71, 85, 105, 0.88);
+  --scrollbar-sidebar-track: rgba(15, 23, 42, 0.62);
+  --scrollbar-sidebar-thumb: rgba(94, 234, 212, 0.34);
+  --scrollbar-sidebar-thumb-hover: rgba(94, 234, 212, 0.52);
 }
 
 * {
   box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+*::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+*::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-color: var(--scrollbar-thumb);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
 }
 
 html {
+  height: 100%;
   min-height: 100%;
+  overflow: hidden;
 }
 
 body {
   margin: 0;
+  height: 100%;
   min-height: 100svh;
+  overflow: hidden;
 }
 
 body::before {
@@ -56,5 +89,7 @@ code {
 }
 
 #root {
+  height: 100%;
   min-height: 100svh;
+  overflow: hidden;
 }

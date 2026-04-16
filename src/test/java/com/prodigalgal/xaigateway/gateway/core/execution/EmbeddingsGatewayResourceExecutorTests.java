@@ -13,13 +13,17 @@ import com.prodigalgal.xaigateway.gateway.core.shared.ReasoningTransport;
 import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class EmbeddingsGatewayResourceExecutorTests {
 
-    private final EmbeddingsGatewayResourceExecutor executor = new EmbeddingsGatewayResourceExecutor(new ObjectMapper());
+    private final EmbeddingsGatewayResourceExecutor executor = new EmbeddingsGatewayResourceExecutor(
+            new ObjectMapper(),
+            Mockito.mock(com.prodigalgal.xaigateway.provider.adapter.gemini.GeminiChatModelFactory.class)
+    );
 
     @Test
     void shouldSupportGeminiDirectOnlyWhenPathAndAuthMatchNativeRequirements() {
@@ -44,11 +48,17 @@ class EmbeddingsGatewayResourceExecutorTests {
     }
 
     @Test
-    void shouldRejectVertexAiEmbeddingsCandidatesInSupports() {
-        assertFalse(executor.supports(request(), candidate(
+    void shouldSupportVertexAiEmbeddingsCandidatesWhenPathAndAuthMatchGoogleGenAiRequirements() {
+        assertTrue(executor.supports(request(), candidate(
                 ProviderType.GEMINI_DIRECT,
                 UpstreamSiteKind.VERTEX_AI,
                 AuthStrategy.BEARER,
+                PathStrategy.GEMINI_V1BETA_MODELS
+        )));
+        assertFalse(executor.supports(request(), candidate(
+                ProviderType.GEMINI_DIRECT,
+                UpstreamSiteKind.VERTEX_AI,
+                AuthStrategy.API_KEY_QUERY,
                 PathStrategy.GEMINI_V1BETA_MODELS
         )));
     }

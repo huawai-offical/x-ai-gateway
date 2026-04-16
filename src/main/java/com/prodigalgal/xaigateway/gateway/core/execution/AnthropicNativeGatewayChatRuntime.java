@@ -1,9 +1,11 @@
 package com.prodigalgal.xaigateway.gateway.core.execution;
 
 import com.anthropic.client.AnthropicClient;
+import com.anthropic.core.JsonValue;
 import com.anthropic.core.http.StreamResponse;
 import com.anthropic.models.messages.ContentBlock;
 import com.anthropic.models.messages.ContentBlockParam;
+import com.anthropic.models.messages.ContentBlockSource;
 import com.anthropic.models.messages.DocumentBlockParam;
 import com.anthropic.models.messages.ImageBlockParam;
 import com.anthropic.models.messages.Message;
@@ -185,6 +187,22 @@ public class AnthropicNativeGatewayChatRuntime implements GatewayChatRuntime {
 
     private DocumentBlockParam toDocumentBlock(String distributedKeyPrefix, CanonicalContentPart part) {
         if (part.uri() != null && part.uri().startsWith("gateway://")) {
+            String fileKey = part.uri().substring("gateway://".length());
+            Long distributedKeyId = distributedKeyQueryService.findActiveByKeyPrefix(distributedKeyPrefix)
+                    .orElseThrow(() -> new IllegalArgumentException("未找到可用的 DistributedKey。"))
+                    .id();
+            String anthropicFileId = gatewayFileService.resolveAnthropicExternalFileId(fileKey, distributedKeyId).orElse(null);
+            if (anthropicFileId != null && !anthropicFileId.isBlank()) {
+                return DocumentBlockParam.builder()
+                        .source(ContentBlockSource.builder()
+                                .type(JsonValue.from("file"))
+                                // Anthropic SDK 当前要求 content 必填，这里放一个空占位以便透传 file_id。
+                                .content("")
+                                .putAdditionalProperty("file_id", JsonValue.from(anthropicFileId))
+                                .build())
+                        .title(part.name())
+                        .build();
+            }
             GatewayFileContent content = resolveGatewayFile(distributedKeyPrefix, part);
             return DocumentBlockParam.builder()
                     .base64Source(Base64.getEncoder().encodeToString(content.bytes()))

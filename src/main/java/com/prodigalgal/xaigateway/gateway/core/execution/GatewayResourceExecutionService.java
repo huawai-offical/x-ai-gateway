@@ -319,14 +319,14 @@ public class GatewayResourceExecutionService {
             CanonicalResourceRequest request,
             Long distributedKeyId,
             String defaultModel) {
-        GatewayRequestSemantics semantics = gatewayRequestFeatureService.describe(request.httpMethod(), request.requestPath(), request.jsonBody());
+        GatewayRequestSemantics semantics = describeRequest(request, request.jsonBody());
         if (!semantics.requiresRouteSelection()) {
             GatewayResourceExecutionContext context = prepareNoRouteContext(distributedKeyId, request);
             JsonNode payload = request.jsonBody() == null ? objectMapper.createObjectNode() : request.jsonBody();
             return jsonResult(request, context.executionPlan(), resolveExecutor(context).executeJson(context, payload, defaultModel));
         }
         ObjectNode payload = requireObjectPayload(request.jsonBody(), defaultModel);
-        RouteSelectionResult selectionResult = select(request.distributedKeyPrefix(), request.requestPath(), payload.path("model").asText(), payload);
+        RouteSelectionResult selectionResult = select(request, payload.path("model").asText(), payload);
         String requestId = gatewayObservabilityService.nextRequestId();
         Instant startedAt = Instant.now();
         var initialPlan = translationExecutionPlanCompiler.compileSelected(selectionResult, request, semantics, payload).canonicalPlan();
@@ -464,14 +464,14 @@ public class GatewayResourceExecutionService {
             CanonicalResourceRequest request,
             Long distributedKeyId,
             String defaultModel) {
-        GatewayRequestSemantics semantics = gatewayRequestFeatureService.describe(request.httpMethod(), request.requestPath(), request.jsonBody());
+        GatewayRequestSemantics semantics = describeRequest(request, request.jsonBody());
         if (!semantics.requiresRouteSelection()) {
             GatewayResourceExecutionContext context = prepareNoRouteContext(distributedKeyId, request);
             JsonNode payload = request.jsonBody() == null ? objectMapper.createObjectNode() : request.jsonBody();
             return binaryResult(request, context.executionPlan(), resolveExecutor(context).executeBinary(context, payload, defaultModel));
         }
         ObjectNode payload = requireObjectPayload(request.jsonBody(), defaultModel);
-        RouteSelectionResult selectionResult = select(request.distributedKeyPrefix(), request.requestPath(), payload.path("model").asText(), payload);
+        RouteSelectionResult selectionResult = select(request, payload.path("model").asText(), payload);
         String requestId = gatewayObservabilityService.nextRequestId();
         Instant startedAt = Instant.now();
         var initialPlan = translationExecutionPlanCompiler.compileSelected(selectionResult, request, semantics, payload).canonicalPlan();
@@ -610,13 +610,13 @@ public class GatewayResourceExecutionService {
             String requestedModel,
             Map<String, FilePart> files) {
         ObjectNode routePayload = objectPayloadForMultipart(request, requestedModel);
-        GatewayRequestSemantics semantics = gatewayRequestFeatureService.describe(request.httpMethod(), request.requestPath(), routePayload);
+        GatewayRequestSemantics semantics = describeRequest(request, routePayload);
         if (!semantics.requiresRouteSelection()) {
             GatewayResourceExecutionContext context = prepareNoRouteContext(distributedKeyId, request);
             return resolveExecutor(context).executeMultipart(context, requestedModel, request.formFields(), files)
                     .map(response -> jsonResult(request, context.executionPlan(), response));
         }
-        RouteSelectionResult selectionResult = select(request.distributedKeyPrefix(), request.requestPath(), requestedModel, routePayload);
+        RouteSelectionResult selectionResult = select(request, requestedModel, routePayload);
         String requestId = gatewayObservabilityService.nextRequestId();
         Instant startedAt = Instant.now();
         var initialPlan = translationExecutionPlanCompiler.compileSelected(selectionResult, request, semantics, routePayload).canonicalPlan();
@@ -640,14 +640,13 @@ public class GatewayResourceExecutionService {
     }
 
     private RouteSelectionResult select(
-            String distributedKeyPrefix,
-            String requestPath,
+            CanonicalResourceRequest request,
             String requestedModel,
             Object requestBody) {
         return gatewayRouteSelectionService.select(new RouteSelectionRequest(
-                distributedKeyPrefix,
-                "openai",
-                requestPath,
+                request.distributedKeyPrefix(),
+                request.ingressProtocol().name().toLowerCase(),
+                selectionPath(request),
                 requestedModel,
                 requestBody,
                 GatewayClientFamily.GENERIC_OPENAI,
@@ -774,7 +773,7 @@ public class GatewayResourceExecutionService {
         GatewayRequestSemantics semantics = new GatewayRequestSemantics(
                 request.resourceType(),
                 request.operation(),
-                gatewayRequestFeatureService.describe(request.httpMethod(), request.requestPath(), requestBody).requiredFeatures(),
+                describeRequest(request, requestBody).requiredFeatures(),
                 true
         );
         var executionPlanCompilation = translationExecutionPlanCompiler.compileSelected(
@@ -803,7 +802,7 @@ public class GatewayResourceExecutionService {
                 request.distributedKeyPrefix(),
                 request.ingressProtocol().name().toLowerCase(),
                 request.httpMethod(),
-                request.requestPath(),
+                selectionPath(request),
                 request.requestedModel(),
                 GatewayDegradationPolicy.ALLOW_LOSSY,
                 GatewayClientFamily.GENERIC_OPENAI,
@@ -895,6 +894,16 @@ public class GatewayResourceExecutionService {
             throw new IllegalArgumentException("未找到对应的上游凭证。");
         }
         return credential.get();
+    }
+
+    private GatewayRequestSemantics describeRequest(CanonicalResourceRequest request, JsonNode requestBody) {
+        return gatewayRequestFeatureService.describe(request.httpMethod(), selectionPath(request), requestBody);
+    }
+
+    private String selectionPath(CanonicalResourceRequest request) {
+        return request.normalizedPath() == null || request.normalizedPath().isBlank()
+                ? request.requestPath()
+                : request.normalizedPath();
     }
 
     private void recordRouteOutcome(RouteSelectionResult selectionResult, int statusCode) {

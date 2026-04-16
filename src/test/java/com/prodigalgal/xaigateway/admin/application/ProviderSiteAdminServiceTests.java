@@ -161,14 +161,18 @@ class ProviderSiteAdminServiceTests {
         assertEquals(SupportStatus.NATIVE, response.surfaces().get("image_generation").supportStatus());
         assertEquals(SupportStatus.NATIVE, response.surfaces().get("moderation_create").supportStatus());
         assertEquals("blocked", response.features().get("upload_create").supportStatus());
+        assertTrue(response.features().get("upload_create").blockedReasons().stream()
+                .anyMatch(reason -> reason.contains("gateway-local orchestration surface")));
         assertEquals(SupportStatus.ORCHESTRATION, response.surfaces().get("upload_create").supportStatus());
-        assertEquals(SupportStatus.ORCHESTRATION, response.surfaces().get("realtime_client_secret_create").supportStatus());
+        assertEquals(SupportStatus.BLOCKED, response.surfaces().get("realtime_client_secret_create").supportStatus());
+        assertTrue(response.features().get("realtime_client_secret").blockedReasons().stream()
+                .anyMatch(reason -> reason.contains("Gemini ephemeral/live token")));
         assertEquals(SupportStatus.NATIVE, response.surfaces().get("embedding_create").supportStatus());
         assertTrue(response.surfaces().get("file_create").featureResolutions().containsKey("file_object"));
     }
 
     @Test
-    void shouldExposeVertexEmbeddingsAsBlockedWhileObjectSurfacesStayOrchestrated() {
+    void shouldExposeVertexNativeMediaAndWrappedObjectSurfaces() {
         UpstreamSiteProfileRepository profileRepository = Mockito.mock(UpstreamSiteProfileRepository.class);
         SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
         SiteModelCapabilityRepository modelCapabilityRepository = Mockito.mock(SiteModelCapabilityRepository.class);
@@ -201,10 +205,64 @@ class ProviderSiteAdminServiceTests {
 
         ProviderSiteResponse response = service.get(2L);
 
-        assertEquals("blocked", response.features().get("embeddings").supportStatus());
-        assertEquals(SupportStatus.BLOCKED, response.surfaces().get("embedding_create").supportStatus());
-        assertEquals(SupportStatus.ORCHESTRATION, response.surfaces().get("file_create").supportStatus());
-        assertEquals(SupportStatus.ORCHESTRATION, response.surfaces().get("realtime_client_secret_create").supportStatus());
+        assertEquals("native", response.features().get("embeddings").supportStatus());
+        assertEquals(SupportStatus.NATIVE, response.surfaces().get("embedding_create").supportStatus());
+        assertEquals("native", response.features().get("audio_transcription").supportStatus());
+        assertEquals(SupportStatus.NATIVE, response.surfaces().get("audio_transcription").supportStatus());
+        assertEquals(SupportStatus.NATIVE, response.surfaces().get("image_generation").supportStatus());
+        assertEquals(SupportStatus.NATIVE, response.surfaces().get("moderation_create").supportStatus());
+        assertEquals("native", response.features().get("file_object").supportStatus());
+        assertEquals(SupportStatus.NATIVE, response.surfaces().get("file_create").supportStatus());
+        assertEquals(SupportStatus.NATIVE, response.surfaces().get("batch_create").supportStatus());
+        assertEquals(SupportStatus.NATIVE, response.surfaces().get("tuning_create").supportStatus());
+        assertEquals("blocked", response.features().get("upload_create").supportStatus());
+        assertEquals(SupportStatus.BLOCKED, response.surfaces().get("realtime_client_secret_create").supportStatus());
+    }
+
+    @Test
+    void shouldExposeAnthropicFileAndNativeMessageBatchSurfaces() {
+        UpstreamSiteProfileRepository profileRepository = Mockito.mock(UpstreamSiteProfileRepository.class);
+        SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        SiteModelCapabilityRepository modelCapabilityRepository = Mockito.mock(SiteModelCapabilityRepository.class);
+        UpstreamCredentialRepository credentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        ProviderSiteRegistryService providerSiteRegistryService = Mockito.mock(ProviderSiteRegistryService.class);
+        CredentialModelDiscoveryService credentialModelDiscoveryService = Mockito.mock(CredentialModelDiscoveryService.class);
+        SiteCapabilityTruthService truthService = new SiteCapabilityTruthService(
+                new UpstreamSitePolicyService(),
+                snapshotRepository
+        );
+
+        ProviderSiteAdminService service = new ProviderSiteAdminService(
+                profileRepository,
+                snapshotRepository,
+                modelCapabilityRepository,
+                credentialRepository,
+                providerSiteRegistryService,
+                credentialModelDiscoveryService,
+                truthService
+        );
+
+        UpstreamSiteProfileEntity site = sampleAnthropicSite(3L);
+        SiteCapabilitySnapshotEntity snapshot = anthropicSnapshot(site);
+
+        Mockito.when(profileRepository.findById(3L)).thenReturn(Optional.of(site));
+        Mockito.when(snapshotRepository.findBySiteProfile_Id(3L)).thenReturn(Optional.of(snapshot));
+        Mockito.when(modelCapabilityRepository.findAllBySiteProfile_IdOrderByModelKeyAsc(3L)).thenReturn(List.of());
+        Mockito.when(credentialRepository.findAllBySiteProfileIdAndDeletedFalseAndActiveTrueOrderByCreatedAtDesc(3L))
+                .thenReturn(List.of());
+
+        ProviderSiteResponse response = service.get(3L);
+
+        assertEquals("native", response.features().get("file_object").supportStatus());
+        assertEquals("blocked", response.features().get("batch_create").supportStatus());
+        assertEquals("native", response.features().get("anthropic_message_batch").supportStatus());
+        assertEquals(SupportStatus.NATIVE, response.surfaces().get("file_create").supportStatus());
+        assertEquals(SupportStatus.BLOCKED, response.surfaces().get("batch_create").supportStatus());
+        assertEquals(SupportStatus.NATIVE, response.surfaces().get("anthropic_message_batch_create").supportStatus());
+        assertEquals(com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend.ORCHESTRATION,
+                response.surfaces().get("anthropic_message_batch_create").preferredBackend());
+        assertTrue(response.surfaces().get("batch_create").blockerReasons().stream()
+                .anyMatch(reason -> reason.contains("Message Batches")));
     }
 
     private void mockAllFeatures(
@@ -297,6 +355,21 @@ class ProviderSiteAdminServiceTests {
         return entity;
     }
 
+    private UpstreamSiteProfileEntity sampleAnthropicSite(Long id) {
+        UpstreamSiteProfileEntity entity = new UpstreamSiteProfileEntity();
+        entity.setProfileCode("site:anthropic_direct");
+        entity.setDisplayName("ANTHROPIC_DIRECT");
+        entity.setProviderFamily(ProviderFamily.ANTHROPIC);
+        entity.setSiteKind(UpstreamSiteKind.ANTHROPIC_DIRECT);
+        entity.setAuthStrategy(AuthStrategy.BEARER);
+        entity.setPathStrategy(PathStrategy.ANTHROPIC_V1_MESSAGES);
+        entity.setModelAddressingStrategy(ModelAddressingStrategy.MODEL_NAME);
+        entity.setErrorSchemaStrategy(ErrorSchemaStrategy.ANTHROPIC_ERROR);
+        entity.setActive(true);
+        ReflectionTestUtils.setField(entity, "id", id);
+        return entity;
+    }
+
     private SiteCapabilitySnapshotEntity sampleSnapshot(UpstreamSiteProfileEntity site) {
         SiteCapabilitySnapshotEntity snapshot = new SiteCapabilitySnapshotEntity();
         snapshot.setSiteProfile(site);
@@ -317,12 +390,31 @@ class ProviderSiteAdminServiceTests {
         snapshot.setSupportsAudio(true);
         snapshot.setSupportsImages(true);
         snapshot.setSupportsModeration(true);
-        snapshot.setSupportsFiles(site.getSiteKind() == UpstreamSiteKind.GEMINI_DIRECT);
+        snapshot.setSupportsFiles(site.getSiteKind() == UpstreamSiteKind.GEMINI_DIRECT || site.getSiteKind() == UpstreamSiteKind.VERTEX_AI);
         snapshot.setSupportsUploads(false);
-        snapshot.setSupportsBatches(site.getSiteKind() == UpstreamSiteKind.GEMINI_DIRECT);
-        snapshot.setSupportsTuning(site.getSiteKind() == UpstreamSiteKind.GEMINI_DIRECT);
+        snapshot.setSupportsBatches(site.getSiteKind() == UpstreamSiteKind.GEMINI_DIRECT || site.getSiteKind() == UpstreamSiteKind.VERTEX_AI);
+        snapshot.setSupportsTuning(site.getSiteKind() == UpstreamSiteKind.GEMINI_DIRECT || site.getSiteKind() == UpstreamSiteKind.VERTEX_AI);
         snapshot.setSupportsRealtime(false);
         snapshot.setRefreshedAt(Instant.parse("2026-04-15T02:00:00Z"));
+        return snapshot;
+    }
+
+    private SiteCapabilitySnapshotEntity anthropicSnapshot(UpstreamSiteProfileEntity site) {
+        SiteCapabilitySnapshotEntity snapshot = new SiteCapabilitySnapshotEntity();
+        snapshot.setSiteProfile(site);
+        snapshot.setSupportedProtocols(List.of("anthropic_native"));
+        snapshot.setHealthState("READY");
+        snapshot.setSupportsResponses(true);
+        snapshot.setSupportsFiles(true);
+        snapshot.setSupportsBatches(true);
+        snapshot.setSupportsEmbeddings(false);
+        snapshot.setSupportsAudio(false);
+        snapshot.setSupportsImages(false);
+        snapshot.setSupportsModeration(false);
+        snapshot.setSupportsUploads(false);
+        snapshot.setSupportsTuning(false);
+        snapshot.setSupportsRealtime(false);
+        snapshot.setRefreshedAt(Instant.parse("2026-04-16T02:00:00Z"));
         return snapshot;
     }
 

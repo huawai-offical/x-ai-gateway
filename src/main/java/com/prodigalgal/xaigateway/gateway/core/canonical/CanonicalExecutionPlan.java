@@ -219,6 +219,7 @@ public record CanonicalExecutionPlan(
             case FILE_CREATE, FILE_LIST, FILE_GET, FILE_CONTENT_GET, FILE_DELETE -> "files";
             case UPLOAD_CREATE, UPLOAD_GET, UPLOAD_PART_ADD, UPLOAD_COMPLETE, UPLOAD_CANCEL -> "uploads";
             case BATCH_CREATE, BATCH_GET, BATCH_CANCEL -> "batches";
+            case ANTHROPIC_MESSAGE_BATCH_CREATE, ANTHROPIC_MESSAGE_BATCH_GET, ANTHROPIC_MESSAGE_BATCH_CANCEL -> "messages.batches";
             case TUNING_CREATE, TUNING_GET, TUNING_CANCEL -> "fine_tuning";
             case REALTIME_CLIENT_SECRET_CREATE -> "realtime";
             case UNKNOWN -> resourceType == null ? "unknown" : resourceType.wireName();
@@ -248,6 +249,9 @@ public record CanonicalExecutionPlan(
             case BATCH_CREATE -> "/v1/batches";
             case BATCH_GET -> "/v1/batches/{batchId}";
             case BATCH_CANCEL -> "/v1/batches/{batchId}/cancel";
+            case ANTHROPIC_MESSAGE_BATCH_CREATE -> "/v1/messages/batches";
+            case ANTHROPIC_MESSAGE_BATCH_GET -> "/v1/messages/batches/{messageBatchId}";
+            case ANTHROPIC_MESSAGE_BATCH_CANCEL -> "/v1/messages/batches/{messageBatchId}/cancel";
             case TUNING_CREATE -> "/v1/fine_tuning/jobs";
             case TUNING_GET -> "/v1/fine_tuning/jobs/{jobId}";
             case TUNING_CANCEL -> "/v1/fine_tuning/jobs/{jobId}/cancel";

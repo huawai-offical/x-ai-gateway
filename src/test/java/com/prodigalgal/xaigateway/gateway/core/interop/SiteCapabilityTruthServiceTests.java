@@ -209,9 +209,9 @@ class SiteCapabilityTruthServiceTests {
     }
 
     @Test
-    void shouldTreatVertexChatAsNativeButEmbeddingsAsUnsupported() {
+    void shouldTreatVertexChatAndEmbeddingsAsNative() {
         SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
-        Mockito.when(repository.findBySiteProfile_Id(8L)).thenReturn(Optional.of(snapshot(false, false, false, false, false, false, false, false, false, false)));
+        Mockito.when(repository.findBySiteProfile_Id(8L)).thenReturn(Optional.of(snapshot(false, true, true, true, true, true, false, true, true, false)));
         SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
 
         CatalogCandidateView candidate = new CatalogCandidateView(
@@ -242,14 +242,17 @@ class SiteCapabilityTruthServiceTests {
 
         assertEquals(InteropCapabilityLevel.NATIVE, service.capabilityLevel(candidate, InteropFeature.CHAT_TEXT));
         assertEquals(InteropCapabilityLevel.NATIVE, service.capabilityLevel(candidate, InteropFeature.IMAGE_INPUT));
-        assertEquals(InteropCapabilityLevel.UNSUPPORTED, service.capabilityLevel(candidate, InteropFeature.EMBEDDINGS));
+        assertEquals(InteropCapabilityLevel.NATIVE, service.capabilityLevel(candidate, InteropFeature.EMBEDDINGS));
+        assertEquals(InteropCapabilityLevel.NATIVE, service.capabilityLevel(candidate, InteropFeature.AUDIO_TRANSCRIPTION));
+        assertEquals(InteropCapabilityLevel.NATIVE, service.capabilityLevel(candidate, InteropFeature.MODERATION));
+        assertEquals(InteropCapabilityLevel.NATIVE, service.capabilityLevel(candidate, InteropFeature.FILE_OBJECT));
     }
 
     @Test
     void shouldFreezeGeminiFirstSliceSupportStatuses() {
         SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
         Mockito.when(repository.findBySiteProfile_Id(10L)).thenReturn(Optional.of(snapshot(false, true, true, true, true, false, false, false, false, false)));
-        Mockito.when(repository.findBySiteProfile_Id(11L)).thenReturn(Optional.of(snapshot(false, false, false, false, false, false, false, false, false, false)));
+        Mockito.when(repository.findBySiteProfile_Id(11L)).thenReturn(Optional.of(snapshot(false, true, true, true, true, true, false, true, true, false)));
         SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
 
         FeatureCompatibilityReport nativeEmbeddings = service.evaluate(
@@ -288,7 +291,7 @@ class SiteCapabilityTruthServiceTests {
                         true
                 )
         );
-        FeatureCompatibilityReport blockedVertexEmbeddings = service.evaluate(
+        FeatureCompatibilityReport nativeVertexEmbeddings = service.evaluate(
                 geminiCandidate(11L, UpstreamSiteKind.VERTEX_AI),
                 new GatewayRequestSemantics(
                         TranslationResourceType.EMBEDDING,
@@ -303,7 +306,7 @@ class SiteCapabilityTruthServiceTests {
         assertEquals(SupportStatus.NATIVE, nativeAudio.supportStatus());
         assertEquals(SupportStatus.NATIVE, nativeImageGeneration.supportStatus());
         assertEquals(SupportStatus.NATIVE, nativeModeration.supportStatus());
-        assertEquals(SupportStatus.BLOCKED, blockedVertexEmbeddings.supportStatus());
+        assertEquals(SupportStatus.NATIVE, nativeVertexEmbeddings.supportStatus());
     }
 
     @Test
@@ -365,16 +368,44 @@ class SiteCapabilityTruthServiceTests {
                 InteropCapabilityLevel.NATIVE,
                 report.featureResolutions().get("file_object").effectiveLevel()
         );
+        assertTrue(report.featureResolutions().get("upload_create").blockedReasons().stream()
+                .anyMatch(reason -> reason.contains("gateway-local orchestration surface")));
     }
 
     @Test
-    void shouldKeepVertexEmbeddingsBlockedAtSurfaceLevel() {
+    void shouldKeepGeminiRealtimeBlockedAtSurfaceLevel() {
+        SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
+
+        SurfaceCompatibilityReport report = service.evaluateSurface(
+                siteProfile(UpstreamSiteKind.GEMINI_DIRECT),
+                snapshot(false, true, true, true, true, true, false, true, true, true),
+                new GatewayRequestSemantics(
+                        TranslationResourceType.REALTIME,
+                        TranslationOperation.REALTIME_CLIENT_SECRET_CREATE,
+                        List.of(InteropFeature.REALTIME_CLIENT_SECRET),
+                        false
+                ),
+                new com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendDecision(
+                        ExecutionBackend.ORCHESTRATION,
+                        List.of(ExecutionBackend.ORCHESTRATION),
+                        "test"
+                )
+        );
+
+        assertEquals(InteropCapabilityLevel.UNSUPPORTED, report.executionCapabilityLevel());
+        assertTrue(report.blockedReasons().stream()
+                .anyMatch(reason -> reason.contains("Gemini ephemeral/live token")));
+    }
+
+    @Test
+    void shouldExposeVertexEmbeddingsAsNativeAtSurfaceLevel() {
         SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
         SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
 
         SurfaceCompatibilityReport report = service.evaluateSurface(
                 siteProfile(UpstreamSiteKind.VERTEX_AI),
-                snapshot(false, true, false, false, false, false, false, false, false, false),
+                snapshot(false, true, true, true, true, true, false, true, true, false),
                 new GatewayRequestSemantics(
                         TranslationResourceType.EMBEDDING,
                         TranslationOperation.EMBEDDING_CREATE,
@@ -388,8 +419,8 @@ class SiteCapabilityTruthServiceTests {
                 )
         );
 
-        assertEquals(InteropCapabilityLevel.UNSUPPORTED, report.executionCapabilityLevel());
-        assertTrue(report.blockedReasons().stream().anyMatch(item -> item.contains("embeddings")));
+        assertEquals(InteropCapabilityLevel.NATIVE, report.executionCapabilityLevel());
+        assertTrue(report.blockedReasons().isEmpty());
     }
 
     @Test
@@ -415,6 +446,76 @@ class SiteCapabilityTruthServiceTests {
 
         assertEquals(InteropCapabilityLevel.NATIVE, report.executionCapabilityLevel());
         assertTrue(report.blockedReasons().isEmpty());
+    }
+
+    @Test
+    void shouldTreatAnthropicFilesAndNativeMessageBatchSeparatelyFromGenericBatch() {
+        SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        Mockito.when(repository.findBySiteProfile_Id(12L)).thenReturn(Optional.of(snapshot(false, false, false, false, false, true, false, true, false, false)));
+        SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
+
+        CatalogCandidateView candidate = anthropicCandidate(12L);
+
+        assertEquals(InteropCapabilityLevel.NATIVE, service.capabilityLevel(candidate, InteropFeature.FILE_OBJECT));
+        assertEquals(InteropCapabilityLevel.UNSUPPORTED, service.capabilityLevel(candidate, InteropFeature.BATCH_CREATE));
+        assertEquals(InteropCapabilityLevel.NATIVE, service.capabilityLevel(candidate, InteropFeature.ANTHROPIC_MESSAGE_BATCH));
+    }
+
+    @Test
+    void shouldExposeAnthropicFileAndNativeBatchSurfaceTruth() {
+        SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
+
+        SurfaceCompatibilityReport fileReport = service.evaluateSurface(
+                siteProfile(UpstreamSiteKind.ANTHROPIC_DIRECT),
+                snapshot(false, false, false, false, false, true, false, true, false, false),
+                new GatewayRequestSemantics(
+                        TranslationResourceType.FILE,
+                        TranslationOperation.FILE_CREATE,
+                        List.of(InteropFeature.FILE_OBJECT),
+                        true
+                ),
+                new com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendDecision(
+                        ExecutionBackend.ORCHESTRATION,
+                        List.of(ExecutionBackend.ORCHESTRATION),
+                        "test"
+                )
+        );
+        SurfaceCompatibilityReport batchReport = service.evaluateSurface(
+                siteProfile(UpstreamSiteKind.ANTHROPIC_DIRECT),
+                snapshot(false, false, false, false, false, true, false, true, false, false),
+                new GatewayRequestSemantics(
+                        TranslationResourceType.BATCH,
+                        TranslationOperation.ANTHROPIC_MESSAGE_BATCH_CREATE,
+                        List.of(InteropFeature.ANTHROPIC_MESSAGE_BATCH),
+                        true
+                ),
+                new com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendDecision(
+                        ExecutionBackend.ORCHESTRATION,
+                        List.of(ExecutionBackend.ORCHESTRATION),
+                        "test"
+                )
+        );
+        SurfaceCompatibilityReport genericBatchReport = service.evaluateSurface(
+                siteProfile(UpstreamSiteKind.ANTHROPIC_DIRECT),
+                snapshot(false, false, false, false, false, true, false, true, false, false),
+                new GatewayRequestSemantics(
+                        TranslationResourceType.BATCH,
+                        TranslationOperation.BATCH_CREATE,
+                        List.of(InteropFeature.BATCH_CREATE),
+                        true
+                ),
+                new com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendDecision(
+                        ExecutionBackend.ORCHESTRATION,
+                        List.of(ExecutionBackend.ORCHESTRATION),
+                        "test"
+                )
+        );
+
+        assertEquals(InteropCapabilityLevel.NATIVE, fileReport.executionCapabilityLevel());
+        assertEquals(InteropCapabilityLevel.NATIVE, batchReport.executionCapabilityLevel());
+        assertEquals(InteropCapabilityLevel.UNSUPPORTED, genericBatchReport.executionCapabilityLevel());
+        assertTrue(genericBatchReport.blockedReasons().stream().anyMatch(reason -> reason.contains("Message Batches")));
     }
 
     private CatalogCandidateView geminiCandidate(Long siteProfileId, UpstreamSiteKind siteKind) {
@@ -467,6 +568,34 @@ class SiteCapabilityTruthServiceTests {
                 true,
                 true,
                 ReasoningTransport.OPENAI_CHAT,
+                InteropCapabilityLevel.NATIVE
+        );
+    }
+
+    private CatalogCandidateView anthropicCandidate(Long siteProfileId) {
+        return new CatalogCandidateView(
+                401L,
+                "anthropic",
+                ProviderType.ANTHROPIC_DIRECT,
+                siteProfileId,
+                ProviderFamily.ANTHROPIC,
+                UpstreamSiteKind.ANTHROPIC_DIRECT,
+                AuthStrategy.BEARER,
+                PathStrategy.ANTHROPIC_V1_MESSAGES,
+                ErrorSchemaStrategy.ANTHROPIC_ERROR,
+                "https://api.anthropic.com",
+                "claude-sonnet-4",
+                "claude-sonnet-4",
+                List.of("anthropic_native"),
+                true,
+                false,
+                false,
+                true,
+                false,
+                false,
+                false,
+                false,
+                ReasoningTransport.ANTHROPIC,
                 InteropCapabilityLevel.NATIVE
         );
     }

@@ -46,7 +46,7 @@ class GeminiImagesGatewayResourceExecutorTests {
 
         assertTrue(executor.supports(request("/v1/images/generations", TranslationOperation.IMAGE_GENERATION), candidate(UpstreamSiteKind.GEMINI_DIRECT)));
         assertFalse(executor.supports(request("/v1/images/edits", TranslationOperation.IMAGE_EDIT), candidate(UpstreamSiteKind.GEMINI_DIRECT)));
-        assertFalse(executor.supports(request("/v1/images/generations", TranslationOperation.IMAGE_GENERATION), candidate(UpstreamSiteKind.VERTEX_AI)));
+        assertTrue(executor.supports(request("/v1/images/generations", TranslationOperation.IMAGE_GENERATION), candidate(UpstreamSiteKind.VERTEX_AI)));
     }
 
     @Test

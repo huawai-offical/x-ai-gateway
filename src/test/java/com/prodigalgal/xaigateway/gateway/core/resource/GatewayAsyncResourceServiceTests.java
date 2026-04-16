@@ -176,6 +176,7 @@ class GatewayAsyncResourceServiceTests {
         Mockito.verify(gatewayAsyncResourceRepository).save(captor.capture());
         assertTrue(captor.getValue().getRequestPayloadJson().contains("file-upstream-1"));
         assertTrue(captor.getValue().getMetadataJson().contains("batch-upstream-1"));
+        assertEquals("batch-upstream-1", captor.getValue().getUpstreamObjectId());
     }
 
     @Test
@@ -252,6 +253,87 @@ class GatewayAsyncResourceServiceTests {
         assertTrue(captor.getValue().getMetadataJson().contains("\"upstream_object_id\":\"batches/upstream-1\""));
         assertTrue(captor.getValue().getMetadataJson().contains("\"site_profile_id\":2"));
         assertTrue(captor.getValue().getMetadataJson().contains("\"object_mode\":\"upstream_object_with_local_lineage\""));
+        assertEquals("batches/upstream-1", captor.getValue().getUpstreamObjectId());
+    }
+
+    @Test
+    void shouldCreateVertexBatchWithLocalLineageMetadata() {
+        GatewayAsyncResourceRepository gatewayAsyncResourceRepository = Mockito.mock(GatewayAsyncResourceRepository.class);
+        DistributedKeyQueryService distributedKeyQueryService = Mockito.mock(DistributedKeyQueryService.class);
+        UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        UpstreamSiteProfileRepository upstreamSiteProfileRepository = Mockito.mock(UpstreamSiteProfileRepository.class);
+        SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        GatewayFileRepository gatewayFileRepository = Mockito.mock(GatewayFileRepository.class);
+        GatewayFileBindingRepository gatewayFileBindingRepository = Mockito.mock(GatewayFileBindingRepository.class);
+        CredentialCryptoService credentialCryptoService = Mockito.mock(CredentialCryptoService.class);
+        CredentialMaterialResolver credentialMaterialResolver = Mockito.mock(CredentialMaterialResolver.class);
+        GeminiChatModelFactory geminiChatModelFactory = Mockito.mock(GeminiChatModelFactory.class);
+
+        GatewayAsyncResourceService service = new GatewayAsyncResourceService(
+                gatewayAsyncResourceRepository,
+                distributedKeyQueryService,
+                upstreamCredentialRepository,
+                upstreamSiteProfileRepository,
+                snapshotRepository,
+                gatewayFileRepository,
+                gatewayFileBindingRepository,
+                credentialCryptoService,
+                credentialMaterialResolver,
+                new SiteCapabilityTruthService(new UpstreamSitePolicyService(), snapshotRepository),
+                geminiChatModelFactory,
+                new ObjectMapper(),
+                Clock.fixed(Instant.parse("2026-04-12T04:00:00Z"), ZoneOffset.UTC),
+                WebClient.builder()
+        );
+
+        UpstreamCredentialEntity credential = credential(301L, ProviderType.GEMINI_DIRECT, 3L, "https://aiplatform.googleapis.com");
+        UpstreamSiteProfileEntity siteProfile = googleGenAiSiteProfile(3L, UpstreamSiteKind.VERTEX_AI, AuthStrategy.BEARER);
+        ResolvedCredentialMaterial credentialMaterial = resolvedMaterial(
+                301L,
+                3L,
+                "vertex-token",
+                Map.of("projectId", "demo-project", "location", "us-central1")
+        );
+
+        Mockito.when(distributedKeyQueryService.findActiveById(1L))
+                .thenReturn(Optional.of(distributedKey(ProviderType.GEMINI_DIRECT, 301L, credential.getBaseUrl())));
+        Mockito.when(upstreamCredentialRepository.findAllByIdInAndDeletedFalse(List.of(301L))).thenReturn(List.of(credential));
+        Mockito.when(upstreamSiteProfileRepository.findById(3L)).thenReturn(Optional.of(siteProfile));
+        Mockito.when(snapshotRepository.findBySiteProfile_Id(3L))
+                .thenReturn(Optional.of(snapshot(false, false, true, true, AuthStrategy.BEARER, PathStrategy.GEMINI_V1BETA_MODELS)));
+        Mockito.when(credentialMaterialResolver.resolveStored(credential)).thenReturn(credentialMaterial);
+        Mockito.when(gatewayAsyncResourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        GatewayFileEntity file = gatewayFileEntity(42L, "file-local-vertex", "payload.jsonl", tempDir.resolve("vertex-payload.jsonl"), 1L);
+        Mockito.when(gatewayFileRepository.findByFileKeyAndDeletedFalse("file-local-vertex")).thenReturn(Optional.of(file));
+        GatewayFileBindingEntity binding = gatewayBinding(42L, 301L, 3L, "files/vertex-upstream-input");
+        Mockito.when(gatewayFileBindingRepository.findAllByGatewayFileIdAndCredentialIdOrderByCreatedAtDesc(42L, 301L))
+                .thenReturn(List.of(binding));
+
+        com.google.genai.Batches batchesFacade = Mockito.mock(com.google.genai.Batches.class);
+        Client client = geminiClient(batchesFacade, null);
+        Mockito.when(geminiChatModelFactory.createClient(UpstreamSiteKind.VERTEX_AI, credential.getBaseUrl(), credentialMaterial))
+                .thenReturn(client);
+        BatchJob batchJob = batchJob("batches/vertex-upstream-1", "gemini-2.5-pro", JobState.Known.JOB_STATE_PENDING);
+        Mockito.when(batchesFacade.create(Mockito.eq("gemini-2.5-pro"), any(com.google.genai.types.BatchJobSource.class), any(com.google.genai.types.CreateBatchJobConfig.class)))
+                .thenReturn(batchJob);
+
+        ObjectNode request = new ObjectMapper().createObjectNode();
+        request.put("model", "gemini-2.5-pro");
+        request.put("input_file_id", "file-local-vertex");
+        request.put("endpoint", "/v1/chat/completions");
+
+        JsonNode response = service.createBatch(1L, request);
+
+        assertTrue(response.path("id").asText().startsWith("batch_"));
+        assertEquals("validating", response.path("status").asText());
+        assertEquals("files/vertex-upstream-input", response.path("input_file_id").asText());
+        ArgumentCaptor<GatewayAsyncResourceEntity> captor = ArgumentCaptor.forClass(GatewayAsyncResourceEntity.class);
+        Mockito.verify(gatewayAsyncResourceRepository).save(captor.capture());
+        assertTrue(captor.getValue().getRequestPayloadJson().contains("files/vertex-upstream-input"));
+        assertTrue(captor.getValue().getMetadataJson().contains("\"upstream_object_id\":\"batches/vertex-upstream-1\""));
+        assertTrue(captor.getValue().getMetadataJson().contains("\"site_profile_id\":3"));
+        assertEquals("batches/vertex-upstream-1", captor.getValue().getUpstreamObjectId());
     }
 
     @Test
@@ -453,6 +535,173 @@ class GatewayAsyncResourceServiceTests {
     }
 
     @Test
+    void shouldCreateAndManageGeminiLocalUploadWithoutUpstreamObjectId() throws Exception {
+        GatewayAsyncResourceRepository gatewayAsyncResourceRepository = Mockito.mock(GatewayAsyncResourceRepository.class);
+        DistributedKeyQueryService distributedKeyQueryService = Mockito.mock(DistributedKeyQueryService.class);
+        UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        UpstreamSiteProfileRepository upstreamSiteProfileRepository = Mockito.mock(UpstreamSiteProfileRepository.class);
+        SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        GatewayFileRepository gatewayFileRepository = Mockito.mock(GatewayFileRepository.class);
+        GatewayFileBindingRepository gatewayFileBindingRepository = Mockito.mock(GatewayFileBindingRepository.class);
+        CredentialCryptoService credentialCryptoService = Mockito.mock(CredentialCryptoService.class);
+        CredentialMaterialResolver credentialMaterialResolver = Mockito.mock(CredentialMaterialResolver.class);
+        GeminiChatModelFactory geminiChatModelFactory = Mockito.mock(GeminiChatModelFactory.class);
+
+        GatewayAsyncResourceService service = new GatewayAsyncResourceService(
+                gatewayAsyncResourceRepository,
+                distributedKeyQueryService,
+                upstreamCredentialRepository,
+                upstreamSiteProfileRepository,
+                snapshotRepository,
+                gatewayFileRepository,
+                gatewayFileBindingRepository,
+                credentialCryptoService,
+                credentialMaterialResolver,
+                new SiteCapabilityTruthService(new UpstreamSitePolicyService(), snapshotRepository),
+                geminiChatModelFactory,
+                new ObjectMapper(),
+                Clock.fixed(Instant.parse("2026-04-12T04:00:00Z"), ZoneOffset.UTC),
+                WebClient.builder()
+        );
+
+        UpstreamCredentialEntity credential = credential(201L, ProviderType.GEMINI_DIRECT, 2L, "https://generativelanguage.googleapis.com");
+        UpstreamSiteProfileEntity siteProfile = geminiSiteProfile(2L);
+        SiteCapabilitySnapshotEntity snapshot = snapshot(
+                true,
+                true,
+                true,
+                true,
+                AuthStrategy.API_KEY_QUERY,
+                PathStrategy.GEMINI_V1BETA_MODELS
+        );
+        ResolvedCredentialMaterial material = resolvedMaterial(201L, 2L, "api-key");
+        java.util.concurrent.atomic.AtomicReference<GatewayAsyncResourceEntity> stored = new java.util.concurrent.atomic.AtomicReference<>();
+
+        Mockito.when(distributedKeyQueryService.findActiveById(1L))
+                .thenReturn(Optional.of(distributedKey(ProviderType.GEMINI_DIRECT, 201L, credential.getBaseUrl())));
+        Mockito.when(upstreamCredentialRepository.findAllByIdInAndDeletedFalse(List.of(201L)))
+                .thenReturn(List.of(credential));
+        Mockito.when(upstreamSiteProfileRepository.findById(2L)).thenReturn(Optional.of(siteProfile));
+        Mockito.when(snapshotRepository.findBySiteProfile_Id(2L)).thenReturn(Optional.of(snapshot));
+        Mockito.when(credentialMaterialResolver.resolveStored(credential)).thenReturn(material);
+        Mockito.when(gatewayAsyncResourceRepository.save(any())).thenAnswer(invocation -> {
+            GatewayAsyncResourceEntity entity = invocation.getArgument(0);
+            stored.set(entity);
+            return entity;
+        });
+        Mockito.when(gatewayAsyncResourceRepository.findByResourceKeyAndResourceTypeAndDeletedFalse(any(), any()))
+                .thenAnswer(invocation -> {
+                    String resourceKey = invocation.getArgument(0);
+                    GatewayAsyncResourceType resourceType = invocation.getArgument(1);
+                    GatewayAsyncResourceEntity entity = stored.get();
+                    if (entity == null || !resourceKey.equals(entity.getResourceKey()) || resourceType != entity.getResourceType()) {
+                        return Optional.empty();
+                    }
+                    return Optional.of(entity);
+                });
+
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode createResponse = service.createUpload(1L, mapper.readTree("""
+                {
+                  "filename":"batch-input.jsonl",
+                  "bytes":1234,
+                  "purpose":"batch"
+                }
+                """), 201L);
+
+        String uploadId = createResponse.path("id").asText();
+        assertEquals("upload", createResponse.path("object").asText());
+        assertEquals("created", createResponse.path("status").asText());
+        assertEquals("batch-input.jsonl", createResponse.path("filename").asText());
+
+        GatewayAsyncResourceEntity createdEntity = stored.get();
+        assertTrue(createdEntity.getMetadataJson().contains("\"object_mode\":\"gateway_upload_object\""));
+        assertTrue(createdEntity.getMetadataJson().contains("\"credential_id\":201"));
+        assertTrue(createdEntity.getMetadataJson().contains("\"site_profile_id\":2"));
+        assertTrue(createdEntity.getMetadataJson().contains("\"partsCount\":0"));
+        assertTrue(createdEntity.getMetadataJson().contains("\"part_bindings\":[]"));
+        assertTrue(createdEntity.getMetadataJson().contains("\"parts\":[]"));
+        assertTrue(!createdEntity.getMetadataJson().contains("upstream_object_id"));
+
+        JsonNode getResponse = service.getUpload(uploadId, 1L);
+        assertEquals(uploadId, getResponse.path("id").asText());
+        assertEquals("created", getResponse.path("status").asText());
+
+        FilePart filePart = Mockito.mock(FilePart.class);
+        Mockito.when(filePart.filename()).thenReturn("part.bin");
+        Mockito.when(filePart.headers()).thenReturn(new HttpHeaders() {{
+            setContentType(MediaType.APPLICATION_OCTET_STREAM);
+        }});
+        Mockito.when(filePart.content()).thenReturn(Flux.just(new DefaultDataBufferFactory().wrap("hello".getBytes(StandardCharsets.UTF_8))));
+
+        JsonNode partResponse = service.addUploadPart(uploadId, 1L, filePart).block();
+        assertEquals("upload.part", partResponse.path("object").asText());
+        assertEquals(uploadId, partResponse.path("upload_id").asText());
+        assertTrue(stored.get().getMetadataJson().contains("\"object_mode\":\"gateway_upload_object\""));
+        assertTrue(stored.get().getMetadataJson().contains("\"partsCount\":1"));
+
+        JsonNode completed = service.completeUpload(uploadId, 1L);
+        assertEquals("completed", completed.path("status").asText());
+        JsonNode cancelled = service.cancelUpload(uploadId, 1L);
+        assertEquals("cancelled", cancelled.path("status").asText());
+    }
+
+    @Test
+    void shouldExplainGeminiRealtimeAsBlockedWhenNoNativeTargetExists() throws Exception {
+        GatewayAsyncResourceRepository gatewayAsyncResourceRepository = Mockito.mock(GatewayAsyncResourceRepository.class);
+        DistributedKeyQueryService distributedKeyQueryService = Mockito.mock(DistributedKeyQueryService.class);
+        UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        UpstreamSiteProfileRepository upstreamSiteProfileRepository = Mockito.mock(UpstreamSiteProfileRepository.class);
+        SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        CredentialMaterialResolver credentialMaterialResolver = Mockito.mock(CredentialMaterialResolver.class);
+        GatewayAsyncResourceService service = new GatewayAsyncResourceService(
+                gatewayAsyncResourceRepository,
+                distributedKeyQueryService,
+                upstreamCredentialRepository,
+                upstreamSiteProfileRepository,
+                snapshotRepository,
+                Mockito.mock(GatewayFileRepository.class),
+                Mockito.mock(GatewayFileBindingRepository.class),
+                Mockito.mock(CredentialCryptoService.class),
+                credentialMaterialResolver,
+                new SiteCapabilityTruthService(new UpstreamSitePolicyService(), snapshotRepository),
+                Mockito.mock(GeminiChatModelFactory.class),
+                new ObjectMapper(),
+                Clock.systemUTC(),
+                WebClient.builder()
+        );
+
+        UpstreamCredentialEntity credential = credential(201L, ProviderType.GEMINI_DIRECT, 2L, "https://generativelanguage.googleapis.com");
+        Mockito.when(distributedKeyQueryService.findActiveById(1L))
+                .thenReturn(Optional.of(distributedKey(ProviderType.GEMINI_DIRECT, 201L, credential.getBaseUrl())));
+        Mockito.when(upstreamCredentialRepository.findAllByIdInAndDeletedFalse(List.of(201L)))
+                .thenReturn(List.of(credential));
+        Mockito.when(upstreamSiteProfileRepository.findById(2L)).thenReturn(Optional.of(geminiSiteProfile(2L)));
+        Mockito.when(snapshotRepository.findBySiteProfile_Id(2L))
+                .thenReturn(Optional.of(snapshot(
+                        true,
+                        true,
+                        true,
+                        true,
+                        AuthStrategy.API_KEY_QUERY,
+                        PathStrategy.GEMINI_V1BETA_MODELS
+                )));
+        Mockito.when(credentialMaterialResolver.resolveStored(credential)).thenReturn(resolvedMaterial(201L, 2L, "api-key"));
+
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class, () -> service.createRealtimeClientSecret(
+                1L,
+                new ObjectMapper().readTree("""
+                        {
+                          "model":"gemini-2.5-flash-live"
+                        }
+                        """),
+                201L
+        ));
+
+        assertTrue(error.getMessage().contains("Gemini ephemeral/live token"));
+    }
+
+    @Test
     void shouldAddUploadPartUsingBoundUpstreamMetadata() {
         GatewayAsyncResourceRepository gatewayAsyncResourceRepository = Mockito.mock(GatewayAsyncResourceRepository.class);
         UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
@@ -553,10 +802,14 @@ class GatewayAsyncResourceServiceTests {
     }
 
     private UpstreamSiteProfileEntity geminiSiteProfile(Long id) {
+        return googleGenAiSiteProfile(id, UpstreamSiteKind.GEMINI_DIRECT, AuthStrategy.API_KEY_QUERY);
+    }
+
+    private UpstreamSiteProfileEntity googleGenAiSiteProfile(Long id, UpstreamSiteKind siteKind, AuthStrategy authStrategy) {
         UpstreamSiteProfileEntity entity = new UpstreamSiteProfileEntity();
         ReflectionTestUtils.setField(entity, "id", id);
-        entity.setSiteKind(UpstreamSiteKind.GEMINI_DIRECT);
-        entity.setAuthStrategy(AuthStrategy.API_KEY_QUERY);
+        entity.setSiteKind(siteKind);
+        entity.setAuthStrategy(authStrategy);
         entity.setPathStrategy(PathStrategy.GEMINI_V1BETA_MODELS);
         entity.setErrorSchemaStrategy(ErrorSchemaStrategy.GEMINI_ERROR);
         entity.setActive(true);
@@ -578,7 +831,11 @@ class GatewayAsyncResourceServiceTests {
     }
 
     private ResolvedCredentialMaterial resolvedMaterial(Long credentialId, Long siteProfileId, String secret) {
-        return new ResolvedCredentialMaterial(credentialId, siteProfileId, null, secret, "fp", Map.of(), null, "credential");
+        return resolvedMaterial(credentialId, siteProfileId, secret, Map.of());
+    }
+
+    private ResolvedCredentialMaterial resolvedMaterial(Long credentialId, Long siteProfileId, String secret, Map<String, Object> metadata) {
+        return new ResolvedCredentialMaterial(credentialId, siteProfileId, null, secret, "fp", metadata, null, "credential");
     }
 
     private GatewayFileEntity gatewayFileEntity(Long id, String fileKey, String filename, Path storagePath, Long distributedKeyId) {

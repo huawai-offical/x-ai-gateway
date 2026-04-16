@@ -140,7 +140,7 @@ class ExecutionSupportMatrixServiceTests {
                 service.implementedLevel(geminiCandidate(UpstreamSiteKind.GEMINI_DIRECT), embeddingsSemantics, InteropFeature.EMBEDDINGS)
         );
         assertEquals(
-                InteropCapabilityLevel.UNSUPPORTED,
+                InteropCapabilityLevel.NATIVE,
                 service.implementedLevel(geminiCandidate(UpstreamSiteKind.VERTEX_AI), embeddingsSemantics, InteropFeature.EMBEDDINGS)
         );
         assertEquals(
@@ -153,15 +153,35 @@ class ExecutionSupportMatrixServiceTests {
         );
         assertEquals(
                 InteropCapabilityLevel.NATIVE,
+                service.implementedLevel(geminiCandidate(UpstreamSiteKind.VERTEX_AI), audioSemantics, InteropFeature.AUDIO_TRANSCRIPTION)
+        );
+        assertEquals(
+                InteropCapabilityLevel.NATIVE,
+                service.implementedLevel(geminiCandidate(UpstreamSiteKind.VERTEX_AI), audioSpeechSemantics, InteropFeature.AUDIO_SPEECH)
+        );
+        assertEquals(
+                InteropCapabilityLevel.NATIVE,
                 service.implementedLevel(geminiCandidate(UpstreamSiteKind.GEMINI_DIRECT), imageSemantics, InteropFeature.IMAGE_GENERATION)
+        );
+        assertEquals(
+                InteropCapabilityLevel.NATIVE,
+                service.implementedLevel(geminiCandidate(UpstreamSiteKind.VERTEX_AI), imageSemantics, InteropFeature.IMAGE_GENERATION)
         );
         assertEquals(
                 InteropCapabilityLevel.UNSUPPORTED,
                 service.implementedLevel(geminiCandidate(UpstreamSiteKind.GEMINI_DIRECT), imageEditSemantics, InteropFeature.IMAGE_EDIT)
         );
         assertEquals(
+                InteropCapabilityLevel.UNSUPPORTED,
+                service.implementedLevel(geminiCandidate(UpstreamSiteKind.VERTEX_AI), imageEditSemantics, InteropFeature.IMAGE_EDIT)
+        );
+        assertEquals(
                 InteropCapabilityLevel.NATIVE,
                 service.implementedLevel(geminiCandidate(UpstreamSiteKind.GEMINI_DIRECT), moderationSemantics, InteropFeature.MODERATION)
+        );
+        assertEquals(
+                InteropCapabilityLevel.NATIVE,
+                service.implementedLevel(geminiCandidate(UpstreamSiteKind.VERTEX_AI), moderationSemantics, InteropFeature.MODERATION)
         );
         assertEquals(
                 InteropCapabilityLevel.NATIVE,
@@ -184,16 +204,55 @@ class ExecutionSupportMatrixServiceTests {
                 service.implementedLevel(geminiCandidate(UpstreamSiteKind.GEMINI_DIRECT), realtimeSemantics, InteropFeature.REALTIME_CLIENT_SECRET)
         );
         assertEquals(
-                InteropCapabilityLevel.UNSUPPORTED,
+                InteropCapabilityLevel.NATIVE,
                 service.implementedLevel(geminiCandidate(UpstreamSiteKind.VERTEX_AI), batchSemantics, InteropFeature.BATCH_CREATE)
         );
         assertEquals(
-                InteropCapabilityLevel.UNSUPPORTED,
+                InteropCapabilityLevel.NATIVE,
                 service.implementedLevel(geminiCandidate(UpstreamSiteKind.VERTEX_AI), fileSemantics, InteropFeature.FILE_OBJECT)
+        );
+        assertEquals(
+                InteropCapabilityLevel.NATIVE,
+                service.implementedLevel(geminiCandidate(UpstreamSiteKind.VERTEX_AI), tuningSemantics, InteropFeature.TUNING_CREATE)
         );
         assertEquals(
                 InteropCapabilityLevel.UNSUPPORTED,
                 service.implementedLevel(geminiCandidate(UpstreamSiteKind.VERTEX_AI), realtimeSemantics, InteropFeature.REALTIME_CLIENT_SECRET)
+        );
+    }
+
+    @Test
+    void shouldFreezeAnthropicFilesAndNativeMessageBatchMatrix() {
+        GatewayRequestSemantics fileSemantics = new GatewayRequestSemantics(
+                TranslationResourceType.FILE,
+                TranslationOperation.FILE_CREATE,
+                List.of(InteropFeature.FILE_OBJECT),
+                true
+        );
+        GatewayRequestSemantics genericBatchSemantics = new GatewayRequestSemantics(
+                TranslationResourceType.BATCH,
+                TranslationOperation.BATCH_CREATE,
+                List.of(InteropFeature.BATCH_CREATE),
+                true
+        );
+        GatewayRequestSemantics anthropicBatchSemantics = new GatewayRequestSemantics(
+                TranslationResourceType.BATCH,
+                TranslationOperation.ANTHROPIC_MESSAGE_BATCH_CREATE,
+                List.of(InteropFeature.ANTHROPIC_MESSAGE_BATCH),
+                true
+        );
+
+        assertEquals(
+                InteropCapabilityLevel.NATIVE,
+                service.implementedLevel(anthropicCandidate(), fileSemantics, InteropFeature.FILE_OBJECT)
+        );
+        assertEquals(
+                InteropCapabilityLevel.UNSUPPORTED,
+                service.implementedLevel(anthropicCandidate(), genericBatchSemantics, InteropFeature.BATCH_CREATE)
+        );
+        assertEquals(
+                InteropCapabilityLevel.NATIVE,
+                service.implementedLevel(anthropicCandidate(), anthropicBatchSemantics, InteropFeature.ANTHROPIC_MESSAGE_BATCH)
         );
     }
 
@@ -221,6 +280,34 @@ class ExecutionSupportMatrixServiceTests {
                 true,
                 false,
                 ReasoningTransport.GEMINI_THOUGHTS,
+                InteropCapabilityLevel.NATIVE
+        );
+    }
+
+    private CatalogCandidateView anthropicCandidate() {
+        return new CatalogCandidateView(
+                202L,
+                "anthropic-candidate",
+                ProviderType.ANTHROPIC_DIRECT,
+                2L,
+                ProviderFamily.ANTHROPIC,
+                UpstreamSiteKind.ANTHROPIC_DIRECT,
+                AuthStrategy.BEARER,
+                PathStrategy.ANTHROPIC_V1_MESSAGES,
+                ErrorSchemaStrategy.ANTHROPIC_ERROR,
+                "https://api.anthropic.com",
+                "claude-sonnet-4",
+                "claude-sonnet-4",
+                List.of("anthropic_native"),
+                true,
+                false,
+                false,
+                true,
+                false,
+                false,
+                false,
+                false,
+                ReasoningTransport.ANTHROPIC,
                 InteropCapabilityLevel.NATIVE
         );
     }

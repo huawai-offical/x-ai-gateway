@@ -26,17 +26,26 @@ final class GeminiGatewayResourceSupport {
     private GeminiGatewayResourceSupport() {
     }
 
-    static boolean supportsGeminiDirectCandidate(CanonicalResourceRequest request, CatalogCandidateView candidate, String... normalizedPaths) {
+    static boolean supportsGoogleGenAiCandidate(CanonicalResourceRequest request, CatalogCandidateView candidate, String... normalizedPaths) {
         if (request == null || candidate == null || request.normalizedPath() == null) {
             return false;
         }
         if (candidate.providerType() != ProviderType.GEMINI_DIRECT
-                || candidate.siteKind() != UpstreamSiteKind.GEMINI_DIRECT
                 || candidate.pathStrategy() != PathStrategy.GEMINI_V1BETA_MODELS
-                || candidate.authStrategy() != AuthStrategy.API_KEY_QUERY) {
+                || !supportsGoogleGenAiSite(candidate.siteKind(), candidate.authStrategy())) {
             return false;
         }
         return Arrays.stream(normalizedPaths).anyMatch(path -> path.equals(request.normalizedPath()));
+    }
+
+    static boolean supportsGoogleGenAiSite(UpstreamSiteKind siteKind, AuthStrategy authStrategy) {
+        if (siteKind == UpstreamSiteKind.GEMINI_DIRECT) {
+            return authStrategy == AuthStrategy.API_KEY_QUERY;
+        }
+        if (siteKind == UpstreamSiteKind.VERTEX_AI) {
+            return authStrategy == AuthStrategy.BEARER;
+        }
+        return false;
     }
 
     static Client createClient(GeminiChatModelFactory geminiChatModelFactory, GatewayResourceExecutionContext context) {

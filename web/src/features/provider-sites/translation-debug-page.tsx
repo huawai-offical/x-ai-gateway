@@ -1,8 +1,9 @@
-import { type FormEvent, useState } from 'react'
+import { type FormEvent, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { apiRequest } from '../../lib/api'
 import { useTypedMutation } from '../../lib/typed-react-query'
 import {
+  featureLabel,
   isChatLikePath,
   isDebugExecutablePath,
   isMultipartResourcePath,
@@ -10,6 +11,64 @@ import {
   type AdminResourceExecuteResponse,
   type TranslationPlan,
 } from './types'
+
+type DebugPreset = {
+  id: string
+  label: string
+  description: string
+  protocol: string
+  method: string
+  requestPath: string
+  requestedModel: string
+  body: string
+  formFields?: string
+  fileRefs?: string
+}
+
+const DEBUG_PRESETS: DebugPreset[] = [
+  {
+    id: 'chat',
+    label: 'Chat',
+    description: '快速调试 `/v1/chat/completions`。',
+    protocol: 'openai',
+    method: 'POST',
+    requestPath: '/v1/chat/completions',
+    requestedModel: 'gpt-4o',
+    body: '{"model":"gpt-4o","messages":[{"role":"user","content":"hello"}]}',
+  },
+  {
+    id: 'embeddings',
+    label: 'Embeddings',
+    description: '验证 `/v1/embeddings` 的执行解释。',
+    protocol: 'openai',
+    method: 'POST',
+    requestPath: '/v1/embeddings',
+    requestedModel: 'text-embedding-3-small',
+    body: '{"model":"text-embedding-3-small","input":"hello"}',
+  },
+  {
+    id: 'file-content',
+    label: 'File Content',
+    description: '检查文件内容读取的资源调试。',
+    protocol: 'openai',
+    method: 'GET',
+    requestPath: '/v1/files/file_123/content',
+    requestedModel: 'gpt-4o-mini',
+    body: '{}',
+  },
+  {
+    id: 'audio-transcription',
+    label: 'Audio',
+    description: '验证 multipart 资源路径与 fileRefs。',
+    protocol: 'openai',
+    method: 'POST',
+    requestPath: '/v1/audio/transcriptions',
+    requestedModel: 'gpt-4o-mini-transcribe',
+    body: '{}',
+    formFields: '{"model":"gpt-4o-mini-transcribe","language":"zh"}',
+    fileRefs: '[{"fieldName":"file","fileKey":"file-123"}]',
+  },
+]
 
 export function TranslationDebugPage() {
   const [searchParams] = useSearchParams()
@@ -78,6 +137,92 @@ export function TranslationDebugPage() {
     },
   })
 
+  const canExecute = isDebugExecutablePath(requestPath)
+  const explainResult = explainMutation.data
+  const executeResult = executeMutation.data
+  const resourceExecuteResult = resourceExecuteMutation.data
+  const executeTarget = canExecute
+    ? isChatLikePath(requestPath)
+      ? '/admin/chat/execute'
+      : '/admin/resource/execute'
+    : '当前路径不可执行'
+
+  const activePreset = useMemo(
+    () =>
+      DEBUG_PRESETS.find((preset) => preset.method === method && preset.requestPath === requestPath)
+      ?? null,
+    [method, requestPath],
+  )
+  const bodyDraft = useMemo(() => inspectJsonDraft(body), [body])
+  const formFieldsDraft = useMemo(
+    () => (multipartMode ? inspectJsonDraft(formFields, 'object') : null),
+    [formFields, multipartMode],
+  )
+  const fileRefsDraft = useMemo(
+    () => (multipartMode ? inspectJsonDraft(fileRefs, 'array') : null),
+    [fileRefs, multipartMode],
+  )
+
+  const requestSummary = useMemo(
+    () => [
+      { label: '预设', value: activePreset?.label ?? '自定义' },
+      { label: '模式', value: multipartMode ? 'multipart resource' : isChatLikePath(requestPath) ? 'chat-like' : 'resource' },
+      { label: '执行端点', value: executeTarget },
+      { label: 'method', value: method },
+      { label: 'path', value: requestPath },
+    ],
+    [activePreset?.label, executeTarget, method, multipartMode, requestPath],
+  )
+
+  const explainSummary = explainResult
+    ? [
+        { label: '可执行', value: String(explainResult.executable) },
+        { label: 'backend', value: explainResult.executionBackend ?? '-' },
+        { label: 'support', value: explainResult.supportStatus ?? '-' },
+        { label: 'degradation', value: explainResult.degradationLevel ?? '-' },
+        { label: 'surface', value: explainResult.surface ?? '-' },
+        { label: 'operation', value: explainResult.operation ?? '-' },
+        { label: 'normalizedPath', value: explainResult.normalizedPath ?? '-' },
+        { label: 'resolvedModel', value: explainResult.resolvedModel ?? '-' },
+      ]
+    : []
+
+  const executeSummary = isChatLikePath(requestPath)
+    ? executeResult
+      ? [
+          { label: 'requestId', value: executeResult.requestId },
+          { label: 'backend', value: executeResult.executionBackend ?? '-' },
+          { label: 'text', value: executeResult.text ?? '无文本输出' },
+        ]
+      : []
+    : resourceExecuteResult
+      ? [
+          { label: 'backend', value: resourceExecuteResult.executionBackend ?? '无 backend' },
+          { label: 'status', value: String(resourceExecuteResult.statusCode) },
+          { label: 'contentType', value: resourceExecuteResult.contentType ?? '未知' },
+          { label: 'upstreamPath', value: resourceExecuteResult.upstreamPath ?? '无' },
+          { label: 'binaryLength', value: String(resourceExecuteResult.binaryLength ?? '-') },
+        ]
+      : []
+
+  const applyPreset = (preset: DebugPreset) => {
+    setProtocol(preset.protocol)
+    setMethod(preset.method)
+    setRequestPath(preset.requestPath)
+    setRequestedModel(preset.requestedModel)
+    setBody(preset.body)
+    setFormFields(preset.formFields ?? '{"model":"gpt-4o-mini-transcribe"}')
+    setFileRefs(preset.fileRefs ?? '[{"fieldName":"file","fileKey":"file-123"}]')
+    setInputError(null)
+  }
+
+  const handleClearResults = () => {
+    explainMutation.reset()
+    executeMutation.reset()
+    resourceExecuteMutation.reset()
+    setInputError(null)
+  }
+
   const handleExplain = async (event: FormEvent) => {
     event.preventDefault()
     try {
@@ -101,10 +246,32 @@ export function TranslationDebugPage() {
     }
   }
 
-  const canExecute = isDebugExecutablePath(requestPath)
-  const explainResult = explainMutation.data
-  const executeResult = executeMutation.data
-  const resourceExecuteResult = resourceExecuteMutation.data
+  const handleFormatBody = () => {
+    try {
+      setBody(formatJson(body))
+      setInputError(null)
+    } catch (error) {
+      setInputError(error instanceof Error ? error.message : 'request body 格式化失败。')
+    }
+  }
+
+  const handleFormatFormFields = () => {
+    try {
+      setFormFields(formatJson(formFields))
+      setInputError(null)
+    } catch (error) {
+      setInputError(error instanceof Error ? error.message : 'formFields 格式化失败。')
+    }
+  }
+
+  const handleFormatFileRefs = () => {
+    try {
+      setFileRefs(formatJson(fileRefs))
+      setInputError(null)
+    } catch (error) {
+      setInputError(error instanceof Error ? error.message : 'fileRefs 格式化失败。')
+    }
+  }
 
   return (
     <section className="page-grid">
@@ -113,6 +280,38 @@ export function TranslationDebugPage() {
           <p className="panel-kicker">Translation explain</p>
           <h2>翻译执行解释</h2>
           <p className="empty-state">支持 explain / execute 双模式；资源路径会自动切到 `/admin/resource/execute`。</p>
+        </div>
+        <div className="detail-grid">
+          {requestSummary.map((item) => (
+            <div key={item.label} className="detail-card">
+              <strong>{item.label}</strong>
+              <span>{item.value}</span>
+            </div>
+          ))}
+        </div>
+        <p className="accent-copy">
+          {activePreset
+            ? `${activePreset.label} 预设已载入：${activePreset.description}`
+            : '当前为自定义调试请求，可以直接修改 method、path 和 payload。'}
+        </p>
+        <div className="stack-bar">
+          <span>body · {bodyDraft.summary}</span>
+          <span>执行目标 · {executeTarget}</span>
+          {multipartMode && formFieldsDraft ? <span>formFields · {formFieldsDraft.summary}</span> : null}
+          {multipartMode && fileRefsDraft ? <span>fileRefs · {fileRefsDraft.summary}</span> : null}
+        </div>
+        <div className="preset-strip" aria-label="调试预设">
+          {DEBUG_PRESETS.map((preset) => (
+            <button
+              key={preset.id}
+              type="button"
+              className={`secondary-button${activePreset?.id === preset.id ? ' active' : ''}`}
+              onClick={() => applyPreset(preset)}
+              title={preset.description}
+            >
+              {preset.label}
+            </button>
+          ))}
         </div>
         <form className="stacked-form" onSubmit={handleExplain}>
           <div className="form-grid">
@@ -141,6 +340,17 @@ export function TranslationDebugPage() {
             <span>request body</span>
             <textarea value={body} onChange={(event) => setBody(event.target.value)} rows={8} />
           </label>
+          <div className="inline-actions">
+            <button type="button" className="secondary-button" onClick={handleFormatBody}>格式化 body</button>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => applyPreset(activePreset ?? DEBUG_PRESETS[0])}
+            >
+              恢复示例
+            </button>
+            <button type="button" className="secondary-button" onClick={handleClearResults}>清空结果</button>
+          </div>
           {multipartMode ? (
             <>
               <label>
@@ -151,11 +361,15 @@ export function TranslationDebugPage() {
                 <span>fileRefs JSON</span>
                 <textarea value={fileRefs} onChange={(event) => setFileRefs(event.target.value)} rows={4} />
               </label>
+              <div className="inline-actions">
+                <button type="button" className="secondary-button" onClick={handleFormatFormFields}>格式化 formFields</button>
+                <button type="button" className="secondary-button" onClick={handleFormatFileRefs}>格式化 fileRefs</button>
+              </div>
             </>
           ) : null}
           <div className="inline-actions">
             <button type="submit" disabled={explainMutation.isPending}>查看 Explain</button>
-            <button type="button" onClick={handleExecute} disabled={!canExecute || executeMutation.isPending}>
+            <button type="button" onClick={handleExecute} disabled={!canExecute || executeMutation.isPending || resourceExecuteMutation.isPending}>
               {isChatLikePath(requestPath) ? '执行 Chat 调试' : '执行资源调试'}
             </button>
           </div>
@@ -171,20 +385,24 @@ export function TranslationDebugPage() {
         </div>
         {explainResult ? (
           <div className="card-list">
-            <div className="detail-card">
-              <strong>{String(explainResult.executable)}</strong>
-              <span>{explainResult.executionKind ?? '-'}</span>
-              <span>backend: {explainResult.executionBackend ?? '-'}</span>
-              <span>supportStatus: {explainResult.supportStatus ?? '-'}</span>
-              <span>degradationLevel: {explainResult.degradationLevel ?? '-'}</span>
-              <span>objectMode: {explainResult.objectMode ?? '-'}</span>
-              <span>protocol: {explainResult.ingressProtocol ?? '-'}</span>
-              <span>surface: {explainResult.surface ?? '-'}</span>
-              <span>normalizedPath: {explainResult.normalizedPath ?? '-'}</span>
-              <span>resource / operation: {explainResult.resourceType ?? '-'} / {explainResult.operation ?? '-'}</span>
-              <span>execution / render / overall: {explainResult.executionCapabilityLevel ?? '-'} / {explainResult.renderCapabilityLevel ?? '-'} / {explainResult.overallCapabilityLevel ?? '-'}</span>
-              <span>resolvedModel: {explainResult.resolvedModel ?? '-'}</span>
+            <div className="detail-grid">
+              {explainSummary.map((item) => (
+                <div key={item.label} className="detail-card">
+                  <strong>{item.label}</strong>
+                  <span>{item.value}</span>
+                </div>
+              ))}
             </div>
+            {explainResult.requiredFeatures.length ? (
+              <div className="feature-list">
+                {explainResult.requiredFeatures.map((feature) => (
+                  <div key={feature} className="feature-badge native">
+                    <strong>{formatRequiredFeature(feature)}</strong>
+                    <small>{resolveFeatureLevel(explainResult.featureLevels, feature)}</small>
+                  </div>
+                ))}
+              </div>
+            ) : null}
             <div className="detail-grid">
               {explainResult.blockerReasons.length ? (
                 <div className="detail-card">
@@ -219,13 +437,18 @@ export function TranslationDebugPage() {
           <p className="panel-kicker">Execute result</p>
           <h3>{isChatLikePath(requestPath) ? 'Chat 执行调试' : '资源执行调试'}</h3>
         </div>
+        {executeSummary.length ? (
+          <div className="detail-grid">
+            {executeSummary.map((item) => (
+              <div key={item.label} className="detail-card">
+                <strong>{item.label}</strong>
+                <span>{item.value}</span>
+              </div>
+            ))}
+          </div>
+        ) : null}
         {isChatLikePath(requestPath) && executeResult ? (
           <div className="card-list">
-            <div className="detail-card">
-              <strong>{executeResult.requestId}</strong>
-              <span>backend: {executeResult.executionBackend ?? '无'}</span>
-              <span>{executeResult.text ?? '无文本输出'}</span>
-            </div>
             <div className="code-block">
               <pre>{JSON.stringify(executeResult.routeSelection, null, 2)}</pre>
             </div>
@@ -238,26 +461,17 @@ export function TranslationDebugPage() {
           </div>
         ) : !isChatLikePath(requestPath) && resourceExecuteResult ? (
           <div className="card-list">
-            <div className="detail-card">
-              <strong>{resourceExecuteResult.executionBackend ?? '无 backend'}</strong>
-              <span>status: {resourceExecuteResult.statusCode}</span>
-              <span>contentType: {resourceExecuteResult.contentType ?? '未知'}</span>
-              <span>upstreamPath: {resourceExecuteResult.upstreamPath ?? '无'}</span>
-              <span>supportStatus: {resourceExecuteResult.supportStatus ?? '无'}</span>
-              <span>degradationLevel: {resourceExecuteResult.degradationLevel ?? '无'}</span>
-              <span>objectMode: {resourceExecuteResult.objectMode ?? '无'}</span>
-              {typeof resourceExecuteResult.binaryLength === 'number' ? <span>binaryLength: {resourceExecuteResult.binaryLength}</span> : null}
-              {resourceExecuteResult.blockerReasons.length ? <span>blockerReasons: {resourceExecuteResult.blockerReasons.join('；')}</span> : null}
-            </div>
             {resourceExecuteResult.canonicalResponse ? (
-              <div className="detail-card">
-                <strong>canonical</strong>
-                <span>responseKind: {resourceExecuteResult.canonicalResponse.responseKind ?? '无'}</span>
-                <span>objectType: {resourceExecuteResult.canonicalResponse.objectType ?? '无'}</span>
-                <span>objectId: {resourceExecuteResult.canonicalResponse.objectId ?? '无'}</span>
-                <span>status: {resourceExecuteResult.canonicalResponse.status ?? '无'}</span>
-                <span>events: {resourceExecuteResult.canonicalResponse.events.length}</span>
-                <span>degradations: {resourceExecuteResult.canonicalResponse.degradations.length}</span>
+              <div className="detail-grid">
+                <div className="detail-card">
+                  <strong>canonical</strong>
+                  <span>responseKind: {resourceExecuteResult.canonicalResponse.responseKind ?? '无'}</span>
+                  <span>objectType: {resourceExecuteResult.canonicalResponse.objectType ?? '无'}</span>
+                  <span>objectId: {resourceExecuteResult.canonicalResponse.objectId ?? '无'}</span>
+                  <span>status: {resourceExecuteResult.canonicalResponse.status ?? '无'}</span>
+                  <span>events: {resourceExecuteResult.canonicalResponse.events.length}</span>
+                  <span>degradations: {resourceExecuteResult.canonicalResponse.degradations.length}</span>
+                </div>
               </div>
             ) : null}
             <div className="code-block">
@@ -322,4 +536,56 @@ function buildMultipartExplainBody(requestedModel: string, formFields: string, f
     payload.fileRefs = refs
   }
   return payload
+}
+
+function formatJson(value: string) {
+  return JSON.stringify(parseJsonBody(value), null, 2)
+}
+
+function inspectJsonDraft(value: string, expectedType: 'json' | 'object' | 'array' = 'json') {
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return {
+      valid: false,
+      summary: '空白',
+    }
+  }
+
+  try {
+    const parsed = JSON.parse(value)
+    if (expectedType === 'object') {
+      return {
+        valid: typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed),
+        summary:
+          typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+            ? `${Object.keys(parsed).length} 个字段`
+            : '需为 object',
+      }
+    }
+
+    if (expectedType === 'array') {
+      return {
+        valid: Array.isArray(parsed),
+        summary: Array.isArray(parsed) ? `${parsed.length} 个引用` : '需为 array',
+      }
+    }
+
+    return {
+      valid: true,
+      summary: Array.isArray(parsed) ? `JSON array · ${parsed.length} 项` : 'JSON 有效',
+    }
+  } catch {
+    return {
+      valid: false,
+      summary: 'JSON 非法',
+    }
+  }
+}
+
+function resolveFeatureLevel(levels: Record<string, string>, feature: string) {
+  return levels[feature] ?? levels[feature.toLowerCase()] ?? levels[feature.toUpperCase()] ?? '-'
+}
+
+function formatRequiredFeature(feature: string) {
+  return featureLabel(feature.toLowerCase())
 }

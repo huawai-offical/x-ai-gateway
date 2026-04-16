@@ -288,17 +288,18 @@ public class ProviderSiteAdminService {
     private Map<String, CapabilityResolutionView> buildFeatureViews(
             UpstreamSiteProfileEntity entity,
             SiteCapabilitySnapshotEntity snapshot) {
-        return Map.of(
-                InteropFeature.RESPONSE_OBJECT.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.RESPONSE_OBJECT)),
-                InteropFeature.EMBEDDINGS.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.EMBEDDINGS)),
-                InteropFeature.AUDIO_TRANSCRIPTION.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.AUDIO_TRANSCRIPTION)),
-                InteropFeature.IMAGE_GENERATION.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.IMAGE_GENERATION)),
-                InteropFeature.MODERATION.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.MODERATION)),
-                InteropFeature.FILE_OBJECT.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.FILE_OBJECT)),
-                InteropFeature.UPLOAD_CREATE.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.UPLOAD_CREATE)),
-                InteropFeature.BATCH_CREATE.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.BATCH_CREATE)),
-                InteropFeature.TUNING_CREATE.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.TUNING_CREATE)),
-                InteropFeature.REALTIME_CLIENT_SECRET.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.REALTIME_CLIENT_SECRET))
+        return Map.ofEntries(
+                Map.entry(InteropFeature.RESPONSE_OBJECT.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.RESPONSE_OBJECT))),
+                Map.entry(InteropFeature.EMBEDDINGS.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.EMBEDDINGS))),
+                Map.entry(InteropFeature.AUDIO_TRANSCRIPTION.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.AUDIO_TRANSCRIPTION))),
+                Map.entry(InteropFeature.IMAGE_GENERATION.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.IMAGE_GENERATION))),
+                Map.entry(InteropFeature.MODERATION.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.MODERATION))),
+                Map.entry(InteropFeature.FILE_OBJECT.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.FILE_OBJECT))),
+                Map.entry(InteropFeature.UPLOAD_CREATE.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.UPLOAD_CREATE))),
+                Map.entry(InteropFeature.BATCH_CREATE.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.BATCH_CREATE))),
+                Map.entry(InteropFeature.ANTHROPIC_MESSAGE_BATCH.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.ANTHROPIC_MESSAGE_BATCH))),
+                Map.entry(InteropFeature.TUNING_CREATE.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.TUNING_CREATE))),
+                Map.entry(InteropFeature.REALTIME_CLIENT_SECRET.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.REALTIME_CLIENT_SECRET)))
         );
     }
 
@@ -387,6 +388,15 @@ public class ProviderSiteAdminService {
                         TranslationOperation.BATCH_CREATE,
                         List.of(InteropFeature.BATCH_CREATE, InteropFeature.FILE_OBJECT)
                 )),
+                Map.entry("anthropic_message_batch_create", toSurface(
+                        entity,
+                        snapshot,
+                        "anthropic_native",
+                        "/v1/messages/batches",
+                        TranslationResourceType.BATCH,
+                        TranslationOperation.ANTHROPIC_MESSAGE_BATCH_CREATE,
+                        List.of(InteropFeature.ANTHROPIC_MESSAGE_BATCH)
+                )),
                 Map.entry("tuning_create", toSurface(
                         entity,
                         snapshot,
@@ -447,6 +457,7 @@ public class ProviderSiteAdminService {
         SupportStatus supportStatus = surfaceSupportStatus(
                 entity.getSiteKind(),
                 resourceType,
+                operation,
                 backendDecision,
                 overallCapabilityLevel,
                 surfaceReport.blockedReasons()
@@ -482,16 +493,11 @@ public class ProviderSiteAdminService {
     private SupportStatus surfaceSupportStatus(
             com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind siteKind,
             TranslationResourceType resourceType,
+            TranslationOperation operation,
             ExecutionBackendDecision backendDecision,
             InteropCapabilityLevel overallCapabilityLevel,
             List<String> blockerReasons) {
-        if (siteKind == com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind.GEMINI_DIRECT
-                && backendDecision != null
-                && backendDecision.preferredBackend() == com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend.ORCHESTRATION
-                && overallCapabilityLevel == InteropCapabilityLevel.NATIVE
-                && (resourceType == TranslationResourceType.FILE
-                || resourceType == TranslationResourceType.BATCH
-                || resourceType == TranslationResourceType.TUNING)) {
+        if (isNativeWrappedObjectSurface(siteKind, resourceType, operation, backendDecision, overallCapabilityLevel)) {
             return SupportStatus.NATIVE;
         }
         return SupportStatus.resolve(
@@ -499,6 +505,29 @@ public class ProviderSiteAdminService {
                 overallCapabilityLevel,
                 blockerReasons
         );
+    }
+
+    private boolean isNativeWrappedObjectSurface(
+            com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind siteKind,
+            TranslationResourceType resourceType,
+            TranslationOperation operation,
+            ExecutionBackendDecision backendDecision,
+            InteropCapabilityLevel overallCapabilityLevel) {
+        if (backendDecision == null
+                || backendDecision.preferredBackend() != com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend.ORCHESTRATION
+                || overallCapabilityLevel != InteropCapabilityLevel.NATIVE) {
+            return false;
+        }
+        return switch (siteKind) {
+            case GEMINI_DIRECT, VERTEX_AI -> resourceType == TranslationResourceType.FILE
+                    || resourceType == TranslationResourceType.BATCH
+                    || resourceType == TranslationResourceType.TUNING;
+            case ANTHROPIC_DIRECT -> resourceType == TranslationResourceType.FILE
+                    || operation == TranslationOperation.ANTHROPIC_MESSAGE_BATCH_CREATE
+                    || operation == TranslationOperation.ANTHROPIC_MESSAGE_BATCH_GET
+                    || operation == TranslationOperation.ANTHROPIC_MESSAGE_BATCH_CANCEL;
+            default -> false;
+        };
     }
 
     private SurfaceCapabilityView modelSurface(

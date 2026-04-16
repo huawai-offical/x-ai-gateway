@@ -105,10 +105,10 @@ public class ExecutionBackendPolicyService {
                 case ANTHROPIC_DIRECT, OLLAMA_DIRECT -> List.of();
             };
         }
-        if (supportsGeminiNativeMedia(providerType, siteKind, semantics)) {
+        if (supportsGoogleGenAiNativeMedia(providerType, siteKind, semantics)) {
             return List.of(ExecutionBackend.NATIVE);
         }
-        if (blocksGeminiNativeMedia(providerType, siteKind, semantics)) {
+        if (blocksGoogleGenAiNativeMedia(providerType, siteKind, semantics)) {
             return List.of();
         }
         if (semantics.resourceType() == TranslationResourceType.AUDIO
@@ -283,12 +283,12 @@ public class ExecutionBackendPolicyService {
         };
     }
 
-    private boolean supportsGeminiNativeMedia(
+    private boolean supportsGoogleGenAiNativeMedia(
             ProviderType providerType,
             UpstreamSiteKind siteKind,
             GatewayRequestSemantics semantics) {
         if (providerType != ProviderType.GEMINI_DIRECT
-                || siteKind != UpstreamSiteKind.GEMINI_DIRECT
+                || !supportsGoogleGenAiSite(siteKind)
                 || semantics == null) {
             return false;
         }
@@ -298,23 +298,21 @@ public class ExecutionBackendPolicyService {
         };
     }
 
-    private boolean blocksGeminiNativeMedia(
+    private boolean blocksGoogleGenAiNativeMedia(
             ProviderType providerType,
             UpstreamSiteKind siteKind,
             GatewayRequestSemantics semantics) {
         if (providerType != ProviderType.GEMINI_DIRECT || semantics == null) {
             return false;
         }
-        if (siteKind == UpstreamSiteKind.VERTEX_AI) {
-            return semantics.resourceType() == TranslationResourceType.EMBEDDING
-                    || semantics.resourceType() == TranslationResourceType.AUDIO
-                    || semantics.resourceType() == TranslationResourceType.IMAGE
-                    || semantics.resourceType() == TranslationResourceType.MODERATION;
-        }
-        if (siteKind != UpstreamSiteKind.GEMINI_DIRECT) {
+        if (!supportsGoogleGenAiSite(siteKind)) {
             return false;
         }
         return semantics.operation() == TranslationOperation.IMAGE_EDIT
                 || semantics.operation() == TranslationOperation.IMAGE_VARIATION;
+    }
+
+    private boolean supportsGoogleGenAiSite(UpstreamSiteKind siteKind) {
+        return siteKind == UpstreamSiteKind.GEMINI_DIRECT || siteKind == UpstreamSiteKind.VERTEX_AI;
     }
 }

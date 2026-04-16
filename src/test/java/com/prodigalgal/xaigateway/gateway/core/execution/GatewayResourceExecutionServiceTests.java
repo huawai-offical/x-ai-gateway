@@ -369,7 +369,7 @@ class GatewayResourceExecutionServiceTests {
                         false
                 );
 
-        Mockito.when(gatewayRequestFeatureService.describe(eq("GET"), eq("/v1/files/file_123/content"), any()))
+        Mockito.when(gatewayRequestFeatureService.describe(eq("GET"), eq("/v1/files/{fileId}/content"), any()))
                 .thenReturn(new GatewayRequestSemantics(
                         com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType.FILE,
                         com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation.FILE_CONTENT_GET,

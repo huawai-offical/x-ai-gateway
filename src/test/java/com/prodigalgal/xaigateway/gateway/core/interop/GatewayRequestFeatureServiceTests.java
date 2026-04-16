@@ -68,7 +68,7 @@ class GatewayRequestFeatureServiceTests {
         assertEquals("uploads", semantics.surface());
         assertEquals("/v1/uploads/{uploadId}/parts", semantics.normalizedPath());
         assertEquals(List.of(InteropFeature.UPLOAD_CREATE, InteropFeature.FILE_OBJECT), semantics.requiredFeatures());
-        assertEquals(true, semantics.requiresRouteSelection());
+        assertEquals(false, semantics.requiresRouteSelection());
     }
 
     @Test

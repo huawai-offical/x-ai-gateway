@@ -53,7 +53,7 @@ class GeminiModerationsGatewayResourceExecutorTests {
         TestGeminiModerationsExecutor executor = new TestGeminiModerationsExecutor(List.of(safeResponse()));
 
         assertTrue(executor.supports(request("/v1/moderations"), candidate(UpstreamSiteKind.GEMINI_DIRECT)));
-        assertFalse(executor.supports(request("/v1/moderations"), candidate(UpstreamSiteKind.VERTEX_AI)));
+        assertTrue(executor.supports(request("/v1/moderations"), candidate(UpstreamSiteKind.VERTEX_AI)));
         assertFalse(executor.supports(request("/v1/images/generations"), candidate(UpstreamSiteKind.GEMINI_DIRECT)));
     }
 

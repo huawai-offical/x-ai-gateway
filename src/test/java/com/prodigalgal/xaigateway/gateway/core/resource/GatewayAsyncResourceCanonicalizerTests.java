@@ -90,6 +90,38 @@ class GatewayAsyncResourceCanonicalizerTests {
     }
 
     @Test
+    void shouldBuildGatewayLocalUploadLineageWithoutUpstreamObjectId() {
+        GatewayFileBindingRepository gatewayFileBindingRepository = Mockito.mock(GatewayFileBindingRepository.class);
+        GatewayFileRepository gatewayFileRepository = Mockito.mock(GatewayFileRepository.class);
+        GatewayAsyncResourceCanonicalizer canonicalizer = new GatewayAsyncResourceCanonicalizer(
+                gatewayFileBindingRepository,
+                gatewayFileRepository,
+                new ObjectMapper()
+        );
+
+        GatewayAsyncResourceEntity entity = entity(GatewayAsyncResourceType.UPLOAD, "upload_2", "completed", """
+                {
+                  "object_mode":"gateway_upload_object",
+                  "credential_id":201,
+                  "site_profile_id":2,
+                  "parts":["part-local-1"],
+                  "part_bindings":[{"filename":"segment.bin","synced_at":1713150000}],
+                  "events":[{"type":"created","status":"created","at":1713150000},{"type":"status_changed","status":"completed","at":1713150300}]
+                }
+                """);
+
+        var lineage = canonicalizer.toLineage(entity);
+        var artifacts = canonicalizer.toArtifacts(entity);
+
+        assertEquals("gateway_upload_object", lineage.objectMode());
+        assertEquals("upload_2", lineage.gatewayResourceKey());
+        assertEquals(null, lineage.upstreamObjectId());
+        assertEquals(1, lineage.parts().size());
+        assertEquals(1, artifacts.size());
+        assertEquals("upload_part", artifacts.get(0).artifactKind());
+    }
+
+    @Test
     void shouldResolveGatewayFileBindingArtifactsForBatchAndTuningRequests() {
         GatewayFileBindingRepository gatewayFileBindingRepository = Mockito.mock(GatewayFileBindingRepository.class);
         GatewayFileRepository gatewayFileRepository = Mockito.mock(GatewayFileRepository.class);
