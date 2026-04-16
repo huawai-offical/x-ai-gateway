@@ -307,13 +307,13 @@ class SiteCapabilityTruthServiceTests {
     }
 
     @Test
-    void shouldExposeOrchestrationSurfaceForGeminiFileResources() {
+    void shouldExposeNativeWrappedSurfaceForGeminiFileResources() {
         SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
         SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
 
         SurfaceCompatibilityReport report = service.evaluateSurface(
                 siteProfile(UpstreamSiteKind.GEMINI_DIRECT),
-                snapshot(false, true, false, false, false, false, false, false, false, false),
+                snapshot(false, true, false, false, false, true, false, true, true, false),
                 new GatewayRequestSemantics(
                         TranslationResourceType.FILE,
                         TranslationOperation.FILE_CREATE,
@@ -330,7 +330,39 @@ class SiteCapabilityTruthServiceTests {
         assertEquals(InteropCapabilityLevel.NATIVE, report.executionCapabilityLevel());
         assertTrue(report.blockedReasons().isEmpty());
         assertEquals(
+                InteropCapabilityLevel.NATIVE,
+                report.featureResolutions().get("file_object").effectiveLevel()
+        );
+    }
+
+    @Test
+    void shouldKeepGeminiUploadsAsOrchestrationSurfaceWhenFeatureTruthBlocked() {
+        SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
+
+        SurfaceCompatibilityReport report = service.evaluateSurface(
+                siteProfile(UpstreamSiteKind.GEMINI_DIRECT),
+                snapshot(false, true, true, true, true, true, false, true, true, false),
+                new GatewayRequestSemantics(
+                        TranslationResourceType.UPLOAD,
+                        TranslationOperation.UPLOAD_CREATE,
+                        List.of(InteropFeature.UPLOAD_CREATE, InteropFeature.FILE_OBJECT),
+                        true
+                ),
+                new com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendDecision(
+                        ExecutionBackend.ORCHESTRATION,
+                        List.of(ExecutionBackend.ORCHESTRATION),
+                        "test"
+                )
+        );
+
+        assertEquals(InteropCapabilityLevel.NATIVE, report.executionCapabilityLevel());
+        assertEquals(
                 InteropCapabilityLevel.UNSUPPORTED,
+                report.featureResolutions().get("upload_create").effectiveLevel()
+        );
+        assertEquals(
+                InteropCapabilityLevel.NATIVE,
                 report.featureResolutions().get("file_object").effectiveLevel()
         );
     }

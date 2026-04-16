@@ -49,6 +49,10 @@ public class GatewayFileBindingEntity {
     @Comment("上游凭证主键。")
     private Long credentialId;
 
+    @Column(name = "site_profile_id")
+    @Comment("上游站点档案主键。")
+    private Long siteProfileId;
+
     @Column(name = "external_file_id", nullable = false, length = 256)
     @Comment("上游文件对象 ID。")
     private String externalFileId;
@@ -101,6 +105,14 @@ public class GatewayFileBindingEntity {
 
     public void setCredentialId(Long credentialId) {
         this.credentialId = credentialId;
+    }
+
+    public Long getSiteProfileId() {
+        return siteProfileId;
+    }
+
+    public void setSiteProfileId(Long siteProfileId) {
+        this.siteProfileId = siteProfileId;
     }
 
     public String getExternalFileId() {

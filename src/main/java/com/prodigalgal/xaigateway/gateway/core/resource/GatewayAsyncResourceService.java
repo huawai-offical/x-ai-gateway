@@ -1,5 +1,20 @@
 package com.prodigalgal.xaigateway.gateway.core.resource;
 
+import com.google.genai.Client;
+import com.google.genai.types.BatchJob;
+import com.google.genai.types.BatchJobSource;
+import com.google.genai.types.CancelBatchJobConfig;
+import com.google.genai.types.CancelTuningJobConfig;
+import com.google.genai.types.CreateBatchJobConfig;
+import com.google.genai.types.CreateTuningJobConfig;
+import com.google.genai.types.GetBatchJobConfig;
+import com.google.genai.types.GetTuningJobConfig;
+import com.google.genai.types.JobState;
+import com.google.genai.types.TuningDataset;
+import com.google.genai.types.TuningExample;
+import com.google.genai.types.TuningJob;
+import com.google.genai.types.TuningJobState;
+import io.micrometer.observation.ObservationRegistry;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -10,10 +25,12 @@ import com.prodigalgal.xaigateway.gateway.core.credential.ResolvedCredentialMate
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedCredentialBindingView;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyQueryService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyView;
+import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileContent;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature;
 import com.prodigalgal.xaigateway.gateway.core.interop.SiteCapabilityTruthService;
 import com.prodigalgal.xaigateway.gateway.core.shared.AuthStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.PathStrategy;
+import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
 import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayAsyncResourceEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayFileBindingEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayFileEntity;
@@ -26,9 +43,14 @@ import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayFileReposi
 import com.prodigalgal.xaigateway.infra.persistence.repository.SiteCapabilitySnapshotRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamSiteProfileRepository;
+import com.prodigalgal.xaigateway.provider.adapter.gemini.GeminiChatModelFactory;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -39,7 +61,6 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.multipart.FilePart;
-import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileContent;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.LinkedMultiValueMap;
@@ -62,6 +83,7 @@ public class GatewayAsyncResourceService {
     private final CredentialCryptoService credentialCryptoService;
     private final CredentialMaterialResolver credentialMaterialResolver;
     private final SiteCapabilityTruthService siteCapabilityTruthService;
+    private final GeminiChatModelFactory geminiChatModelFactory;
     private final ObjectMapper objectMapper;
     private final Clock clock;
     private final WebClient.Builder webClientBuilder;
@@ -78,6 +100,7 @@ public class GatewayAsyncResourceService {
             CredentialCryptoService credentialCryptoService,
             CredentialMaterialResolver credentialMaterialResolver,
             SiteCapabilityTruthService siteCapabilityTruthService,
+            GeminiChatModelFactory geminiChatModelFactory,
             ObjectMapper objectMapper,
             Clock clock,
             WebClient.Builder webClientBuilder) {
@@ -91,6 +114,7 @@ public class GatewayAsyncResourceService {
         this.credentialCryptoService = credentialCryptoService;
         this.credentialMaterialResolver = credentialMaterialResolver;
         this.siteCapabilityTruthService = siteCapabilityTruthService;
+        this.geminiChatModelFactory = geminiChatModelFactory;
         this.objectMapper = objectMapper;
         this.clock = clock;
         this.webClientBuilder = webClientBuilder;
@@ -125,6 +149,7 @@ public class GatewayAsyncResourceService {
                         null
                 ), credentialCryptoService, objectMapper),
                 siteCapabilityTruthService,
+                new GeminiChatModelFactory(ObservationRegistry.NOOP),
                 objectMapper,
                 clock,
                 webClientBuilder
@@ -183,7 +208,7 @@ public class GatewayAsyncResourceService {
     public JsonNode createUpload(Long distributedKeyId, JsonNode requestBody, Long preferredCredentialId) {
         ObjectNode payload = requireObject(requestBody);
         UpstreamTarget target = resolveUpstreamTarget(distributedKeyId, InteropFeature.UPLOAD_CREATE, preferredCredentialId);
-        JsonNode upstreamResponse = invokeUpstreamJson(target, "/v1/uploads", rewriteFileRefs(payload, distributedKeyId));
+        JsonNode upstreamResponse = invokeUpstreamJson(target, "/v1/uploads", rewriteFileRefs(payload, distributedKeyId, target));
         return persistUpstreamBackedResource(distributedKeyId, GatewayAsyncResourceType.UPLOAD, "upload_", payload, upstreamResponse, "upload", target);
     }
 
@@ -234,8 +259,12 @@ public class GatewayAsyncResourceService {
     }
 
     public JsonNode createBatch(Long distributedKeyId, JsonNode requestBody, Long preferredCredentialId) {
-        ObjectNode payload = rewriteFileRefs(requireObject(requestBody), distributedKeyId);
+        ObjectNode sourcePayload = copyObject(requireObject(requestBody));
         UpstreamTarget target = resolveUpstreamTarget(distributedKeyId, InteropFeature.BATCH_CREATE, preferredCredentialId);
+        ObjectNode payload = rewriteFileRefs(copyObject(sourcePayload), distributedKeyId, target);
+        if (target.siteProfile().getSiteKind() == UpstreamSiteKind.GEMINI_DIRECT) {
+            return createGeminiBatch(distributedKeyId, sourcePayload, payload, target);
+        }
         JsonNode upstreamResponse = invokeUpstreamJson(target, "/v1/batches", payload);
         return persistUpstreamBackedResource(distributedKeyId, GatewayAsyncResourceType.BATCH, "batch_", payload, upstreamResponse, "batch", target);
     }
@@ -253,8 +282,12 @@ public class GatewayAsyncResourceService {
     }
 
     public JsonNode createTuning(Long distributedKeyId, JsonNode requestBody, Long preferredCredentialId) {
-        ObjectNode payload = rewriteFileRefs(requireObject(requestBody), distributedKeyId);
+        ObjectNode sourcePayload = copyObject(requireObject(requestBody));
         UpstreamTarget target = resolveUpstreamTarget(distributedKeyId, InteropFeature.TUNING_CREATE, preferredCredentialId);
+        ObjectNode payload = rewriteFileRefs(copyObject(sourcePayload), distributedKeyId, target);
+        if (target.siteProfile().getSiteKind() == UpstreamSiteKind.GEMINI_DIRECT) {
+            return createGeminiTuning(distributedKeyId, sourcePayload, payload, target);
+        }
         JsonNode upstreamResponse = invokeUpstreamJson(target, "/v1/fine_tuning/jobs", payload);
         return persistUpstreamBackedResource(distributedKeyId, GatewayAsyncResourceType.TUNING, "ftjob_", payload, upstreamResponse, "fine_tuning.job", target);
     }
@@ -298,6 +331,12 @@ public class GatewayAsyncResourceService {
             return readJson(entity.getResponsePayloadJson());
         }
         UpstreamTarget target = resolveUpstreamTargetForEntity(entity, metadata);
+        if (target.siteProfile().getSiteKind() == UpstreamSiteKind.GEMINI_DIRECT && resourceType == GatewayAsyncResourceType.BATCH) {
+            return syncPersistedResource(entity, fetchGeminiBatch(entity, metadata, target), objectName);
+        }
+        if (target.siteProfile().getSiteKind() == UpstreamSiteKind.GEMINI_DIRECT && resourceType == GatewayAsyncResourceType.TUNING) {
+            return syncPersistedResource(entity, fetchGeminiTuning(entity, metadata, target), objectName);
+        }
         JsonNode upstreamResponse = target.client()
                 .get()
                 .uri(target.path() + "/" + upstreamId)
@@ -320,8 +359,312 @@ public class GatewayAsyncResourceService {
             return updateLocalStatus(resourceKey, distributedKeyId, resourceType, suffix.contains("cancel") ? "cancelled" : "completed");
         }
         UpstreamTarget target = resolveUpstreamTargetForEntity(entity, metadata);
+        if (target.siteProfile().getSiteKind() == UpstreamSiteKind.GEMINI_DIRECT && resourceType == GatewayAsyncResourceType.BATCH) {
+            cancelGeminiBatch(metadata, target);
+            return syncPersistedResource(entity, fetchGeminiBatch(entity, metadata, target), inferObjectName(resourceType));
+        }
+        if (target.siteProfile().getSiteKind() == UpstreamSiteKind.GEMINI_DIRECT && resourceType == GatewayAsyncResourceType.TUNING) {
+            cancelGeminiTuning(metadata, target);
+            return syncPersistedResource(entity, fetchGeminiTuning(entity, metadata, target), inferObjectName(resourceType));
+        }
         JsonNode upstreamResponse = invokeUpstreamJson(target, target.path() + "/" + upstreamId + suffix, objectMapper.createObjectNode());
         return syncPersistedResource(entity, upstreamResponse, inferObjectName(resourceType));
+    }
+
+    private JsonNode createGeminiBatch(
+            Long distributedKeyId,
+            ObjectNode sourcePayload,
+            ObjectNode payload,
+            UpstreamTarget target) {
+        String model = requireText(payload, "model", "Gemini batch_create 需要显式 model。");
+        String inputFileId = requireText(payload, "input_file_id", "Gemini batch_create 需要 input_file_id。");
+        BatchJobSource source = BatchJobSource.builder()
+                .fileName(inputFileId)
+                .build();
+        CreateBatchJobConfig.Builder configBuilder = CreateBatchJobConfig.builder();
+        if (payload.hasNonNull("metadata") && payload.path("metadata").isObject()) {
+            String displayName = payload.path("metadata").path("display_name").asText(null);
+            if (displayName != null && !displayName.isBlank()) {
+                configBuilder.displayName(displayName);
+            }
+        }
+        try (Client client = createGeminiClient(target)) {
+            BatchJob batchJob = client.batches.create(model, source, configBuilder.build());
+            JsonNode response = mapGeminiBatchJob(batchJob, payload);
+            String upstreamObjectId = batchJob.name()
+                    .orElseThrow(() -> new IllegalStateException("Gemini batch 响应缺少 name。"));
+            return persistUpstreamBackedResource(
+                    distributedKeyId,
+                    GatewayAsyncResourceType.BATCH,
+                    "batch_",
+                    payload,
+                    response,
+                    "batch",
+                    target,
+                    upstreamObjectId
+            );
+        }
+    }
+
+    private JsonNode fetchGeminiBatch(
+            GatewayAsyncResourceEntity entity,
+            ObjectNode metadata,
+            UpstreamTarget target) {
+        String upstreamObjectId = requireUpstreamObjectId(metadata, "Gemini batch 对象缺少 upstream_object_id。");
+        try (Client client = createGeminiClient(target)) {
+            BatchJob batchJob = client.batches.get(upstreamObjectId, GetBatchJobConfig.builder().build());
+            return mapGeminiBatchJob(batchJob, readObject(entity.getRequestPayloadJson()));
+        }
+    }
+
+    private void cancelGeminiBatch(ObjectNode metadata, UpstreamTarget target) {
+        String upstreamObjectId = requireUpstreamObjectId(metadata, "Gemini batch 对象缺少 upstream_object_id。");
+        try (Client client = createGeminiClient(target)) {
+            client.batches.cancel(upstreamObjectId, CancelBatchJobConfig.builder().build());
+        }
+    }
+
+    private JsonNode createGeminiTuning(
+            Long distributedKeyId,
+            ObjectNode sourcePayload,
+            ObjectNode payload,
+            UpstreamTarget target) {
+        if (sourcePayload.hasNonNull("validation_file")) {
+            throw new IllegalArgumentException("Gemini tuning 暂不支持 validation_file。");
+        }
+        String model = requireText(payload, "model", "Gemini tuning_create 需要显式 model。");
+        String trainingFileKey = requireText(sourcePayload, "training_file", "Gemini tuning_create 需要 training_file。");
+        TuningDataset dataset = TuningDataset.builder()
+                .examples(parseTuningExamples(distributedKeyId, trainingFileKey))
+                .build();
+        CreateTuningJobConfig.Builder configBuilder = CreateTuningJobConfig.builder();
+        if (sourcePayload.hasNonNull("suffix")) {
+            String suffix = sourcePayload.path("suffix").asText(null);
+            if (suffix != null && !suffix.isBlank()) {
+                configBuilder.tunedModelDisplayName(suffix);
+            }
+        }
+        try (Client client = createGeminiClient(target)) {
+            TuningJob tuningJob = client.tunings.tune(model, dataset, configBuilder.build());
+            JsonNode response = mapGeminiTuningJob(tuningJob, payload);
+            String upstreamObjectId = tuningJob.name()
+                    .orElseThrow(() -> new IllegalStateException("Gemini tuning 响应缺少 name。"));
+            return persistUpstreamBackedResource(
+                    distributedKeyId,
+                    GatewayAsyncResourceType.TUNING,
+                    "ftjob_",
+                    payload,
+                    response,
+                    "fine_tuning.job",
+                    target,
+                    upstreamObjectId
+            );
+        }
+    }
+
+    private JsonNode fetchGeminiTuning(
+            GatewayAsyncResourceEntity entity,
+            ObjectNode metadata,
+            UpstreamTarget target) {
+        String upstreamObjectId = requireUpstreamObjectId(metadata, "Gemini tuning 对象缺少 upstream_object_id。");
+        try (Client client = createGeminiClient(target)) {
+            TuningJob tuningJob = client.tunings.get(upstreamObjectId, GetTuningJobConfig.builder().build());
+            return mapGeminiTuningJob(tuningJob, readObject(entity.getRequestPayloadJson()));
+        }
+    }
+
+    private void cancelGeminiTuning(ObjectNode metadata, UpstreamTarget target) {
+        String upstreamObjectId = requireUpstreamObjectId(metadata, "Gemini tuning 对象缺少 upstream_object_id。");
+        try (Client client = createGeminiClient(target)) {
+            client.tunings.cancel(upstreamObjectId, CancelTuningJobConfig.builder().build());
+        }
+    }
+
+    private JsonNode mapGeminiBatchJob(BatchJob batchJob, JsonNode requestPayload) {
+        ObjectNode response = objectMapper.createObjectNode();
+        response.put("object", "batch");
+        putIfPresent(response, "model", batchJob.model().orElse(text(requestPayload, "model")));
+        putIfPresent(response, "endpoint", text(requestPayload, "endpoint"));
+        putIfPresent(response, "completion_window", text(requestPayload, "completion_window"));
+        putIfPresent(response, "input_file_id", text(requestPayload, "input_file_id"));
+        response.put("created_at", epochSeconds(batchJob.createTime().orElse(now())));
+        response.put("status", geminiBatchStatus(batchJob));
+        if (batchJob.error().flatMap(error -> error.message()).isPresent()) {
+            ObjectNode error = response.putObject("error");
+            error.put("message", batchJob.error().flatMap(com.google.genai.types.JobError::message).orElse(""));
+            error.put("type", "gemini_batch_error");
+        }
+        return response;
+    }
+
+    private JsonNode mapGeminiTuningJob(TuningJob tuningJob, JsonNode requestPayload) {
+        ObjectNode response = objectMapper.createObjectNode();
+        response.put("object", "fine_tuning.job");
+        putIfPresent(response, "model", text(requestPayload, "model"));
+        putIfPresent(response, "training_file", text(requestPayload, "training_file"));
+        putIfPresent(response, "validation_file", text(requestPayload, "validation_file"));
+        response.put("created_at", epochSeconds(tuningJob.createTime().orElse(now())));
+        response.put("status", geminiTuningStatus(tuningJob));
+        putIfPresent(response, "fine_tuned_model", tuningJob.tunedModel().flatMap(model -> model.model()).orElse(null));
+        if (tuningJob.error().flatMap(error -> error.message()).isPresent()) {
+            ObjectNode error = response.putObject("error");
+            error.put("message", tuningJob.error().flatMap(com.google.genai.types.GoogleRpcStatus::message).orElse(""));
+            error.put("type", "gemini_tuning_error");
+        }
+        return response;
+    }
+
+    private String geminiBatchStatus(BatchJob batchJob) {
+        JobState.Known state = batchJob.state().map(JobState::knownEnum).orElse(null);
+        if (state == null) {
+            return "queued";
+        }
+        return switch (state) {
+            case JOB_STATE_QUEUED, JOB_STATE_PENDING -> "validating";
+            case JOB_STATE_RUNNING, JOB_STATE_UPDATING, JOB_STATE_CANCELLING, JOB_STATE_PAUSED -> "running";
+            case JOB_STATE_SUCCEEDED, JOB_STATE_PARTIALLY_SUCCEEDED -> "completed";
+            case JOB_STATE_FAILED, JOB_STATE_EXPIRED -> "failed";
+            case JOB_STATE_CANCELLED -> "cancelled";
+            case JOB_STATE_UNSPECIFIED -> "queued";
+        };
+    }
+
+    private String geminiTuningStatus(TuningJob tuningJob) {
+        JobState.Known jobState = tuningJob.state().map(JobState::knownEnum).orElse(null);
+        if (jobState != null) {
+            return switch (jobState) {
+                case JOB_STATE_QUEUED, JOB_STATE_PENDING -> "queued";
+                case JOB_STATE_RUNNING, JOB_STATE_UPDATING, JOB_STATE_CANCELLING, JOB_STATE_PAUSED -> "running";
+                case JOB_STATE_SUCCEEDED, JOB_STATE_PARTIALLY_SUCCEEDED -> "succeeded";
+                case JOB_STATE_FAILED, JOB_STATE_EXPIRED -> "failed";
+                case JOB_STATE_CANCELLED -> "cancelled";
+                case JOB_STATE_UNSPECIFIED -> "queued";
+            };
+        }
+        TuningJobState.Known tuningState = tuningJob.tuningJobState().map(TuningJobState::knownEnum).orElse(null);
+        if (tuningState == null) {
+            return "queued";
+        }
+        return switch (tuningState) {
+            case TUNING_JOB_STATE_WAITING_FOR_QUOTA, TUNING_JOB_STATE_WAITING_FOR_CAPACITY -> "queued";
+            case TUNING_JOB_STATE_PROCESSING_DATASET, TUNING_JOB_STATE_TUNING, TUNING_JOB_STATE_POST_PROCESSING -> "running";
+            case TUNING_JOB_STATE_UNSPECIFIED -> "queued";
+        };
+    }
+
+    private List<TuningExample> parseTuningExamples(Long distributedKeyId, String trainingFileKey) {
+        GatewayFileContent fileContent = getGatewayFileContent(trainingFileKey, distributedKeyId);
+        String content = new String(fileContent.bytes(), StandardCharsets.UTF_8);
+        List<TuningExample> examples = new ArrayList<>();
+        int lineNumber = 0;
+        for (String rawLine : content.split("\\r?\\n")) {
+            lineNumber++;
+            String line = rawLine.trim();
+            if (line.isBlank()) {
+                continue;
+            }
+            JsonNode node;
+            try {
+                node = objectMapper.readTree(line);
+            } catch (JacksonException exception) {
+                throw new IllegalArgumentException("Gemini tuning 训练文件第 " + lineNumber + " 行不是有效 JSON。", exception);
+            }
+            String input = extractTuningInput(node);
+            String output = extractTuningOutput(node);
+            if (input == null || input.isBlank() || output == null || output.isBlank()) {
+                throw new IllegalArgumentException("Gemini tuning 训练文件第 " + lineNumber + " 行缺少可映射的 input/output。");
+            }
+            examples.add(TuningExample.builder()
+                    .textInput(input)
+                    .output(output)
+                    .build());
+        }
+        if (examples.isEmpty()) {
+            throw new IllegalArgumentException("Gemini tuning 训练文件不能为空。");
+        }
+        return List.copyOf(examples);
+    }
+
+    private String extractTuningInput(JsonNode node) {
+        String direct = firstText(node, "text_input", "input", "prompt");
+        if (direct != null) {
+            return direct;
+        }
+        return joinMessagesByRole(node.path("messages"), "user");
+    }
+
+    private String extractTuningOutput(JsonNode node) {
+        String direct = firstText(node, "output", "completion");
+        if (direct != null) {
+            return direct;
+        }
+        return joinMessagesByRole(node.path("messages"), "assistant");
+    }
+
+    private String joinMessagesByRole(JsonNode messages, String role) {
+        if (messages == null || !messages.isArray()) {
+            return null;
+        }
+        List<String> parts = new ArrayList<>();
+        for (JsonNode message : messages) {
+            if (!role.equals(text(message, "role"))) {
+                continue;
+            }
+            String content = extractMessageContent(message.path("content"));
+            if (content != null && !content.isBlank()) {
+                parts.add(content);
+            }
+        }
+        if (parts.isEmpty()) {
+            return null;
+        }
+        return String.join("\n\n", parts);
+    }
+
+    private String extractMessageContent(JsonNode contentNode) {
+        if (contentNode == null || contentNode.isMissingNode() || contentNode.isNull()) {
+            return null;
+        }
+        if (contentNode.isTextual()) {
+            return contentNode.asText();
+        }
+        if (contentNode.isArray()) {
+            List<String> parts = new ArrayList<>();
+            for (JsonNode part : contentNode) {
+                String text = firstText(part, "text", "input_text");
+                if (text != null && !text.isBlank()) {
+                    parts.add(text);
+                }
+            }
+            return parts.isEmpty() ? null : String.join("\n", parts);
+        }
+        return firstText(contentNode, "text", "input_text");
+    }
+
+    private String requireUpstreamObjectId(ObjectNode metadata, String message) {
+        String upstreamObjectId = metadata.path("upstream_object_id").asText(null);
+        if (upstreamObjectId == null || upstreamObjectId.isBlank()) {
+            throw new IllegalArgumentException(message);
+        }
+        return upstreamObjectId;
+    }
+
+    private String requireText(JsonNode payload, String fieldName, String message) {
+        String value = text(payload, fieldName);
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(message);
+        }
+        return value;
+    }
+
+    private long epochSeconds(Instant instant) {
+        return (instant == null ? now() : instant).getEpochSecond();
+    }
+
+    private void putIfPresent(ObjectNode node, String fieldName, String value) {
+        if (value != null && !value.isBlank()) {
+            node.put(fieldName, value);
+        }
     }
 
     private JsonNode persistUpstreamBackedResource(
@@ -332,19 +675,39 @@ public class GatewayAsyncResourceService {
             JsonNode upstreamResponse,
             String objectName,
             UpstreamTarget target) {
+        return persistUpstreamBackedResource(
+                distributedKeyId,
+                type,
+                idPrefix,
+                requestPayload,
+                upstreamResponse,
+                objectName,
+                target,
+                upstreamResponse.path("id").asText(null)
+        );
+    }
+
+    private JsonNode persistUpstreamBackedResource(
+            Long distributedKeyId,
+            GatewayAsyncResourceType type,
+            String idPrefix,
+            JsonNode requestPayload,
+            JsonNode upstreamResponse,
+            String objectName,
+            UpstreamTarget target,
+            String upstreamObjectId) {
         String resourceKey = idPrefix + UUID.randomUUID().toString().replace("-", "");
         ObjectNode response = copyObject(upstreamResponse);
         response.put("id", resourceKey);
         if (!response.has("object")) {
             response.put("object", objectName);
         }
-        String upstreamId = upstreamResponse.path("id").asText(null);
         String status = response.path("status").asText("created");
 
         ObjectNode metadata = objectMapper.createObjectNode();
         metadata.put("object_mode", "upstream_object_with_local_lineage");
-        if (upstreamId != null) {
-            metadata.put("upstream_object_id", upstreamId);
+        if (upstreamObjectId != null && !upstreamObjectId.isBlank()) {
+            metadata.put("upstream_object_id", upstreamObjectId);
         }
         metadata.put("credential_id", target.credential().getId());
         metadata.put("site_profile_id", target.siteProfile().getId());
@@ -468,11 +831,11 @@ public class GatewayAsyncResourceService {
         if (preferredCredentialId != null) {
             UpstreamCredentialEntity preferred = credentials.get(preferredCredentialId);
             if (preferred != null && preferred.getSiteProfileId() != null) {
-                UpstreamSiteProfileEntity siteProfile = upstreamSiteProfileRepository.findById(preferred.getSiteProfileId()).orElse(null);
+                UpstreamSiteProfileEntity siteProfile = resolveSiteProfile(preferred.getSiteProfileId()).orElse(null);
                 SiteCapabilitySnapshotEntity snapshot = siteCapabilitySnapshotRepository.findBySiteProfile_Id(preferred.getSiteProfileId())
                         .orElse(null);
                 if (siteProfile != null && siteCapabilityTruthService.supportsFeature(siteProfile, snapshot, feature)) {
-                    return new UpstreamTarget(preferred, siteProfile, buildClient(preferred, siteProfile, basePath(feature)));
+                    return buildUpstreamTarget(preferred, siteProfile, basePath(feature));
                 }
             }
         }
@@ -482,13 +845,13 @@ public class GatewayAsyncResourceService {
             if (credential == null || credential.getSiteProfileId() == null) {
                 continue;
             }
-            UpstreamSiteProfileEntity siteProfile = upstreamSiteProfileRepository.findById(credential.getSiteProfileId()).orElse(null);
+            UpstreamSiteProfileEntity siteProfile = resolveSiteProfile(credential.getSiteProfileId()).orElse(null);
             SiteCapabilitySnapshotEntity snapshot = siteCapabilitySnapshotRepository.findBySiteProfile_Id(credential.getSiteProfileId())
                     .orElse(null);
             if (siteProfile == null || !siteCapabilityTruthService.supportsFeature(siteProfile, snapshot, feature)) {
                 continue;
             }
-            return new UpstreamTarget(credential, siteProfile, buildClient(credential, siteProfile, basePath(feature)));
+            return buildUpstreamTarget(credential, siteProfile, basePath(feature));
         }
         throw new IllegalArgumentException("当前 DistributedKey 没有可用的异步资源上游编排站点。");
     }
@@ -500,16 +863,37 @@ public class GatewayAsyncResourceService {
         }
         UpstreamCredentialEntity credential = upstreamCredentialRepository.findById(credentialId)
                 .orElseThrow(() -> new IllegalArgumentException("未找到异步资源绑定的上游凭证。"));
-        UpstreamSiteProfileEntity siteProfile = upstreamSiteProfileRepository.findById(credential.getSiteProfileId())
+        Long siteProfileId = metadata.has("site_profile_id") && !metadata.path("site_profile_id").isNull()
+                ? metadata.path("site_profile_id").asLong()
+                : credential.getSiteProfileId();
+        UpstreamSiteProfileEntity siteProfile = resolveSiteProfile(siteProfileId)
                 .orElseThrow(() -> new IllegalArgumentException("未找到异步资源绑定的站点档案。"));
-        return new UpstreamTarget(credential, siteProfile, buildClient(credential, siteProfile, basePath(featureFor(entity.getResourceType()))));
+        return buildUpstreamTarget(credential, siteProfile, basePath(featureFor(entity.getResourceType())));
+    }
+
+    private Optional<UpstreamSiteProfileEntity> resolveSiteProfile(Long siteProfileId) {
+        if (siteProfileId == null) {
+            return Optional.empty();
+        }
+        return upstreamSiteProfileRepository.findById(siteProfileId);
+    }
+
+    private UpstreamTarget buildUpstreamTarget(
+            UpstreamCredentialEntity credential,
+            UpstreamSiteProfileEntity siteProfile,
+            String requestPath) {
+        ResolvedCredentialMaterial credentialMaterial = credentialMaterialResolver.resolveStored(credential);
+        SiteClient request = siteProfile.getSiteKind() == UpstreamSiteKind.GEMINI_DIRECT
+                ? null
+                : buildClient(credential, siteProfile, requestPath, credentialMaterial);
+        return new UpstreamTarget(credential, siteProfile, credentialMaterial, request);
     }
 
     private SiteClient buildClient(
             UpstreamCredentialEntity credential,
             UpstreamSiteProfileEntity siteProfile,
-            String requestPath) {
-        ResolvedCredentialMaterial credentialMaterial = credentialMaterialResolver.resolveStored(credential);
+            String requestPath,
+            ResolvedCredentialMaterial credentialMaterial) {
         WebClient.Builder builder = webClientBuilder.clone().baseUrl(credential.getBaseUrl().replaceAll("/+$", ""));
         String path = resolvePath(credential.getBaseUrl(), requestPath);
         if (siteProfile.getAuthStrategy() == AuthStrategy.BEARER) {
@@ -525,6 +909,14 @@ public class GatewayAsyncResourceService {
             throw new IllegalArgumentException("当前站点路径策略不支持异步资源编排。");
         }
         return new SiteClient(builder.build(), path);
+    }
+
+    private Client createGeminiClient(UpstreamTarget target) {
+        return geminiChatModelFactory.createClient(
+                target.siteProfile().getSiteKind(),
+                target.credential().getBaseUrl(),
+                target.credentialMaterial()
+        );
     }
 
     private JsonNode invokeUpstreamJson(UpstreamTarget target, String path, JsonNode payload) {
@@ -589,26 +981,52 @@ public class GatewayAsyncResourceService {
                 .bodyToMono(JsonNode.class);
     }
 
-    private ObjectNode rewriteFileRefs(ObjectNode payload, Long distributedKeyId) {
+    private ObjectNode rewriteFileRefs(ObjectNode payload, Long distributedKeyId, UpstreamTarget target) {
         if (payload.hasNonNull("input_file_id")) {
-            payload.put("input_file_id", resolveExternalFileId(payload.path("input_file_id").asText(), distributedKeyId));
+            payload.put("input_file_id", resolveExternalFileId(payload.path("input_file_id").asText(), distributedKeyId, target));
         }
         if (payload.hasNonNull("training_file")) {
-            payload.put("training_file", resolveExternalFileId(payload.path("training_file").asText(), distributedKeyId));
+            payload.put("training_file", resolveExternalFileId(payload.path("training_file").asText(), distributedKeyId, target));
+        }
+        if (payload.hasNonNull("validation_file")) {
+            payload.put("validation_file", resolveExternalFileId(payload.path("validation_file").asText(), distributedKeyId, target));
         }
         return payload;
     }
 
-    private String resolveExternalFileId(String fileKey, Long distributedKeyId) {
+    private String resolveExternalFileId(String fileKey, Long distributedKeyId, UpstreamTarget target) {
         GatewayFileEntity file = gatewayFileRepository.findByFileKeyAndDeletedFalse(fileKey)
                 .orElseThrow(() -> new IllegalArgumentException("未找到指定的网关文件对象。"));
         if (!file.getDistributedKeyId().equals(distributedKeyId)) {
             throw new IllegalArgumentException("文件对象不属于当前 DistributedKey。");
         }
-        return gatewayFileBindingRepository.findAllByGatewayFileIdOrderByCreatedAtDesc(file.getId()).stream()
+        return resolveBindingForTarget(file.getId(), target).stream()
                 .findFirst()
                 .map(GatewayFileBindingEntity::getExternalFileId)
                 .orElseThrow(() -> new IllegalArgumentException("文件对象尚未完成 upstream binding。"));
+    }
+
+    private List<GatewayFileBindingEntity> resolveBindingForTarget(Long gatewayFileId, UpstreamTarget target) {
+        if (target == null) {
+            return gatewayFileBindingRepository.findAllByGatewayFileIdOrderByCreatedAtDesc(gatewayFileId);
+        }
+        if (target.credential().getId() != null) {
+            List<GatewayFileBindingEntity> byCredential = gatewayFileBindingRepository
+                    .findAllByGatewayFileIdAndCredentialIdOrderByCreatedAtDesc(gatewayFileId, target.credential().getId());
+            if (!byCredential.isEmpty()) {
+                return byCredential;
+            }
+        }
+        if (target.siteProfile().getId() != null) {
+            List<GatewayFileBindingEntity> bySiteProfile = gatewayFileBindingRepository
+                    .findAllByGatewayFileIdAndSiteProfileIdOrderByCreatedAtDesc(gatewayFileId, target.siteProfile().getId());
+            if (!bySiteProfile.isEmpty()) {
+                return bySiteProfile;
+            }
+        }
+        return gatewayFileBindingRepository.findAllByGatewayFileIdOrderByCreatedAtDesc(gatewayFileId).stream()
+                .filter(binding -> binding.getProviderType() == target.credential().getProviderType())
+                .toList();
     }
 
     private GatewayFileContent getGatewayFileContent(String fileKey, Long distributedKeyId) {
@@ -661,6 +1079,28 @@ public class GatewayAsyncResourceService {
                 .put("status", status)
                 .put("at", now().getEpochSecond());
         return metadata;
+    }
+
+    private String text(JsonNode node, String fieldName) {
+        if (node == null || node.isMissingNode()) {
+            return null;
+        }
+        JsonNode value = node.path(fieldName);
+        if (value.isMissingNode() || value.isNull()) {
+            return null;
+        }
+        String text = value.asText(null);
+        return text == null || text.isBlank() ? null : text;
+    }
+
+    private String firstText(JsonNode node, String... fieldNames) {
+        for (String fieldName : fieldNames) {
+            String value = text(node, fieldName);
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
     }
 
     private JsonNode readJson(String json) {
@@ -737,13 +1177,20 @@ public class GatewayAsyncResourceService {
     private record UpstreamTarget(
             UpstreamCredentialEntity credential,
             UpstreamSiteProfileEntity siteProfile,
+            ResolvedCredentialMaterial credentialMaterial,
             SiteClient siteClient
     ) {
         private WebClient client() {
+            if (siteClient == null) {
+                throw new IllegalStateException("当前 UpstreamTarget 不支持 WebClient 调用。");
+            }
             return siteClient.client();
         }
 
         private String path() {
+            if (siteClient == null) {
+                throw new IllegalStateException("当前 UpstreamTarget 不支持路径解析。");
+            }
             return siteClient.path();
         }
     }

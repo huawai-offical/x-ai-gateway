@@ -14,6 +14,7 @@ import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature;
 import com.prodigalgal.xaigateway.gateway.core.interop.SiteCapabilityTruthService;
+import com.prodigalgal.xaigateway.gateway.core.interop.SupportStatus;
 import com.prodigalgal.xaigateway.gateway.core.interop.SurfaceCompatibilityReport;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
@@ -443,6 +444,13 @@ public class ProviderSiteAdminService {
                 surfaceReport.executionCapabilityLevel(),
                 renderLevel
         );
+        SupportStatus supportStatus = surfaceSupportStatus(
+                entity.getSiteKind(),
+                resourceType,
+                backendDecision,
+                overallCapabilityLevel,
+                surfaceReport.blockedReasons()
+        );
         return new SurfaceCapabilityView(
                 resourceType,
                 operation,
@@ -450,12 +458,8 @@ public class ProviderSiteAdminService {
                 requestPath,
                 backendDecision.preferredBackend(),
                 backendDecision.supportedBackends(),
-                com.prodigalgal.xaigateway.gateway.core.interop.SupportStatus.resolve(
-                        backendDecision.preferredBackend(),
-                        overallCapabilityLevel,
-                        surfaceReport.blockedReasons()
-                ),
-                com.prodigalgal.xaigateway.gateway.core.interop.SupportStatus.normalizeDegradationLevel(
+                supportStatus,
+                SupportStatus.normalizeDegradationLevel(
                         overallCapabilityLevel,
                         surfaceReport.blockedReasons()
                 ),
@@ -472,6 +476,28 @@ public class ProviderSiteAdminService {
                                 (left, right) -> left,
                                 java.util.LinkedHashMap::new
                         ))
+        );
+    }
+
+    private SupportStatus surfaceSupportStatus(
+            com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind siteKind,
+            TranslationResourceType resourceType,
+            ExecutionBackendDecision backendDecision,
+            InteropCapabilityLevel overallCapabilityLevel,
+            List<String> blockerReasons) {
+        if (siteKind == com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind.GEMINI_DIRECT
+                && backendDecision != null
+                && backendDecision.preferredBackend() == com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend.ORCHESTRATION
+                && overallCapabilityLevel == InteropCapabilityLevel.NATIVE
+                && (resourceType == TranslationResourceType.FILE
+                || resourceType == TranslationResourceType.BATCH
+                || resourceType == TranslationResourceType.TUNING)) {
+            return SupportStatus.NATIVE;
+        }
+        return SupportStatus.resolve(
+                backendDecision == null ? null : backendDecision.preferredBackend(),
+                overallCapabilityLevel,
+                blockerReasons
         );
     }
 

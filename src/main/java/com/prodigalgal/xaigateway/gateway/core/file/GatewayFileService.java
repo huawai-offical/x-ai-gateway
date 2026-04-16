@@ -1,17 +1,25 @@
 package com.prodigalgal.xaigateway.gateway.core.file;
 
+import com.google.genai.Client;
+import com.google.genai.types.DeleteFileConfig;
+import com.google.genai.types.DownloadFileConfig;
+import com.google.genai.types.FileState;
+import com.google.genai.types.GetFileConfig;
+import com.google.genai.types.UploadFileConfig;
+import io.micrometer.observation.ObservationRegistry;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.admin.application.CredentialCryptoService;
-import com.prodigalgal.xaigateway.gateway.core.credential.CredentialMaterialResolver;
-import com.prodigalgal.xaigateway.gateway.core.credential.ResolvedCredentialMaterial;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedCredentialBindingView;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyQueryService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyView;
+import com.prodigalgal.xaigateway.gateway.core.credential.CredentialMaterialResolver;
+import com.prodigalgal.xaigateway.gateway.core.credential.ResolvedCredentialMaterial;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature;
 import com.prodigalgal.xaigateway.gateway.core.interop.SiteCapabilityTruthService;
 import com.prodigalgal.xaigateway.gateway.core.shared.AuthStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.PathStrategy;
+import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
 import com.prodigalgal.xaigateway.infra.config.GatewayProperties;
 import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayFileBindingEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayFileEntity;
@@ -23,6 +31,7 @@ import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayFileReposi
 import com.prodigalgal.xaigateway.infra.persistence.repository.SiteCapabilitySnapshotRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamSiteProfileRepository;
+import com.prodigalgal.xaigateway.provider.adapter.gemini.GeminiChatModelFactory;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -64,6 +73,7 @@ public class GatewayFileService {
     private final SiteCapabilityTruthService siteCapabilityTruthService;
     private final CredentialCryptoService credentialCryptoService;
     private final CredentialMaterialResolver credentialMaterialResolver;
+    private final GeminiChatModelFactory geminiChatModelFactory;
     private final GatewayProperties gatewayProperties;
     private final WebClient.Builder webClientBuilder;
     private final ObjectMapper objectMapper;
@@ -79,6 +89,7 @@ public class GatewayFileService {
             SiteCapabilityTruthService siteCapabilityTruthService,
             CredentialCryptoService credentialCryptoService,
             CredentialMaterialResolver credentialMaterialResolver,
+            GeminiChatModelFactory geminiChatModelFactory,
             GatewayProperties gatewayProperties,
             WebClient.Builder webClientBuilder,
             ObjectMapper objectMapper) {
@@ -91,6 +102,7 @@ public class GatewayFileService {
         this.siteCapabilityTruthService = siteCapabilityTruthService;
         this.credentialCryptoService = credentialCryptoService;
         this.credentialMaterialResolver = credentialMaterialResolver;
+        this.geminiChatModelFactory = geminiChatModelFactory;
         this.gatewayProperties = gatewayProperties;
         this.webClientBuilder = webClientBuilder;
         this.objectMapper = objectMapper;
@@ -123,6 +135,7 @@ public class GatewayFileService {
                         null,
                         null
                 ), credentialCryptoService, objectMapper),
+                new GeminiChatModelFactory(ObservationRegistry.NOOP),
                 gatewayProperties,
                 webClientBuilder,
                 objectMapper
@@ -134,13 +147,8 @@ public class GatewayFileService {
     }
 
     public Mono<GatewayFileResponse> createFile(Long distributedKeyId, FilePart filePart, String purpose, Long preferredCredentialId) {
-        UpstreamFileTarget upstreamTarget = resolveUpstreamFileTarget(distributedKeyId)
+        UpstreamFileTarget upstreamTarget = resolveUpstreamFileTarget(distributedKeyId, preferredCredentialId)
                 .orElseThrow(() -> new IllegalArgumentException("当前 DistributedKey 没有可用的 files 上游编排站点。"));
-        if (preferredCredentialId != null) {
-            upstreamTarget = resolveUpstreamFileTarget(distributedKeyId, preferredCredentialId)
-                    .orElse(upstreamTarget);
-        }
-        UpstreamFileTarget selectedUpstreamTarget = upstreamTarget;
         String fileKey = "file-" + UUID.randomUUID().toString().replace("-", "");
         Path directory = ensureStorageDirectory();
         Path storagePath = directory.resolve(fileKey + "-" + sanitizeFilename(filePart.filename()));
@@ -155,7 +163,7 @@ public class GatewayFileService {
                             filePart.headers().getContentType() == null ? "application/octet-stream" : filePart.headers().getContentType().toString(),
                             purpose
                     );
-                    synchronizeUpstreamFile(file, selectedUpstreamTarget);
+                    synchronizeUpstreamFile(file, upstreamTarget);
                     return toResponse(file);
                 }));
     }
@@ -165,12 +173,8 @@ public class GatewayFileService {
     }
 
     public GatewayFileResponse createFileFromExisting(Long distributedKeyId, String sourceFileKey, String purpose, Long preferredCredentialId) {
-        UpstreamFileTarget upstreamTarget = resolveUpstreamFileTarget(distributedKeyId)
+        UpstreamFileTarget upstreamTarget = resolveUpstreamFileTarget(distributedKeyId, preferredCredentialId)
                 .orElseThrow(() -> new IllegalArgumentException("当前 DistributedKey 没有可用的 files 上游编排站点。"));
-        if (preferredCredentialId != null) {
-            upstreamTarget = resolveUpstreamFileTarget(distributedKeyId, preferredCredentialId)
-                    .orElse(upstreamTarget);
-        }
         GatewayFileEntity source = getRequired(sourceFileKey, distributedKeyId);
         String fileKey = "file-" + UUID.randomUUID().toString().replace("-", "");
         Path directory = ensureStorageDirectory();
@@ -201,21 +205,17 @@ public class GatewayFileService {
                 .toList();
     }
 
-    @Transactional(readOnly = true)
     public GatewayFileResponse getFile(String fileKey, Long distributedKeyId) {
         GatewayFileEntity entity = getRequired(fileKey, distributedKeyId);
+        latestBinding(entity.getId()).ifPresent(binding -> refreshUpstreamFile(entity, binding));
         return toResponse(entity);
     }
 
-    @Transactional(readOnly = true)
     public GatewayFileContent getFileContent(String fileKey, Long distributedKeyId) {
         GatewayFileEntity entity = getRequired(fileKey, distributedKeyId);
-        try {
-            byte[] bytes = Files.readAllBytes(Path.of(entity.getStoragePath()));
-            return new GatewayFileContent(toResponse(entity), bytes, entity.getMimeType());
-        } catch (IOException exception) {
-            throw new IllegalStateException("无法读取文件内容。", exception);
-        }
+        return latestBinding(entity.getId())
+                .map(binding -> readUpstreamFileContent(entity, binding))
+                .orElseGet(() -> readLocalFileContent(entity));
     }
 
     @Transactional(readOnly = true)
@@ -231,9 +231,7 @@ public class GatewayFileService {
 
     public void deleteFile(String fileKey, Long distributedKeyId) {
         GatewayFileEntity entity = getRequired(fileKey, distributedKeyId);
-        gatewayFileBindingRepository.findAllByGatewayFileIdOrderByCreatedAtDesc(entity.getId()).stream()
-                .findFirst()
-                .ifPresent(binding -> deleteUpstreamFile(binding));
+        latestBinding(entity.getId()).ifPresent(this::deleteUpstreamFile);
         entity.setDeleted(true);
         entity.setStatus("deleted");
         gatewayFileRepository.save(entity);
@@ -245,6 +243,14 @@ public class GatewayFileService {
     }
 
     private void synchronizeUpstreamFile(GatewayFileEntity file, UpstreamFileTarget upstreamTarget) {
+        if (upstreamTarget.siteProfile().getSiteKind() == UpstreamSiteKind.GEMINI_DIRECT) {
+            synchronizeGeminiFile(file, upstreamTarget);
+            return;
+        }
+        synchronizeOpenAiStyleFile(file, upstreamTarget);
+    }
+
+    private void synchronizeOpenAiStyleFile(GatewayFileEntity file, UpstreamFileTarget upstreamTarget) {
         try {
             byte[] bytes = Files.readAllBytes(Path.of(file.getStoragePath()));
             MultiValueMap<String, HttpEntity<?>> body = new LinkedMultiValueMap<>();
@@ -277,6 +283,7 @@ public class GatewayFileService {
             binding.setGatewayFileId(file.getId());
             binding.setProviderType(upstreamTarget.credential().getProviderType());
             binding.setCredentialId(upstreamTarget.credential().getId());
+            binding.setSiteProfileId(upstreamTarget.siteProfile().getId());
             binding.setExternalFileId(upstreamResponse.path("id").asText());
             binding.setExternalFilename(upstreamResponse.path("filename").asText(file.getFilename()));
             binding.setStatus("SYNCED");
@@ -293,25 +300,177 @@ public class GatewayFileService {
         }
     }
 
-    private void deleteUpstreamFile(GatewayFileBindingEntity binding) {
-        UpstreamCredentialEntity credential = upstreamCredentialRepository.findById(binding.getCredentialId())
-                .orElse(null);
-        if (credential == null || credential.isDeleted() || !credential.isActive()) {
+    private void synchronizeGeminiFile(GatewayFileEntity file, UpstreamFileTarget upstreamTarget) {
+        try {
+            byte[] bytes = Files.readAllBytes(Path.of(file.getStoragePath()));
+            UploadFileConfig config = UploadFileConfig.builder()
+                    .mimeType(file.getMimeType())
+                    .displayName(file.getFilename())
+                    .build();
+            try (Client client = geminiChatModelFactory.createClient(
+                    upstreamTarget.siteProfile().getSiteKind(),
+                    upstreamTarget.credential().getBaseUrl(),
+                    upstreamTarget.credentialMaterial()
+            )) {
+                com.google.genai.types.File upstreamFile = client.files.upload(bytes, config);
+                saveGeminiBinding(file, upstreamTarget, upstreamFile);
+                refreshGeminiFileEntity(file, upstreamFile);
+            }
+        } catch (IOException exception) {
+            throw new IllegalStateException("读取本地文件失败。", exception);
+        }
+    }
+
+    private void saveGeminiBinding(
+            GatewayFileEntity file,
+            UpstreamFileTarget upstreamTarget,
+            com.google.genai.types.File upstreamFile) {
+        String externalFileId = upstreamFile.name()
+                .orElseThrow(() -> new IllegalStateException("Gemini files.upload 响应缺少 name。"));
+        GatewayFileBindingEntity binding = new GatewayFileBindingEntity();
+        binding.setGatewayFileId(file.getId());
+        binding.setProviderType(upstreamTarget.credential().getProviderType());
+        binding.setCredentialId(upstreamTarget.credential().getId());
+        binding.setSiteProfileId(upstreamTarget.siteProfile().getId());
+        binding.setExternalFileId(externalFileId);
+        binding.setExternalFilename(upstreamFile.displayName().orElse(file.getFilename()));
+        binding.setStatus(geminiBindingStatus(upstreamFile));
+        binding.setLastSyncedAt(Instant.now());
+        gatewayFileBindingRepository.save(binding);
+    }
+
+    private void refreshUpstreamFile(GatewayFileEntity entity, GatewayFileBindingEntity binding) {
+        BindingContext bindingContext = resolveBindingContext(binding).orElse(null);
+        if (bindingContext == null || bindingContext.siteProfile().getSiteKind() != UpstreamSiteKind.GEMINI_DIRECT) {
             return;
         }
-        UpstreamSiteProfileEntity siteProfile = resolveSiteProfile(credential.getSiteProfileId()).orElse(null);
-        if (siteProfile == null) {
+        try (Client client = geminiChatModelFactory.createClient(
+                bindingContext.siteProfile().getSiteKind(),
+                bindingContext.credential().getBaseUrl(),
+                bindingContext.credentialMaterial()
+        )) {
+            com.google.genai.types.File upstreamFile = client.files.get(
+                    binding.getExternalFileId(),
+                    GetFileConfig.builder().build()
+            );
+            refreshGeminiFileEntity(entity, upstreamFile);
+            binding.setExternalFilename(upstreamFile.displayName().orElse(binding.getExternalFilename()));
+            binding.setStatus(geminiBindingStatus(upstreamFile));
+            binding.setLastSyncedAt(Instant.now());
+            gatewayFileBindingRepository.save(binding);
+        } catch (RuntimeException ignored) {
+            // 刷新失败时保留本地结果，避免 metadata 查询阻塞读取。
+        }
+    }
+
+    private GatewayFileContent readUpstreamFileContent(GatewayFileEntity entity, GatewayFileBindingEntity binding) {
+        BindingContext bindingContext = resolveBindingContext(binding).orElse(null);
+        if (bindingContext == null || bindingContext.siteProfile().getSiteKind() != UpstreamSiteKind.GEMINI_DIRECT) {
+            return readLocalFileContent(entity);
+        }
+        Path tempFile = null;
+        try (Client client = geminiChatModelFactory.createClient(
+                bindingContext.siteProfile().getSiteKind(),
+                bindingContext.credential().getBaseUrl(),
+                bindingContext.credentialMaterial()
+        )) {
+            com.google.genai.types.File upstreamFile = client.files.get(
+                    binding.getExternalFileId(),
+                    GetFileConfig.builder().build()
+            );
+            refreshGeminiFileEntity(entity, upstreamFile);
+            tempFile = Files.createTempFile(ensureStorageDirectory(), "gemini-file-", ".bin");
+            client.files.download(
+                    binding.getExternalFileId(),
+                    tempFile.toString(),
+                    DownloadFileConfig.builder().build()
+            );
+            byte[] bytes = Files.readAllBytes(tempFile);
+            String mimeType = upstreamFile.mimeType().orElse(entity.getMimeType());
+            return new GatewayFileContent(
+                    toResponse(entity),
+                    bytes,
+                    mimeType == null || mimeType.isBlank() ? MediaType.APPLICATION_OCTET_STREAM_VALUE : mimeType
+            );
+        } catch (IOException | RuntimeException exception) {
+            return readLocalFileContent(entity);
+        } finally {
+            if (tempFile != null) {
+                try {
+                    Files.deleteIfExists(tempFile);
+                } catch (IOException ignored) {
+                }
+            }
+        }
+    }
+
+    private GatewayFileContent readLocalFileContent(GatewayFileEntity entity) {
+        try {
+            byte[] bytes = Files.readAllBytes(Path.of(entity.getStoragePath()));
+            return new GatewayFileContent(toResponse(entity), bytes, entity.getMimeType());
+        } catch (IOException exception) {
+            throw new IllegalStateException("无法读取文件内容。", exception);
+        }
+    }
+
+    private void deleteUpstreamFile(GatewayFileBindingEntity binding) {
+        BindingContext bindingContext = resolveBindingContext(binding).orElse(null);
+        if (bindingContext == null) {
             return;
         }
         try {
-            SiteClientRequest request = buildSiteClient(credential, siteProfile, "/v1/files/" + binding.getExternalFileId());
-            request.client().delete().uri(request.path()).retrieve().toBodilessEntity().block();
+            if (bindingContext.siteProfile().getSiteKind() == UpstreamSiteKind.GEMINI_DIRECT) {
+                try (Client client = geminiChatModelFactory.createClient(
+                        bindingContext.siteProfile().getSiteKind(),
+                        bindingContext.credential().getBaseUrl(),
+                        bindingContext.credentialMaterial()
+                )) {
+                    client.files.delete(binding.getExternalFileId(), DeleteFileConfig.builder().build());
+                }
+            } else {
+                SiteClientRequest request = buildSiteClient(bindingContext.credential(), bindingContext.siteProfile(), "/v1/files/" + binding.getExternalFileId());
+                request.client().delete().uri(request.path()).retrieve().toBodilessEntity().block();
+            }
             binding.setStatus("DELETED");
             binding.setLastSyncedAt(Instant.now());
             gatewayFileBindingRepository.save(binding);
         } catch (RuntimeException ignored) {
             // 删除失败时保留本地删除结果，避免让清理过程阻塞用户请求。
         }
+    }
+
+    private void refreshGeminiFileEntity(GatewayFileEntity entity, com.google.genai.types.File upstreamFile) {
+        entity.setFilename(upstreamFile.displayName().orElse(entity.getFilename()));
+        entity.setMimeType(upstreamFile.mimeType().orElse(entity.getMimeType()));
+        entity.setStatus(geminiFileStatus(upstreamFile));
+        entity.setSizeBytes(upstreamFile.sizeBytes().orElse(entity.getSizeBytes()));
+        gatewayFileRepository.save(entity);
+    }
+
+    private String geminiFileStatus(com.google.genai.types.File upstreamFile) {
+        FileState.Known state = upstreamFile.state().map(FileState::knownEnum).orElse(null);
+        if (state == null) {
+            return "uploaded";
+        }
+        return switch (state) {
+            case ACTIVE -> "processed";
+            case PROCESSING -> "processing";
+            case FAILED -> "failed";
+            case STATE_UNSPECIFIED, FILE_STATE_UNSPECIFIED -> "uploaded";
+        };
+    }
+
+    private String geminiBindingStatus(com.google.genai.types.File upstreamFile) {
+        FileState.Known state = upstreamFile.state().map(FileState::knownEnum).orElse(null);
+        if (state == null) {
+            return "SYNCED";
+        }
+        return switch (state) {
+            case ACTIVE -> "ACTIVE";
+            case PROCESSING -> "PROCESSING";
+            case FAILED -> "FAILED";
+            case STATE_UNSPECIFIED, FILE_STATE_UNSPECIFIED -> "SYNCED";
+        };
     }
 
     private Optional<UpstreamFileTarget> resolveUpstreamFileTarget(Long distributedKeyId) {
@@ -336,7 +495,7 @@ public class GatewayFileService {
                 SiteCapabilitySnapshotEntity snapshot = siteCapabilitySnapshotRepository.findBySiteProfile_Id(preferred.getSiteProfileId())
                         .orElse(null);
                 if (siteProfile != null && siteCapabilityTruthService.supportsFeature(siteProfile, snapshot, InteropFeature.FILE_OBJECT)) {
-                    return Optional.of(new UpstreamFileTarget(preferred, siteProfile, buildSiteClient(preferred, siteProfile, "/v1/files")));
+                    return Optional.of(buildUpstreamFileTarget(preferred, siteProfile));
                 }
             }
         }
@@ -352,7 +511,7 @@ public class GatewayFileService {
             if (siteProfile == null || !siteCapabilityTruthService.supportsFeature(siteProfile, snapshot, InteropFeature.FILE_OBJECT)) {
                 continue;
             }
-            return Optional.of(new UpstreamFileTarget(credential, siteProfile, buildSiteClient(credential, siteProfile, "/v1/files")));
+            return Optional.of(buildUpstreamFileTarget(credential, siteProfile));
         }
         return Optional.empty();
     }
@@ -362,6 +521,16 @@ public class GatewayFileService {
             return Optional.empty();
         }
         return upstreamSiteProfileRepository.findById(siteProfileId);
+    }
+
+    private UpstreamFileTarget buildUpstreamFileTarget(
+            UpstreamCredentialEntity credential,
+            UpstreamSiteProfileEntity siteProfile) {
+        ResolvedCredentialMaterial credentialMaterial = credentialMaterialResolver.resolveStored(credential);
+        SiteClientRequest request = siteProfile.getSiteKind() == UpstreamSiteKind.GEMINI_DIRECT
+                ? null
+                : buildSiteClient(credential, siteProfile, "/v1/files");
+        return new UpstreamFileTarget(credential, siteProfile, credentialMaterial, request);
     }
 
     private SiteClientRequest buildSiteClient(
@@ -384,6 +553,26 @@ public class GatewayFileService {
             throw new IllegalArgumentException("当前站点路径策略不支持 files 编排。");
         }
         return new SiteClientRequest(builder.build(), path);
+    }
+
+    private Optional<BindingContext> resolveBindingContext(GatewayFileBindingEntity binding) {
+        UpstreamCredentialEntity credential = upstreamCredentialRepository.findById(binding.getCredentialId())
+                .orElse(null);
+        if (credential == null || credential.isDeleted() || !credential.isActive()) {
+            return Optional.empty();
+        }
+        Long siteProfileId = binding.getSiteProfileId() != null ? binding.getSiteProfileId() : credential.getSiteProfileId();
+        UpstreamSiteProfileEntity siteProfile = resolveSiteProfile(siteProfileId).orElse(null);
+        if (siteProfile == null) {
+            return Optional.empty();
+        }
+        ResolvedCredentialMaterial credentialMaterial = credentialMaterialResolver.resolveStored(credential);
+        return Optional.of(new BindingContext(credential, siteProfile, credentialMaterial));
+    }
+
+    private Optional<GatewayFileBindingEntity> latestBinding(Long gatewayFileId) {
+        return gatewayFileBindingRepository.findAllByGatewayFileIdOrderByCreatedAtDesc(gatewayFileId).stream()
+                .findFirst();
     }
 
     private GatewayFileEntity persistFile(
@@ -478,14 +667,28 @@ public class GatewayFileService {
     private record UpstreamFileTarget(
             UpstreamCredentialEntity credential,
             UpstreamSiteProfileEntity siteProfile,
+            ResolvedCredentialMaterial credentialMaterial,
             SiteClientRequest request
     ) {
         private WebClient client() {
+            if (request == null) {
+                throw new IllegalStateException("当前 UpstreamFileTarget 不支持 WebClient 调用。");
+            }
             return request.client();
         }
 
         private String path() {
+            if (request == null) {
+                throw new IllegalStateException("当前 UpstreamFileTarget 不支持路径解析。");
+            }
             return request.path();
         }
+    }
+
+    private record BindingContext(
+            UpstreamCredentialEntity credential,
+            UpstreamSiteProfileEntity siteProfile,
+            ResolvedCredentialMaterial credentialMaterial
+    ) {
     }
 }

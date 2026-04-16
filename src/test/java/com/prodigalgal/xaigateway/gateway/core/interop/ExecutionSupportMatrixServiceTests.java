@@ -164,7 +164,7 @@ class ExecutionSupportMatrixServiceTests {
                 service.implementedLevel(geminiCandidate(UpstreamSiteKind.GEMINI_DIRECT), moderationSemantics, InteropFeature.MODERATION)
         );
         assertEquals(
-                InteropCapabilityLevel.UNSUPPORTED,
+                InteropCapabilityLevel.NATIVE,
                 service.implementedLevel(geminiCandidate(UpstreamSiteKind.GEMINI_DIRECT), fileSemantics, InteropFeature.FILE_OBJECT)
         );
         assertEquals(
@@ -172,11 +172,11 @@ class ExecutionSupportMatrixServiceTests {
                 service.implementedLevel(geminiCandidate(UpstreamSiteKind.GEMINI_DIRECT), uploadSemantics, InteropFeature.UPLOAD_CREATE)
         );
         assertEquals(
-                InteropCapabilityLevel.UNSUPPORTED,
+                InteropCapabilityLevel.NATIVE,
                 service.implementedLevel(geminiCandidate(UpstreamSiteKind.GEMINI_DIRECT), batchSemantics, InteropFeature.BATCH_CREATE)
         );
         assertEquals(
-                InteropCapabilityLevel.UNSUPPORTED,
+                InteropCapabilityLevel.NATIVE,
                 service.implementedLevel(geminiCandidate(UpstreamSiteKind.GEMINI_DIRECT), tuningSemantics, InteropFeature.TUNING_CREATE)
         );
         assertEquals(

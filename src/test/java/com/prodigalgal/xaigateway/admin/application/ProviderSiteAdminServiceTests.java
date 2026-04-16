@@ -118,7 +118,7 @@ class ProviderSiteAdminServiceTests {
     }
 
     @Test
-    void shouldExposeGeminiSurfaceTruthSeparatelyFromFeatureTruth() {
+    void shouldExposeGeminiNativeWrappedSurfaceTruthSeparatelyFromBackend() {
         UpstreamSiteProfileRepository profileRepository = Mockito.mock(UpstreamSiteProfileRepository.class);
         SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
         SiteModelCapabilityRepository modelCapabilityRepository = Mockito.mock(SiteModelCapabilityRepository.class);
@@ -151,15 +151,18 @@ class ProviderSiteAdminServiceTests {
 
         ProviderSiteResponse response = service.get(1L);
 
-        assertEquals("blocked", response.features().get("file_object").supportStatus());
-        assertEquals(SupportStatus.ORCHESTRATION, response.surfaces().get("file_create").supportStatus());
+        assertEquals("native", response.features().get("file_object").supportStatus());
+        assertEquals(SupportStatus.NATIVE, response.surfaces().get("file_create").supportStatus());
         assertEquals(InteropCapabilityLevel.NATIVE, response.surfaces().get("file_create").degradationLevel());
+        assertEquals(SupportStatus.NATIVE, response.surfaces().get("batch_create").supportStatus());
+        assertEquals(SupportStatus.NATIVE, response.surfaces().get("tuning_create").supportStatus());
         assertEquals("native", response.features().get("audio_transcription").supportStatus());
         assertEquals(SupportStatus.NATIVE, response.surfaces().get("audio_transcription").supportStatus());
         assertEquals(SupportStatus.NATIVE, response.surfaces().get("image_generation").supportStatus());
         assertEquals(SupportStatus.NATIVE, response.surfaces().get("moderation_create").supportStatus());
         assertEquals("blocked", response.features().get("upload_create").supportStatus());
         assertEquals(SupportStatus.ORCHESTRATION, response.surfaces().get("upload_create").supportStatus());
+        assertEquals(SupportStatus.ORCHESTRATION, response.surfaces().get("realtime_client_secret_create").supportStatus());
         assertEquals(SupportStatus.NATIVE, response.surfaces().get("embedding_create").supportStatus());
         assertTrue(response.surfaces().get("file_create").featureResolutions().containsKey("file_object"));
     }
@@ -314,10 +317,10 @@ class ProviderSiteAdminServiceTests {
         snapshot.setSupportsAudio(true);
         snapshot.setSupportsImages(true);
         snapshot.setSupportsModeration(true);
-        snapshot.setSupportsFiles(false);
+        snapshot.setSupportsFiles(site.getSiteKind() == UpstreamSiteKind.GEMINI_DIRECT);
         snapshot.setSupportsUploads(false);
-        snapshot.setSupportsBatches(false);
-        snapshot.setSupportsTuning(false);
+        snapshot.setSupportsBatches(site.getSiteKind() == UpstreamSiteKind.GEMINI_DIRECT);
+        snapshot.setSupportsTuning(site.getSiteKind() == UpstreamSiteKind.GEMINI_DIRECT);
         snapshot.setSupportsRealtime(false);
         snapshot.setRefreshedAt(Instant.parse("2026-04-15T02:00:00Z"));
         return snapshot;

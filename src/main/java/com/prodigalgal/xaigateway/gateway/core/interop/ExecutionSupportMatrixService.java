@@ -61,11 +61,15 @@ public class ExecutionSupportMatrixService {
                     supportsGeminiDirectModeration(siteKind) || supportsOpenAiStyleSite(siteKind)
                             ? InteropCapabilityLevel.NATIVE
                             : InteropCapabilityLevel.UNSUPPORTED;
-            case FILE_OBJECT -> siteKind == UpstreamSiteKind.OPENAI_DIRECT
+            case FILE_OBJECT -> (siteKind == UpstreamSiteKind.OPENAI_DIRECT || siteKind == UpstreamSiteKind.GEMINI_DIRECT)
                     ? InteropCapabilityLevel.NATIVE
                     : InteropCapabilityLevel.UNSUPPORTED;
-            case UPLOAD_CREATE, BATCH_CREATE, TUNING_CREATE, REALTIME_CLIENT_SECRET ->
+            case UPLOAD_CREATE, REALTIME_CLIENT_SECRET ->
                     siteKind == UpstreamSiteKind.OPENAI_DIRECT ? InteropCapabilityLevel.NATIVE : InteropCapabilityLevel.UNSUPPORTED;
+            case BATCH_CREATE, TUNING_CREATE ->
+                    (siteKind == UpstreamSiteKind.OPENAI_DIRECT || siteKind == UpstreamSiteKind.GEMINI_DIRECT)
+                            ? InteropCapabilityLevel.NATIVE
+                            : InteropCapabilityLevel.UNSUPPORTED;
         };
     }
 

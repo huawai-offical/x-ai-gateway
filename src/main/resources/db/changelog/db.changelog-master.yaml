@@ -37,3 +37,5 @@ databaseChangeLog:
       file: db/changelog/changes/db.changelog-0018-canonical-resource-observability.yaml
   - include:
       file: db/changelog/changes/db.changelog-0019-request-log-gateway-resource-key.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0020-gateway-file-binding-site-profile.yaml

@@ -141,15 +141,15 @@ apiRequest.mockImplementation(async (url: string, init?: RequestInit) => {
 
 const sampleSite = {
   id: 1,
-  profileCode: 'site:openai_direct',
-  displayName: 'OPENAI_DIRECT',
-  providerFamily: 'OPENAI',
-  siteKind: 'OPENAI_DIRECT',
-  authStrategy: 'BEARER',
-  pathStrategy: 'OPENAI_V1',
+  profileCode: 'site:gemini_direct',
+  displayName: 'GEMINI_DIRECT',
+  providerFamily: 'GEMINI',
+  siteKind: 'GEMINI_DIRECT',
+  authStrategy: 'API_KEY_QUERY',
+  pathStrategy: 'GEMINI_V1BETA_MODELS',
   modelAddressingStrategy: 'MODEL_NAME',
-  errorSchemaStrategy: 'OPENAI_ERROR',
-  baseUrlPattern: 'https://api.openai.com',
+  errorSchemaStrategy: 'GEMINI_ERROR',
+  baseUrlPattern: 'https://generativelanguage.googleapis.com',
   description: 'sample',
   active: true,
   healthState: 'READY',
@@ -199,11 +199,29 @@ const sampleSite = {
       lossReasons: [],
     },
     file_object: {
-      declaredLevel: 'UNSUPPORTED',
-      implementedLevel: 'UNSUPPORTED',
-      effectiveLevel: 'UNSUPPORTED',
-      supportStatus: 'BLOCKED',
-      degradationLevel: 'UNSUPPORTED',
+      declaredLevel: 'NATIVE',
+      implementedLevel: 'NATIVE',
+      effectiveLevel: 'NATIVE',
+      supportStatus: 'NATIVE',
+      degradationLevel: 'NATIVE',
+      blockedReasons: [],
+      lossReasons: [],
+    },
+    batch_create: {
+      declaredLevel: 'NATIVE',
+      implementedLevel: 'NATIVE',
+      effectiveLevel: 'NATIVE',
+      supportStatus: 'NATIVE',
+      degradationLevel: 'NATIVE',
+      blockedReasons: [],
+      lossReasons: [],
+    },
+    tuning_create: {
+      declaredLevel: 'NATIVE',
+      implementedLevel: 'NATIVE',
+      effectiveLevel: 'NATIVE',
+      supportStatus: 'NATIVE',
+      degradationLevel: 'NATIVE',
       blockedReasons: [],
       lossReasons: [],
     },
@@ -241,7 +259,7 @@ const sampleSite = {
       normalizedPath: '/v1/files',
       preferredBackend: 'ORCHESTRATION',
       supportedBackends: ['ORCHESTRATION'],
-      supportStatus: 'ORCHESTRATION',
+      supportStatus: 'NATIVE',
       degradationLevel: 'NATIVE',
       executionCapabilityLevel: 'NATIVE',
       renderCapabilityLevel: 'NATIVE',
@@ -251,12 +269,93 @@ const sampleSite = {
       requiredFeatures: ['file_object'],
       featureResolutions: {
         file_object: {
+          declaredLevel: 'NATIVE',
+          implementedLevel: 'NATIVE',
+          effectiveLevel: 'NATIVE',
+          supportStatus: 'NATIVE',
+          degradationLevel: 'NATIVE',
+          blockedReasons: [],
+          lossReasons: [],
+        },
+      },
+    },
+    batch_create: {
+      resourceType: 'BATCH',
+      operation: 'BATCH_CREATE',
+      surface: 'openai',
+      normalizedPath: '/v1/batches',
+      preferredBackend: 'ORCHESTRATION',
+      supportedBackends: ['ORCHESTRATION'],
+      supportStatus: 'NATIVE',
+      degradationLevel: 'NATIVE',
+      executionCapabilityLevel: 'NATIVE',
+      renderCapabilityLevel: 'NATIVE',
+      overallCapabilityLevel: 'NATIVE',
+      blockerReasons: [],
+      lossReasons: [],
+      requiredFeatures: ['batch_create'],
+      featureResolutions: {
+        batch_create: {
+          declaredLevel: 'NATIVE',
+          implementedLevel: 'NATIVE',
+          effectiveLevel: 'NATIVE',
+          supportStatus: 'NATIVE',
+          degradationLevel: 'NATIVE',
+          blockedReasons: [],
+          lossReasons: [],
+        },
+      },
+    },
+    tuning_create: {
+      resourceType: 'TUNING',
+      operation: 'TUNING_CREATE',
+      surface: 'openai',
+      normalizedPath: '/v1/fine_tuning/jobs',
+      preferredBackend: 'ORCHESTRATION',
+      supportedBackends: ['ORCHESTRATION'],
+      supportStatus: 'NATIVE',
+      degradationLevel: 'NATIVE',
+      executionCapabilityLevel: 'NATIVE',
+      renderCapabilityLevel: 'NATIVE',
+      overallCapabilityLevel: 'NATIVE',
+      blockerReasons: [],
+      lossReasons: [],
+      requiredFeatures: ['tuning_create'],
+      featureResolutions: {
+        tuning_create: {
+          declaredLevel: 'NATIVE',
+          implementedLevel: 'NATIVE',
+          effectiveLevel: 'NATIVE',
+          supportStatus: 'NATIVE',
+          degradationLevel: 'NATIVE',
+          blockedReasons: [],
+          lossReasons: [],
+        },
+      },
+    },
+    upload_create: {
+      resourceType: 'UPLOAD',
+      operation: 'UPLOAD_CREATE',
+      surface: 'openai',
+      normalizedPath: '/v1/uploads',
+      preferredBackend: 'ORCHESTRATION',
+      supportedBackends: ['ORCHESTRATION'],
+      supportStatus: 'ORCHESTRATION',
+      degradationLevel: 'NATIVE',
+      executionCapabilityLevel: 'NATIVE',
+      renderCapabilityLevel: 'NATIVE',
+      overallCapabilityLevel: 'NATIVE',
+      blockerReasons: [],
+      lossReasons: [],
+      requiredFeatures: ['upload_create'],
+      featureResolutions: {
+        upload_create: {
           declaredLevel: 'UNSUPPORTED',
           implementedLevel: 'UNSUPPORTED',
           effectiveLevel: 'UNSUPPORTED',
           supportStatus: 'BLOCKED',
           degradationLevel: 'UNSUPPORTED',
-          blockedReasons: ['file_object 当前站点声明不支持。'],
+          blockedReasons: ['upload_create 当前站点声明不支持。'],
           lossReasons: [],
         },
       },
@@ -379,17 +478,22 @@ describe('ProviderSiteDetailPage', () => {
     expect(screen.getByText(/blockerReasons: response object fallback/)).toBeInTheDocument()
     expect(screen.getByText('supportStatus: ORCHESTRATION')).toBeInTheDocument()
     expect(screen.getByText('normalizedPath: /v1/files')).toBeInTheDocument()
-    expect(screen.getByText('featureSupport: file_object:BLOCKED')).toBeInTheDocument()
+    expect(screen.getByText('featureSupport: file_object:NATIVE')).toBeInTheDocument()
     expect(screen.getAllByText('supportStatus: NATIVE').length).toBeGreaterThan(0)
+    expect(screen.getByText('normalizedPath: /v1/batches')).toBeInTheDocument()
+    expect(screen.getByText('normalizedPath: /v1/fine_tuning/jobs')).toBeInTheDocument()
+    expect(screen.getByText('normalizedPath: /v1/uploads')).toBeInTheDocument()
     expect(screen.getByText('normalizedPath: /v1/audio/transcriptions')).toBeInTheDocument()
     expect(screen.getByText('normalizedPath: /v1/images/generations')).toBeInTheDocument()
     expect(screen.getByText('normalizedPath: /v1/moderations')).toBeInTheDocument()
     expect(screen.getByText('featureSupport: audio_transcription:NATIVE')).toBeInTheDocument()
     expect(screen.getByText('featureSupport: image_generation:NATIVE')).toBeInTheDocument()
     expect(screen.getByText('featureSupport: moderation:NATIVE')).toBeInTheDocument()
+    expect(screen.getByText('featureSupport: batch_create:NATIVE')).toBeInTheDocument()
+    expect(screen.getByText('featureSupport: tuning_create:NATIVE')).toBeInTheDocument()
 
     fireEvent.change(screen.getByLabelText('displayName'), {
-      target: { value: 'OPENAI_DIRECT_EDITED' },
+      target: { value: 'GEMINI_DIRECT_EDITED' },
     })
     fireEvent.click(screen.getByRole('button', { name: '保存站点档案' }))
 
@@ -398,7 +502,7 @@ describe('ProviderSiteDetailPage', () => {
         '/admin/provider-sites/1',
         expect.objectContaining({
           method: 'PUT',
-          body: expect.stringContaining('OPENAI_DIRECT_EDITED'),
+          body: expect.stringContaining('GEMINI_DIRECT_EDITED'),
         }),
       )
     })

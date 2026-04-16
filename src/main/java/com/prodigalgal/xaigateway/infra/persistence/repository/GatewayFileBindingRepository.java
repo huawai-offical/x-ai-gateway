@@ -8,6 +8,14 @@ public interface GatewayFileBindingRepository extends JpaRepository<GatewayFileB
 
     List<GatewayFileBindingEntity> findAllByGatewayFileIdOrderByCreatedAtDesc(Long gatewayFileId);
 
+    List<GatewayFileBindingEntity> findAllByGatewayFileIdAndCredentialIdOrderByCreatedAtDesc(
+            Long gatewayFileId,
+            Long credentialId);
+
+    List<GatewayFileBindingEntity> findAllByGatewayFileIdAndSiteProfileIdOrderByCreatedAtDesc(
+            Long gatewayFileId,
+            Long siteProfileId);
+
     List<GatewayFileBindingEntity> findAllByCredentialIdAndExternalFileIdOrderByCreatedAtDesc(
             Long credentialId,
             String externalFileId);

@@ -127,12 +127,30 @@ apiRequest.mockImplementation(async () => [
         lossReasons: [],
       },
       file_object: {
-        declaredLevel: 'UNSUPPORTED',
-        implementedLevel: 'UNSUPPORTED',
-        effectiveLevel: 'UNSUPPORTED',
-        supportStatus: 'BLOCKED',
-        degradationLevel: 'UNSUPPORTED',
-        blockedReasons: ['file object unsupported'],
+        declaredLevel: 'NATIVE',
+        implementedLevel: 'NATIVE',
+        effectiveLevel: 'NATIVE',
+        supportStatus: 'NATIVE',
+        degradationLevel: 'NATIVE',
+        blockedReasons: [],
+        lossReasons: [],
+      },
+      batch_create: {
+        declaredLevel: 'NATIVE',
+        implementedLevel: 'NATIVE',
+        effectiveLevel: 'NATIVE',
+        supportStatus: 'NATIVE',
+        degradationLevel: 'NATIVE',
+        blockedReasons: [],
+        lossReasons: [],
+      },
+      tuning_create: {
+        declaredLevel: 'NATIVE',
+        implementedLevel: 'NATIVE',
+        effectiveLevel: 'NATIVE',
+        supportStatus: 'NATIVE',
+        degradationLevel: 'NATIVE',
+        blockedReasons: [],
         lossReasons: [],
       },
     },
@@ -225,7 +243,7 @@ apiRequest.mockImplementation(async () => [
         normalizedPath: '/v1/files',
         preferredBackend: 'ORCHESTRATION',
         supportedBackends: ['ORCHESTRATION'],
-        supportStatus: 'ORCHESTRATION',
+        supportStatus: 'NATIVE',
         degradationLevel: 'NATIVE',
         executionCapabilityLevel: 'NATIVE',
         renderCapabilityLevel: 'NATIVE',
@@ -235,12 +253,120 @@ apiRequest.mockImplementation(async () => [
         requiredFeatures: ['file_object'],
         featureResolutions: {
           file_object: {
+            declaredLevel: 'NATIVE',
+            implementedLevel: 'NATIVE',
+            effectiveLevel: 'NATIVE',
+            supportStatus: 'NATIVE',
+            degradationLevel: 'NATIVE',
+            blockedReasons: [],
+            lossReasons: [],
+          },
+        },
+      },
+      batch_create: {
+        resourceType: 'BATCH',
+        operation: 'BATCH_CREATE',
+        surface: 'openai',
+        normalizedPath: '/v1/batches',
+        preferredBackend: 'ORCHESTRATION',
+        supportedBackends: ['ORCHESTRATION'],
+        supportStatus: 'NATIVE',
+        degradationLevel: 'NATIVE',
+        executionCapabilityLevel: 'NATIVE',
+        renderCapabilityLevel: 'NATIVE',
+        overallCapabilityLevel: 'NATIVE',
+        blockerReasons: [],
+        lossReasons: [],
+        requiredFeatures: ['batch_create'],
+        featureResolutions: {
+          batch_create: {
+            declaredLevel: 'NATIVE',
+            implementedLevel: 'NATIVE',
+            effectiveLevel: 'NATIVE',
+            supportStatus: 'NATIVE',
+            degradationLevel: 'NATIVE',
+            blockedReasons: [],
+            lossReasons: [],
+          },
+        },
+      },
+      tuning_create: {
+        resourceType: 'TUNING',
+        operation: 'TUNING_CREATE',
+        surface: 'openai',
+        normalizedPath: '/v1/fine_tuning/jobs',
+        preferredBackend: 'ORCHESTRATION',
+        supportedBackends: ['ORCHESTRATION'],
+        supportStatus: 'NATIVE',
+        degradationLevel: 'NATIVE',
+        executionCapabilityLevel: 'NATIVE',
+        renderCapabilityLevel: 'NATIVE',
+        overallCapabilityLevel: 'NATIVE',
+        blockerReasons: [],
+        lossReasons: [],
+        requiredFeatures: ['tuning_create'],
+        featureResolutions: {
+          tuning_create: {
+            declaredLevel: 'NATIVE',
+            implementedLevel: 'NATIVE',
+            effectiveLevel: 'NATIVE',
+            supportStatus: 'NATIVE',
+            degradationLevel: 'NATIVE',
+            blockedReasons: [],
+            lossReasons: [],
+          },
+        },
+      },
+      upload_create: {
+        resourceType: 'UPLOAD',
+        operation: 'UPLOAD_CREATE',
+        surface: 'openai',
+        normalizedPath: '/v1/uploads',
+        preferredBackend: 'ORCHESTRATION',
+        supportedBackends: ['ORCHESTRATION'],
+        supportStatus: 'ORCHESTRATION',
+        degradationLevel: 'NATIVE',
+        executionCapabilityLevel: 'NATIVE',
+        renderCapabilityLevel: 'NATIVE',
+        overallCapabilityLevel: 'NATIVE',
+        blockerReasons: [],
+        lossReasons: [],
+        requiredFeatures: ['upload_create'],
+        featureResolutions: {
+          upload_create: {
             declaredLevel: 'UNSUPPORTED',
             implementedLevel: 'UNSUPPORTED',
             effectiveLevel: 'UNSUPPORTED',
             supportStatus: 'BLOCKED',
             degradationLevel: 'UNSUPPORTED',
-            blockedReasons: ['file object unsupported'],
+            blockedReasons: ['upload object unsupported'],
+            lossReasons: [],
+          },
+        },
+      },
+      realtime_client_secret_create: {
+        resourceType: 'REALTIME',
+        operation: 'REALTIME_CLIENT_SECRET_CREATE',
+        surface: 'openai',
+        normalizedPath: '/v1/realtime/client_secrets',
+        preferredBackend: 'ORCHESTRATION',
+        supportedBackends: ['ORCHESTRATION'],
+        supportStatus: 'ORCHESTRATION',
+        degradationLevel: 'NATIVE',
+        executionCapabilityLevel: 'NATIVE',
+        renderCapabilityLevel: 'NATIVE',
+        overallCapabilityLevel: 'NATIVE',
+        blockerReasons: [],
+        lossReasons: [],
+        requiredFeatures: ['realtime_client_secret'],
+        featureResolutions: {
+          realtime_client_secret: {
+            declaredLevel: 'UNSUPPORTED',
+            implementedLevel: 'UNSUPPORTED',
+            effectiveLevel: 'UNSUPPORTED',
+            supportStatus: 'BLOCKED',
+            degradationLevel: 'UNSUPPORTED',
+            blockedReasons: ['realtime client secret unsupported'],
             lossReasons: [],
           },
         },
@@ -278,10 +404,10 @@ apiRequest.mockImplementation(async () => [
     supportsAudio: true,
     supportsImages: true,
     supportsModeration: true,
-    supportsFiles: false,
+    supportsFiles: true,
     supportsUploads: false,
-    supportsBatches: false,
-    supportsTuning: false,
+    supportsBatches: true,
+    supportsTuning: true,
     supportsRealtime: false,
   },
   {
@@ -384,16 +510,22 @@ describe('CapabilityMatrixPage', () => {
     expect(screen.getByText('VERTEX_AI')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /FILE_CREATE/ })).toHaveAttribute('href', '/provider-sites/2?surface=file_create')
     expect(screen.getByRole('link', { name: /EMBEDDING_CREATE/ })).toHaveAttribute('href', '/provider-sites/3?surface=embedding_create')
-    expect(screen.getByText('supportStatus: ORCHESTRATION')).toBeInTheDocument()
+    expect(screen.getAllByText('supportStatus: ORCHESTRATION').length).toBeGreaterThan(0)
     expect(screen.getAllByText('supportStatus: BLOCKED').length).toBeGreaterThan(0)
     expect(screen.getAllByText('supportStatus: NATIVE').length).toBeGreaterThan(0)
     expect(screen.getByText('normalizedPath: /v1/files')).toBeInTheDocument()
+    expect(screen.getByText('normalizedPath: /v1/batches')).toBeInTheDocument()
+    expect(screen.getByText('normalizedPath: /v1/fine_tuning/jobs')).toBeInTheDocument()
+    expect(screen.getByText('normalizedPath: /v1/uploads')).toBeInTheDocument()
+    expect(screen.getByText('normalizedPath: /v1/realtime/client_secrets')).toBeInTheDocument()
     expect(screen.getByText('normalizedPath: /v1/embeddings')).toBeInTheDocument()
     expect(screen.getByText('normalizedPath: /v1/audio/transcriptions')).toBeInTheDocument()
     expect(screen.getByText('normalizedPath: /v1/images/generations')).toBeInTheDocument()
     expect(screen.getByText('normalizedPath: /v1/moderations')).toBeInTheDocument()
     expect(screen.getByText('normalizedPath: /v1/images/edits')).toBeInTheDocument()
-    expect(screen.getByText('featureSupport: file_object:BLOCKED')).toBeInTheDocument()
+    expect(screen.getByText('featureSupport: file_object:NATIVE')).toBeInTheDocument()
+    expect(screen.getByText('featureSupport: batch_create:NATIVE')).toBeInTheDocument()
+    expect(screen.getByText('featureSupport: tuning_create:NATIVE')).toBeInTheDocument()
     expect(screen.getByText('featureSupport: embeddings:BLOCKED')).toBeInTheDocument()
     expect(screen.getByText('featureSupport: audio_transcription:NATIVE')).toBeInTheDocument()
     expect(screen.getByText('featureSupport: image_generation:NATIVE')).toBeInTheDocument()

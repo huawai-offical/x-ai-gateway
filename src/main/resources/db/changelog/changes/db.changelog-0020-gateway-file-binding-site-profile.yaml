@@ -1,0 +1,12 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0020-gateway-file-binding-site-profile
+      author: codex
+      changes:
+        - addColumn:
+            tableName: gateway_file_binding
+            columns:
+              - column:
+                  name: site_profile_id
+                  type: bigint
+                  remarks: 上游站点档案主键，便于定位 Gemini 等 provider-aware binding 的目标站点。

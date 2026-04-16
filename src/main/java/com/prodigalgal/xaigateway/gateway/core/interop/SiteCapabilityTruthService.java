@@ -499,13 +499,13 @@ public class SiteCapabilityTruthService {
 
     private boolean supportsUpstreamFileObjects(UpstreamSiteKind siteKind) {
         return switch (siteKind) {
-            case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, OPENROUTER, TOGETHER, FIREWORKS, DEEPSEEK, GROK, MISTRAL, COHERE -> true;
+            case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, OPENROUTER, TOGETHER, FIREWORKS, DEEPSEEK, GROK, MISTRAL, COHERE, GEMINI_DIRECT -> true;
             default -> false;
         };
     }
 
     private boolean supportsUpstreamAsyncObjects(UpstreamSiteKind siteKind) {
-        return siteKind == UpstreamSiteKind.OPENAI_DIRECT;
+        return siteKind == UpstreamSiteKind.OPENAI_DIRECT || siteKind == UpstreamSiteKind.GEMINI_DIRECT;
     }
 
     private boolean supportsGatewayOrchestrationSurface(
