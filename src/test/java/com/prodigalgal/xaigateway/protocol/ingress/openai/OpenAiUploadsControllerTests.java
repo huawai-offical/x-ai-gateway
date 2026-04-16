@@ -93,4 +93,70 @@ class OpenAiUploadsControllerTests {
                 .jsonPath("$.object").isEqualTo("upload.part")
                 .jsonPath("$.upload_id").isEqualTo("upload_1");
     }
+
+    @Test
+    void shouldGetUpload() {
+        ObjectNode response = objectMapper.createObjectNode();
+        response.put("id", "upload_1");
+        response.put("object", "upload");
+        response.put("status", "created");
+
+        Mockito.when(gatewayTokenAuthenticationResolver.authenticate("Bearer sk-gw-test.secret", null, null, null))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayResourceExecutionService.executeLifecycleJson(1L, "sk-gw-test", "GET", "/v1/uploads/upload_1", "resource-orchestration", null))
+                .thenReturn(response);
+
+        webTestClient.get()
+                .uri("/v1/uploads/upload_1")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.id").isEqualTo("upload_1")
+                .jsonPath("$.status").isEqualTo("created");
+    }
+
+    @Test
+    void shouldCompleteUpload() {
+        ObjectNode response = objectMapper.createObjectNode();
+        response.put("id", "upload_1");
+        response.put("object", "upload");
+        response.put("status", "completed");
+
+        Mockito.when(gatewayTokenAuthenticationResolver.authenticate("Bearer sk-gw-test.secret", null, null, null))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayResourceExecutionService.executeLifecycleJson(1L, "sk-gw-test", "POST", "/v1/uploads/upload_1/complete", "resource-orchestration", null))
+                .thenReturn(response);
+
+        webTestClient.post()
+                .uri("/v1/uploads/upload_1/complete")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.id").isEqualTo("upload_1")
+                .jsonPath("$.status").isEqualTo("completed");
+    }
+
+    @Test
+    void shouldCancelUpload() {
+        ObjectNode response = objectMapper.createObjectNode();
+        response.put("id", "upload_1");
+        response.put("object", "upload");
+        response.put("status", "cancelled");
+
+        Mockito.when(gatewayTokenAuthenticationResolver.authenticate("Bearer sk-gw-test.secret", null, null, null))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayResourceExecutionService.executeLifecycleJson(1L, "sk-gw-test", "POST", "/v1/uploads/upload_1/cancel", "resource-orchestration", null))
+                .thenReturn(response);
+
+        webTestClient.post()
+                .uri("/v1/uploads/upload_1/cancel")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.id").isEqualTo("upload_1")
+                .jsonPath("$.status").isEqualTo("cancelled");
+    }
 }

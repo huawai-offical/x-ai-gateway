@@ -220,6 +220,99 @@ class GatewayRequestLifecycleServiceTests {
         assertEquals("batch_1", stored.get().getGatewayResourceKey());
     }
 
+    @Test
+    void shouldPersistOpenAiFileDeleteCanonicalSummary() {
+        RequestLogRepository requestLogRepository = Mockito.mock(RequestLogRepository.class);
+        UsageRecordRepository usageRecordRepository = Mockito.mock(UsageRecordRepository.class);
+        GatewayAuditLogService gatewayAuditLogService = Mockito.mock(GatewayAuditLogService.class);
+        AtomicReference<RequestLogEntity> stored = new AtomicReference<>();
+        Mockito.when(requestLogRepository.save(Mockito.any(RequestLogEntity.class)))
+                .thenAnswer(invocation -> {
+                    RequestLogEntity entity = invocation.getArgument(0);
+                    stored.set(entity);
+                    return entity;
+                });
+        Mockito.when(requestLogRepository.findByRequestId("req-file-delete"))
+                .thenAnswer(invocation -> Optional.ofNullable(stored.get()));
+
+        GatewayRequestLifecycleService service = new GatewayRequestLifecycleService(
+                requestLogRepository,
+                usageRecordRepository,
+                gatewayAuditLogService,
+                new SimpleMeterRegistry(),
+                new tools.jackson.databind.ObjectMapper()
+        );
+
+        RouteSelectionResult selectionResult = selectionResult();
+        CanonicalResourceRequest request = new CanonicalResourceRequest(
+                "sk-gw-test",
+                CanonicalIngressProtocol.OPENAI,
+                "DELETE",
+                "/v1/files/file_123",
+                "/v1/files/{fileId}",
+                Map.of("fileId", "file_123"),
+                "resource-orchestration",
+                TranslationResourceType.FILE,
+                TranslationOperation.FILE_DELETE,
+                null,
+                Map.of(),
+                List.of(),
+                false,
+                false
+        );
+        CanonicalExecutionPlan plan = new CanonicalExecutionPlan(
+                true,
+                CanonicalIngressProtocol.OPENAI,
+                "/v1/files/file_123",
+                "/v1/files/{fileId}",
+                "files",
+                "resource-orchestration",
+                "resource-orchestration",
+                "resource-orchestration",
+                TranslationResourceType.FILE,
+                TranslationOperation.FILE_DELETE,
+                ExecutionKind.NATIVE,
+                ExecutionBackend.ORCHESTRATION,
+                SupportStatus.ORCHESTRATION,
+                "upstream_object_with_local_lineage",
+                List.of(ExecutionBackend.ORCHESTRATION),
+                "test",
+                InteropCapabilityLevel.NATIVE,
+                InteropCapabilityLevel.NATIVE,
+                InteropCapabilityLevel.NATIVE,
+                InteropCapabilityLevel.NATIVE,
+                List.of(),
+                List.of(),
+                Map.of(),
+                List.of(),
+                List.of()
+        );
+        CanonicalResourceResponse canonicalResponse = new CanonicalResourceResponse(
+                TranslationResourceType.FILE,
+                TranslationOperation.FILE_DELETE,
+                "object",
+                "file.deleted",
+                "file_123",
+                "deleted",
+                List.of(),
+                List.of(),
+                null,
+                null,
+                Map.of()
+        );
+
+        service.startRequest("req-file-delete", selectionResult, request, plan, false, Instant.now());
+        service.completeRequest("req-file-delete", selectionResult, request, plan, false, GatewayUsageView.empty(), canonicalResponse, Instant.now());
+
+        RequestLogEntity entity = stored.get();
+        assertEquals("ORCHESTRATION", entity.getSupportStatus());
+        assertEquals("NATIVE", entity.getDegradationLevel());
+        assertEquals("object", entity.getResponseKind());
+        assertEquals("file.deleted", entity.getResponseObjectType());
+        assertEquals("file_123", entity.getResponseObjectId());
+        assertEquals("deleted", entity.getResponseStatus());
+    }
+
     private RouteSelectionResult selectionResult() {
         CatalogCandidateView candidate = new CatalogCandidateView(
                 101L,

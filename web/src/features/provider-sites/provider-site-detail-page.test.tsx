@@ -136,6 +136,12 @@ apiRequest.mockImplementation(async (url: string, init?: RequestInit) => {
       },
     ]
   }
+  if (url === '/admin/provider-sites/2') {
+    return sampleOpenAiCompatibleSite
+  }
+  if (url === '/admin/provider-sites/2/capabilities') {
+    return openAiCompatibleCapabilities
+  }
   throw new Error(`unexpected url: ${url}`)
 })
 
@@ -448,6 +454,224 @@ const sampleSite = {
   updatedAt: '2026-04-13T03:00:00Z',
 }
 
+const sampleOpenAiCompatibleSite = {
+  ...sampleSite,
+  id: 2,
+  profileCode: 'site:openai_compatible_generic',
+  displayName: 'OPENAI_COMPATIBLE_GENERIC',
+  providerFamily: 'OPENAI',
+  siteKind: 'OPENAI_COMPATIBLE_GENERIC',
+  authStrategy: 'BEARER',
+  pathStrategy: 'OPENAI_V1',
+  errorSchemaStrategy: 'OPENAI_ERROR',
+  baseUrlPattern: 'https://compatible.example.com/v1',
+  fallbackStrategy: 'accepted-exception',
+  features: {
+    file_object: {
+      declaredLevel: 'NATIVE',
+      implementedLevel: 'UNSUPPORTED',
+      effectiveLevel: 'UNSUPPORTED',
+      supportStatus: 'BLOCKED',
+      degradationLevel: 'UNSUPPORTED',
+      blockedReasons: ['OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；files 仍作为 accepted exception，不在当前实现面内。'],
+      lossReasons: [],
+    },
+    upload_create: {
+      declaredLevel: 'UNSUPPORTED',
+      implementedLevel: 'UNSUPPORTED',
+      effectiveLevel: 'UNSUPPORTED',
+      supportStatus: 'BLOCKED',
+      degradationLevel: 'UNSUPPORTED',
+      blockedReasons: ['OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；uploads 仍作为 accepted exception，不在当前实现面内。'],
+      lossReasons: [],
+    },
+    batch_create: {
+      declaredLevel: 'UNSUPPORTED',
+      implementedLevel: 'UNSUPPORTED',
+      effectiveLevel: 'UNSUPPORTED',
+      supportStatus: 'BLOCKED',
+      degradationLevel: 'UNSUPPORTED',
+      blockedReasons: ['OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；batches 仍作为 accepted exception，不在当前实现面内。'],
+      lossReasons: [],
+    },
+    tuning_create: {
+      declaredLevel: 'UNSUPPORTED',
+      implementedLevel: 'UNSUPPORTED',
+      effectiveLevel: 'UNSUPPORTED',
+      supportStatus: 'BLOCKED',
+      degradationLevel: 'UNSUPPORTED',
+      blockedReasons: ['OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；fine-tuning 仍作为 accepted exception，不在当前实现面内。'],
+      lossReasons: [],
+    },
+    realtime_client_secret: {
+      declaredLevel: 'UNSUPPORTED',
+      implementedLevel: 'UNSUPPORTED',
+      effectiveLevel: 'UNSUPPORTED',
+      supportStatus: 'BLOCKED',
+      degradationLevel: 'UNSUPPORTED',
+      blockedReasons: ['OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；realtime client secrets 仍作为 accepted exception，不在当前实现面内。'],
+      lossReasons: [],
+    },
+  },
+  surfaces: {
+    file_create: {
+      resourceType: 'FILE',
+      operation: 'FILE_CREATE',
+      surface: 'openai',
+      normalizedPath: '/v1/files',
+      preferredBackend: 'ORCHESTRATION',
+      supportedBackends: ['ORCHESTRATION'],
+      supportStatus: 'BLOCKED',
+      degradationLevel: 'UNSUPPORTED',
+      executionCapabilityLevel: 'UNSUPPORTED',
+      renderCapabilityLevel: 'NATIVE',
+      overallCapabilityLevel: 'UNSUPPORTED',
+      blockerReasons: ['OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；files 仍作为 accepted exception，不在当前实现面内。'],
+      lossReasons: [],
+      requiredFeatures: ['file_object'],
+      featureResolutions: {
+        file_object: {
+          declaredLevel: 'NATIVE',
+          implementedLevel: 'UNSUPPORTED',
+          effectiveLevel: 'UNSUPPORTED',
+          supportStatus: 'BLOCKED',
+          degradationLevel: 'UNSUPPORTED',
+          blockedReasons: ['OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；files 仍作为 accepted exception，不在当前实现面内。'],
+          lossReasons: [],
+        },
+      },
+    },
+    upload_create: {
+      resourceType: 'UPLOAD',
+      operation: 'UPLOAD_CREATE',
+      surface: 'openai',
+      normalizedPath: '/v1/uploads',
+      preferredBackend: 'ORCHESTRATION',
+      supportedBackends: ['ORCHESTRATION'],
+      supportStatus: 'BLOCKED',
+      degradationLevel: 'UNSUPPORTED',
+      executionCapabilityLevel: 'UNSUPPORTED',
+      renderCapabilityLevel: 'NATIVE',
+      overallCapabilityLevel: 'UNSUPPORTED',
+      blockerReasons: ['OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；uploads 仍作为 accepted exception，不在当前实现面内。'],
+      lossReasons: [],
+      requiredFeatures: ['upload_create'],
+      featureResolutions: {
+        upload_create: {
+          declaredLevel: 'UNSUPPORTED',
+          implementedLevel: 'UNSUPPORTED',
+          effectiveLevel: 'UNSUPPORTED',
+          supportStatus: 'BLOCKED',
+          degradationLevel: 'UNSUPPORTED',
+          blockedReasons: ['OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；uploads 仍作为 accepted exception，不在当前实现面内。'],
+          lossReasons: [],
+        },
+      },
+    },
+    batch_create: {
+      resourceType: 'BATCH',
+      operation: 'BATCH_CREATE',
+      surface: 'openai',
+      normalizedPath: '/v1/batches',
+      preferredBackend: 'ORCHESTRATION',
+      supportedBackends: ['ORCHESTRATION'],
+      supportStatus: 'BLOCKED',
+      degradationLevel: 'UNSUPPORTED',
+      executionCapabilityLevel: 'UNSUPPORTED',
+      renderCapabilityLevel: 'NATIVE',
+      overallCapabilityLevel: 'UNSUPPORTED',
+      blockerReasons: ['OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；batches 仍作为 accepted exception，不在当前实现面内。'],
+      lossReasons: [],
+      requiredFeatures: ['batch_create'],
+      featureResolutions: {
+        batch_create: {
+          declaredLevel: 'UNSUPPORTED',
+          implementedLevel: 'UNSUPPORTED',
+          effectiveLevel: 'UNSUPPORTED',
+          supportStatus: 'BLOCKED',
+          degradationLevel: 'UNSUPPORTED',
+          blockedReasons: ['OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；batches 仍作为 accepted exception，不在当前实现面内。'],
+          lossReasons: [],
+        },
+      },
+    },
+    tuning_create: {
+      resourceType: 'TUNING',
+      operation: 'TUNING_CREATE',
+      surface: 'openai',
+      normalizedPath: '/v1/fine_tuning/jobs',
+      preferredBackend: 'ORCHESTRATION',
+      supportedBackends: ['ORCHESTRATION'],
+      supportStatus: 'BLOCKED',
+      degradationLevel: 'UNSUPPORTED',
+      executionCapabilityLevel: 'UNSUPPORTED',
+      renderCapabilityLevel: 'NATIVE',
+      overallCapabilityLevel: 'UNSUPPORTED',
+      blockerReasons: ['OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；fine-tuning 仍作为 accepted exception，不在当前实现面内。'],
+      lossReasons: [],
+      requiredFeatures: ['tuning_create'],
+      featureResolutions: {
+        tuning_create: {
+          declaredLevel: 'UNSUPPORTED',
+          implementedLevel: 'UNSUPPORTED',
+          effectiveLevel: 'UNSUPPORTED',
+          supportStatus: 'BLOCKED',
+          degradationLevel: 'UNSUPPORTED',
+          blockedReasons: ['OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；fine-tuning 仍作为 accepted exception，不在当前实现面内。'],
+          lossReasons: [],
+        },
+      },
+    },
+    realtime_client_secret_create: {
+      resourceType: 'REALTIME',
+      operation: 'REALTIME_CLIENT_SECRET_CREATE',
+      surface: 'openai',
+      normalizedPath: '/v1/realtime/client_secrets',
+      preferredBackend: 'ORCHESTRATION',
+      supportedBackends: ['ORCHESTRATION'],
+      supportStatus: 'BLOCKED',
+      degradationLevel: 'UNSUPPORTED',
+      executionCapabilityLevel: 'UNSUPPORTED',
+      renderCapabilityLevel: 'NATIVE',
+      overallCapabilityLevel: 'UNSUPPORTED',
+      blockerReasons: ['OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；realtime client secrets 仍作为 accepted exception，不在当前实现面内。'],
+      lossReasons: [],
+      requiredFeatures: ['realtime_client_secret'],
+      featureResolutions: {
+        realtime_client_secret: {
+          declaredLevel: 'UNSUPPORTED',
+          implementedLevel: 'UNSUPPORTED',
+          effectiveLevel: 'UNSUPPORTED',
+          supportStatus: 'BLOCKED',
+          degradationLevel: 'UNSUPPORTED',
+          blockedReasons: ['OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；realtime client secrets 仍作为 accepted exception，不在当前实现面内。'],
+          lossReasons: [],
+        },
+      },
+    },
+  },
+}
+
+const openAiCompatibleCapabilities = [
+  {
+    id: 3,
+    modelName: 'compatible-model',
+    modelKey: 'compatible-model',
+    supportedProtocols: ['openai'],
+    supportsChat: true,
+    supportsTools: true,
+    supportsImageInput: false,
+    supportsEmbeddings: true,
+    supportsCache: false,
+    supportsThinking: false,
+    supportsVisibleReasoning: false,
+    supportsReasoningReuse: false,
+    reasoningTransport: null,
+    capabilityLevel: 'NATIVE',
+    surfaces: sampleOpenAiCompatibleSite.surfaces,
+  },
+]
+
 vi.mock('../../lib/api', () => ({
   apiRequest,
 }))
@@ -506,5 +730,27 @@ describe('ProviderSiteDetailPage', () => {
         }),
       )
     })
+  })
+
+  it('shows openai-compatible object lifecycle as blocked accepted exceptions', async () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter initialEntries={['/provider-sites/2?surface=file_create']}>
+          <Routes>
+            <Route path="/provider-sites/:id" element={<ProviderSiteDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+
+    expect(await screen.findByText('OPENAI_COMPATIBLE_GENERIC')).toBeInTheDocument()
+    expect(await screen.findByText('normalizedPath: /v1/files')).toBeInTheDocument()
+    expect((await screen.findAllByText(/accepted exception/)).length).toBeGreaterThan(0)
+    expect(screen.getAllByText('supportStatus: BLOCKED').length).toBeGreaterThan(0)
+    expect(screen.getByText('normalizedPath: /v1/uploads')).toBeInTheDocument()
+    expect(screen.getByText('normalizedPath: /v1/batches')).toBeInTheDocument()
+    expect(screen.getByText('normalizedPath: /v1/fine_tuning/jobs')).toBeInTheDocument()
+    expect(screen.getByText('normalizedPath: /v1/realtime/client_secrets')).toBeInTheDocument()
+    expect(screen.getByText('featureSupport: file_object:BLOCKED')).toBeInTheDocument()
   })
 })

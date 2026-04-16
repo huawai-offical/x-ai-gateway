@@ -265,6 +265,75 @@ class ProviderSiteAdminServiceTests {
                 .anyMatch(reason -> reason.contains("Message Batches")));
     }
 
+    @Test
+    void shouldKeepOpenAiDirectObjectLifecycleUsableAndBlockOpenAiCompatibleAcceptedExceptions() {
+        UpstreamSiteProfileRepository profileRepository = Mockito.mock(UpstreamSiteProfileRepository.class);
+        SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        SiteModelCapabilityRepository modelCapabilityRepository = Mockito.mock(SiteModelCapabilityRepository.class);
+        UpstreamCredentialRepository credentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        ProviderSiteRegistryService providerSiteRegistryService = Mockito.mock(ProviderSiteRegistryService.class);
+        CredentialModelDiscoveryService credentialModelDiscoveryService = Mockito.mock(CredentialModelDiscoveryService.class);
+        SiteCapabilityTruthService truthService = new SiteCapabilityTruthService(
+                new UpstreamSitePolicyService(),
+                snapshotRepository
+        );
+
+        ProviderSiteAdminService service = new ProviderSiteAdminService(
+                profileRepository,
+                snapshotRepository,
+                modelCapabilityRepository,
+                credentialRepository,
+                providerSiteRegistryService,
+                credentialModelDiscoveryService,
+                truthService
+        );
+
+        UpstreamSiteProfileEntity openAiDirect = sampleSite(4L, "OPENAI_DIRECT", true);
+        SiteCapabilitySnapshotEntity openAiDirectSnapshot = sampleSnapshot(openAiDirect);
+        openAiDirectSnapshot.setSupportsFiles(true);
+        openAiDirectSnapshot.setSupportsUploads(true);
+        openAiDirectSnapshot.setSupportsBatches(true);
+        openAiDirectSnapshot.setSupportsTuning(true);
+        openAiDirectSnapshot.setSupportsRealtime(true);
+
+        UpstreamSiteProfileEntity openAiCompatible = sampleOpenAiCompatibleSite(5L);
+        SiteCapabilitySnapshotEntity openAiCompatibleSnapshot = sampleSnapshot(openAiCompatible);
+        openAiCompatibleSnapshot.setSupportsFiles(true);
+        openAiCompatibleSnapshot.setSupportsUploads(true);
+        openAiCompatibleSnapshot.setSupportsBatches(true);
+        openAiCompatibleSnapshot.setSupportsTuning(true);
+        openAiCompatibleSnapshot.setSupportsRealtime(true);
+
+        Mockito.when(profileRepository.findById(4L)).thenReturn(Optional.of(openAiDirect));
+        Mockito.when(profileRepository.findById(5L)).thenReturn(Optional.of(openAiCompatible));
+        Mockito.when(snapshotRepository.findBySiteProfile_Id(4L)).thenReturn(Optional.of(openAiDirectSnapshot));
+        Mockito.when(snapshotRepository.findBySiteProfile_Id(5L)).thenReturn(Optional.of(openAiCompatibleSnapshot));
+        Mockito.when(modelCapabilityRepository.findAllBySiteProfile_IdOrderByModelKeyAsc(4L)).thenReturn(List.of());
+        Mockito.when(modelCapabilityRepository.findAllBySiteProfile_IdOrderByModelKeyAsc(5L)).thenReturn(List.of());
+        Mockito.when(credentialRepository.findAllBySiteProfileIdAndDeletedFalseAndActiveTrueOrderByCreatedAtDesc(4L))
+                .thenReturn(List.of());
+        Mockito.when(credentialRepository.findAllBySiteProfileIdAndDeletedFalseAndActiveTrueOrderByCreatedAtDesc(5L))
+                .thenReturn(List.of());
+
+        ProviderSiteResponse openAiDirectResponse = service.get(4L);
+        ProviderSiteResponse openAiCompatibleResponse = service.get(5L);
+
+        assertEquals(SupportStatus.ORCHESTRATION, openAiDirectResponse.surfaces().get("file_create").supportStatus());
+        assertEquals(SupportStatus.ORCHESTRATION, openAiDirectResponse.surfaces().get("upload_create").supportStatus());
+        assertEquals(SupportStatus.ORCHESTRATION, openAiDirectResponse.surfaces().get("batch_create").supportStatus());
+        assertEquals(SupportStatus.ORCHESTRATION, openAiDirectResponse.surfaces().get("tuning_create").supportStatus());
+        assertEquals(SupportStatus.ORCHESTRATION, openAiDirectResponse.surfaces().get("realtime_client_secret_create").supportStatus());
+
+        assertEquals("blocked", openAiCompatibleResponse.features().get("file_object").supportStatus());
+        assertEquals(SupportStatus.BLOCKED, openAiCompatibleResponse.surfaces().get("file_create").supportStatus());
+        assertEquals(SupportStatus.BLOCKED, openAiCompatibleResponse.surfaces().get("upload_create").supportStatus());
+        assertEquals(SupportStatus.BLOCKED, openAiCompatibleResponse.surfaces().get("batch_create").supportStatus());
+        assertEquals(SupportStatus.BLOCKED, openAiCompatibleResponse.surfaces().get("tuning_create").supportStatus());
+        assertEquals(SupportStatus.BLOCKED, openAiCompatibleResponse.surfaces().get("realtime_client_secret_create").supportStatus());
+        assertTrue(openAiCompatibleResponse.surfaces().get("file_create").blockerReasons().stream()
+                .anyMatch(reason -> reason.contains("accepted exception")));
+    }
+
     private void mockAllFeatures(
             SiteCapabilityTruthService truthService,
             UpstreamSiteProfileEntity site,
@@ -365,6 +434,21 @@ class ProviderSiteAdminServiceTests {
         entity.setPathStrategy(PathStrategy.ANTHROPIC_V1_MESSAGES);
         entity.setModelAddressingStrategy(ModelAddressingStrategy.MODEL_NAME);
         entity.setErrorSchemaStrategy(ErrorSchemaStrategy.ANTHROPIC_ERROR);
+        entity.setActive(true);
+        ReflectionTestUtils.setField(entity, "id", id);
+        return entity;
+    }
+
+    private UpstreamSiteProfileEntity sampleOpenAiCompatibleSite(Long id) {
+        UpstreamSiteProfileEntity entity = new UpstreamSiteProfileEntity();
+        entity.setProfileCode("site:openai_compatible_generic");
+        entity.setDisplayName("OPENAI_COMPATIBLE_GENERIC");
+        entity.setProviderFamily(ProviderFamily.OPENAI);
+        entity.setSiteKind(UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC);
+        entity.setAuthStrategy(AuthStrategy.BEARER);
+        entity.setPathStrategy(PathStrategy.OPENAI_V1);
+        entity.setModelAddressingStrategy(ModelAddressingStrategy.MODEL_NAME);
+        entity.setErrorSchemaStrategy(ErrorSchemaStrategy.OPENAI_ERROR);
         entity.setActive(true);
         ReflectionTestUtils.setField(entity, "id", id);
         return entity;

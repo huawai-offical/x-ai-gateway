@@ -256,6 +256,82 @@ class ExecutionSupportMatrixServiceTests {
         );
     }
 
+    @Test
+    void shouldFreezeOpenAiFamilyObjectLifecycleExceptions() {
+        GatewayRequestSemantics fileSemantics = new GatewayRequestSemantics(
+                TranslationResourceType.FILE,
+                TranslationOperation.FILE_CREATE,
+                List.of(InteropFeature.FILE_OBJECT),
+                true
+        );
+        GatewayRequestSemantics uploadSemantics = new GatewayRequestSemantics(
+                TranslationResourceType.UPLOAD,
+                TranslationOperation.UPLOAD_CREATE,
+                List.of(InteropFeature.UPLOAD_CREATE),
+                true
+        );
+        GatewayRequestSemantics batchSemantics = new GatewayRequestSemantics(
+                TranslationResourceType.BATCH,
+                TranslationOperation.BATCH_CREATE,
+                List.of(InteropFeature.BATCH_CREATE),
+                true
+        );
+        GatewayRequestSemantics tuningSemantics = new GatewayRequestSemantics(
+                TranslationResourceType.TUNING,
+                TranslationOperation.TUNING_CREATE,
+                List.of(InteropFeature.TUNING_CREATE),
+                true
+        );
+        GatewayRequestSemantics realtimeSemantics = new GatewayRequestSemantics(
+                TranslationResourceType.REALTIME,
+                TranslationOperation.REALTIME_CLIENT_SECRET_CREATE,
+                List.of(InteropFeature.REALTIME_CLIENT_SECRET),
+                true
+        );
+
+        assertEquals(
+                InteropCapabilityLevel.NATIVE,
+                service.implementedLevel(openAiCandidate(ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT), fileSemantics, InteropFeature.FILE_OBJECT)
+        );
+        assertEquals(
+                InteropCapabilityLevel.NATIVE,
+                service.implementedLevel(openAiCandidate(ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT), uploadSemantics, InteropFeature.UPLOAD_CREATE)
+        );
+        assertEquals(
+                InteropCapabilityLevel.NATIVE,
+                service.implementedLevel(openAiCandidate(ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT), batchSemantics, InteropFeature.BATCH_CREATE)
+        );
+        assertEquals(
+                InteropCapabilityLevel.NATIVE,
+                service.implementedLevel(openAiCandidate(ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT), tuningSemantics, InteropFeature.TUNING_CREATE)
+        );
+        assertEquals(
+                InteropCapabilityLevel.NATIVE,
+                service.implementedLevel(openAiCandidate(ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT), realtimeSemantics, InteropFeature.REALTIME_CLIENT_SECRET)
+        );
+
+        assertEquals(
+                InteropCapabilityLevel.UNSUPPORTED,
+                service.implementedLevel(openAiCandidate(ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC), fileSemantics, InteropFeature.FILE_OBJECT)
+        );
+        assertEquals(
+                InteropCapabilityLevel.UNSUPPORTED,
+                service.implementedLevel(openAiCandidate(ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC), uploadSemantics, InteropFeature.UPLOAD_CREATE)
+        );
+        assertEquals(
+                InteropCapabilityLevel.UNSUPPORTED,
+                service.implementedLevel(openAiCandidate(ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC), batchSemantics, InteropFeature.BATCH_CREATE)
+        );
+        assertEquals(
+                InteropCapabilityLevel.UNSUPPORTED,
+                service.implementedLevel(openAiCandidate(ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC), tuningSemantics, InteropFeature.TUNING_CREATE)
+        );
+        assertEquals(
+                InteropCapabilityLevel.UNSUPPORTED,
+                service.implementedLevel(openAiCandidate(ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC), realtimeSemantics, InteropFeature.REALTIME_CLIENT_SECRET)
+        );
+    }
+
     private CatalogCandidateView geminiCandidate(UpstreamSiteKind siteKind) {
         return new CatalogCandidateView(
                 101L,
@@ -308,6 +384,34 @@ class ExecutionSupportMatrixServiceTests {
                 false,
                 false,
                 ReasoningTransport.ANTHROPIC,
+                InteropCapabilityLevel.NATIVE
+        );
+    }
+
+    private CatalogCandidateView openAiCandidate(ProviderType providerType, UpstreamSiteKind siteKind) {
+        return new CatalogCandidateView(
+                303L,
+                "openai-candidate",
+                providerType,
+                3L,
+                ProviderFamily.OPENAI,
+                siteKind,
+                AuthStrategy.BEARER,
+                PathStrategy.OPENAI_V1,
+                ErrorSchemaStrategy.OPENAI_ERROR,
+                "https://example.com",
+                "gpt-4o-mini",
+                "gpt-4o-mini",
+                List.of("openai"),
+                true,
+                true,
+                true,
+                true,
+                false,
+                true,
+                true,
+                false,
+                ReasoningTransport.OPENAI_CHAT,
                 InteropCapabilityLevel.NATIVE
         );
     }

@@ -1,11 +1,10 @@
 package com.prodigalgal.xaigateway.protocol.ingress.openai;
 
+import tools.jackson.databind.JsonNode;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthenticationService;
-import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileContent;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileResponse;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayResourceExecutionService;
-import java.util.List;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -35,9 +34,9 @@ public class OpenAiFilesController {
     }
 
     @GetMapping
-    public List<GatewayFileResponse> list(@RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
+    public OpenAiListResponse<GatewayFileResponse> list(@RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
         AuthenticatedDistributedKey distributedKey = distributedKeyAuthenticationService.authenticateBearerToken(authorization);
-        return gatewayResourceExecutionService.listFiles(distributedKey.id());
+        return OpenAiListResponse.of(gatewayResourceExecutionService.listFiles(distributedKey.id()));
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -66,10 +65,10 @@ public class OpenAiFilesController {
     }
 
     @DeleteMapping("/{fileId}")
-    public void delete(
+    public JsonNode delete(
             @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
             @PathVariable String fileId) {
         AuthenticatedDistributedKey distributedKey = distributedKeyAuthenticationService.authenticateBearerToken(authorization);
-        gatewayResourceExecutionService.deleteFile(distributedKey.keyPrefix(), distributedKey.id(), fileId);
+        return gatewayResourceExecutionService.deleteFile(distributedKey.keyPrefix(), distributedKey.id(), fileId);
     }
 }

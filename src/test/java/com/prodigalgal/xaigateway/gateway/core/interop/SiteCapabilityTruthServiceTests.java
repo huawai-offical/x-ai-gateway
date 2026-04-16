@@ -518,6 +518,61 @@ class SiteCapabilityTruthServiceTests {
         assertTrue(genericBatchReport.blockedReasons().stream().anyMatch(reason -> reason.contains("Message Batches")));
     }
 
+    @Test
+    void shouldKeepOpenAiDirectObjectLifecycleUsableAndBlockOpenAiCompatibleAcceptedExceptions() {
+        SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
+
+        SurfaceCompatibilityReport openAiDirectFileReport = service.evaluateSurface(
+                siteProfile(UpstreamSiteKind.OPENAI_DIRECT),
+                snapshot(true, true, true, true, true, true, true, true, true, true),
+                new GatewayRequestSemantics(
+                        TranslationResourceType.FILE,
+                        TranslationOperation.FILE_CREATE,
+                        List.of(InteropFeature.FILE_OBJECT),
+                        true
+                ),
+                new com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendDecision(
+                        ExecutionBackend.ORCHESTRATION,
+                        List.of(ExecutionBackend.ORCHESTRATION),
+                        "test"
+                )
+        );
+        SurfaceCompatibilityReport openAiCompatibleFileReport = service.evaluateSurface(
+                siteProfile(UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC),
+                snapshot(true, true, true, true, true, true, true, true, true, true),
+                new GatewayRequestSemantics(
+                        TranslationResourceType.FILE,
+                        TranslationOperation.FILE_CREATE,
+                        List.of(InteropFeature.FILE_OBJECT),
+                        true
+                ),
+                new com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendDecision(
+                        ExecutionBackend.ORCHESTRATION,
+                        List.of(ExecutionBackend.ORCHESTRATION),
+                        "test"
+                )
+        );
+        FeatureCompatibilityReport openAiCompatibleRealtimeFeature = service.evaluate(
+                candidate(13L, ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC),
+                new GatewayRequestSemantics(
+                        TranslationResourceType.REALTIME,
+                        TranslationOperation.REALTIME_CLIENT_SECRET_CREATE,
+                        List.of(InteropFeature.REALTIME_CLIENT_SECRET),
+                        true
+                )
+        );
+
+        assertEquals(InteropCapabilityLevel.NATIVE, openAiDirectFileReport.executionCapabilityLevel());
+        assertTrue(openAiDirectFileReport.blockedReasons().isEmpty());
+        assertEquals(InteropCapabilityLevel.UNSUPPORTED, openAiCompatibleFileReport.executionCapabilityLevel());
+        assertTrue(openAiCompatibleFileReport.blockedReasons().stream()
+                .anyMatch(reason -> reason.contains("accepted exception")));
+        assertEquals(SupportStatus.BLOCKED, openAiCompatibleRealtimeFeature.supportStatus());
+        assertTrue(openAiCompatibleRealtimeFeature.blockedReasons().stream()
+                .anyMatch(reason -> reason.contains("realtime client secrets")));
+    }
+
     private CatalogCandidateView geminiCandidate(Long siteProfileId, UpstreamSiteKind siteKind) {
         return new CatalogCandidateView(
                 301L,

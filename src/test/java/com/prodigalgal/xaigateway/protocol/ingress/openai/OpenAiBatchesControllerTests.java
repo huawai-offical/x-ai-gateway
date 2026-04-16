@@ -61,4 +61,48 @@ class OpenAiBatchesControllerTests {
                 .jsonPath("$.object").isEqualTo("batch")
                 .jsonPath("$.status").isEqualTo("validating");
     }
+
+    @Test
+    void shouldGetBatch() {
+        ObjectNode response = objectMapper.createObjectNode();
+        response.put("id", "batch_1");
+        response.put("object", "batch");
+        response.put("status", "in_progress");
+
+        Mockito.when(gatewayTokenAuthenticationResolver.authenticate("Bearer sk-gw-test.secret", null, null, null))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayResourceExecutionService.executeLifecycleJson(1L, "sk-gw-test", "GET", "/v1/batches/batch_1", "resource-orchestration", null))
+                .thenReturn(response);
+
+        webTestClient.get()
+                .uri("/v1/batches/batch_1")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.id").isEqualTo("batch_1")
+                .jsonPath("$.status").isEqualTo("in_progress");
+    }
+
+    @Test
+    void shouldCancelBatch() {
+        ObjectNode response = objectMapper.createObjectNode();
+        response.put("id", "batch_1");
+        response.put("object", "batch");
+        response.put("status", "cancelling");
+
+        Mockito.when(gatewayTokenAuthenticationResolver.authenticate("Bearer sk-gw-test.secret", null, null, null))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayResourceExecutionService.executeLifecycleJson(1L, "sk-gw-test", "POST", "/v1/batches/batch_1/cancel", "resource-orchestration", null))
+                .thenReturn(response);
+
+        webTestClient.post()
+                .uri("/v1/batches/batch_1/cancel")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.id").isEqualTo("batch_1")
+                .jsonPath("$.status").isEqualTo("cancelling");
+    }
 }

@@ -479,6 +479,111 @@ apiRequest.mockImplementation(async () => [
     supportsTuning: false,
     supportsRealtime: false,
   },
+  {
+    siteProfileId: 4,
+    profileCode: 'site:openai_compatible_generic',
+    displayName: 'OPENAI_COMPATIBLE_GENERIC',
+    providerFamily: 'OPENAI',
+    siteKind: 'OPENAI_COMPATIBLE_GENERIC',
+    authStrategy: 'BEARER',
+    pathStrategy: 'OPENAI_V1',
+    errorSchemaStrategy: 'OPENAI_ERROR',
+    healthState: 'READY',
+    blockedReason: null,
+    supportedProtocols: ['openai'],
+    compatibilitySurface: 'openai',
+    credentialRequirements: ['api_key'],
+    streamTransport: 'sse',
+    fallbackStrategy: 'accepted-exception',
+    cooldownCredentialCount: 0,
+    cooldownUntil: null,
+    features: {
+      file_object: {
+        declaredLevel: 'NATIVE',
+        implementedLevel: 'UNSUPPORTED',
+        effectiveLevel: 'UNSUPPORTED',
+        supportStatus: 'BLOCKED',
+        degradationLevel: 'UNSUPPORTED',
+        blockedReasons: ['OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；files 仍作为 accepted exception，不在当前实现面内。'],
+        lossReasons: [],
+      },
+      upload_create: {
+        declaredLevel: 'UNSUPPORTED',
+        implementedLevel: 'UNSUPPORTED',
+        effectiveLevel: 'UNSUPPORTED',
+        supportStatus: 'BLOCKED',
+        degradationLevel: 'UNSUPPORTED',
+        blockedReasons: ['OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；uploads 仍作为 accepted exception，不在当前实现面内。'],
+        lossReasons: [],
+      },
+    },
+    surfaces: {
+      file_create: {
+        resourceType: 'FILE',
+        operation: 'FILE_CREATE',
+        surface: 'openai',
+        normalizedPath: '/v1/files',
+        preferredBackend: 'ORCHESTRATION',
+        supportedBackends: ['ORCHESTRATION'],
+        supportStatus: 'BLOCKED',
+        degradationLevel: 'UNSUPPORTED',
+        executionCapabilityLevel: 'UNSUPPORTED',
+        renderCapabilityLevel: 'NATIVE',
+        overallCapabilityLevel: 'UNSUPPORTED',
+        blockerReasons: ['OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；files 仍作为 accepted exception，不在当前实现面内。'],
+        lossReasons: [],
+        requiredFeatures: ['file_object'],
+        featureResolutions: {
+          file_object: {
+            declaredLevel: 'NATIVE',
+            implementedLevel: 'UNSUPPORTED',
+            effectiveLevel: 'UNSUPPORTED',
+            supportStatus: 'BLOCKED',
+            degradationLevel: 'UNSUPPORTED',
+            blockedReasons: ['OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；files 仍作为 accepted exception，不在当前实现面内。'],
+            lossReasons: [],
+          },
+        },
+      },
+      upload_create: {
+        resourceType: 'UPLOAD',
+        operation: 'UPLOAD_CREATE',
+        surface: 'openai',
+        normalizedPath: '/v1/uploads',
+        preferredBackend: 'ORCHESTRATION',
+        supportedBackends: ['ORCHESTRATION'],
+        supportStatus: 'BLOCKED',
+        degradationLevel: 'UNSUPPORTED',
+        executionCapabilityLevel: 'UNSUPPORTED',
+        renderCapabilityLevel: 'NATIVE',
+        overallCapabilityLevel: 'UNSUPPORTED',
+        blockerReasons: ['OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；uploads 仍作为 accepted exception，不在当前实现面内。'],
+        lossReasons: [],
+        requiredFeatures: ['upload_create'],
+        featureResolutions: {
+          upload_create: {
+            declaredLevel: 'UNSUPPORTED',
+            implementedLevel: 'UNSUPPORTED',
+            effectiveLevel: 'UNSUPPORTED',
+            supportStatus: 'BLOCKED',
+            degradationLevel: 'UNSUPPORTED',
+            blockedReasons: ['OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；uploads 仍作为 accepted exception，不在当前实现面内。'],
+            lossReasons: [],
+          },
+        },
+      },
+    },
+    supportsResponses: false,
+    supportsEmbeddings: true,
+    supportsAudio: false,
+    supportsImages: false,
+    supportsModeration: false,
+    supportsFiles: true,
+    supportsUploads: true,
+    supportsBatches: false,
+    supportsTuning: false,
+    supportsRealtime: false,
+  },
 ])
 
 vi.mock('../../lib/api', () => ({
@@ -508,16 +613,18 @@ describe('CapabilityMatrixPage', () => {
     expect(screen.queryByText('OPENAI_DIRECT')).not.toBeInTheDocument()
     expect(screen.getByText('GEMINI_DIRECT')).toBeInTheDocument()
     expect(screen.getByText('VERTEX_AI')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /FILE_CREATE/ })).toHaveAttribute('href', '/provider-sites/2?surface=file_create')
+    expect(screen.getByText('OPENAI_COMPATIBLE_GENERIC')).toBeInTheDocument()
+    expect(screen.getAllByRole('link', { name: /FILE_CREATE/ }).some((link) => link.getAttribute('href') === '/provider-sites/2?surface=file_create')).toBe(true)
+    expect(screen.getAllByRole('link', { name: /FILE_CREATE/ }).some((link) => link.getAttribute('href') === '/provider-sites/4?surface=file_create')).toBe(true)
     expect(screen.getByRole('link', { name: /EMBEDDING_CREATE/ })).toHaveAttribute('href', '/provider-sites/3?surface=embedding_create')
     expect(screen.getAllByText('supportStatus: ORCHESTRATION').length).toBeGreaterThan(0)
     expect(screen.getAllByText('supportStatus: BLOCKED').length).toBeGreaterThan(0)
     expect(screen.getAllByText('supportStatus: NATIVE').length).toBeGreaterThan(0)
-    expect(screen.getByText('normalizedPath: /v1/files')).toBeInTheDocument()
-    expect(screen.getByText('normalizedPath: /v1/batches')).toBeInTheDocument()
-    expect(screen.getByText('normalizedPath: /v1/fine_tuning/jobs')).toBeInTheDocument()
-    expect(screen.getByText('normalizedPath: /v1/uploads')).toBeInTheDocument()
-    expect(screen.getByText('normalizedPath: /v1/realtime/client_secrets')).toBeInTheDocument()
+    expect(screen.getAllByText('normalizedPath: /v1/files').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('normalizedPath: /v1/batches').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('normalizedPath: /v1/fine_tuning/jobs').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('normalizedPath: /v1/uploads').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('normalizedPath: /v1/realtime/client_secrets').length).toBeGreaterThan(0)
     expect(screen.getByText('normalizedPath: /v1/embeddings')).toBeInTheDocument()
     expect(screen.getByText('normalizedPath: /v1/audio/transcriptions')).toBeInTheDocument()
     expect(screen.getByText('normalizedPath: /v1/images/generations')).toBeInTheDocument()
@@ -530,5 +637,7 @@ describe('CapabilityMatrixPage', () => {
     expect(screen.getByText('featureSupport: audio_transcription:NATIVE')).toBeInTheDocument()
     expect(screen.getByText('featureSupport: image_generation:NATIVE')).toBeInTheDocument()
     expect(screen.getByText('featureSupport: moderation:NATIVE')).toBeInTheDocument()
+    expect(screen.getByText('featureSupport: file_object:BLOCKED')).toBeInTheDocument()
+    expect(screen.getAllByText(/accepted exception/).length).toBeGreaterThan(0)
   })
 })

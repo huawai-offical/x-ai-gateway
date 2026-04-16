@@ -60,4 +60,48 @@ class OpenAiFineTuningJobsControllerTests {
                 .jsonPath("$.object").isEqualTo("fine_tuning.job")
                 .jsonPath("$.status").isEqualTo("queued");
     }
+
+    @Test
+    void shouldGetTuningJob() {
+        ObjectNode response = objectMapper.createObjectNode();
+        response.put("id", "ftjob_1");
+        response.put("object", "fine_tuning.job");
+        response.put("status", "running");
+
+        Mockito.when(gatewayTokenAuthenticationResolver.authenticate("Bearer sk-gw-test.secret", null, null, null))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayResourceExecutionService.executeLifecycleJson(1L, "sk-gw-test", "GET", "/v1/fine_tuning/jobs/ftjob_1", "resource-orchestration", null))
+                .thenReturn(response);
+
+        webTestClient.get()
+                .uri("/v1/fine_tuning/jobs/ftjob_1")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.id").isEqualTo("ftjob_1")
+                .jsonPath("$.status").isEqualTo("running");
+    }
+
+    @Test
+    void shouldCancelTuningJob() {
+        ObjectNode response = objectMapper.createObjectNode();
+        response.put("id", "ftjob_1");
+        response.put("object", "fine_tuning.job");
+        response.put("status", "cancelled");
+
+        Mockito.when(gatewayTokenAuthenticationResolver.authenticate("Bearer sk-gw-test.secret", null, null, null))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayResourceExecutionService.executeLifecycleJson(1L, "sk-gw-test", "POST", "/v1/fine_tuning/jobs/ftjob_1/cancel", "resource-orchestration", null))
+                .thenReturn(response);
+
+        webTestClient.post()
+                .uri("/v1/fine_tuning/jobs/ftjob_1/cancel")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.id").isEqualTo("ftjob_1")
+                .jsonPath("$.status").isEqualTo("cancelled");
+    }
 }

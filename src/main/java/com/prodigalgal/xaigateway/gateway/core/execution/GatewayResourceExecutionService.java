@@ -218,7 +218,7 @@ public class GatewayResourceExecutionService {
                 .map(response -> objectMapper.convertValue(response.getBody(), GatewayFileResponse.class));
     }
 
-    public void deleteFile(
+    public JsonNode deleteFile(
             String distributedKeyPrefix,
             Long distributedKeyId,
             String fileId) {
@@ -232,7 +232,7 @@ public class GatewayResourceExecutionService {
                 java.util.List.of(),
                 false
         );
-        executeJson(request, distributedKeyId, "resource-orchestration");
+        return executeJson(request, distributedKeyId, "resource-orchestration").getBody();
     }
 
     public JsonNode executeLifecycleJson(

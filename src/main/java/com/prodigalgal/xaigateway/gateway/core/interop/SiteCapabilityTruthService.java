@@ -562,11 +562,7 @@ public class SiteCapabilityTruthService {
                     || semantics.operation() == TranslationOperation.ANTHROPIC_MESSAGE_BATCH_CREATE
                     || semantics.operation() == TranslationOperation.ANTHROPIC_MESSAGE_BATCH_GET
                     || semantics.operation() == TranslationOperation.ANTHROPIC_MESSAGE_BATCH_CANCEL;
-            default -> semantics.resourceType() == TranslationResourceType.FILE
-                    || semantics.resourceType() == TranslationResourceType.UPLOAD
-                    || semantics.resourceType() == TranslationResourceType.BATCH
-                    || semantics.resourceType() == TranslationResourceType.TUNING
-                    || semantics.resourceType() == TranslationResourceType.REALTIME;
+            default -> false;
         };
     }
 
@@ -596,6 +592,19 @@ public class SiteCapabilityTruthService {
                         "Anthropic 当前没有稳定的原生 tuning API，因此当前不开放。";
                 case REALTIME_CLIENT_SECRET ->
                         "Anthropic 当前没有与 OpenAI realtime client_secret 等价的稳定原生对象，因此当前不开放。";
+                default -> null;
+            };
+            case OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, GROK, MISTRAL, COHERE, TOGETHER, FIREWORKS, OPENROUTER -> switch (feature) {
+                case FILE_OBJECT ->
+                        "OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；files 仍作为 accepted exception，不在当前实现面内。";
+                case UPLOAD_CREATE ->
+                        "OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；uploads 仍作为 accepted exception，不在当前实现面内。";
+                case BATCH_CREATE ->
+                        "OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；batches 仍作为 accepted exception，不在当前实现面内。";
+                case TUNING_CREATE ->
+                        "OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；fine-tuning 仍作为 accepted exception，不在当前实现面内。";
+                case REALTIME_CLIENT_SECRET ->
+                        "OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；realtime client secrets 仍作为 accepted exception，不在当前实现面内。";
                 default -> null;
             };
             default -> null;

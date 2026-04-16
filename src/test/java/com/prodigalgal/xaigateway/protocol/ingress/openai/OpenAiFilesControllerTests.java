@@ -1,8 +1,8 @@
 package com.prodigalgal.xaigateway.protocol.ingress.openai;
 
+import tools.jackson.databind.node.JsonNodeFactory;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthenticationService;
-import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileContent;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileResponse;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayResourceExecutionService;
 import com.prodigalgal.xaigateway.testsupport.PermitAllSecurityTestConfig;
@@ -54,8 +54,9 @@ class OpenAiFilesControllerTests {
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
-                .jsonPath("$[0].id").isEqualTo("file-123")
-                .jsonPath("$[0].filename").isEqualTo("demo.txt");
+                .jsonPath("$.object").isEqualTo("list")
+                .jsonPath("$.data[0].id").isEqualTo("file-123")
+                .jsonPath("$.data[0].filename").isEqualTo("demo.txt");
     }
 
     @Test
@@ -133,5 +134,26 @@ class OpenAiFilesControllerTests {
                 .expectStatus().isOk()
                 .expectHeader().contentType(MediaType.TEXT_PLAIN)
                 .expectBody(String.class).isEqualTo("hello");
+    }
+
+    @Test
+    void shouldDeleteFileAndReturnDeleteObject() {
+        Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayResourceExecutionService.deleteFile("sk-gw-test", 1L, "file-789"))
+                .thenReturn(JsonNodeFactory.instance.objectNode()
+                        .put("id", "file-789")
+                        .put("object", "file.deleted")
+                        .put("deleted", true));
+
+        webTestClient.delete()
+                .uri("/v1/files/file-789")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.id").isEqualTo("file-789")
+                .jsonPath("$.object").isEqualTo("file.deleted")
+                .jsonPath("$.deleted").isEqualTo(true);
     }
 }
