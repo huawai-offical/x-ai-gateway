@@ -14,6 +14,8 @@ public interface RequestLogRepository extends JpaRepository<RequestLogEntity, Lo
 
     Optional<RequestLogEntity> findByRequestId(String requestId);
 
+    List<RequestLogEntity> findTop100ByGatewayResourceKeyOrderByCreatedAtDesc(String gatewayResourceKey);
+
     @Query("""
             select entity
             from RequestLogEntity entity

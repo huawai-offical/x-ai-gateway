@@ -1,7 +1,10 @@
 package com.prodigalgal.xaigateway.admin.application;
 
+import com.prodigalgal.xaigateway.admin.api.AsyncResourceDetailResponse;
+import com.prodigalgal.xaigateway.admin.api.AsyncResourceSummaryResponse;
 import com.prodigalgal.xaigateway.admin.api.CacheHitLogResponse;
 import com.prodigalgal.xaigateway.admin.api.ObservabilitySummaryResponse;
+import com.prodigalgal.xaigateway.admin.api.ObservabilityTraceResponse;
 import com.prodigalgal.xaigateway.admin.api.RequestLogResponse;
 import com.prodigalgal.xaigateway.admin.api.RouteDecisionLogResponse;
 import com.prodigalgal.xaigateway.admin.api.UpstreamCacheReferenceResponse;
@@ -18,7 +21,13 @@ import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCacheRefe
 import com.prodigalgal.xaigateway.infra.persistence.repository.UsageRecordRepository;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +44,23 @@ public class ObservabilityQueryService {
     private final RequestLogRepository requestLogRepository;
     private final UpstreamCacheReferenceRepository upstreamCacheReferenceRepository;
     private final UsageRecordRepository usageRecordRepository;
+    private final AsyncResourceAdminService asyncResourceAdminService;
+
+    @Autowired
+    public ObservabilityQueryService(
+            RouteDecisionLogRepository routeDecisionLogRepository,
+            CacheHitLogRepository cacheHitLogRepository,
+            RequestLogRepository requestLogRepository,
+            UpstreamCacheReferenceRepository upstreamCacheReferenceRepository,
+            UsageRecordRepository usageRecordRepository,
+            AsyncResourceAdminService asyncResourceAdminService) {
+        this.routeDecisionLogRepository = routeDecisionLogRepository;
+        this.cacheHitLogRepository = cacheHitLogRepository;
+        this.requestLogRepository = requestLogRepository;
+        this.upstreamCacheReferenceRepository = upstreamCacheReferenceRepository;
+        this.usageRecordRepository = usageRecordRepository;
+        this.asyncResourceAdminService = asyncResourceAdminService;
+    }
 
     public ObservabilityQueryService(
             RouteDecisionLogRepository routeDecisionLogRepository,
@@ -42,19 +68,22 @@ public class ObservabilityQueryService {
             RequestLogRepository requestLogRepository,
             UpstreamCacheReferenceRepository upstreamCacheReferenceRepository,
             UsageRecordRepository usageRecordRepository) {
-        this.routeDecisionLogRepository = routeDecisionLogRepository;
-        this.cacheHitLogRepository = cacheHitLogRepository;
-        this.requestLogRepository = requestLogRepository;
-        this.upstreamCacheReferenceRepository = upstreamCacheReferenceRepository;
-        this.usageRecordRepository = usageRecordRepository;
+        this(
+                routeDecisionLogRepository,
+                cacheHitLogRepository,
+                requestLogRepository,
+                upstreamCacheReferenceRepository,
+                usageRecordRepository,
+                null
+        );
     }
 
     public List<RouteDecisionLogResponse> listRouteDecisions(Long distributedKeyId) {
-        return listRouteDecisions(distributedKeyId, null, null, null);
+        return listRouteDecisions(distributedKeyId, null, null, null, null, null, null);
     }
 
     public List<RouteDecisionLogResponse> listRouteDecisions(Long distributedKeyId, ProviderType providerType) {
-        return listRouteDecisions(distributedKeyId, providerType, null, null);
+        return listRouteDecisions(distributedKeyId, providerType, null, null, null, null, null);
     }
 
     public List<RouteDecisionLogResponse> listRouteDecisions(
@@ -62,9 +91,30 @@ public class ObservabilityQueryService {
             ProviderType providerType,
             Instant from,
             Instant to) {
+        return listRouteDecisions(distributedKeyId, providerType, from, to, null, null, null);
+    }
+
+    public List<RouteDecisionLogResponse> listRouteDecisions(
+            Long distributedKeyId,
+            ProviderType providerType,
+            Instant from,
+            Instant to,
+            String requestId,
+            String gatewayResourceKey,
+            String upstreamObjectId) {
         TimeWindow window = resolveWindow(from, to);
+        Set<String> requestIds = resolveRequestIds(
+                requestId,
+                gatewayResourceKey,
+                upstreamObjectId,
+                distributedKeyId,
+                providerType,
+                window
+        );
         List<RouteDecisionLogEntity> entities;
-        if (window == null) {
+        if (requestIds != null) {
+            entities = routeDecisionsForRequestIds(requestIds, distributedKeyId, providerType, window);
+        } else if (window == null) {
             entities = routeDecisionLogRepository.search(distributedKeyId, providerType, DEFAULT_SAMPLE_PAGE);
         } else {
             entities = routeDecisionLogRepository.searchWithinWindow(
@@ -77,11 +127,7 @@ public class ObservabilityQueryService {
     }
 
     public List<CacheHitLogResponse> listCacheHits(Long distributedKeyId, ProviderType providerType) {
-        List<CacheHitLogEntity> entities = cacheHitLogRepository.search(
-                distributedKeyId,
-                providerType,
-                DEFAULT_SAMPLE_PAGE);
-        return entities.stream().map(this::toCacheHitResponse).toList();
+        return listCacheHits(distributedKeyId, providerType, null, null, null, null, null);
     }
 
     public List<CacheHitLogResponse> listCacheHits(
@@ -89,16 +135,41 @@ public class ObservabilityQueryService {
             ProviderType providerType,
             Instant from,
             Instant to) {
-        TimeWindow window = resolveWindow(from, to);
-        if (window == null) {
-            return listCacheHits(distributedKeyId, providerType);
-        }
+        return listCacheHits(distributedKeyId, providerType, from, to, null, null, null);
+    }
 
-        List<CacheHitLogEntity> entities = cacheHitLogRepository.searchWithinWindow(
+    public List<CacheHitLogResponse> listCacheHits(
+            Long distributedKeyId,
+            ProviderType providerType,
+            Instant from,
+            Instant to,
+            String requestId,
+            String gatewayResourceKey,
+            String upstreamObjectId) {
+        TimeWindow window = resolveWindow(from, to);
+        Set<String> requestIds = resolveRequestIds(
+                requestId,
+                gatewayResourceKey,
+                upstreamObjectId,
                 distributedKeyId,
                 providerType,
-                window.from(),
-                window.to());
+                window
+        );
+        List<CacheHitLogEntity> entities;
+        if (requestIds != null) {
+            entities = cacheHitsForRequestIds(requestIds, distributedKeyId, providerType, window);
+        } else if (window == null) {
+            entities = cacheHitLogRepository.search(
+                    distributedKeyId,
+                    providerType,
+                    DEFAULT_SAMPLE_PAGE);
+        } else {
+            entities = cacheHitLogRepository.searchWithinWindow(
+                    distributedKeyId,
+                    providerType,
+                    window.from(),
+                    window.to());
+        }
         return entities.stream().map(this::toCacheHitResponse).toList();
     }
 
@@ -107,9 +178,30 @@ public class ObservabilityQueryService {
             ProviderType providerType,
             Instant from,
             Instant to) {
+        return listRequestLogs(distributedKeyId, providerType, from, to, null, null, null);
+    }
+
+    public List<RequestLogResponse> listRequestLogs(
+            Long distributedKeyId,
+            ProviderType providerType,
+            Instant from,
+            Instant to,
+            String requestId,
+            String gatewayResourceKey,
+            String upstreamObjectId) {
         TimeWindow window = resolveWindow(from, to);
+        Set<String> requestIds = resolveRequestIds(
+                requestId,
+                gatewayResourceKey,
+                upstreamObjectId,
+                distributedKeyId,
+                providerType,
+                window
+        );
         List<RequestLogEntity> entities;
-        if (window == null) {
+        if (requestIds != null) {
+            entities = requestLogsForRequestIds(requestIds, distributedKeyId, providerType, window);
+        } else if (window == null) {
             entities = requestLogRepository.search(distributedKeyId, providerType, DEFAULT_SAMPLE_PAGE);
         } else {
             entities = requestLogRepository.searchWithinWindow(
@@ -122,7 +214,7 @@ public class ObservabilityQueryService {
     }
 
     public List<UpstreamCacheReferenceResponse> listUpstreamCacheReferences(Long distributedKeyId, String status) {
-        return listUpstreamCacheReferences(distributedKeyId, null, status, null, null);
+        return listUpstreamCacheReferences(distributedKeyId, null, status, null, null, null, null, null);
     }
 
     public List<UpstreamCacheReferenceResponse> listUpstreamCacheReferences(
@@ -131,11 +223,33 @@ public class ObservabilityQueryService {
             String status,
             Instant from,
             Instant to) {
+        return listUpstreamCacheReferences(distributedKeyId, providerType, status, from, to, null, null, null);
+    }
+
+    public List<UpstreamCacheReferenceResponse> listUpstreamCacheReferences(
+            Long distributedKeyId,
+            ProviderType providerType,
+            String status,
+            Instant from,
+            Instant to,
+            String requestId,
+            String gatewayResourceKey,
+            String upstreamObjectId) {
         String normalizedStatus = normalizeStatus(status);
         TimeWindow window = resolveWindow(from, to);
+        Set<String> requestIds = resolveRequestIds(
+                requestId,
+                gatewayResourceKey,
+                upstreamObjectId,
+                distributedKeyId,
+                providerType,
+                window
+        );
 
         List<UpstreamCacheReferenceEntity> entities;
-        if (window == null) {
+        if (requestIds != null) {
+            entities = upstreamReferencesForRequestIds(requestIds, normalizedStatus, distributedKeyId, providerType, window);
+        } else if (window == null) {
             entities = upstreamCacheReferenceRepository.search(
                     distributedKeyId,
                     providerType,
@@ -152,6 +266,41 @@ public class ObservabilityQueryService {
         return entities.stream().map(this::toUpstreamCacheReferenceResponse).toList();
     }
 
+    public ObservabilityTraceResponse trace(String requestId) {
+        RequestLogEntity requestLog = requestLogRepository.findByRequestId(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("未找到对应的 requestId。"));
+
+        RouteDecisionLogResponse routeDecision = routeDecisionLogRepository.findTopByRequestIdOrderByCreatedAtDesc(requestId)
+                .map(this::toRouteDecisionResponse)
+                .orElse(null);
+        List<CacheHitLogResponse> cacheHits = cacheHitLogRepository.findAllByRequestIdOrderByCreatedAtDesc(requestId).stream()
+                .map(this::toCacheHitResponse)
+                .toList();
+        List<UpstreamCacheReferenceResponse> upstreamCacheReferences = upstreamReferencesForRequestIds(
+                Set.of(requestId),
+                null,
+                null,
+                null,
+                null
+        ).stream().map(this::toUpstreamCacheReferenceResponse).toList();
+
+        AsyncResourceSummaryResponse asyncResourceSummary = asyncResourceAdminService == null || requestLog.getGatewayResourceKey() == null
+                ? null
+                : asyncResourceAdminService.findAsyncResourceSummary(requestLog.getGatewayResourceKey()).orElse(null);
+        AsyncResourceDetailResponse asyncResourceDetail = asyncResourceAdminService == null || requestLog.getGatewayResourceKey() == null
+                ? null
+                : asyncResourceAdminService.findAsyncResourceDetail(requestLog.getGatewayResourceKey()).orElse(null);
+
+        return new ObservabilityTraceResponse(
+                toRequestLogResponse(requestLog),
+                routeDecision,
+                cacheHits,
+                upstreamCacheReferences,
+                asyncResourceSummary,
+                asyncResourceDetail
+        );
+    }
+
     public ObservabilitySummaryResponse summary(Long distributedKeyId, ProviderType providerType) {
         return summary(distributedKeyId, providerType, null, null);
     }
@@ -162,14 +311,18 @@ public class ObservabilityQueryService {
             Instant from,
             Instant to) {
         TimeWindow window = resolveWindow(from, to);
-        List<RouteDecisionLogResponse> routeDecisions = listRouteDecisions(distributedKeyId, providerType, from, to);
-        List<CacheHitLogResponse> cacheHits = listCacheHits(distributedKeyId, providerType, from, to);
+        List<RouteDecisionLogResponse> routeDecisions = listRouteDecisions(distributedKeyId, providerType, from, to, null, null, null);
+        List<CacheHitLogResponse> cacheHits = listCacheHits(distributedKeyId, providerType, from, to, null, null, null);
         List<UpstreamCacheReferenceResponse> upstreamReferences = listUpstreamCacheReferences(
                 distributedKeyId,
                 providerType,
                 "ACTIVE",
                 from,
-                to);
+                to,
+                null,
+                null,
+                null
+        );
         List<UsageRecordEntity> usageRecords = window == null
                 ? usageRecordRepository.search(distributedKeyId, providerType, DEFAULT_SAMPLE_PAGE)
                 : usageRecordRepository.searchWithinWindow(distributedKeyId, providerType, window.from(), window.to());
@@ -205,6 +358,156 @@ public class ObservabilityQueryService {
         );
     }
 
+    private Set<String> resolveRequestIds(
+            String requestId,
+            String gatewayResourceKey,
+            String upstreamObjectId,
+            Long distributedKeyId,
+            ProviderType providerType,
+            TimeWindow window) {
+        String normalizedRequestId = normalizeFilter(requestId);
+        if (normalizedRequestId != null) {
+            return Set.of(normalizedRequestId);
+        }
+
+        LinkedHashSet<String> resourceKeys = resolveGatewayResourceKeys(gatewayResourceKey, upstreamObjectId);
+        if (resourceKeys == null) {
+            return null;
+        }
+        if (resourceKeys.isEmpty()) {
+            return Set.of();
+        }
+
+        LinkedHashSet<String> requestIds = new LinkedHashSet<>();
+        for (String resourceKey : resourceKeys) {
+            for (RequestLogEntity entity : requestLogRepository.findTop100ByGatewayResourceKeyOrderByCreatedAtDesc(resourceKey)) {
+                if (matchesRequestLogFilters(entity, distributedKeyId, providerType, window)) {
+                    requestIds.add(entity.getRequestId());
+                }
+            }
+        }
+        return requestIds;
+    }
+
+    private LinkedHashSet<String> resolveGatewayResourceKeys(String gatewayResourceKey, String upstreamObjectId) {
+        String normalizedGatewayResourceKey = normalizeFilter(gatewayResourceKey);
+        String normalizedUpstreamObjectId = normalizeFilter(upstreamObjectId);
+        if (normalizedGatewayResourceKey == null && normalizedUpstreamObjectId == null) {
+            return null;
+        }
+
+        LinkedHashSet<String> keys = new LinkedHashSet<>();
+        if (normalizedGatewayResourceKey != null) {
+            keys.add(normalizedGatewayResourceKey);
+        }
+        if (normalizedUpstreamObjectId != null && asyncResourceAdminService != null) {
+            asyncResourceAdminService.findAsyncResourcesByUpstreamObjectId(normalizedUpstreamObjectId).stream()
+                    .map(AsyncResourceSummaryResponse::resourceKey)
+                    .filter(Objects::nonNull)
+                    .forEach(keys::add);
+        }
+        return keys;
+    }
+
+    private List<RequestLogEntity> requestLogsForRequestIds(
+            Set<String> requestIds,
+            Long distributedKeyId,
+            ProviderType providerType,
+            TimeWindow window) {
+        return requestIds.stream()
+                .map(requestLogRepository::findByRequestId)
+                .flatMap(Optional::stream)
+                .filter(entity -> matchesRequestLogFilters(entity, distributedKeyId, providerType, window))
+                .sorted(Comparator.comparing(RequestLogEntity::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
+    }
+
+    private List<RouteDecisionLogEntity> routeDecisionsForRequestIds(
+            Set<String> requestIds,
+            Long distributedKeyId,
+            ProviderType providerType,
+            TimeWindow window) {
+        return requestIds.stream()
+                .map(routeDecisionLogRepository::findTopByRequestIdOrderByCreatedAtDesc)
+                .flatMap(Optional::stream)
+                .filter(entity -> matchesRouteDecisionFilters(entity, distributedKeyId, providerType, window))
+                .sorted(Comparator.comparing(RouteDecisionLogEntity::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
+    }
+
+    private List<CacheHitLogEntity> cacheHitsForRequestIds(
+            Set<String> requestIds,
+            Long distributedKeyId,
+            ProviderType providerType,
+            TimeWindow window) {
+        return requestIds.stream()
+                .flatMap(id -> cacheHitLogRepository.findAllByRequestIdOrderByCreatedAtDesc(id).stream())
+                .filter(entity -> matchesCacheHitFilters(entity, distributedKeyId, providerType, window))
+                .sorted(Comparator.comparing(CacheHitLogEntity::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
+    }
+
+    private List<UpstreamCacheReferenceEntity> upstreamReferencesForRequestIds(
+            Set<String> requestIds,
+            String normalizedStatus,
+            Long distributedKeyId,
+            ProviderType providerType,
+            TimeWindow window) {
+        LinkedHashSet<UpstreamCacheReferenceEntity> references = new LinkedHashSet<>();
+        List<RouteDecisionLogEntity> routeDecisions = routeDecisionsForRequestIds(requestIds, distributedKeyId, providerType, window);
+        List<CacheHitLogEntity> cacheHits = cacheHitsForRequestIds(requestIds, distributedKeyId, providerType, window);
+
+        routeDecisions.forEach(entity -> maybeAddUpstreamReference(
+                references,
+                entity.getDistributedKeyId(),
+                entity.getSelectedProviderType(),
+                entity.getModelGroup(),
+                entity.getPrefixHash(),
+                normalizedStatus,
+                distributedKeyId,
+                providerType,
+                window
+        ));
+        cacheHits.forEach(entity -> maybeAddUpstreamReference(
+                references,
+                entity.getDistributedKeyId(),
+                entity.getProviderType(),
+                entity.getModelGroup(),
+                entity.getPrefixHash(),
+                normalizedStatus,
+                distributedKeyId,
+                providerType,
+                window
+        ));
+
+        return references.stream()
+                .sorted(Comparator.comparing(UpstreamCacheReferenceEntity::getUpdatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
+    }
+
+    private void maybeAddUpstreamReference(
+            LinkedHashSet<UpstreamCacheReferenceEntity> references,
+            Long lookupDistributedKeyId,
+            ProviderType lookupProviderType,
+            String modelGroup,
+            String prefixHash,
+            String normalizedStatus,
+            Long distributedKeyFilter,
+            ProviderType providerFilter,
+            TimeWindow window) {
+        if (lookupDistributedKeyId == null || lookupProviderType == null || modelGroup == null || prefixHash == null) {
+            return;
+        }
+        upstreamCacheReferenceRepository.findByDistributedKeyIdAndProviderTypeAndModelGroupAndPrefixHash(
+                        lookupDistributedKeyId,
+                        lookupProviderType,
+                        modelGroup,
+                        prefixHash
+                )
+                .filter(entity -> matchesUpstreamReferenceFilters(entity, distributedKeyFilter, providerFilter, normalizedStatus, window))
+                .ifPresent(references::add);
+    }
+
     private TimeWindow resolveWindow(Instant from, Instant to) {
         if (from == null && to == null) {
             return null;
@@ -223,6 +526,65 @@ public class ObservabilityQueryService {
             return null;
         }
         return status.trim().toUpperCase();
+    }
+
+    private String normalizeFilter(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
+    }
+
+    private boolean matchesRouteDecisionFilters(
+            RouteDecisionLogEntity entity,
+            Long distributedKeyId,
+            ProviderType providerType,
+            TimeWindow window) {
+        return (distributedKeyId == null || Objects.equals(entity.getDistributedKeyId(), distributedKeyId))
+                && (providerType == null || providerType == entity.getSelectedProviderType())
+                && withinWindow(entity.getCreatedAt(), window);
+    }
+
+    private boolean matchesCacheHitFilters(
+            CacheHitLogEntity entity,
+            Long distributedKeyId,
+            ProviderType providerType,
+            TimeWindow window) {
+        return (distributedKeyId == null || Objects.equals(entity.getDistributedKeyId(), distributedKeyId))
+                && (providerType == null || providerType == entity.getProviderType())
+                && withinWindow(entity.getCreatedAt(), window);
+    }
+
+    private boolean matchesRequestLogFilters(
+            RequestLogEntity entity,
+            Long distributedKeyId,
+            ProviderType providerType,
+            TimeWindow window) {
+        return (distributedKeyId == null || Objects.equals(entity.getDistributedKeyId(), distributedKeyId))
+                && (providerType == null || providerType == entity.getProviderType())
+                && withinWindow(entity.getCreatedAt(), window);
+    }
+
+    private boolean matchesUpstreamReferenceFilters(
+            UpstreamCacheReferenceEntity entity,
+            Long distributedKeyId,
+            ProviderType providerType,
+            String normalizedStatus,
+            TimeWindow window) {
+        return (distributedKeyId == null || Objects.equals(entity.getDistributedKeyId(), distributedKeyId))
+                && (providerType == null || providerType == entity.getProviderType())
+                && (normalizedStatus == null || normalizedStatus.equals(entity.getStatus()))
+                && withinWindow(entity.getUpdatedAt(), window);
+    }
+
+    private boolean withinWindow(Instant value, TimeWindow window) {
+        if (window == null) {
+            return true;
+        }
+        if (value == null) {
+            return false;
+        }
+        return !value.isBefore(window.from()) && !value.isAfter(window.to());
     }
 
     private RouteDecisionLogResponse toRouteDecisionResponse(RouteDecisionLogEntity entity) {

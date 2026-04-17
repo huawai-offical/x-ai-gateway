@@ -10,10 +10,14 @@ import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEvent;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEventType;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolCall;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalUsage;
+import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileResponse;
+import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileService;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
+import com.prodigalgal.xaigateway.gateway.core.resource.GatewayAsyncResourceService;
+import com.prodigalgal.xaigateway.gateway.core.resource.GatewayAsyncResourceType;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayFinishReason;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
@@ -21,17 +25,27 @@ import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionSource;
 import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.shared.ReasoningTransport;
+import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayAsyncResourceEntity;
 import com.prodigalgal.xaigateway.protocol.ingress.anthropic.AnthropicMessagesEncoder;
 import com.prodigalgal.xaigateway.protocol.ingress.anthropic.AnthropicMessagesResponse;
+import com.prodigalgal.xaigateway.protocol.ingress.anthropic.AnthropicMessageBatchesEncoder;
+import com.prodigalgal.xaigateway.protocol.ingress.google.GeminiBatchesEncoder;
+import com.prodigalgal.xaigateway.protocol.ingress.google.GeminiEmbeddingsEncoder;
+import com.prodigalgal.xaigateway.protocol.ingress.google.GeminiFilesEncoder;
 import com.prodigalgal.xaigateway.protocol.ingress.google.GeminiGenerateContentEncoder;
 import com.prodigalgal.xaigateway.protocol.ingress.google.GeminiGenerateContentResponse;
 import com.prodigalgal.xaigateway.protocol.ingress.openai.OpenAiChatCompletionEncoder;
 import com.prodigalgal.xaigateway.protocol.ingress.openai.OpenAiChatCompletionResponse;
 import com.prodigalgal.xaigateway.protocol.ingress.openai.OpenAiResponsesEncoder;
 import com.prodigalgal.xaigateway.protocol.ingress.openai.OpenAiResponsesResponse;
+import java.lang.reflect.Field;
+import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -124,6 +138,91 @@ class GatewayProtocolEncoderContractTests {
         assertEquals("lookup_weather", response.candidates().get(0).content().parts().get(0).functionCall().name());
         assertEquals(280, response.usageMetadata().cachedContentTokenCount());
         assertEquals(40, response.usageMetadata().thoughtsTokenCount());
+    }
+
+    @Test
+    void shouldEncodeGeminiEmbeddingsContract() {
+        GeminiEmbeddingsEncoder encoder = new GeminiEmbeddingsEncoder(objectMapper);
+        ObjectNode responseBody = objectMapper.createObjectNode();
+        ArrayNode data = responseBody.putArray("data");
+        data.addObject()
+                .putArray("embedding")
+                .add(0.1)
+                .add(0.2);
+        data.addObject()
+                .putArray("embedding")
+                .add(0.3)
+                .add(0.4);
+
+        JsonNode single = encoder.encodeSingle(responseBody);
+        JsonNode batch = encoder.encodeBatch(responseBody);
+
+        assertEquals(0.1, single.path("embedding").path("values").get(0).asDouble());
+        assertEquals(2, batch.path("embeddings").size());
+        assertEquals(0.4, batch.path("embeddings").get(1).path("values").get(1).asDouble());
+    }
+
+    @Test
+    void shouldEncodeGeminiFilesContract() {
+        GeminiFilesEncoder encoder = new GeminiFilesEncoder(objectMapper);
+        GatewayFileService.GoogleNativeFileView view = new GatewayFileService.GoogleNativeFileView(
+                GatewayFileResponse.from("file_local_1", "doc.txt", "assistants", 12L, Instant.parse("2026-04-17T00:00:00Z"), "processed"),
+                "files/abc123",
+                "Doc",
+                "text/plain",
+                Instant.parse("2026-04-17T00:00:00Z"),
+                Instant.parse("2026-04-17T01:00:00Z"),
+                "sha256",
+                101L,
+                11L,
+                "processed"
+        );
+
+        JsonNode encoded = encoder.encode(view);
+        JsonNode listEncoded = encoder.encodeList(List.of(view));
+
+        assertEquals("files/abc123", encoded.path("name").asText());
+        assertEquals("ACTIVE", encoded.path("state").asText());
+        assertEquals(1, listEncoded.path("files").size());
+    }
+
+    @Test
+    void shouldEncodeGeminiBatchesContract() {
+        GeminiBatchesEncoder encoder = new GeminiBatchesEncoder(objectMapper);
+        GatewayAsyncResourceEntity entity = new GatewayAsyncResourceEntity();
+        entity.setResourceKey("batch_local_1");
+        entity.setResourceType(GatewayAsyncResourceType.BATCH);
+        entity.setRequestModel("gemini-2.5-pro");
+        entity.setStatus("completed");
+        entity.setUpstreamObjectId("batches/abc123");
+        setField(entity, "createdAt", Instant.parse("2026-04-17T00:00:00Z"));
+        setField(entity, "updatedAt", Instant.parse("2026-04-17T01:00:00Z"));
+
+        ObjectNode payload = objectMapper.createObjectNode();
+        payload.put("model", "gemini-2.5-pro");
+        payload.put("status", "completed");
+        payload.put("input_file_id", "file_123");
+        ObjectNode metadata = objectMapper.createObjectNode();
+        metadata.put("upstream_object_id", "batches/abc123");
+
+        JsonNode encoded = encoder.encode(new GatewayAsyncResourceService.GoogleNativeBatchView(entity, payload, metadata));
+
+        assertEquals("batches/abc123", encoded.path("name").asText());
+        assertEquals("JOB_STATE_SUCCEEDED", encoded.path("state").asText());
+        assertEquals("file_123", encoded.path("inputFile").asText());
+    }
+
+    @Test
+    void shouldEncodeAnthropicMessageBatchesContract() {
+        AnthropicMessageBatchesEncoder encoder = new AnthropicMessageBatchesEncoder(objectMapper);
+        ObjectNode response = objectMapper.createObjectNode();
+        response.put("id", "msgbatch_123");
+        response.put("status", "running");
+
+        JsonNode encoded = encoder.encode(response);
+
+        assertEquals("msgbatch_123", encoded.path("id").asText());
+        assertEquals("running", encoded.path("status").asText());
     }
 
     private CanonicalExecutionResult canonicalResult(
@@ -224,5 +323,15 @@ class GatewayProtocolEncoderContractTests {
                 routeCandidateView,
                 List.of(routeCandidateView)
         );
+    }
+
+    private void setField(Object target, String fieldName, Object value) {
+        try {
+            Field field = target.getClass().getDeclaredField(fieldName);
+            field.setAccessible(true);
+            field.set(target, value);
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException(exception);
+        }
     }
 }

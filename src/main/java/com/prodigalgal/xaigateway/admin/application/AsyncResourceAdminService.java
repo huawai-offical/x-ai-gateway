@@ -61,6 +61,25 @@ public class AsyncResourceAdminService {
         return toDetailResponse(entity);
     }
 
+    public java.util.Optional<AsyncResourceSummaryResponse> findAsyncResourceSummary(String resourceKey) {
+        return gatewayAsyncResourceRepository.findByResourceKeyAndDeletedFalse(resourceKey)
+                .map(this::toSummaryResponse);
+    }
+
+    public java.util.Optional<AsyncResourceDetailResponse> findAsyncResourceDetail(String resourceKey) {
+        return gatewayAsyncResourceRepository.findByResourceKeyAndDeletedFalse(resourceKey)
+                .map(this::toDetailResponse);
+    }
+
+    public List<AsyncResourceSummaryResponse> findAsyncResourcesByUpstreamObjectId(String upstreamObjectId) {
+        if (upstreamObjectId == null || upstreamObjectId.isBlank()) {
+            return List.of();
+        }
+        return gatewayAsyncResourceRepository.findAllByUpstreamObjectIdAndDeletedFalse(upstreamObjectId).stream()
+                .map(this::toSummaryResponse)
+                .toList();
+    }
+
     private AsyncResourceSummaryResponse toSummaryResponse(GatewayAsyncResourceEntity entity) {
         CanonicalResourceLifecycle lifecycle = gatewayAsyncResourceCanonicalizer.toLifecycle(entity);
         CanonicalResourceLineage lineage = gatewayAsyncResourceCanonicalizer.toLineage(entity);

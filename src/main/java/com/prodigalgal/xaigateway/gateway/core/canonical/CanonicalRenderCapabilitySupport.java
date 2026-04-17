@@ -107,8 +107,10 @@ public final class CanonicalRenderCapabilitySupport {
         if ("/v1/messages".equals(requestPath) || resourceType == TranslationResourceType.CHAT) {
             return true;
         }
+        if (requestPath == null || requestPath.isBlank()) {
+            return false;
+        }
         return "/v1/messages/batches".equals(requestPath)
-                || "/v1/messages/batches/{messageBatchId}".equals(requestPath)
-                || "/v1/messages/batches/{messageBatchId}/cancel".equals(requestPath);
+                || requestPath.startsWith("/v1/messages/batches/");
     }
 }

@@ -69,6 +69,15 @@ apiRequest.mockImplementation(async (url: string, init?: RequestInit) => {
     return {
       requestId: 'req-1',
       routeSelection: { selectedCandidate: { candidate: { credentialId: 1 } } },
+      plan: {
+        routeSelectionMode: 'CATALOG_SELECTION',
+        routePolicyReason: 'chat route',
+        renderPolicyReason: 'native render',
+        fallbackPolicyReason: 'allow fallback',
+        supportStatus: 'NATIVE',
+        degradationLevel: 'NATIVE',
+        objectMode: 'chat',
+      },
       text: 'hello from runtime',
       usage: { totalTokens: 12 },
       toolCalls: [],
@@ -76,12 +85,19 @@ apiRequest.mockImplementation(async (url: string, init?: RequestInit) => {
   }
   if (url === '/admin/resource/execute') {
     return {
+      requestId: 'req-resource-1',
+      gatewayResourceKey: 'file_123',
       routeSelection: { selectedCandidate: { candidate: { credentialId: 1 } } },
       plan: {
         normalizedPath: '/v1/files/{fileId}/content',
         surface: 'files',
         supportStatus: 'NATIVE',
         degradationLevel: 'NATIVE',
+        routeSelectionMode: 'STORED_LINEAGE',
+        routePolicyReason: 'stored lineage',
+        renderPolicyReason: 'native render',
+        fallbackPolicyReason: 'no fallback',
+        objectMode: 'resource-orchestration',
         blockerReasons: [],
       },
       executionBackend: 'NATIVE',
@@ -100,6 +116,46 @@ apiRequest.mockImplementation(async (url: string, init?: RequestInit) => {
         status: 'completed',
         events: [],
         degradations: [],
+      },
+    }
+  }
+  if (url === '/admin/observability/traces/req-1') {
+    return {
+      requestLog: {
+        requestId: 'req-1',
+        supportStatus: 'NATIVE',
+        degradationLevel: 'NATIVE',
+        gatewayResourceKey: null,
+      },
+      routeDecision: { selectionSource: 'PREFIX_AFFINITY' },
+      cacheHits: [],
+      upstreamCacheReferences: [],
+      asyncResourceSummary: null,
+      asyncResourceDetail: null,
+    }
+  }
+  if (url === '/admin/observability/traces/req-resource-1') {
+    return {
+      requestLog: {
+        requestId: 'req-resource-1',
+        supportStatus: 'NATIVE',
+        degradationLevel: 'NATIVE',
+        gatewayResourceKey: 'file_123',
+      },
+      routeDecision: { selectionSource: 'STORED_LINEAGE' },
+      cacheHits: [],
+      upstreamCacheReferences: [],
+      asyncResourceSummary: {
+        resourceKey: 'file_123',
+        resourceType: 'FILE',
+        status: 'completed',
+        upstreamObjectId: 'upstream-file-123',
+      },
+      asyncResourceDetail: {
+        lifecycle: {},
+        transitions: [],
+        lineage: {},
+        artifacts: [],
       },
     }
   }
@@ -128,10 +184,13 @@ describe('TranslationDebugPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '查看 Explain' }))
     expect(await screen.findByText('chat.completions')).toBeInTheDocument()
     expect(screen.getByText('CHAT_COMPLETION')).toBeInTheDocument()
+    expect(screen.getByText('计划语义')).toBeInTheDocument()
     expect(screen.getAllByText((_, node) => node?.textContent?.includes('"ingressProtocol": "OPENAI"') ?? false).length).toBeGreaterThan(0)
 
     fireEvent.click(screen.getByRole('button', { name: '执行 Chat 调试' }))
     expect(await screen.findByText('hello from runtime')).toBeInTheDocument()
+    expect(await screen.findByText('req-1')).toBeInTheDocument()
+    expect(await screen.findByText('PREFIX_AFFINITY')).toBeInTheDocument()
   })
 
   it('shows resource canonical panel and binary summary', async () => {
@@ -154,6 +213,9 @@ describe('TranslationDebugPage', () => {
     expect(await screen.findByText('128')).toBeInTheDocument()
     expect(screen.getByText('responseKind: binary')).toBeInTheDocument()
     expect(screen.getByText('objectType: file.content')).toBeInTheDocument()
+    expect(await screen.findByText('file_123')).toBeInTheDocument()
+    expect((await screen.findAllByText('req-resource-1')).length).toBeGreaterThan(0)
+    expect(await screen.findByText(/upstreamObjectId: upstream-file-123/)).toBeInTheDocument()
   })
 
   it('validates invalid json body before explain', async () => {

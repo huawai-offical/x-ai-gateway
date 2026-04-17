@@ -101,6 +101,8 @@ class AdminResourceExecutionServiceTests {
                 .thenReturn(new CanonicalExecutionPlanCompilation(plan, null, semantics, null));
         Mockito.when(gatewayResourceExecutionService.executeDetailedBinaryJson(any(), eq("gpt-4o-mini")))
                 .thenReturn(GatewayResourceExecutionResult.binary(
+                        "req-file-content-1",
+                        "file_123",
                         ResponseEntity.ok()
                                 .contentType(MediaType.APPLICATION_PDF)
                                 .body(new byte[] {1, 2, 3}),
@@ -119,6 +121,8 @@ class AdminResourceExecutionServiceTests {
         ));
 
         assertEquals(200, response.statusCode());
+        assertEquals("req-file-content-1", response.requestId());
+        assertEquals("file_123", response.gatewayResourceKey());
         assertEquals("application/pdf", response.contentType());
         assertEquals(3, response.binaryLength());
         assertEquals("binary", response.canonicalResponse().responseKind());

@@ -1,0 +1,37 @@
+[ {
+  "id" : "google-native-file-download-egress",
+  "scope" : "provider_protocol",
+  "summary" : "Google native files 当前不补 file download native egress。",
+  "blockerReason" : "Google native 不补 file download native egress。",
+  "appliesTo" : [ "/v1beta/files/{fileName}:download" ]
+}, {
+  "id" : "anthropic-files-no-native-ingress",
+  "scope" : "provider_protocol",
+  "summary" : "Anthropic files 仅通过现有 `/v1/files` surface 暴露，不新增 native ingress。",
+  "blockerReason" : "Anthropic files 不新增 native ingress。",
+  "appliesTo" : [ "/v1/files", "/v1/files/{fileId}", "/v1/files/{fileId}/content" ]
+}, {
+  "id" : "anthropic-message-batches-not-generic-batches",
+  "scope" : "provider_protocol",
+  "summary" : "Anthropic `messages/batches` 不等价于 generic `/v1/batches`。",
+  "blockerReason" : "Anthropic Message Batches 是原生 messages request array 语义，不等价于当前 file-driven /v1/batches contract，因此当前不开放。",
+  "appliesTo" : [ "/v1/batches" ]
+}, {
+  "id" : "openai-compatible-object-lifecycle-blocked",
+  "scope" : "provider_family",
+  "summary" : "OPENAI_COMPATIBLE family 不扩成 object lifecycle 通用替代实现。",
+  "blockerReason" : "OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；object lifecycle 仍作为 accepted exception，不在当前实现面内。",
+  "appliesTo" : [ "/v1/files", "/v1/uploads", "/v1/batches", "/v1/fine_tuning/jobs", "/v1/realtime/client_secrets" ]
+}, {
+  "id" : "openai-unexposed-list-events-checkpoints",
+  "scope" : "not_exposed",
+  "summary" : "未公开的 OpenAI list / events / checkpoints endpoint 继续作为 accepted exceptions。",
+  "blockerReason" : "当前仓库未暴露 GET /v1/batches、GET /v1/fine_tuning/jobs、fine-tuning events / checkpoints，因此继续作为 accepted exceptions 记录。",
+  "appliesTo" : [ "/v1/batches [GET]", "/v1/fine_tuning/jobs [GET]", "/v1/fine_tuning/jobs/{jobId}/events", "/v1/fine_tuning/jobs/{jobId}/checkpoints" ]
+}, {
+  "id" : "notion-mcp-auth-required",
+  "scope" : "workflow",
+  "summary" : "Notion MCP 当前 `Auth required`，最终回写依赖认证恢复。",
+  "blockerReason" : "Notion MCP 当前 `Auth required`，文档回写依赖认证恢复。",
+  "appliesTo" : [ ]
+} ]

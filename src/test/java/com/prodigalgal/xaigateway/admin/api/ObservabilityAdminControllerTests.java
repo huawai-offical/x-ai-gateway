@@ -1,6 +1,7 @@
 package com.prodigalgal.xaigateway.admin.api;
 
 import com.prodigalgal.xaigateway.admin.application.ObservabilityQueryService;
+import com.prodigalgal.xaigateway.gateway.core.resource.GatewayAsyncResourceType;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.testsupport.PermitAllSecurityTestConfig;
 import java.time.Instant;
@@ -27,7 +28,14 @@ class ObservabilityAdminControllerTests {
     void shouldReturnRouteDecisionLogs() {
         Instant from = Instant.parse("2026-04-07T07:00:00Z");
         Instant to = Instant.parse("2026-04-07T09:00:00Z");
-        Mockito.when(observabilityQueryService.listRouteDecisions(1L, ProviderType.OPENAI_DIRECT, from, to))
+        Mockito.when(observabilityQueryService.listRouteDecisions(
+                        1L,
+                        ProviderType.OPENAI_DIRECT,
+                        from,
+                        to,
+                        null,
+                        null,
+                        null))
                 .thenReturn(List.of(new RouteDecisionLogResponse(
                         1L,
                         "req-1",
@@ -75,7 +83,14 @@ class ObservabilityAdminControllerTests {
     void shouldReturnCacheHitLogs() {
         Instant from = Instant.parse("2026-04-07T07:00:00Z");
         Instant to = Instant.parse("2026-04-07T09:00:00Z");
-        Mockito.when(observabilityQueryService.listCacheHits(null, ProviderType.OPENAI_DIRECT, from, to))
+        Mockito.when(observabilityQueryService.listCacheHits(
+                        null,
+                        ProviderType.OPENAI_DIRECT,
+                        from,
+                        to,
+                        null,
+                        null,
+                        null))
                 .thenReturn(List.of(new CacheHitLogResponse(
                         1L,
                         "req-1",
@@ -119,7 +134,14 @@ class ObservabilityAdminControllerTests {
     void shouldReturnRequestLogs() {
         Instant from = Instant.parse("2026-04-07T07:00:00Z");
         Instant to = Instant.parse("2026-04-07T09:00:00Z");
-        Mockito.when(observabilityQueryService.listRequestLogs(1L, ProviderType.OPENAI_DIRECT, from, to))
+        Mockito.when(observabilityQueryService.listRequestLogs(
+                        1L,
+                        ProviderType.OPENAI_DIRECT,
+                        from,
+                        to,
+                        null,
+                        null,
+                        null))
                 .thenReturn(List.of(new RequestLogResponse(
                         1L,
                         "req-1",
@@ -173,7 +195,15 @@ class ObservabilityAdminControllerTests {
     void shouldReturnUpstreamCacheReferences() {
         Instant from = Instant.parse("2026-04-07T07:00:00Z");
         Instant to = Instant.parse("2026-04-07T09:00:00Z");
-        Mockito.when(observabilityQueryService.listUpstreamCacheReferences(1L, ProviderType.GEMINI_DIRECT, "ACTIVE", from, to))
+        Mockito.when(observabilityQueryService.listUpstreamCacheReferences(
+                        1L,
+                        ProviderType.GEMINI_DIRECT,
+                        "ACTIVE",
+                        from,
+                        to,
+                        null,
+                        null,
+                        null))
                 .thenReturn(List.of(new UpstreamCacheReferenceResponse(
                         1L,
                         1L,
@@ -202,6 +232,100 @@ class ObservabilityAdminControllerTests {
                 .expectBody()
                 .jsonPath("$[0].externalCacheRef").isEqualTo("cachedContents/abc")
                 .jsonPath("$[0].status").isEqualTo("ACTIVE");
+    }
+
+    @Test
+    void shouldReturnTrace() {
+        Instant now = Instant.parse("2026-04-07T08:00:00Z");
+        Mockito.when(observabilityQueryService.trace("req-1"))
+                .thenReturn(new ObservabilityTraceResponse(
+                        new RequestLogResponse(
+                                1L,
+                                "req-1",
+                                1L,
+                                "sk-gw-test",
+                                "openai",
+                                "/v1/batches/batch_1",
+                                "batch",
+                                "batch_get",
+                                "gpt-4o",
+                                "gpt-4o",
+                                "gpt-4o",
+                                "gpt-4o",
+                                ProviderType.OPENAI_DIRECT,
+                                101L,
+                                "PREFIX_AFFINITY",
+                                "ORCHESTRATION",
+                                "NATIVE",
+                                "NATIVE",
+                                "gateway-object-lineage",
+                                "batch_1",
+                                "object",
+                                "batch",
+                                "batch_1",
+                                "in_progress",
+                                1,
+                                com.prodigalgal.xaigateway.gateway.core.observability.GatewayRequestStatus.COMPLETED,
+                                now,
+                                now,
+                                now
+                        ),
+                        new RouteDecisionLogResponse(
+                                2L,
+                                "req-1",
+                                1L,
+                                "sk-gw-test",
+                                "gpt-4o",
+                                "gpt-4o",
+                                "gpt-4o",
+                                "openai",
+                                "/v1/batches/batch_1",
+                                "batch",
+                                "batch_get",
+                                "gpt-4o",
+                                "PREFIX_AFFINITY",
+                                "ORCHESTRATION",
+                                "NATIVE",
+                                "NATIVE",
+                                "gateway-object-lineage",
+                                101L,
+                                ProviderType.OPENAI_DIRECT,
+                                "https://api.openai.com",
+                                "prefix",
+                                "fingerprint",
+                                1,
+                                "{\"candidates\":[]}",
+                                now
+                        ),
+                        List.of(),
+                        List.of(),
+                        new AsyncResourceSummaryResponse(
+                                "batch_1",
+                                GatewayAsyncResourceType.BATCH,
+                                "in_progress",
+                                "IN_PROGRESS",
+                                false,
+                                false,
+                                "gateway-object-lineage",
+                                "batch_1",
+                                1,
+                                null,
+                                null,
+                                null,
+                                now,
+                                now
+                        ),
+                        null
+                ));
+
+        webTestClient.get()
+                .uri("/admin/observability/traces/req-1")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.requestLog.requestId").isEqualTo("req-1")
+                .jsonPath("$.routeDecision.selectionSource").isEqualTo("PREFIX_AFFINITY")
+                .jsonPath("$.asyncResourceSummary.resourceKey").isEqualTo("batch_1");
     }
 
     @Test

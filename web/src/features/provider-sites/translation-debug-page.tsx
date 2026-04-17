@@ -1,7 +1,7 @@
 import { type FormEvent, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { apiRequest } from '../../lib/api'
-import { useTypedMutation } from '../../lib/typed-react-query'
+import { useTypedMutation, useTypedQuery } from '../../lib/typed-react-query'
 import {
   featureLabel,
   isChatLikePath,
@@ -9,6 +9,7 @@ import {
   isMultipartResourcePath,
   type AdminChatExecuteResponse,
   type AdminResourceExecuteResponse,
+  type ObservabilityTraceResponse,
   type TranslationPlan,
 } from './types'
 
@@ -141,6 +142,16 @@ export function TranslationDebugPage() {
   const explainResult = explainMutation.data
   const executeResult = executeMutation.data
   const resourceExecuteResult = resourceExecuteMutation.data
+  const activePlan = resourceExecuteResult?.plan ?? executeResult?.plan ?? explainResult ?? null
+  const activeRequestId = resourceExecuteResult?.requestId ?? executeResult?.requestId ?? null
+  const activeGatewayResourceKey = resourceExecuteResult?.gatewayResourceKey ?? null
+
+  const traceQuery = useTypedQuery<ObservabilityTraceResponse>({
+    queryKey: ['observability-trace', activeRequestId],
+    queryFn: () => apiRequest<ObservabilityTraceResponse>(`/admin/observability/traces/${encodeURIComponent(activeRequestId ?? '')}`),
+    enabled: Boolean(activeRequestId),
+  })
+
   const executeTarget = canExecute
     ? isChatLikePath(requestPath)
       ? '/admin/chat/execute'
@@ -187,16 +198,31 @@ export function TranslationDebugPage() {
       ]
     : []
 
+  const planSummary = activePlan
+    ? [
+        { label: 'routeSelectionMode', value: activePlan.routeSelectionMode ?? '-' },
+        { label: 'routePolicyReason', value: activePlan.routePolicyReason ?? '-' },
+        { label: 'renderPolicyReason', value: activePlan.renderPolicyReason ?? '-' },
+        { label: 'fallbackPolicyReason', value: activePlan.fallbackPolicyReason ?? '-' },
+        { label: 'supportStatus', value: activePlan.supportStatus ?? '-' },
+        { label: 'degradationLevel', value: activePlan.degradationLevel ?? '-' },
+        { label: 'objectMode', value: activePlan.objectMode ?? '-' },
+      ]
+    : []
+
   const executeSummary = isChatLikePath(requestPath)
     ? executeResult
       ? [
           { label: 'requestId', value: executeResult.requestId },
+          { label: 'gatewayResourceKey', value: activeGatewayResourceKey ?? '-' },
           { label: 'backend', value: executeResult.executionBackend ?? '-' },
           { label: 'text', value: executeResult.text ?? '无文本输出' },
         ]
       : []
     : resourceExecuteResult
       ? [
+          { label: 'requestId', value: resourceExecuteResult.requestId ?? '-' },
+          { label: 'gatewayResourceKey', value: resourceExecuteResult.gatewayResourceKey ?? '-' },
           { label: 'backend', value: resourceExecuteResult.executionBackend ?? '无 backend' },
           { label: 'status', value: String(resourceExecuteResult.statusCode) },
           { label: 'contentType', value: resourceExecuteResult.contentType ?? '未知' },
@@ -380,6 +406,26 @@ export function TranslationDebugPage() {
 
       <div className="panel panel-wide">
         <div className="panel-head">
+          <p className="panel-kicker">Shared plan</p>
+          <h3>计划语义</h3>
+          <p className="empty-state">Explain 与 Execute 统一读取同一套计划语义字段。</p>
+        </div>
+        {planSummary.length ? (
+          <div className="detail-grid">
+            {planSummary.map((item) => (
+              <div key={item.label} className="detail-card">
+                <strong>{item.label}</strong>
+                <span>{item.value}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="empty-state">查看 explain 或执行调试后，这里会展示 route / render / fallback 语义。</p>
+        )}
+      </div>
+
+      <div className="panel panel-wide">
+        <div className="panel-head">
           <p className="panel-kicker">Explain result</p>
           <h3>Explain 结果</h3>
         </div>
@@ -491,6 +537,84 @@ export function TranslationDebugPage() {
           </div>
         ) : (
           <p className="empty-state">执行调试后可在这里对照 explain、backend 与真实 route/result。</p>
+        )}
+      </div>
+
+      <div className="panel panel-wide">
+        <div className="panel-head">
+          <p className="panel-kicker">Observability trace</p>
+          <h3>联查视图</h3>
+          <p className="empty-state">当执行结果里拿到 requestId 后，这里会自动拉取 route / cache / async 资源联查结果。</p>
+        </div>
+        {!activeRequestId ? (
+          <p className="empty-state">执行调试后可在这里查看 observability trace。</p>
+        ) : traceQuery.isLoading ? (
+          <p className="empty-state">正在加载 trace…</p>
+        ) : traceQuery.error ? (
+          <p className="empty-state">{traceQuery.error instanceof Error ? traceQuery.error.message : 'trace 查询失败。'}</p>
+        ) : traceQuery.data ? (
+          <div className="card-list">
+            <div className="detail-grid">
+              <div className="detail-card">
+                <strong>requestId</strong>
+                <span>{activeRequestId}</span>
+              </div>
+              <div className="detail-card">
+                <strong>gatewayResourceKey</strong>
+                <span>{activeGatewayResourceKey ?? traceQuery.data.requestLog?.gatewayResourceKey ?? '-'}</span>
+              </div>
+              <div className="detail-card">
+                <strong>trace support</strong>
+                <span>{traceQuery.data.requestLog?.supportStatus ?? '-'}</span>
+              </div>
+              <div className="detail-card">
+                <strong>trace degradation</strong>
+                <span>{traceQuery.data.requestLog?.degradationLevel ?? '-'}</span>
+              </div>
+            </div>
+            <div className="detail-grid">
+              <div className="detail-card">
+                <strong>routeDecision</strong>
+                <span>{traceQuery.data.routeDecision?.selectionSource ?? '无 route decision'}</span>
+              </div>
+              <div className="detail-card">
+                <strong>cacheHits</strong>
+                <span>{traceQuery.data.cacheHits.length}</span>
+              </div>
+              <div className="detail-card">
+                <strong>upstream refs</strong>
+                <span>{traceQuery.data.upstreamCacheReferences.length}</span>
+              </div>
+              <div className="detail-card">
+                <strong>async resource</strong>
+                <span>{traceQuery.data.asyncResourceSummary?.resourceKey ?? '无'}</span>
+              </div>
+            </div>
+            <div className="code-block">
+              <pre>{JSON.stringify(traceQuery.data.requestLog ?? null, null, 2)}</pre>
+            </div>
+            <div className="code-block">
+              <pre>{JSON.stringify(traceQuery.data.routeDecision ?? null, null, 2)}</pre>
+            </div>
+            {traceQuery.data.asyncResourceSummary ? (
+              <div className="detail-grid">
+                <div className="detail-card">
+                  <strong>async summary</strong>
+                  <span>resourceKey: {traceQuery.data.asyncResourceSummary.resourceKey}</span>
+                  <span>resourceType: {traceQuery.data.asyncResourceSummary.resourceType ?? '无'}</span>
+                  <span>status: {traceQuery.data.asyncResourceSummary.status ?? '无'}</span>
+                  <span>upstreamObjectId: {traceQuery.data.asyncResourceSummary.upstreamObjectId ?? '无'}</span>
+                </div>
+              </div>
+            ) : null}
+            {traceQuery.data.asyncResourceDetail ? (
+              <div className="code-block">
+                <pre>{JSON.stringify(traceQuery.data.asyncResourceDetail, null, 2)}</pre>
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <p className="empty-state">暂无 trace 数据。</p>
         )}
       </div>
     </section>

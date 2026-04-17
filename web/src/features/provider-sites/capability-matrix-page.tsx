@@ -65,6 +65,8 @@ export function CapabilityMatrixPage() {
             <div key={item.siteProfileId} className="detail-card">
               <div className="inline-actions">
                 <Link className="action-link" to={`/provider-sites/${item.siteProfileId}`}>查看站点</Link>
+                <Link className="action-link" to={`/translation-debug?protocol=openai&requestPath=${encodeURIComponent('/v1/chat/completions')}`}>调试</Link>
+                <Link className="action-link" to={`/ops/logs?providerType=${encodeURIComponent(item.siteKind)}&requestPath=${encodeURIComponent(Object.values(item.surfaces)[0]?.normalizedPath ?? '')}`}>Trace</Link>
               </div>
               <strong>{item.displayName}</strong>
               <span>{item.providerFamily} / {item.siteKind}</span>
@@ -95,7 +97,7 @@ export function CapabilityMatrixPage() {
                     <span>supportStatus: {surface.supportStatus ?? '-'}</span>
                     <span>degradationLevel: {surface.degradationLevel ?? '-'}</span>
                     <span>featureSupport: {summarizeSurfaceFeatureStatuses(surface) || '无'}</span>
-                    {surface.blockerReasons.length ? <span>blockerReasons: {surface.blockerReasons.join(', ')}</span> : null}
+                    {surface.blockerReasons.length ? <span>acceptedException / blockerReasons: {surface.blockerReasons.join(', ')}</span> : null}
                   </div>
                 ))}
               </div>

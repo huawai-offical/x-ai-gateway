@@ -79,6 +79,37 @@ public class GatewayRequestLifecycleService {
         );
     }
 
+    public void startRequest(
+            String requestId,
+            Long distributedKeyId,
+            String distributedKeyPrefix,
+            String protocol,
+            CanonicalResourceRequest request,
+            CanonicalExecutionPlan plan,
+            boolean stream,
+            Instant startedAt) {
+        RequestLogEntity entity = new RequestLogEntity();
+        entity.setRequestId(requestId);
+        entity.setDistributedKeyId(distributedKeyId);
+        entity.setDistributedKeyPrefix(distributedKeyPrefix);
+        entity.setProtocol(protocol);
+        entity.setRequestPath(request.requestPath());
+        entity.setResourceType(plan == null || plan.resourceType() == null ? null : plan.resourceType().wireName());
+        entity.setOperation(plan == null || plan.operation() == null ? null : plan.operation().wireName());
+        entity.setRequestedModel(request.requestedModel());
+        entity.setPublicModel(request.requestedModel());
+        entity.setResolvedModelKey(request.requestedModel());
+        entity.setExecutionBackend(plan == null || plan.executionBackend() == null ? null : plan.executionBackend().wireName());
+        entity.setSupportStatus(plan == null || plan.supportStatus() == null ? null : plan.supportStatus().name());
+        entity.setDegradationLevel(plan == null || plan.degradationLevel() == null ? null : plan.degradationLevel().name());
+        entity.setObjectMode(plan == null ? null : plan.objectMode());
+        entity.setGatewayResourceKey(gatewayResourceKey(request, plan, null));
+        entity.setStream(stream);
+        entity.setStatus(GatewayRequestStatus.IN_PROGRESS);
+        entity.setStartedAt(startedAt);
+        requestLogRepository.save(entity);
+    }
+
     private void startRequest(
             String requestId,
             RouteSelectionResult selectionResult,
@@ -189,6 +220,39 @@ public class GatewayRequestLifecycleService {
         );
     }
 
+    public void completeRequest(
+            String requestId,
+            Long distributedKeyId,
+            String distributedKeyPrefix,
+            String protocol,
+            CanonicalResourceRequest request,
+            CanonicalExecutionPlan plan,
+            boolean stream,
+            GatewayUsageView usage,
+            CanonicalResourceResponse canonicalResponse,
+            Instant startedAt) {
+        finishRequestWithoutSelection(
+                requestId,
+                distributedKeyId,
+                distributedKeyPrefix,
+                protocol,
+                request.requestPath(),
+                plan == null || plan.resourceType() == null ? null : plan.resourceType().wireName(),
+                plan == null || plan.operation() == null ? null : plan.operation().wireName(),
+                plan == null || plan.executionBackend() == null ? null : plan.executionBackend().wireName(),
+                plan == null || plan.supportStatus() == null ? null : plan.supportStatus().name(),
+                plan == null || plan.degradationLevel() == null ? null : plan.degradationLevel().name(),
+                plan == null ? null : plan.objectMode(),
+                gatewayResourceKey(request, plan, canonicalResponse),
+                stream,
+                GatewayRequestStatus.COMPLETED,
+                null,
+                null,
+                canonicalResponse,
+                startedAt
+        );
+    }
+
     public void failRequest(
             String requestId,
             RouteSelectionResult selectionResult,
@@ -241,6 +305,38 @@ public class GatewayRequestLifecycleService {
                 error == null ? null : error.getClass().getSimpleName(),
                 error == null ? null : error.getMessage(),
                 usage,
+                null,
+                startedAt
+        );
+    }
+
+    public void failRequest(
+            String requestId,
+            Long distributedKeyId,
+            String distributedKeyPrefix,
+            String protocol,
+            CanonicalResourceRequest request,
+            CanonicalExecutionPlan plan,
+            boolean stream,
+            Throwable error,
+            Instant startedAt) {
+        finishRequestWithoutSelection(
+                requestId,
+                distributedKeyId,
+                distributedKeyPrefix,
+                protocol,
+                request.requestPath(),
+                plan == null || plan.resourceType() == null ? null : plan.resourceType().wireName(),
+                plan == null || plan.operation() == null ? null : plan.operation().wireName(),
+                plan == null || plan.executionBackend() == null ? null : plan.executionBackend().wireName(),
+                plan == null || plan.supportStatus() == null ? null : plan.supportStatus().name(),
+                plan == null || plan.degradationLevel() == null ? null : plan.degradationLevel().name(),
+                plan == null ? null : plan.objectMode(),
+                gatewayResourceKey(request, plan, null),
+                stream,
+                GatewayRequestStatus.FAILED,
+                error == null ? null : error.getClass().getSimpleName(),
+                error == null ? null : error.getMessage(),
                 null,
                 startedAt
         );
@@ -319,6 +415,54 @@ public class GatewayRequestLifecycleService {
 
         saveUsageRecord(requestId, selectionResult, requestPath, resourceType, operation, executionBackend, objectMode, stream, usage);
         recordMetrics(selectionResult, requestPath, stream, status, usage, durationMs);
+    }
+
+    private void finishRequestWithoutSelection(
+            String requestId,
+            Long distributedKeyId,
+            String distributedKeyPrefix,
+            String protocol,
+            String requestPath,
+            String resourceType,
+            String operation,
+            String executionBackend,
+            String supportStatus,
+            String degradationLevel,
+            String objectMode,
+            String gatewayResourceKey,
+            boolean stream,
+            GatewayRequestStatus status,
+            String errorCode,
+            String errorMessage,
+            CanonicalResourceResponse canonicalResponse,
+            Instant startedAt) {
+        Instant completedAt = Instant.now();
+        long durationMs = Duration.between(startedAt, completedAt).toMillis();
+
+        requestLogRepository.findByRequestId(requestId).ifPresent(entity -> {
+            entity.setDistributedKeyId(distributedKeyId);
+            entity.setDistributedKeyPrefix(distributedKeyPrefix);
+            entity.setProtocol(protocol);
+            entity.setRequestPath(requestPath);
+            entity.setResourceType(resourceType);
+            entity.setOperation(operation);
+            entity.setExecutionBackend(executionBackend);
+            entity.setSupportStatus(supportStatus);
+            entity.setDegradationLevel(degradationLevel);
+            entity.setObjectMode(objectMode);
+            entity.setGatewayResourceKey(gatewayResourceKey);
+            entity.setResponseKind(canonicalResponse == null ? null : canonicalResponse.responseKind());
+            entity.setResponseObjectType(canonicalResponse == null ? null : canonicalResponse.objectType());
+            entity.setResponseObjectId(canonicalResponse == null ? null : canonicalResponse.objectId());
+            entity.setResponseStatus(canonicalResponse == null ? null : canonicalResponse.status());
+            entity.setCanonicalEventCount(canonicalResponse == null ? null : canonicalResponse.events().size());
+            entity.setStatus(status);
+            entity.setErrorCode(errorCode);
+            entity.setErrorMessage(truncate(errorMessage));
+            entity.setCompletedAt(completedAt);
+            entity.setDurationMs(durationMs);
+            requestLogRepository.save(entity);
+        });
     }
 
     private String gatewayResourceKey(

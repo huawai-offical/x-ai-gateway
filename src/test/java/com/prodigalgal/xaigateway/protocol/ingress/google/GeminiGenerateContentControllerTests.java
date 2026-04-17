@@ -352,6 +352,8 @@ class GeminiGenerateContentControllerTests {
         response.putArray("data").addObject().put("b64_json", "aGVsbG8=");
         Mockito.when(gatewayResourceExecutionService.executeDetailedJson(Mockito.any(), Mockito.eq(1L), Mockito.eq("gemini-2.5-pro")))
                 .thenReturn(GatewayResourceExecutionResult.json(
+                        "req-gemini-image-1",
+                        null,
                         ResponseEntity.ok(response),
                         new CanonicalResourceResponse(null, null, null, null, null, null, List.of(), List.of(), response, null, java.util.Map.of())
                 ));
@@ -387,6 +389,8 @@ class GeminiGenerateContentControllerTests {
         byte[] audio = "hello".getBytes(java.nio.charset.StandardCharsets.UTF_8);
         Mockito.when(gatewayResourceExecutionService.executeDetailedBinaryJson(Mockito.any(), Mockito.eq(1L), Mockito.eq("gemini-2.5-pro")))
                 .thenReturn(GatewayResourceExecutionResult.binary(
+                        "req-gemini-audio-1",
+                        null,
                         ResponseEntity.ok().contentType(MediaType.parseMediaType("audio/wav")).body(audio),
                         new CanonicalResourceResponse(null, null, "binary", null, null, null, List.of(), List.of(), null, audio.length, java.util.Map.of())
                 ));

@@ -82,6 +82,9 @@ export function ProviderSiteDetailPage() {
   const surfaceEntries = Object.entries(current?.surfaces ?? {})
   const debugRequestedModel = filteredCapabilities[0]?.modelKey ?? capabilitiesQuery.data?.[0]?.modelKey ?? ''
   const debugRequestPath = selectedSurface === 'response_create' ? '/v1/responses' : '/v1/chat/completions'
+  const traceRequestPath = selectedSurface
+    ? current?.surfaces[selectedSurface]?.normalizedPath ?? debugRequestPath
+    : debugRequestPath
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault()
@@ -126,6 +129,12 @@ export function ProviderSiteDetailPage() {
                 to={`/translation-debug?protocol=openai&requestPath=${encodeURIComponent(debugRequestPath)}&requestedModel=${encodeURIComponent(debugRequestedModel)}`}
               >
                 进入调试页
+              </Link>
+              <Link
+                className="action-link"
+                to={`/ops/logs?providerType=${encodeURIComponent(current?.siteKind ?? '')}&requestPath=${encodeURIComponent(traceRequestPath)}`}
+              >
+                查看 Trace
               </Link>
             </>
           ) : null}
@@ -237,7 +246,7 @@ export function ProviderSiteDetailPage() {
                   <span>overall: {surface.overallCapabilityLevel ?? '-'}</span>
                   <span>requiredFeatures: {surface.requiredFeatures.join(', ') || '无'}</span>
                   <span>featureSupport: {summarizeSurfaceFeatureStatuses(surface) || '无'}</span>
-                  {surface.blockerReasons.length ? <span>blockerReasons: {surface.blockerReasons.join(', ')}</span> : null}
+                  {surface.blockerReasons.length ? <span>acceptedException / blockerReasons: {surface.blockerReasons.join(', ')}</span> : null}
                 </div>
               ))}
             </div>

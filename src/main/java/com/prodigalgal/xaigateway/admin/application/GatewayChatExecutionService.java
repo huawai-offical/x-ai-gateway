@@ -132,6 +132,7 @@ public class GatewayChatExecutionService {
         return new AdminChatExecuteResponse(
                 response.requestId(),
                 response.routeSelection(),
+                response.plan(),
                 response.plan().executionBackend(),
                 response.response().outputText(),
                 toGatewayUsage(response.response().usage()),

@@ -10,6 +10,8 @@ import java.util.List;
 import tools.jackson.databind.JsonNode;
 
 public record AdminResourceExecuteResponse(
+        String requestId,
+        String gatewayResourceKey,
         RouteSelectionResult routeSelection,
         CanonicalExecutionPlan plan,
         ExecutionBackend executionBackend,
@@ -25,4 +27,39 @@ public record AdminResourceExecuteResponse(
         Integer binaryLength,
         CanonicalResourceResponse canonicalResponse
 ) {
+
+    public AdminResourceExecuteResponse(
+            RouteSelectionResult routeSelection,
+            CanonicalExecutionPlan plan,
+            ExecutionBackend executionBackend,
+            String upstreamPath,
+            String objectMode,
+            SupportStatus supportStatus,
+            InteropCapabilityLevel degradationLevel,
+            List<String> blockerReasons,
+            int statusCode,
+            String contentType,
+            JsonNode responseJson,
+            String responseText,
+            Integer binaryLength,
+            CanonicalResourceResponse canonicalResponse) {
+        this(
+                null,
+                null,
+                routeSelection,
+                plan,
+                executionBackend,
+                upstreamPath,
+                objectMode,
+                supportStatus,
+                degradationLevel,
+                blockerReasons,
+                statusCode,
+                contentType,
+                responseJson,
+                responseText,
+                binaryLength,
+                canonicalResponse
+        );
+    }
 }

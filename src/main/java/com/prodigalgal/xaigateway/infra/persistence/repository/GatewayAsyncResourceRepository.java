@@ -28,6 +28,8 @@ public interface GatewayAsyncResourceRepository extends JpaRepository<GatewayAsy
             GatewayAsyncResourceType resourceType,
             String upstreamObjectId);
 
+    List<GatewayAsyncResourceEntity> findAllByUpstreamObjectIdAndDeletedFalse(String upstreamObjectId);
+
     @Query("""
             select entity
             from GatewayAsyncResourceEntity entity

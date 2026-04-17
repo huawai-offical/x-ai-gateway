@@ -51,6 +51,8 @@ class AnthropicMessageBatchesControllerTests {
         response.put("status", "running");
         Mockito.when(gatewayResourceExecutionService.executeDetailedJson(Mockito.any(), Mockito.eq(1L), Mockito.eq("claude-sonnet-4")))
                 .thenReturn(GatewayResourceExecutionResult.json(
+                        "req-anthropic-batch-create-1",
+                        "msgbatch_123",
                         ResponseEntity.ok(response),
                         new CanonicalResourceResponse(null, null, null, null, null, null, List.of(), List.of(), response, null, java.util.Map.of())
                 ));
@@ -102,10 +104,14 @@ class AnthropicMessageBatchesControllerTests {
         Mockito.when(gatewayResourceExecutionService.executeDetailedJson(Mockito.any(), Mockito.eq(1L), Mockito.eq("resource-orchestration")))
                 .thenReturn(
                         GatewayResourceExecutionResult.json(
+                                "req-anthropic-batch-get-1",
+                                "msgbatch_123",
                                 ResponseEntity.ok(getResponse),
                                 new CanonicalResourceResponse(null, null, null, null, null, null, List.of(), List.of(), getResponse, null, java.util.Map.of())
                         ),
                         GatewayResourceExecutionResult.json(
+                                "req-anthropic-batch-cancel-1",
+                                "msgbatch_123",
                                 ResponseEntity.ok(cancelResponse),
                                 new CanonicalResourceResponse(null, null, null, null, null, null, List.of(), List.of(), cancelResponse, null, java.util.Map.of())
                         )

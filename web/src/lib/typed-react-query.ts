@@ -13,6 +13,9 @@ type MutationOptions<TData, TVariables> = {
 
 export type TypedQueryResult<TData> = {
   data?: TData
+  isPending: boolean
+  isLoading: boolean
+  error?: unknown
 }
 
 export type TypedMutationResult<TData, TVariables> = {

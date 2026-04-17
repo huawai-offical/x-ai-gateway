@@ -313,6 +313,201 @@ class GatewayRequestLifecycleServiceTests {
         assertEquals("deleted", entity.getResponseStatus());
     }
 
+    @Test
+    void shouldPersistNoRouteResourceSummaryOnComplete() {
+        RequestLogRepository requestLogRepository = Mockito.mock(RequestLogRepository.class);
+        UsageRecordRepository usageRecordRepository = Mockito.mock(UsageRecordRepository.class);
+        GatewayAuditLogService gatewayAuditLogService = Mockito.mock(GatewayAuditLogService.class);
+        AtomicReference<RequestLogEntity> stored = new AtomicReference<>();
+        Mockito.when(requestLogRepository.save(Mockito.any(RequestLogEntity.class)))
+                .thenAnswer(invocation -> {
+                    RequestLogEntity entity = invocation.getArgument(0);
+                    stored.set(entity);
+                    return entity;
+                });
+        Mockito.when(requestLogRepository.findByRequestId("req-upload-1"))
+                .thenAnswer(invocation -> Optional.ofNullable(stored.get()));
+
+        GatewayRequestLifecycleService service = new GatewayRequestLifecycleService(
+                requestLogRepository,
+                usageRecordRepository,
+                gatewayAuditLogService,
+                new SimpleMeterRegistry(),
+                new tools.jackson.databind.ObjectMapper()
+        );
+
+        CanonicalResourceRequest request = new CanonicalResourceRequest(
+                "sk-gw-test",
+                CanonicalIngressProtocol.OPENAI,
+                "POST",
+                "/v1/uploads",
+                "/v1/uploads",
+                Map.of(),
+                "resource-orchestration",
+                TranslationResourceType.UPLOAD,
+                TranslationOperation.UPLOAD_CREATE,
+                null,
+                Map.of(),
+                List.of(),
+                false,
+                false
+        );
+        CanonicalExecutionPlan plan = new CanonicalExecutionPlan(
+                true,
+                CanonicalIngressProtocol.OPENAI,
+                "/v1/uploads",
+                "/v1/uploads",
+                "uploads",
+                "resource-orchestration",
+                "resource-orchestration",
+                "resource-orchestration",
+                TranslationResourceType.UPLOAD,
+                TranslationOperation.UPLOAD_CREATE,
+                ExecutionKind.NATIVE,
+                ExecutionBackend.ORCHESTRATION,
+                SupportStatus.ORCHESTRATION,
+                "gateway_upload_object",
+                List.of(ExecutionBackend.ORCHESTRATION),
+                "gateway_local_orchestration",
+                InteropCapabilityLevel.NATIVE,
+                InteropCapabilityLevel.NATIVE,
+                InteropCapabilityLevel.NATIVE,
+                InteropCapabilityLevel.NATIVE,
+                List.of(),
+                List.of(),
+                Map.of(),
+                List.of(),
+                List.of()
+        );
+        CanonicalResourceResponse canonicalResponse = new CanonicalResourceResponse(
+                TranslationResourceType.UPLOAD,
+                TranslationOperation.UPLOAD_CREATE,
+                "object",
+                "upload",
+                "upload_1",
+                "created",
+                List.of(),
+                List.of(),
+                null,
+                null,
+                Map.of()
+        );
+        Instant startedAt = Instant.now();
+
+        service.startRequest("req-upload-1", 1L, "sk-gw-test", "openai", request, plan, false, startedAt);
+        service.completeRequest(
+                "req-upload-1",
+                1L,
+                "sk-gw-test",
+                "openai",
+                request,
+                plan,
+                false,
+                GatewayUsageView.empty(),
+                canonicalResponse,
+                startedAt
+        );
+
+        RequestLogEntity entity = stored.get();
+        assertEquals("req-upload-1", entity.getRequestId());
+        assertEquals("openai", entity.getProtocol());
+        assertEquals("ORCHESTRATION", entity.getSupportStatus());
+        assertEquals("NATIVE", entity.getDegradationLevel());
+        assertEquals("gateway_upload_object", entity.getObjectMode());
+        assertEquals("upload_1", entity.getGatewayResourceKey());
+        assertEquals("upload", entity.getResponseObjectType());
+        assertEquals("created", entity.getResponseStatus());
+    }
+
+    @Test
+    void shouldPersistNoRouteFailureDetails() {
+        RequestLogRepository requestLogRepository = Mockito.mock(RequestLogRepository.class);
+        UsageRecordRepository usageRecordRepository = Mockito.mock(UsageRecordRepository.class);
+        GatewayAuditLogService gatewayAuditLogService = Mockito.mock(GatewayAuditLogService.class);
+        AtomicReference<RequestLogEntity> stored = new AtomicReference<>();
+        Mockito.when(requestLogRepository.save(Mockito.any(RequestLogEntity.class)))
+                .thenAnswer(invocation -> {
+                    RequestLogEntity entity = invocation.getArgument(0);
+                    stored.set(entity);
+                    return entity;
+                });
+        Mockito.when(requestLogRepository.findByRequestId("req-realtime-1"))
+                .thenAnswer(invocation -> Optional.ofNullable(stored.get()));
+
+        GatewayRequestLifecycleService service = new GatewayRequestLifecycleService(
+                requestLogRepository,
+                usageRecordRepository,
+                gatewayAuditLogService,
+                new SimpleMeterRegistry(),
+                new tools.jackson.databind.ObjectMapper()
+        );
+
+        CanonicalResourceRequest request = new CanonicalResourceRequest(
+                "sk-gw-test",
+                CanonicalIngressProtocol.OPENAI,
+                "POST",
+                "/v1/realtime/client_secrets",
+                "/v1/realtime/client_secrets",
+                Map.of(),
+                "resource-orchestration",
+                TranslationResourceType.REALTIME,
+                TranslationOperation.REALTIME_CLIENT_SECRET_CREATE,
+                null,
+                Map.of(),
+                List.of(),
+                false,
+                false
+        );
+        CanonicalExecutionPlan plan = new CanonicalExecutionPlan(
+                false,
+                CanonicalIngressProtocol.OPENAI,
+                "/v1/realtime/client_secrets",
+                "/v1/realtime/client_secrets",
+                "realtime",
+                "resource-orchestration",
+                "resource-orchestration",
+                "resource-orchestration",
+                TranslationResourceType.REALTIME,
+                TranslationOperation.REALTIME_CLIENT_SECRET_CREATE,
+                ExecutionKind.NATIVE,
+                ExecutionBackend.ORCHESTRATION,
+                SupportStatus.BLOCKED,
+                "gateway-object-lineage",
+                List.of(ExecutionBackend.ORCHESTRATION),
+                "blocked_by_policy",
+                InteropCapabilityLevel.UNSUPPORTED,
+                InteropCapabilityLevel.UNSUPPORTED,
+                InteropCapabilityLevel.UNSUPPORTED,
+                InteropCapabilityLevel.UNSUPPORTED,
+                List.of("realtime blocked"),
+                List.of(),
+                Map.of(),
+                List.of(),
+                List.of("realtime blocked")
+        );
+        Instant startedAt = Instant.now();
+
+        service.startRequest("req-realtime-1", 1L, "sk-gw-test", "openai", request, plan, false, startedAt);
+        service.failRequest(
+                "req-realtime-1",
+                1L,
+                "sk-gw-test",
+                "openai",
+                request,
+                plan,
+                false,
+                new IllegalStateException("realtime blocked"),
+                startedAt
+        );
+
+        RequestLogEntity entity = stored.get();
+        assertEquals(GatewayRequestStatus.FAILED, entity.getStatus());
+        assertEquals("IllegalStateException", entity.getErrorCode());
+        assertEquals("realtime blocked", entity.getErrorMessage());
+        assertEquals("BLOCKED", entity.getSupportStatus());
+        assertEquals("UNSUPPORTED", entity.getDegradationLevel());
+    }
+
     private RouteSelectionResult selectionResult() {
         CatalogCandidateView candidate = new CatalogCandidateView(
                 101L,

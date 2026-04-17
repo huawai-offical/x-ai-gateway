@@ -11,6 +11,8 @@ import org.springframework.data.repository.query.Param;
 
 public interface CacheHitLogRepository extends JpaRepository<CacheHitLogEntity, Long> {
 
+    List<CacheHitLogEntity> findAllByRequestIdOrderByCreatedAtDesc(String requestId);
+
     List<CacheHitLogEntity> findTop100ByOrderByCreatedAtDesc();
 
     List<CacheHitLogEntity> findTop100ByDistributedKeyIdOrderByCreatedAtDesc(Long distributedKeyId);

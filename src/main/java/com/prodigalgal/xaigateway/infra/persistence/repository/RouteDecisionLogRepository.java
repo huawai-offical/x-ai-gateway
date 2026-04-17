@@ -11,6 +11,8 @@ import org.springframework.data.repository.query.Param;
 
 public interface RouteDecisionLogRepository extends JpaRepository<RouteDecisionLogEntity, Long> {
 
+    java.util.Optional<RouteDecisionLogEntity> findTopByRequestIdOrderByCreatedAtDesc(String requestId);
+
     List<RouteDecisionLogEntity> findTop100ByOrderByCreatedAtDesc();
 
     List<RouteDecisionLogEntity> findTop100ByDistributedKeyIdOrderByCreatedAtDesc(Long distributedKeyId);

@@ -130,8 +130,12 @@ export type TranslationPlan = {
   executionBackend?: string | null
   supportStatus?: string | null
   objectMode?: string | null
+  routeSelectionMode?: string | null
   supportedBackends: string[]
   backendReason?: string | null
+  routePolicyReason?: string | null
+  renderPolicyReason?: string | null
+  fallbackPolicyReason?: string | null
   degradationLevel?: string | null
   executionCapabilityLevel?: string | null
   renderCapabilityLevel?: string | null
@@ -165,6 +169,7 @@ export type ExecutionPreview = {
 export type AdminChatExecuteResponse = {
   requestId: string
   routeSelection: unknown
+  plan?: TranslationPlan | null
   executionBackend?: string | null
   text?: string | null
   usage?: unknown
@@ -202,6 +207,8 @@ export type CanonicalResourceResponse = {
 }
 
 export type AdminResourceExecuteResponse = {
+  requestId?: string | null
+  gatewayResourceKey?: string | null
   routeSelection: unknown
   plan: TranslationPlan
   executionBackend?: string | null
@@ -216,6 +223,72 @@ export type AdminResourceExecuteResponse = {
   responseText?: string | null
   binaryLength?: number | null
   canonicalResponse?: CanonicalResourceResponse | null
+}
+
+export type RequestLogEntry = {
+  requestId: string
+  gatewayResourceKey?: string | null
+  supportStatus?: string | null
+  degradationLevel?: string | null
+  objectMode?: string | null
+  responseKind?: string | null
+  responseObjectType?: string | null
+  responseObjectId?: string | null
+  responseStatus?: string | null
+  [key: string]: unknown
+}
+
+export type RouteDecisionEntry = {
+  requestId?: string | null
+  selectionSource?: string | null
+  supportStatus?: string | null
+  degradationLevel?: string | null
+  objectMode?: string | null
+  [key: string]: unknown
+}
+
+export type CacheHitEntry = {
+  cacheKind?: string | null
+  supportStatus?: string | null
+  degradationLevel?: string | null
+  objectMode?: string | null
+  [key: string]: unknown
+}
+
+export type UpstreamCacheReferenceEntry = {
+  externalCacheRef?: string | null
+  status?: string | null
+  [key: string]: unknown
+}
+
+export type AsyncResourceSummary = {
+  resourceKey: string
+  resourceType?: string | null
+  status?: string | null
+  normalizedStatus?: string | null
+  objectMode?: string | null
+  upstreamObjectId?: string | null
+  eventCount?: number | null
+  [key: string]: unknown
+}
+
+export type AsyncResourceDetail = {
+  lifecycle?: unknown
+  transitions?: unknown[]
+  lineage?: unknown
+  artifacts?: unknown[]
+  requestPayloadJson?: unknown
+  responsePayloadJson?: unknown
+  metadataJson?: unknown
+}
+
+export type ObservabilityTraceResponse = {
+  requestLog?: RequestLogEntry | null
+  routeDecision?: RouteDecisionEntry | null
+  cacheHits: CacheHitEntry[]
+  upstreamCacheReferences: UpstreamCacheReferenceEntry[]
+  asyncResourceSummary?: AsyncResourceSummary | null
+  asyncResourceDetail?: AsyncResourceDetail | null
 }
 
 export type ProviderSiteDraft = {

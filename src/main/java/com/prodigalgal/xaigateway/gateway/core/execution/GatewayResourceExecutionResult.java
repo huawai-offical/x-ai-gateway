@@ -5,6 +5,8 @@ import org.springframework.http.ResponseEntity;
 import tools.jackson.databind.JsonNode;
 
 public record GatewayResourceExecutionResult(
+        String requestId,
+        String gatewayResourceKey,
         ResponseEntity<JsonNode> jsonResponse,
         ResponseEntity<byte[]> binaryResponse,
         CanonicalResourceResponse canonicalResponse
@@ -17,15 +19,19 @@ public record GatewayResourceExecutionResult(
     }
 
     public static GatewayResourceExecutionResult json(
+            String requestId,
+            String gatewayResourceKey,
             ResponseEntity<JsonNode> response,
             CanonicalResourceResponse canonicalResponse) {
-        return new GatewayResourceExecutionResult(response, null, canonicalResponse);
+        return new GatewayResourceExecutionResult(requestId, gatewayResourceKey, response, null, canonicalResponse);
     }
 
     public static GatewayResourceExecutionResult binary(
+            String requestId,
+            String gatewayResourceKey,
             ResponseEntity<byte[]> response,
             CanonicalResourceResponse canonicalResponse) {
-        return new GatewayResourceExecutionResult(null, response, canonicalResponse);
+        return new GatewayResourceExecutionResult(requestId, gatewayResourceKey, null, response, canonicalResponse);
     }
 
     public boolean binary() {

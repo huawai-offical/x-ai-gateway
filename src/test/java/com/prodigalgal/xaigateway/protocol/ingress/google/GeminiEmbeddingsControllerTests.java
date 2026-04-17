@@ -52,6 +52,8 @@ class GeminiEmbeddingsControllerTests {
         response.putArray("data").addObject().putArray("embedding").add(0.1).add(0.2);
         Mockito.when(gatewayResourceExecutionService.executeDetailedJson(Mockito.any(), Mockito.eq(1L), Mockito.eq("text-embedding-004")))
                 .thenReturn(GatewayResourceExecutionResult.json(
+                        "req-embed-1",
+                        null,
                         ResponseEntity.ok(response),
                         new CanonicalResourceResponse(null, null, null, null, null, null, List.of(), List.of(), response, null, java.util.Map.of())
                 ));
@@ -85,6 +87,8 @@ class GeminiEmbeddingsControllerTests {
         data.addObject().putArray("embedding").add(0.3).add(0.4);
         Mockito.when(gatewayResourceExecutionService.executeDetailedJson(Mockito.any(), Mockito.eq(1L), Mockito.eq("text-embedding-004")))
                 .thenReturn(GatewayResourceExecutionResult.json(
+                        "req-embed-batch-1",
+                        null,
                         ResponseEntity.ok(response),
                         new CanonicalResourceResponse(null, null, null, null, null, null, List.of(), List.of(), response, null, java.util.Map.of())
                 ));

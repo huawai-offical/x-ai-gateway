@@ -84,6 +84,8 @@ public class AdminResourceExecutionService {
             }
             ResponseEntity<JsonNode> response = result.jsonResponse();
             return new AdminResourceExecuteResponse(
+                    result.requestId(),
+                    result.gatewayResourceKey(),
                     response.getStatusCode().is2xxSuccessful() ? compilation.selectionResult() : compilation.selectionResult(),
                     compilation.canonicalPlan(),
                     compilation.canonicalPlan().executionBackend(),
@@ -104,6 +106,8 @@ public class AdminResourceExecutionService {
             GatewayResourceExecutionResult result = gatewayResourceExecutionService.executeDetailedBinaryJson(canonicalRequest, request.requestedModel());
             ResponseEntity<byte[]> response = result.binaryResponse();
             return new AdminResourceExecuteResponse(
+                    result.requestId(),
+                    result.gatewayResourceKey(),
                     compilation.selectionResult(),
                     compilation.canonicalPlan(),
                     compilation.canonicalPlan().executionBackend(),
@@ -124,6 +128,8 @@ public class AdminResourceExecutionService {
         GatewayResourceExecutionResult result = gatewayResourceExecutionService.executeDetailedJson(canonicalRequest, request.requestedModel());
         ResponseEntity<JsonNode> response = result.jsonResponse();
         return new AdminResourceExecuteResponse(
+                result.requestId(),
+                result.gatewayResourceKey(),
                 compilation.selectionResult(),
                 compilation.canonicalPlan(),
                 compilation.canonicalPlan().executionBackend(),

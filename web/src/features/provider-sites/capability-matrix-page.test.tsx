@@ -614,6 +614,8 @@ describe('CapabilityMatrixPage', () => {
     expect(screen.getByText('GEMINI_DIRECT')).toBeInTheDocument()
     expect(screen.getByText('VERTEX_AI')).toBeInTheDocument()
     expect(screen.getByText('OPENAI_COMPATIBLE_GENERIC')).toBeInTheDocument()
+    expect(screen.getAllByRole('link', { name: '调试' }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('link', { name: 'Trace' }).length).toBeGreaterThan(0)
     expect(screen.getAllByRole('link', { name: /FILE_CREATE/ }).some((link) => link.getAttribute('href') === '/provider-sites/2?surface=file_create')).toBe(true)
     expect(screen.getAllByRole('link', { name: /FILE_CREATE/ }).some((link) => link.getAttribute('href') === '/provider-sites/4?surface=file_create')).toBe(true)
     expect(screen.getByRole('link', { name: /EMBEDDING_CREATE/ })).toHaveAttribute('href', '/provider-sites/3?surface=embedding_create')

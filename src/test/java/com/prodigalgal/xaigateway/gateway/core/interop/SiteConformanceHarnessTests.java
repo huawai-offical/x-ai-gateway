@@ -15,6 +15,7 @@ import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyView;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.catalog.GatewayPublicModelView;
 import com.prodigalgal.xaigateway.gateway.core.catalog.ModelCatalogQueryService;
+import com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendPolicyService;
 import com.prodigalgal.xaigateway.gateway.core.routing.GatewayRouteSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
@@ -76,16 +77,55 @@ class SiteConformanceHarnessTests {
         GatewayRouteSelectionService routeSelectionService = Mockito.mock(GatewayRouteSelectionService.class);
         Mockito.when(routeSelectionService.select(any())).thenReturn(selectionResult);
 
+        NonChatTargetResolutionService targetResolutionService = Mockito.mock(NonChatTargetResolutionService.class);
+        Mockito.when(targetResolutionService.resolve(any(), any(), any(), any()))
+                .thenAnswer(invocation -> {
+                    GatewayRequestSemantics semantics = invocation.getArgument(2);
+                    return switch (semantics.routeSelectionMode()) {
+                        case LOCAL_CATALOG -> new NonChatTargetResolution(
+                                RouteSelectionMode.LOCAL_CATALOG,
+                                null,
+                                "local_catalog",
+                                List.of()
+                        );
+                        case STORED_LINEAGE -> new NonChatTargetResolution(
+                                RouteSelectionMode.STORED_LINEAGE,
+                                candidate,
+                                "stored_lineage_binding",
+                                List.of()
+                        );
+                        case DISTRIBUTED_TARGET -> new NonChatTargetResolution(
+                                RouteSelectionMode.DISTRIBUTED_TARGET,
+                                candidate,
+                                "distributed_target_binding",
+                                List.of()
+                        );
+                        case CATALOG_SELECTION -> new NonChatTargetResolution(
+                                RouteSelectionMode.CATALOG_SELECTION,
+                                null,
+                                "catalog_selection",
+                                List.of()
+                        );
+                    };
+                });
+
         TranslationExecutionPlanCompiler compiler = new TranslationExecutionPlanCompiler(
                 routeSelectionService,
                 featureService,
-                truthService
+                truthService,
+                NonChatRoutePolicyService.forTests(
+                        truthService,
+                        new ExecutionBackendPolicyService()
+                ),
+                targetResolutionService,
+                new NonChatDegradationPolicyService()
         );
 
         CanonicalExecutionPlanCompilation preview = compiler.compilePreview(
                 "sk-gw-test",
                 fixture.protocol(),
-                fixture.requestPath(),
+                fixture.httpMethod() == null ? "POST" : fixture.httpMethod(),
+                fixture.runtimePath() == null ? fixture.requestPath() : fixture.runtimePath(),
                 fixture.requestedModel(),
                 GatewayDegradationPolicy.ALLOW_LOSSY,
                 com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily.GENERIC_OPENAI,
@@ -94,18 +134,31 @@ class SiteConformanceHarnessTests {
         assertEquals(fixture.expectedExecutable(), preview.canonicalPlan().executable(), fixture.name());
         assertEquals(fixture.expectedEffectiveLevel(), preview.canonicalPlan().overallCapabilityLevel().name(), fixture.name());
         assertEquals(fixture.expectedExecutionKind(), preview.canonicalPlan().executionKind().name(), fixture.name());
+        if (fixture.expectedSupportStatus() != null) {
+            assertEquals(fixture.expectedSupportStatus(), preview.canonicalPlan().supportStatus().name(), fixture.name());
+        }
+        if (fixture.expectedRenderCapability() != null) {
+            assertEquals(fixture.expectedRenderCapability(), preview.canonicalPlan().renderCapabilityLevel().name(), fixture.name());
+        }
+        if (fixture.expectedRouteSelectionMode() != null) {
+            assertEquals(fixture.expectedRouteSelectionMode(), preview.canonicalPlan().routeSelectionMode().name(), fixture.name());
+        }
 
         TranslationExplainService explainService = new TranslationExplainService(compiler);
         CanonicalExecutionPlan explainPlan = explainService.explain(new TranslationExplainRequest(
                 "sk-gw-test",
                 fixture.protocol(),
-                fixture.requestPath(),
+                fixture.httpMethod(),
+                fixture.runtimePath() == null ? fixture.requestPath() : fixture.runtimePath(),
                 fixture.requestedModel(),
                 "allow_lossy",
                 requestBody(fixture)
         ));
         assertEquals(preview.canonicalPlan().executionKind(), explainPlan.executionKind(), fixture.name());
         assertEquals(preview.canonicalPlan().overallCapabilityLevel(), explainPlan.overallCapabilityLevel(), fixture.name());
+        assertEquals(preview.canonicalPlan().supportStatus(), explainPlan.supportStatus(), fixture.name());
+        assertEquals(preview.canonicalPlan().renderCapabilityLevel(), explainPlan.renderCapabilityLevel(), fixture.name());
+        assertEquals(preview.canonicalPlan().routeSelectionMode(), explainPlan.routeSelectionMode(), fixture.name());
 
         GatewayInteropPlanService interopPlanService = new GatewayInteropPlanService(
                 Mockito.mock(ErrorRuleService.class),
@@ -113,14 +166,19 @@ class SiteConformanceHarnessTests {
         );
         InteropPlanResponse interopPlanResponse = interopPlanService.preview("sk-gw-test", new InteropPlanRequest(
                 fixture.protocol(),
-                fixture.requestPath(),
+                fixture.httpMethod(),
+                fixture.runtimePath() == null ? fixture.requestPath() : fixture.runtimePath(),
                 fixture.requestedModel(),
                 "allow_lossy",
+                null,
                 requestBody(fixture)
         ));
         assertEquals(fixture.expectedExecutable(), interopPlanResponse.plan().executable(), fixture.name());
         assertEquals(fixture.expectedEffectiveLevel(), interopPlanResponse.plan().overallCapabilityLevel().name(), fixture.name());
         assertEquals(fixture.expectedExecutionKind(), interopPlanResponse.plan().executionKind().name(), fixture.name());
+        assertEquals(preview.canonicalPlan().supportStatus(), interopPlanResponse.plan().supportStatus(), fixture.name());
+        assertEquals(preview.canonicalPlan().renderCapabilityLevel(), interopPlanResponse.plan().renderCapabilityLevel(), fixture.name());
+        assertEquals(preview.canonicalPlan().routeSelectionMode(), interopPlanResponse.plan().routeSelectionMode(), fixture.name());
 
         SiteModelCapabilityRepository siteModelCapabilityRepository = Mockito.mock(SiteModelCapabilityRepository.class);
         UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
@@ -200,6 +258,11 @@ class SiteConformanceHarnessTests {
             root.remove("model");
             root.putArray("contents").addObject().put("role", "user")
                     .putArray("parts").addObject().put("text", "hi");
+            if ("image_generation".equals(fixture.operationHint())) {
+                root.putObject("generationConfig").putArray("responseModalities").add("IMAGE");
+            } else if ("audio_speech".equals(fixture.operationHint())) {
+                root.putObject("generationConfig").putArray("responseModalities").add("AUDIO");
+            }
             return root;
         }
         if ("/v1/messages".equals(fixture.requestPath())) {
@@ -211,6 +274,90 @@ class SiteConformanceHarnessTests {
         }
         if ("/v1/moderations".equals(fixture.requestPath())) {
             root.put("input", "hi");
+        }
+        if ("/v1/embeddings".equals(fixture.requestPath())) {
+            root.put("input", "hi");
+            return root;
+        }
+        if (fixture.requestPath().contains(":embedContent")) {
+            root.remove("model");
+            root.putObject("content")
+                    .putArray("parts")
+                    .addObject()
+                    .put("text", "hi");
+            return root;
+        }
+        if (fixture.requestPath().contains(":batchEmbedContents")) {
+            root.remove("model");
+            root.putArray("requests")
+                    .addObject()
+                    .putObject("content")
+                    .putArray("parts")
+                    .addObject()
+                    .put("text", "hi");
+            return root;
+        }
+        if ("/v1/audio/speech".equals(fixture.requestPath())) {
+            root.put("input", "hi");
+            return root;
+        }
+        if ("/v1/images/generations".equals(fixture.requestPath())) {
+            root.put("prompt", "hi");
+            return root;
+        }
+        if ("/upload/v1beta/files".equals(fixture.requestPath())) {
+            root.remove("model");
+            root.put("fileName", "doc.txt");
+            root.put("mimeType", "text/plain");
+            root.put("displayName", "doc.txt");
+            return root;
+        }
+        if (fixture.requestPath().contains(":batchGenerateContent")) {
+            root.remove("model");
+            root.putObject("config").put("displayName", "batch-job");
+            root.put("inputFile", "file_123");
+            return root;
+        }
+        if ("/v1/files".equals(fixture.requestPath())) {
+            if (!"file_list".equals(fixture.operationHint())) {
+                root.put("filename", "doc.txt");
+                root.put("purpose", "assistants");
+                root.put("bytes", 12);
+            }
+            return root;
+        }
+        if ("/v1/uploads".equals(fixture.requestPath())) {
+            root.put("filename", "doc.txt");
+            root.put("purpose", "assistants");
+            root.put("bytes", 12);
+            return root;
+        }
+        if ("/v1/batches".equals(fixture.requestPath())) {
+            root.put("input_file_id", "file_123");
+            root.put("endpoint", "/v1/chat/completions");
+            return root;
+        }
+        if ("/v1/fine_tuning/jobs".equals(fixture.requestPath())) {
+            root.put("training_file", "file_train");
+            root.put("suffix", "demo");
+            return root;
+        }
+        if ("/v1/realtime/client_secrets".equals(fixture.requestPath())) {
+            return root;
+        }
+        if ("/v1/messages/batches".equals(fixture.requestPath())) {
+            root.remove("model");
+            root.putArray("requests")
+                    .addObject()
+                    .put("custom_id", "req-1")
+                    .putObject("params")
+                    .put("model", fixture.requestedModel())
+                    .put("max_tokens", 64)
+                    .putArray("messages")
+                    .addObject()
+                    .put("role", "user")
+                    .put("content", "hi");
+            return root;
         }
         return root;
     }
@@ -349,7 +496,9 @@ class SiteConformanceHarnessTests {
             ProviderFamily providerFamily,
             UpstreamSiteKind siteKind,
             String protocol,
+            String httpMethod,
             String requestPath,
+            String runtimePath,
             String requestedModel,
             List<String> supportedProtocols,
             boolean supportsChat,
@@ -371,7 +520,11 @@ class SiteConformanceHarnessTests {
             boolean expectedExecutable,
             String expectedEffectiveLevel,
             String expectedExecutionKind,
-            boolean expectedModelVisible
+            boolean expectedModelVisible,
+            String expectedSupportStatus,
+            String expectedRenderCapability,
+            String expectedRouteSelectionMode,
+            String operationHint
     ) {
         @Override
         public String toString() {
