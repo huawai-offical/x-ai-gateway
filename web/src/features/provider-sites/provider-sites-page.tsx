@@ -90,7 +90,7 @@ export function ProviderSitesPage() {
           </label>
         </div>
         <div className="inline-actions">
-          <Link className="action-link" to="/provider-sites/new">新建站点档案</Link>
+          <Link className="action-link" to="/provider-sites/new/settings">新建站点档案</Link>
           <button type="button" onClick={() => refreshMutation.mutate(selectedIds)} disabled={refreshMutation.isPending || !selectedIds.length}>
             刷新选中站点
           </button>
@@ -113,6 +113,7 @@ export function ProviderSitesPage() {
                   <span>批量刷新</span>
                 </label>
                 <Link className="action-link" to={`/provider-sites/${item.id}`}>查看详情</Link>
+                <Link className="action-link" to={`/provider-sites/${item.id}/settings`}>编辑设置</Link>
                 <button type="button" onClick={() => refreshMutation.mutate([item.id])} disabled={refreshMutation.isPending}>
                   刷新快照
                 </button>

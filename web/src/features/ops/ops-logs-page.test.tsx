@@ -4,13 +4,16 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { apiRequest } from '../../lib/api'
 import { OpsLogsPage } from './ops-logs-page'
 
-const { apiRequest } = vi.hoisted(() => ({
+vi.mock('../../lib/api', () => ({
   apiRequest: vi.fn(),
 }))
 
-apiRequest.mockImplementation(async (url: string) => {
+const mockedApiRequest = apiRequest as unknown as ReturnType<typeof vi.fn>
+
+mockedApiRequest.mockImplementation(async (url: string) => {
   if (url === '/admin/ops/logs/system') {
     return [{ id: 1, category: 'ops', action: 'refresh', resourceType: 'provider-site', resourceRef: 'site:openai' }]
   }
@@ -35,13 +38,9 @@ apiRequest.mockImplementation(async (url: string) => {
   throw new Error(`unexpected url: ${url}`)
 })
 
-vi.mock('../../lib/api', () => ({
-  apiRequest,
-}))
-
 afterEach(() => {
   cleanup()
-  apiRequest.mockClear()
+  mockedApiRequest.mockClear()
 })
 
 describe('OpsLogsPage', () => {

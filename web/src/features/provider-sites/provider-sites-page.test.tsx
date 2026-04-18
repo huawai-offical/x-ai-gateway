@@ -4,13 +4,16 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { apiRequest } from '../../lib/api'
 import { ProviderSitesPage } from './provider-sites-page'
 
-const { apiRequest } = vi.hoisted(() => ({
+vi.mock('../../lib/api', () => ({
   apiRequest: vi.fn(),
 }))
 
-apiRequest.mockImplementation(async (url: string) => {
+const mockedApiRequest = apiRequest as unknown as ReturnType<typeof vi.fn>
+
+mockedApiRequest.mockImplementation(async (url: string) => {
   if (url === '/admin/provider-sites') {
     return [
       {
@@ -67,13 +70,9 @@ apiRequest.mockImplementation(async (url: string) => {
   throw new Error(`unexpected url: ${url}`)
 })
 
-vi.mock('../../lib/api', () => ({
-  apiRequest,
-}))
-
 afterEach(() => {
   cleanup()
-  apiRequest.mockClear()
+  mockedApiRequest.mockClear()
 })
 
 describe('ProviderSitesPage', () => {
@@ -100,7 +99,7 @@ describe('ProviderSitesPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '刷新选中站点' }))
 
     await waitFor(() => {
-      expect(apiRequest).toHaveBeenCalledWith(
+      expect(mockedApiRequest).toHaveBeenCalledWith(
         '/admin/provider-sites/refresh-capabilities',
         expect.objectContaining({
           method: 'POST',

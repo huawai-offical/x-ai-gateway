@@ -5,12 +5,12 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import { AppLayout } from './layout'
 
-function renderLayout(initialEntry = '/translation-debug') {
+function renderLayout(initialEntry = '/workbench') {
   return render(
     <MemoryRouter initialEntries={[initialEntry]}>
       <Routes>
         <Route element={<AppLayout />}>
-          <Route path="/translation-debug" element={<div>translation debug</div>} />
+          <Route path="/workbench" element={<div>workbench</div>} />
           <Route path="/keys" element={<div>keys</div>} />
         </Route>
       </Routes>
@@ -30,6 +30,6 @@ describe('AppLayout', () => {
 
     expect(container.querySelector('.app-shell')).toHaveClass('menu-collapsed')
     expect(screen.getByRole('button', { name: '展开侧边栏' })).toBeInTheDocument()
-    expect(screen.getByTitle('站点真相 / 执行解释')).toHaveClass('active')
+    expect(screen.getByTitle('站点真相 / Workbench')).toHaveClass('active')
   })
 })

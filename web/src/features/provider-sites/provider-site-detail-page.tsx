@@ -1,290 +1,263 @@
-import { type FormEvent, useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { apiRequest } from '../../lib/api'
-import { useTypedMutation, useTypedQuery } from '../../lib/typed-react-query'
+import { useTypedQuery } from '../../lib/typed-react-query'
 import {
   formatInstant,
-  modelSupportsFeature,
-  SITE_KIND_OPTIONS,
-  summarizeSurfaceFeatureStatuses,
-  type ProviderSite,
-  type ProviderSiteDraft,
+  type ProviderSiteDossierResponse,
   type SiteModelCapability,
+  type SurfaceDossierItemResponse,
 } from './types'
 
-const DEFAULT_DRAFT: ProviderSiteDraft = {
-  profileCode: '',
-  displayName: '',
-  siteKind: 'OPENAI_DIRECT',
-  baseUrlPattern: '',
-  description: '',
-  active: true,
-}
+const DOSSIER_TABS = ['summary', 'surfaces', 'models', 'trace-links'] as const
+type DossierTab = (typeof DOSSIER_TABS)[number]
 
 export function ProviderSiteDetailPage() {
   const params = useParams()
-  const navigate = useNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
-  const queryClient = useQueryClient()
-  const [draft, setDraft] = useState<ProviderSiteDraft | null>(null)
-
-  const isCreateMode = params.id === 'new'
+  const [searchParams] = useSearchParams()
+  const [activeTab, setActiveTab] = useState<DossierTab>('summary')
   const id = Number(params.id)
   const selectedSurface = searchParams.get('surface')
 
-  const detailQuery = useTypedQuery<ProviderSite>({
-    queryKey: ['provider-site', id],
-    queryFn: () => apiRequest<ProviderSite>(`/admin/provider-sites/${id}`),
-    enabled: !isCreateMode && Number.isFinite(id),
+  const dossierQuery = useTypedQuery<ProviderSiteDossierResponse>({
+    queryKey: ['provider-site-dossier', id],
+    queryFn: () => apiRequest<ProviderSiteDossierResponse>(`/admin/provider-sites/${id}/dossier`),
+    enabled: Number.isFinite(id),
   })
 
-  const capabilitiesQuery = useTypedQuery<SiteModelCapability[]>({
-    queryKey: ['provider-site-capabilities', id],
-    queryFn: () => apiRequest<SiteModelCapability[]>(`/admin/provider-sites/${id}/capabilities`),
-    enabled: !isCreateMode && Number.isFinite(id),
-  })
-
-  const refreshMutation = useTypedMutation<ProviderSite, void>({
-    mutationFn: () =>
-      apiRequest<ProviderSite>(`/admin/provider-sites/${id}/refresh-capabilities`, {
-        method: 'POST',
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['provider-site', id] })
-      queryClient.invalidateQueries({ queryKey: ['provider-site-capabilities', id] })
-      queryClient.invalidateQueries({ queryKey: ['provider-sites'] })
-      queryClient.invalidateQueries({ queryKey: ['capability-matrix'] })
-    },
-  })
-
-  const saveMutation = useTypedMutation<ProviderSite, void>({
-    mutationFn: () =>
-      apiRequest<ProviderSite>(isCreateMode ? '/admin/provider-sites' : `/admin/provider-sites/${id}`, {
-        method: isCreateMode ? 'POST' : 'PUT',
-        body: JSON.stringify(form),
-      }),
-    onSuccess: (result: ProviderSite) => {
-      queryClient.invalidateQueries({ queryKey: ['provider-sites'] })
-      queryClient.invalidateQueries({ queryKey: ['capability-matrix'] })
-      queryClient.invalidateQueries({ queryKey: ['provider-site', result.id] })
-      if (isCreateMode) {
-        navigate(`/provider-sites/${result.id}`)
-        return
-      }
-      queryClient.invalidateQueries({ queryKey: ['provider-site-capabilities', result.id] })
-    },
-  })
-
-  const current = detailQuery.data
-  const form = draft ?? (current ? toDraft(current) : DEFAULT_DRAFT)
-  const filteredCapabilities = (capabilitiesQuery.data ?? []).filter((item: SiteModelCapability) => modelSupportsFeature(item, selectedSurface))
-  const surfaceEntries = Object.entries(current?.surfaces ?? {})
-  const debugRequestedModel = filteredCapabilities[0]?.modelKey ?? capabilitiesQuery.data?.[0]?.modelKey ?? ''
-  const debugRequestPath = selectedSurface === 'response_create' ? '/v1/responses' : '/v1/chat/completions'
-  const traceRequestPath = selectedSurface
-    ? current?.surfaces[selectedSurface]?.normalizedPath ?? debugRequestPath
-    : debugRequestPath
-
-  const handleSubmit = (event: FormEvent) => {
-    event.preventDefault()
-    if (!form.profileCode.trim() || !form.displayName.trim()) return
-    saveMutation.mutate()
-  }
-
-  const handleSurfaceSelect = (surface: string) => {
-    const next = new URLSearchParams(searchParams)
-    if (next.get('surface') === surface) {
-      next.delete('surface')
-    } else {
-      next.set('surface', surface)
-    }
-    setSearchParams(next)
-  }
-
-  const updateDraft = (patch: Partial<ProviderSiteDraft>) => {
-    setDraft((currentDraft) => ({
-      ...(currentDraft ?? form),
-      ...patch,
-    }))
-  }
+  const dossier = dossierQuery.data
+  const site = dossier?.site
+  const filteredCapabilities = (dossier?.capabilities ?? []).filter((item) => matchesSurface(item, selectedSurface))
 
   return (
     <section className="page-grid">
       <div className="panel panel-wide">
         <div className="panel-head">
-          <p className="panel-kicker">Site detail</p>
-          <h2>{isCreateMode ? '新建站点档案' : current?.displayName ?? '站点档案'}</h2>
-          <p className="empty-state">详情页同时承载编辑、feature resolution 和调试深链。</p>
+          <p className="panel-kicker">Site dossier</p>
+          <h2>{site?.displayName ?? '站点运行档案'}</h2>
+          <p className="empty-state">详情页先给运行结论、blocker 和建议动作，编辑行为拆到独立 settings 页面。</p>
         </div>
         <div className="inline-actions">
-          <Link className="action-link" to="/provider-sites">返回列表</Link>
-          {!isCreateMode ? (
-            <>
-              <button type="button" onClick={() => refreshMutation.mutate()} disabled={refreshMutation.isPending}>
-                刷新能力快照
-              </button>
-              <Link
-                className="action-link"
-                to={`/translation-debug?protocol=openai&requestPath=${encodeURIComponent(debugRequestPath)}&requestedModel=${encodeURIComponent(debugRequestedModel)}`}
-              >
-                进入调试页
-              </Link>
-              <Link
-                className="action-link"
-                to={`/ops/logs?providerType=${encodeURIComponent(current?.siteKind ?? '')}&requestPath=${encodeURIComponent(traceRequestPath)}`}
-              >
-                查看 Trace
-              </Link>
-            </>
+          <Link className="action-link" to="/provider-sites">返回站点列表</Link>
+          {site ? <Link className="action-link" to={`/provider-sites/${site.id}/settings`}>编辑站点设置</Link> : null}
+          {site ? (
+            <Link
+              className="action-link"
+              to={`/workbench?protocol=openai&requestPath=${encodeURIComponent(selectedSurfacePath(dossier, selectedSurface) ?? '/v1/chat/completions')}&requestedModel=${encodeURIComponent(filteredCapabilities[0]?.modelKey ?? '')}`}
+            >
+              打开 Workbench
+            </Link>
           ) : null}
         </div>
-        <form className="stacked-form" onSubmit={handleSubmit}>
-          <div className="form-grid">
-            <label>
-              <span>profileCode</span>
-              <input value={form.profileCode} onChange={(event) => updateDraft({ profileCode: event.target.value })} />
-            </label>
-            <label>
-              <span>displayName</span>
-              <input value={form.displayName} onChange={(event) => updateDraft({ displayName: event.target.value })} />
-            </label>
-            <label>
-              <span>siteKind</span>
-              <select value={form.siteKind} onChange={(event) => updateDraft({ siteKind: event.target.value })}>
-                {SITE_KIND_OPTIONS.map((option) => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span>baseUrlPattern</span>
-              <input value={form.baseUrlPattern} onChange={(event) => updateDraft({ baseUrlPattern: event.target.value })} />
-            </label>
-            <label className="checkbox-line">
-              <input
-                type="checkbox"
-                checked={form.active}
-                onChange={(event) => updateDraft({ active: event.target.checked })}
-              />
-              <span>active</span>
-            </label>
-          </div>
-          <label>
-            <span>description</span>
-            <textarea value={form.description} onChange={(event) => updateDraft({ description: event.target.value })} rows={4} />
-          </label>
-          <div className="inline-actions">
-            <button type="submit" disabled={saveMutation.isPending}>保存站点档案</button>
-            {!isCreateMode && current ? (
-              <button
-                type="button"
-                onClick={() => setDraft(null)}
-              >
-                重置表单
-              </button>
-            ) : null}
-          </div>
-        </form>
+        <div className="inline-actions">
+          {DOSSIER_TABS.map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              className={`secondary-button${activeTab === tab ? ' active' : ''}`}
+              onClick={() => setActiveTab(tab)}
+            >
+              {tabLabel(tab)}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {!isCreateMode && current ? (
-        <>
-          <div className="panel">
-            <div className="panel-head">
-              <p className="panel-kicker">Site context</p>
-              <h3>站点上下文</h3>
-            </div>
-            <div className="card-list">
-              <div className="detail-card">
-                <strong>{current.profileCode}</strong>
-                <span>{current.providerFamily} / {current.siteKind}</span>
-                <span>{current.authStrategy} / {current.pathStrategy}</span>
-                <span>{current.modelAddressingStrategy} / {current.errorSchemaStrategy}</span>
-                <span>surface: {current.compatibilitySurface}</span>
-                <span>backend: {current.preferredBackend ?? '无'} / {(current.supportedBackends ?? []).join(', ') || '无'}</span>
-                <span>credential: {current.credentialRequirements.join(', ') || '无'}</span>
-                <span>transport: {current.streamTransport ?? '无'}</span>
-                <span>fallback: {current.fallbackStrategy ?? '无'}</span>
-                <span>cooldown: {current.cooldownCredentialCount} / {formatInstant(current.cooldownUntil)}</span>
-                <span>refreshedAt: {formatInstant(current.refreshedAt)}</span>
-                {current.blockedReason ? <span>{current.blockedReason}</span> : null}
+      {activeTab === 'summary' ? (
+        <div className="panel panel-wide">
+          <div className="panel-head">
+            <p className="panel-kicker">Summary</p>
+            <h3>运行摘要</h3>
+          </div>
+          {site ? (
+            <>
+              <div className="detail-grid">
+                <div className="detail-card">
+                  <strong>provider</strong>
+                  <span>{site.providerFamily} / {site.siteKind}</span>
+                </div>
+                <div className="detail-card">
+                  <strong>health</strong>
+                  <span>{site.healthState}</span>
+                </div>
+                <div className="detail-card">
+                  <strong>compatibilitySurface</strong>
+                  <span>{site.compatibilitySurface}</span>
+                </div>
+                <div className="detail-card">
+                  <strong>cooldown</strong>
+                  <span>{site.cooldownCredentialCount} / {formatInstant(site.cooldownUntil)}</span>
+                </div>
+              </div>
+              {site.blockedReason ? (
+                <div className="detail-card">
+                  <strong>site blocker</strong>
+                  <span>{site.blockedReason}</span>
+                </div>
+              ) : null}
+              <div className="card-list">
+                {dossier?.recommendedActions.map((action) => (
+                  <div key={action} className="detail-card">
+                    <strong>Recommended action</strong>
+                    <span>{action}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="detail-grid">
+                <div className="detail-card">
+                  <strong>Blocked surfaces</strong>
+                  <span>{dossier?.blockedSurfaces.length ?? 0}</span>
+                </div>
+                <div className="detail-card">
+                  <strong>Degraded surfaces</strong>
+                  <span>{dossier?.degradedSurfaces.length ?? 0}</span>
+                </div>
+                <div className="detail-card">
+                  <strong>Accepted exceptions</strong>
+                  <span>{dossier?.acceptedExceptions.length ?? 0}</span>
+                </div>
+                <div className="detail-card">
+                  <strong>Models</strong>
+                  <span>{dossier?.capabilities.length ?? 0}</span>
+                </div>
+              </div>
+            </>
+          ) : (
+            <p className="empty-state">正在加载 dossier…</p>
+          )}
+        </div>
+      ) : null}
+
+      {activeTab === 'surfaces' ? (
+        <div className="panel panel-wide">
+          <div className="panel-head">
+            <p className="panel-kicker">Surfaces</p>
+            <h3>Surface 限制与能力</h3>
+          </div>
+          <div className="card-list">
+            <SurfaceSection title="Blocked" items={dossier?.blockedSurfaces ?? []} siteId={site?.id} />
+            <SurfaceSection title="Degraded" items={dossier?.degradedSurfaces ?? []} siteId={site?.id} />
+            <SurfaceSection title="Accepted exceptions" items={dossier?.acceptedExceptions ?? []} siteId={site?.id} />
+          </div>
+        </div>
+      ) : null}
+
+      {activeTab === 'models' ? (
+        <div className="panel panel-wide">
+          <div className="panel-head">
+            <p className="panel-kicker">Models</p>
+            <h3>模型档案</h3>
+          </div>
+          <div className="card-list">
+            {filteredCapabilities.map((item) => (
+              <div key={item.id} className="detail-card">
+                <strong>{item.modelName}</strong>
+                <span>{item.modelKey}</span>
+                <span>{item.capabilityLevel}</span>
+                <span>backend: {item.preferredBackend ?? '-'} / {(item.supportedBackends ?? []).join(', ') || '无'}</span>
+              </div>
+            ))}
+            {!filteredCapabilities.length ? <p className="empty-state">当前筛选下没有模型记录。</p> : null}
+          </div>
+        </div>
+      ) : null}
+
+      {activeTab === 'trace-links' ? (
+        <div className="panel panel-wide">
+          <div className="panel-head">
+            <p className="panel-kicker">Trace links</p>
+            <h3>下一步入口</h3>
+          </div>
+          <div className="card-list">
+            <div className="detail-card">
+              <strong>Capability matrix</strong>
+              <span>从全局 blocker / degraded / accepted exception 视角继续定位。</span>
+              <div className="inline-actions">
+                <Link className="action-link" to="/capability-matrix">打开矩阵</Link>
               </div>
             </div>
-          </div>
-
-          <div className="panel panel-wide">
-            <div className="panel-head">
-              <p className="panel-kicker">Surface capability</p>
-              <h3>Surface 能力</h3>
-            </div>
-            <div className="feature-list">
-              {surfaceEntries.map(([surfaceKey, surface]) => (
-                <button
-                  key={surfaceKey}
-                  type="button"
-                  className={`feature-badge ${(surface.overallCapabilityLevel ?? 'NATIVE').toLowerCase()}${selectedSurface === surfaceKey ? ' active' : ''}`}
-                  onClick={() => handleSurfaceSelect(surfaceKey)}
-                >
-                  {surface.operation}
-                  <small>{surface.executionCapabilityLevel ?? '-'}/{surface.renderCapabilityLevel ?? '-'}/{surface.overallCapabilityLevel ?? '-'}</small>
-                </button>
-              ))}
-            </div>
-            <div className="card-list">
-              {surfaceEntries.map(([surfaceKey, surface]) => (
-                <div key={surfaceKey} className={`detail-card${selectedSurface === surfaceKey ? ' is-selected' : ''}`}>
-                  <strong>{surface.operation}</strong>
-                  <span>backend: {surface.preferredBackend ?? '-'} / {(surface.supportedBackends ?? []).join(', ') || '无'}</span>
-                  <span>resource: {surface.resourceType}</span>
-                  <span>surface: {surface.surface ?? surfaceKey}</span>
-                  <span>normalizedPath: {surface.normalizedPath ?? '无'}</span>
-                  <span>supportStatus: {surface.supportStatus ?? '-'}</span>
-                  <span>degradationLevel: {surface.degradationLevel ?? '-'}</span>
-                  <span>execution: {surface.executionCapabilityLevel ?? '-'}</span>
-                  <span>render: {surface.renderCapabilityLevel ?? '-'}</span>
-                  <span>overall: {surface.overallCapabilityLevel ?? '-'}</span>
-                  <span>requiredFeatures: {surface.requiredFeatures.join(', ') || '无'}</span>
-                  <span>featureSupport: {summarizeSurfaceFeatureStatuses(surface) || '无'}</span>
-                  {surface.blockerReasons.length ? <span>acceptedException / blockerReasons: {surface.blockerReasons.join(', ')}</span> : null}
+            {site ? (
+              <>
+                <div className="detail-card">
+                  <strong>Trace workbench</strong>
+                  <span>按 providerType/requestPath 查看最近请求的 route、cache 和 async 资源线索。</span>
+                  <div className="inline-actions">
+                    <Link
+                      className="action-link"
+                      to={`/traces?providerType=${encodeURIComponent(site.siteKind)}&requestPath=${encodeURIComponent(selectedSurfacePath(dossier, selectedSurface) ?? '/v1/chat/completions')}`}
+                    >
+                      打开 Traces
+                    </Link>
+                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="panel">
-            <div className="panel-head">
-              <p className="panel-kicker">Model capabilities</p>
-              <h3>{selectedSurface ? `模型能力 · ${selectedSurface}` : '模型能力'}</h3>
-            </div>
-            <div className="card-list">
-              {filteredCapabilities.map((item: SiteModelCapability) => (
-                <div key={item.id} className="detail-card">
-                  <strong>{item.modelName}</strong>
-                  <span>{item.modelKey}</span>
-                  <span>{item.capabilityLevel}</span>
-                  <span>backend: {item.preferredBackend ?? '-'} / {(item.supportedBackends ?? []).join(', ') || '无'}</span>
-                  {Object.entries(item.surfaces).map(([surfaceKey, surface]) => (
-                    <span key={surfaceKey}>{surface.operation}: {surface.executionCapabilityLevel ?? '-'}/{surface.renderCapabilityLevel ?? '-'}/{surface.overallCapabilityLevel ?? '-'}</span>
-                  ))}
+                <div className="detail-card">
+                  <strong>Incident command center</strong>
+                  <span>从事件维度看受影响实体与建议动作。</span>
+                  <div className="inline-actions">
+                    <Link className="action-link" to={`/incidents?entityType=SITE_PROFILE&entityRef=${encodeURIComponent(String(site.id))}`}>
+                      打开 Incidents
+                    </Link>
+                  </div>
                 </div>
-              ))}
-              {!filteredCapabilities.length ? <p className="empty-state">当前特征下暂无模型级细分记录。</p> : null}
-            </div>
+              </>
+            ) : null}
           </div>
-        </>
+        </div>
       ) : null}
     </section>
   )
 }
 
-function toDraft(site: ProviderSite): ProviderSiteDraft {
-  return {
-    profileCode: site.profileCode,
-    displayName: site.displayName,
-    siteKind: site.siteKind,
-    baseUrlPattern: site.baseUrlPattern ?? '',
-    description: site.description ?? '',
-    active: site.active,
+function SurfaceSection({ title, items, siteId }: { title: string; items: SurfaceDossierItemResponse[]; siteId?: number }) {
+  return (
+    <div className="detail-card">
+      <strong>{title}</strong>
+      <div className="card-list">
+        {items.map((item) => (
+          <div key={`${title}-${item.surfaceKey}`} className="detail-card">
+            <strong>{item.operation}</strong>
+            <span>{item.supportStatus ?? '-'} / {item.degradationLevel ?? '-'}</span>
+            <span>{item.normalizedPath ?? '无 normalizedPath'}</span>
+            {item.blockerReasons.length ? <span>{item.blockerReasons.join('；')}</span> : null}
+            {item.lossReasons.length ? <span>{item.lossReasons.join('；')}</span> : null}
+            {siteId ? (
+              <div className="inline-actions">
+                <Link className="action-link" to={`/provider-sites/${siteId}/settings`}>设置</Link>
+                <Link className="action-link" to={`/workbench?protocol=openai&requestPath=${encodeURIComponent(item.normalizedPath ?? '/v1/chat/completions')}`}>Workbench</Link>
+              </div>
+            ) : null}
+          </div>
+        ))}
+        {!items.length ? <p className="empty-state">当前没有记录。</p> : null}
+      </div>
+    </div>
+  )
+}
+
+function matchesSurface(model: SiteModelCapability, surface?: string | null) {
+  if (!surface) return true
+  return Boolean(model.surfaces[surface])
+}
+
+function selectedSurfacePath(dossier?: ProviderSiteDossierResponse, surfaceKey?: string | null) {
+  if (!surfaceKey || !dossier) return null
+  const surface =
+    dossier.blockedSurfaces.find((item) => item.surfaceKey === surfaceKey)
+    ?? dossier.degradedSurfaces.find((item) => item.surfaceKey === surfaceKey)
+    ?? dossier.acceptedExceptions.find((item) => item.surfaceKey === surfaceKey)
+    ?? dossier.capabilities.find((item) => item.surfaces[surfaceKey])?.surfaces[surfaceKey]
+  return surface?.normalizedPath ?? null
+}
+
+function tabLabel(tab: DossierTab) {
+  switch (tab) {
+    case 'summary':
+      return 'Summary'
+    case 'surfaces':
+      return 'Surfaces'
+    case 'models':
+      return 'Models'
+    case 'trace-links':
+      return 'Trace links'
   }
 }

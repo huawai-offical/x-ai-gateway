@@ -17,6 +17,7 @@ export type NavigationIcon =
   | 'backup'
   | 'upgrade'
   | 'history'
+  | 'integration'
 
 export type NavigationItem = {
   to: string
@@ -56,12 +57,12 @@ export const navigationGroups: NavigationGroup[] = [
     ],
   },
   {
-    label: '运行观测',
+    label: '运行工作台',
     items: [
-      { to: '/ops', label: '实时总览', description: '核心运行信号与指挥台', icon: 'overview', end: true },
+      { to: '/incidents', label: 'Incidents', description: '当前风险事件、影响范围与建议动作', icon: 'overview', end: true },
+      { to: '/traces', label: 'Traces', description: '按 requestId / resource 串联 trace 与实体', icon: 'logs', end: true },
       { to: '/ops/alerts', label: '告警中心', description: '告警规则、状态与处置', icon: 'alert', end: true },
       { to: '/ops/probes', label: '拨测记录', description: '主动拨测与结果回溯', icon: 'probe', end: true },
-      { to: '/ops/logs', label: '运行日志', description: '日志检索与异常排查', icon: 'logs', end: true },
     ],
   },
   {
@@ -69,7 +70,7 @@ export const navigationGroups: NavigationGroup[] = [
     items: [
       { to: '/provider-sites', label: '站点档案', description: '站点能力、健康与鉴权', icon: 'site' },
       { to: '/capability-matrix', label: '能力矩阵', description: '协议与能力兼容视图', icon: 'matrix', end: true },
-      { to: '/translation-debug', label: '执行解释', description: '计划、损耗与失败原因', icon: 'explain', end: true },
+      { to: '/workbench', label: 'Workbench', description: '请求、计划、执行与 trace 工作台', icon: 'explain', end: true },
     ],
   },
   {
@@ -77,9 +78,18 @@ export const navigationGroups: NavigationGroup[] = [
     items: [
       { to: '/error-rules', label: '错误规则', description: '例外、透传与重写策略', icon: 'rules', end: true },
       { to: '/operations/install', label: '安装初始化', description: '平台初始化与引导流程', icon: 'install', end: true },
-      { to: '/operations/backups', label: '备份恢复', description: '备份任务与恢复入口', icon: 'backup', end: true },
-      { to: '/operations/upgrades', label: '升级回滚', description: '版本升级、检查与回滚', icon: 'upgrade', end: true },
-      { to: '/operations/rollbacks', label: '回滚记录', description: '历史回滚与状态确认', icon: 'history', end: true },
+      { to: '/operations/changes', label: '变更编排', description: '统一申请、审批、执行与回滚', icon: 'upgrade', end: true },
+      { to: '/operations/windows', label: '维护窗口', description: '维护窗口与执行时段治理', icon: 'backup', end: true },
+      { to: '/operations/checkpoints', label: '恢复检查点', description: '真实快照、核验与恢复基线', icon: 'history', end: true },
+    ],
+  },
+  {
+    label: '外部联动',
+    items: [
+      { to: '/integrations/webhooks', label: 'Webhooks', description: '管理 webhook endpoint 与签名配置', icon: 'integration', end: true },
+      { to: '/integrations/channels', label: 'Channels', description: '定义 webhook / IM / email 通道', icon: 'integration', end: true },
+      { to: '/integrations/subscriptions', label: 'Subscriptions', description: '配置事件订阅与过滤条件', icon: 'integration', end: true },
+      { to: '/integrations/deliveries', label: 'Deliveries', description: '查看投递记录、失败重试与重放', icon: 'integration', end: true },
     ],
   },
 ]
@@ -166,41 +176,48 @@ const routeMeta: RouteMeta[] = [
     patterns: ['/ops/alerts'],
     title: '告警中心',
     description: '跟踪当前告警状态、受影响对象与处置入口。',
-    groupLabel: '运行观测',
+    groupLabel: '运行工作台',
     navTo: '/ops/alerts',
   },
   {
     patterns: ['/ops/probes'],
     title: '拨测记录',
     description: '查看主动拨测计划、结果和历史变化。',
-    groupLabel: '运行观测',
+    groupLabel: '运行工作台',
     navTo: '/ops/probes',
   },
   {
-    patterns: ['/ops/logs'],
-    title: '运行日志',
-    description: '检索运行日志、异常线索和实时输出。',
-    groupLabel: '运行观测',
-    navTo: '/ops/logs',
+    patterns: ['/traces'],
+    title: 'Trace Workbench',
+    description: '按 requestId、resource key 和 upstream object 串联链路与实体。',
+    groupLabel: '运行工作台',
+    navTo: '/traces',
   },
   {
-    patterns: ['/ops'],
-    title: '实时总览',
-    description: '聚合关键运行指标、实时事件流与操作入口。',
-    groupLabel: '运行观测',
-    navTo: '/ops',
+    patterns: ['/incidents'],
+    title: 'Incident Command Center',
+    description: '先回答发生了什么、影响谁、为什么危险以及下一步建议动作。',
+    groupLabel: '运行工作台',
+    navTo: '/incidents',
   },
   {
-    patterns: ['/provider-sites/new'],
-    title: '新建站点档案',
-    description: '录入新的 provider site，并初始化兼容与鉴权档案。',
+    patterns: ['/provider-sites/new/settings'],
+    title: '新建站点设置',
+    description: '创建新的 provider site，并初始化基础配置与鉴权设置。',
     groupLabel: '站点真相',
     navTo: '/provider-sites',
   },
   {
     patterns: ['/provider-sites/:id'],
-    title: '站点档案详情',
-    description: '查看单个站点的能力快照、健康状态与协议支持面。',
+    title: '站点运行档案',
+    description: '先查看 blocker、accepted exception、推荐动作和下一步入口。',
+    groupLabel: '站点真相',
+    navTo: '/provider-sites',
+  },
+  {
+    patterns: ['/provider-sites/:id/settings'],
+    title: '站点设置',
+    description: '编辑站点配置、刷新能力快照并维护基础信息。',
     groupLabel: '站点真相',
     navTo: '/provider-sites',
   },
@@ -214,16 +231,16 @@ const routeMeta: RouteMeta[] = [
   {
     patterns: ['/capability-matrix'],
     title: '能力矩阵',
-    description: '按站点与协议对照兼容能力、损耗和限制条件。',
+    description: '按 blocked、degraded 和 accepted exception 发现全局限制。',
     groupLabel: '站点真相',
     navTo: '/capability-matrix',
   },
   {
-    patterns: ['/translation-debug'],
-    title: '执行解释',
-    description: '查看 canonical plan、降级、阻断与执行解释结果。',
+    patterns: ['/workbench', '/translation-debug'],
+    title: 'Translation Workbench',
+    description: '按 Request → Plan → Execute → Trace → Raw 的顺序调试请求。',
     groupLabel: '站点真相',
-    navTo: '/translation-debug',
+    navTo: '/workbench',
   },
   {
     patterns: ['/error-rules'],
@@ -240,25 +257,53 @@ const routeMeta: RouteMeta[] = [
     navTo: '/operations/install',
   },
   {
-    patterns: ['/operations/backups'],
-    title: '备份恢复',
-    description: '查看备份任务、恢复入口和历史结果。',
+    patterns: ['/operations/changes', '/operations/backups', '/operations/upgrades', '/operations/rollbacks'],
+    title: '变更编排',
+    description: '统一处理 ChangePlan、审批、执行阶段与自动回滚。',
     groupLabel: '策略与操作',
-    navTo: '/operations/backups',
+    navTo: '/operations/changes',
   },
   {
-    patterns: ['/operations/upgrades'],
-    title: '升级回滚',
-    description: '处理版本检查、升级动作与回滚入口。',
+    patterns: ['/operations/windows'],
+    title: '维护窗口',
+    description: '配置变更窗口，约束升级与高风险动作的执行时段。',
     groupLabel: '策略与操作',
-    navTo: '/operations/upgrades',
+    navTo: '/operations/windows',
   },
   {
-    patterns: ['/operations/rollbacks'],
-    title: '回滚记录',
-    description: '查看历史回滚、结果摘要与后续确认事项。',
+    patterns: ['/operations/checkpoints'],
+    title: '恢复检查点',
+    description: '查看 metadata、runtime、data 三类快照与 checkpoint 核验结果。',
     groupLabel: '策略与操作',
-    navTo: '/operations/rollbacks',
+    navTo: '/operations/checkpoints',
+  },
+  {
+    patterns: ['/integrations/webhooks'],
+    title: 'Webhook Endpoints',
+    description: '管理 webhook endpoint、签名策略和 timeout，作为统一外发底座。',
+    groupLabel: '外部联动',
+    navTo: '/integrations/webhooks',
+  },
+  {
+    patterns: ['/integrations/channels'],
+    title: 'Notification Channels',
+    description: '定义 webhook / IM / email 通道，并绑定对外出口。',
+    groupLabel: '外部联动',
+    navTo: '/integrations/channels',
+  },
+  {
+    patterns: ['/integrations/subscriptions'],
+    title: 'Event Subscriptions',
+    description: '配置事件筛选规则，让外发通知稳定命中目标。',
+    groupLabel: '外部联动',
+    navTo: '/integrations/subscriptions',
+  },
+  {
+    patterns: ['/integrations/deliveries'],
+    title: 'Outbound Deliveries',
+    description: '查看最近投递、失败重试和 replay，形成完整外发审计链。',
+    groupLabel: '外部联动',
+    navTo: '/integrations/deliveries',
   },
 ]
 

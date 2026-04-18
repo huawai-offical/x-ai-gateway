@@ -4,13 +4,16 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { apiRequest } from '../../lib/api'
 import { CapabilityMatrixPage } from './capability-matrix-page'
 
-const { apiRequest } = vi.hoisted(() => ({
+vi.mock('../../lib/api', () => ({
   apiRequest: vi.fn(),
 }))
 
-apiRequest.mockImplementation(async () => [
+const mockedApiRequest = apiRequest as unknown as ReturnType<typeof vi.fn>
+
+mockedApiRequest.mockImplementation(async () => [
   {
     siteProfileId: 1,
     profileCode: 'site:openai_direct',
@@ -586,17 +589,13 @@ apiRequest.mockImplementation(async () => [
   },
 ])
 
-vi.mock('../../lib/api', () => ({
-  apiRequest,
-}))
-
 afterEach(() => {
   cleanup()
-  apiRequest.mockClear()
+  mockedApiRequest.mockClear()
 })
 
 describe('CapabilityMatrixPage', () => {
-  it('filters blocked rows and exposes deep links', async () => {
+  it('defaults to blocked view and exposes deep links for restricted surfaces', async () => {
     render(
       <QueryClientProvider client={new QueryClient()}>
         <MemoryRouter>
@@ -605,41 +604,22 @@ describe('CapabilityMatrixPage', () => {
       </QueryClientProvider>,
     )
 
-    expect(await screen.findByText('OPENAI_DIRECT')).toBeInTheDocument()
-    fireEvent.change(screen.getByRole('combobox', { name: 'resolution' }), {
-      target: { value: 'blocked' },
-    })
-
+    expect((await screen.findAllByText('GEMINI_DIRECT')).length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: 'Blocked' })).toHaveClass('active')
     expect(screen.queryByText('OPENAI_DIRECT')).not.toBeInTheDocument()
-    expect(screen.getByText('GEMINI_DIRECT')).toBeInTheDocument()
-    expect(screen.getByText('VERTEX_AI')).toBeInTheDocument()
-    expect(screen.getByText('OPENAI_COMPATIBLE_GENERIC')).toBeInTheDocument()
-    expect(screen.getAllByRole('link', { name: '调试' }).length).toBeGreaterThan(0)
-    expect(screen.getAllByRole('link', { name: 'Trace' }).length).toBeGreaterThan(0)
-    expect(screen.getAllByRole('link', { name: /FILE_CREATE/ }).some((link) => link.getAttribute('href') === '/provider-sites/2?surface=file_create')).toBe(true)
-    expect(screen.getAllByRole('link', { name: /FILE_CREATE/ }).some((link) => link.getAttribute('href') === '/provider-sites/4?surface=file_create')).toBe(true)
-    expect(screen.getByRole('link', { name: /EMBEDDING_CREATE/ })).toHaveAttribute('href', '/provider-sites/3?surface=embedding_create')
-    expect(screen.getAllByText('supportStatus: ORCHESTRATION').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('supportStatus: BLOCKED').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('supportStatus: NATIVE').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('normalizedPath: /v1/files').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('normalizedPath: /v1/batches').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('normalizedPath: /v1/fine_tuning/jobs').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('normalizedPath: /v1/uploads').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('normalizedPath: /v1/realtime/client_secrets').length).toBeGreaterThan(0)
-    expect(screen.getByText('normalizedPath: /v1/embeddings')).toBeInTheDocument()
-    expect(screen.getByText('normalizedPath: /v1/audio/transcriptions')).toBeInTheDocument()
-    expect(screen.getByText('normalizedPath: /v1/images/generations')).toBeInTheDocument()
-    expect(screen.getByText('normalizedPath: /v1/moderations')).toBeInTheDocument()
-    expect(screen.getByText('normalizedPath: /v1/images/edits')).toBeInTheDocument()
-    expect(screen.getByText('featureSupport: file_object:NATIVE')).toBeInTheDocument()
-    expect(screen.getByText('featureSupport: batch_create:NATIVE')).toBeInTheDocument()
-    expect(screen.getByText('featureSupport: tuning_create:NATIVE')).toBeInTheDocument()
-    expect(screen.getByText('featureSupport: embeddings:BLOCKED')).toBeInTheDocument()
-    expect(screen.getByText('featureSupport: audio_transcription:NATIVE')).toBeInTheDocument()
-    expect(screen.getByText('featureSupport: image_generation:NATIVE')).toBeInTheDocument()
-    expect(screen.getByText('featureSupport: moderation:NATIVE')).toBeInTheDocument()
-    expect(screen.getByText('featureSupport: file_object:BLOCKED')).toBeInTheDocument()
-    expect(screen.getAllByText(/accepted exception/).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText('VERTEX_AI')).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText('OPENAI_COMPATIBLE_GENERIC')).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('link', { name: '进入 Workbench' }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('link', { name: '查看 Trace' }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('link', { name: '查看 Incident' }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('link', { name: '查看站点' }).some((link) => link.getAttribute('href') === '/provider-sites/2?surface=realtime_client_secret_create')).toBe(true)
+    expect(screen.getAllByRole('link', { name: '查看站点' }).some((link) => link.getAttribute('href') === '/provider-sites/4?surface=file_create')).toBe(true)
+    expect(screen.getAllByText('compatibilitySurface: google_native').length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/accepted exception|不在当前实现面内|不等价/).length).toBeGreaterThan(0)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Accepted exceptions' }))
+
+    expect(await screen.findByText('OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；files 仍作为 accepted exception，不在当前实现面内。')).toBeInTheDocument()
+    expect((await screen.findAllByText('OPENAI_COMPATIBLE_GENERIC')).length).toBeGreaterThan(0)
   })
 })

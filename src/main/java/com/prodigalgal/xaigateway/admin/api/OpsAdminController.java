@@ -1,12 +1,15 @@
 package com.prodigalgal.xaigateway.admin.api;
 
 import com.prodigalgal.xaigateway.admin.application.OpsAlertService;
+import com.prodigalgal.xaigateway.admin.application.OpsCapacityService;
 import com.prodigalgal.xaigateway.admin.application.OpsDashboardService;
 import com.prodigalgal.xaigateway.admin.application.OpsProbeJobService;
 import com.prodigalgal.xaigateway.admin.application.OpsRuntimeLogService;
+import com.prodigalgal.xaigateway.admin.application.OpsSloService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
 import java.util.List;
 
 @RestController
@@ -17,16 +20,22 @@ public class OpsAdminController {
     private final OpsAlertService opsAlertService;
     private final OpsProbeJobService opsProbeJobService;
     private final OpsRuntimeLogService opsRuntimeLogService;
+    private final OpsSloService opsSloService;
+    private final OpsCapacityService opsCapacityService;
 
     public OpsAdminController(
             OpsDashboardService opsDashboardService,
             OpsAlertService opsAlertService,
             OpsProbeJobService opsProbeJobService,
-            OpsRuntimeLogService opsRuntimeLogService) {
+            OpsRuntimeLogService opsRuntimeLogService,
+            OpsSloService opsSloService,
+            OpsCapacityService opsCapacityService) {
         this.opsDashboardService = opsDashboardService;
         this.opsAlertService = opsAlertService;
         this.opsProbeJobService = opsProbeJobService;
         this.opsRuntimeLogService = opsRuntimeLogService;
+        this.opsSloService = opsSloService;
+        this.opsCapacityService = opsCapacityService;
     }
 
     @GetMapping("/summary")
@@ -57,6 +66,46 @@ public class OpsAdminController {
     @PutMapping("/alerts/rules/{id}")
     public OpsAlertRuleResponse updateAlertRule(@PathVariable Long id, @Valid @RequestBody OpsAlertRuleRequest request) {
         return opsAlertService.saveRule(id, request);
+    }
+
+    @GetMapping("/alerts/silences")
+    public List<AlertSilenceResponse> listAlertSilences() {
+        return opsAlertService.listSilences();
+    }
+
+    @PostMapping("/alerts/silences")
+    public AlertSilenceResponse createAlertSilence(@RequestBody AlertSilenceRequest request) {
+        return opsAlertService.saveSilence(null, request);
+    }
+
+    @PutMapping("/alerts/silences/{id}")
+    public AlertSilenceResponse updateAlertSilence(@PathVariable Long id, @RequestBody AlertSilenceRequest request) {
+        return opsAlertService.saveSilence(id, request);
+    }
+
+    @GetMapping("/slo")
+    public OpsSloSummaryResponse sloSummary() {
+        return opsSloService.summary(Instant.now());
+    }
+
+    @GetMapping("/slo/policies")
+    public List<SloPolicyResponse> listSloPolicies() {
+        return opsSloService.listPolicies();
+    }
+
+    @PostMapping("/slo/policies")
+    public SloPolicyResponse createSloPolicy(@RequestBody SloPolicyRequest request) {
+        return opsSloService.savePolicy(null, request);
+    }
+
+    @PutMapping("/slo/policies/{id}")
+    public SloPolicyResponse updateSloPolicy(@PathVariable Long id, @RequestBody SloPolicyRequest request) {
+        return opsSloService.savePolicy(id, request);
+    }
+
+    @GetMapping("/capacity")
+    public OpsCapacitySummaryResponse capacitySummary() {
+        return opsCapacityService.summary(Instant.now());
     }
 
     @GetMapping("/probes")

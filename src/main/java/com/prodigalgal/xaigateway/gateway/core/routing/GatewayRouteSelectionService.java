@@ -16,6 +16,9 @@ import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendPolicyService;
 import com.prodigalgal.xaigateway.gateway.core.catalog.ModelCatalogQueryService;
 import com.prodigalgal.xaigateway.gateway.core.catalog.ResolvedModelView;
+import com.prodigalgal.xaigateway.gateway.core.governance.GovernanceContext;
+import com.prodigalgal.xaigateway.gateway.core.governance.GovernanceDecision;
+import com.prodigalgal.xaigateway.gateway.core.governance.GovernancePolicyEngine;
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestFeatureService;
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
@@ -58,6 +61,7 @@ public class GatewayRouteSelectionService {
     private final GatewayRequestFeatureService gatewayRequestFeatureService;
     private final SiteCapabilityTruthService siteCapabilityTruthService;
     private final NonChatRoutePolicyService nonChatRoutePolicyService;
+    private final GovernancePolicyEngine governancePolicyEngine;
     private final RouteCacheStore routeCacheStore;
     private final HealthStateStore healthStateStore;
 
@@ -74,6 +78,7 @@ public class GatewayRouteSelectionService {
             GatewayRequestFeatureService gatewayRequestFeatureService,
             SiteCapabilityTruthService siteCapabilityTruthService,
             NonChatRoutePolicyService nonChatRoutePolicyService,
+            GovernancePolicyEngine governancePolicyEngine,
             RouteCacheStore routeCacheStore,
             HealthStateStore healthStateStore) {
         this.distributedKeyQueryService = distributedKeyQueryService;
@@ -87,6 +92,7 @@ public class GatewayRouteSelectionService {
         this.gatewayRequestFeatureService = gatewayRequestFeatureService;
         this.siteCapabilityTruthService = siteCapabilityTruthService;
         this.nonChatRoutePolicyService = nonChatRoutePolicyService;
+        this.governancePolicyEngine = governancePolicyEngine;
         this.routeCacheStore = routeCacheStore;
         this.healthStateStore = healthStateStore;
     }
@@ -114,6 +120,7 @@ public class GatewayRouteSelectionService {
                 gatewayRequestFeatureService,
                 siteCapabilityTruthService,
                 NonChatRoutePolicyService.forTests(siteCapabilityTruthService, new ExecutionBackendPolicyService()),
+                GovernancePolicyEngine.allowAll(),
                 new RouteCacheStore() {
                     @Override
                     public Optional<RoutePlanSnapshot> get(Long distributedKeyId, String protocol, String requestPath, String requestedModel, GatewayRequestSemantics semantics) {
@@ -170,6 +177,7 @@ public class GatewayRouteSelectionService {
                 gatewayRequestFeatureService,
                 siteCapabilityTruthService,
                 NonChatRoutePolicyService.forTests(siteCapabilityTruthService, new ExecutionBackendPolicyService()),
+                GovernancePolicyEngine.allowAll(),
                 routeCacheStore,
                 healthStateStore
         );
@@ -459,6 +467,9 @@ public class GatewayRouteSelectionService {
         boolean affinityMatched = false;
         Instant cooldownUntil = null;
         String healthState = "HEALTHY";
+        com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity credential = upstreamCredentialRepository
+                .findById(staticEvaluation.candidate().candidate().credentialId())
+                .orElse(null);
 
         if (exclusionReasons.isEmpty() && distributedKey.bindings().stream().noneMatch(binding ->
                 binding.credentialId().equals(staticEvaluation.candidate().candidate().credentialId()))) {
@@ -476,12 +487,27 @@ public class GatewayRouteSelectionService {
                 cooldownUntil = storedHealth.get().cooldownUntil();
             }
 
-            if (!isNetworkHealthy(staticEvaluation.candidate())) {
+            GovernanceDecision governanceDecision = governancePolicyEngine.evaluate(new GovernanceContext(
+                    staticEvaluation.candidate().candidate().providerType(),
+                    staticEvaluation.candidate().candidate().siteProfileId(),
+                    staticEvaluation.candidate().candidate().credentialId(),
+                    null,
+                    credential == null ? null : credential.getProxyId()
+            ));
+            if (!governanceDecision.allowed()) {
+                exclusionReasons.add(governanceDecision.healthState() != null && governanceDecision.healthState().equals("POLICY_BLOCKED")
+                        ? "governance_policy_blocked"
+                        : "governance_quarantined");
+                healthState = governanceDecision.healthState();
+                cooldownUntil = governanceDecision.effectiveUntil();
+            }
+
+            if (exclusionReasons.isEmpty() && !isNetworkHealthy(credential)) {
                 exclusionReasons.add("network_blocked");
                 healthState = "NETWORK_BLOCKED";
             }
 
-            if (!hasHealthyAccountIfBound(distributedKey.id(), staticEvaluation.candidate().candidate().providerType(), clientFamily)) {
+            if (exclusionReasons.isEmpty() && !hasHealthyAccountIfBound(distributedKey.id(), staticEvaluation.candidate().candidate().providerType(), clientFamily)) {
                 exclusionReasons.add("account_pool_unavailable");
                 healthState = "ACCOUNT_POOL_UNAVAILABLE";
             }
@@ -621,16 +647,15 @@ public class GatewayRouteSelectionService {
         return distributedKey.allowedProviderTypes().contains(candidate.candidate().providerType().name());
     }
 
-    private boolean isNetworkHealthy(RouteCandidateView candidate) {
-        return upstreamCredentialRepository.findById(candidate.candidate().credentialId())
-                .map(credential -> {
-                    if (credential.getProxyId() == null) {
-                        return true;
-                    }
-                    return networkProxyRepository.findById(credential.getProxyId())
-                            .map(proxy -> proxy.isActive() && !"FAILED".equalsIgnoreCase(proxy.getLastStatus()))
-                            .orElse(false);
-                })
+    private boolean isNetworkHealthy(com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity credential) {
+        if (credential == null) {
+            return false;
+        }
+        if (credential.getProxyId() == null) {
+            return true;
+        }
+        return networkProxyRepository.findById(credential.getProxyId())
+                .map(proxy -> proxy.isActive() && !"FAILED".equalsIgnoreCase(proxy.getLastStatus()))
                 .orElse(false);
     }
 

@@ -12,6 +12,9 @@ import com.prodigalgal.xaigateway.gateway.core.cache.PromptFingerprintService;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.catalog.ModelCatalogQueryService;
 import com.prodigalgal.xaigateway.gateway.core.catalog.ResolvedModelView;
+import com.prodigalgal.xaigateway.gateway.core.governance.GovernanceActionType;
+import com.prodigalgal.xaigateway.gateway.core.governance.GovernanceDecision;
+import com.prodigalgal.xaigateway.gateway.core.governance.GovernancePolicyEngine;
 import com.prodigalgal.xaigateway.gateway.core.interop.CapabilityResolution;
 import com.prodigalgal.xaigateway.gateway.core.interop.CapabilityResolutionReport;
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics;
@@ -157,6 +160,95 @@ class GatewayRouteSelectionGovernanceTests {
                 "sk-gw-test", "openai", "/v1/chat/completions", "gpt-4o",
                 Map.of("messages", List.of(Map.of("role", "user", "content", "hi"))),
                 GatewayClientFamily.GEMINI_CLI, false
+        )));
+    }
+
+    @Test
+    void shouldBlockCandidateWhenGovernancePolicyBlocksCredential() {
+        DistributedKeyQueryService keyQueryService = Mockito.mock(DistributedKeyQueryService.class);
+        ModelCatalogQueryService modelCatalogQueryService = Mockito.mock(ModelCatalogQueryService.class);
+        AffinityCacheService affinityCacheService = Mockito.mock(AffinityCacheService.class);
+        DistributedKeyGovernanceService governanceService = Mockito.mock(DistributedKeyGovernanceService.class);
+        UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        NetworkProxyRepository networkProxyRepository = Mockito.mock(NetworkProxyRepository.class);
+        AccountSelectionService accountSelectionService = Mockito.mock(AccountSelectionService.class);
+        GatewayRequestFeatureService gatewayRequestFeatureService = Mockito.mock(GatewayRequestFeatureService.class);
+        SiteCapabilityTruthService siteCapabilityTruthService = Mockito.mock(SiteCapabilityTruthService.class);
+        RouteCacheStore routeCacheStore = Mockito.mock(RouteCacheStore.class);
+        HealthStateStore healthStateStore = Mockito.mock(HealthStateStore.class);
+        GovernancePolicyEngine governancePolicyEngine = Mockito.mock(GovernancePolicyEngine.class);
+
+        PromptFingerprintService promptFingerprintService = new PromptFingerprintService(new ObjectMapper(), new GatewayProperties());
+        GatewayRouteSelectionService service = new GatewayRouteSelectionService(
+                keyQueryService,
+                modelCatalogQueryService,
+                promptFingerprintService,
+                affinityCacheService,
+                governanceService,
+                upstreamCredentialRepository,
+                networkProxyRepository,
+                accountSelectionService,
+                gatewayRequestFeatureService,
+                siteCapabilityTruthService,
+                com.prodigalgal.xaigateway.gateway.core.interop.NonChatRoutePolicyService.forTests(siteCapabilityTruthService, new com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendPolicyService()),
+                governancePolicyEngine,
+                routeCacheStore,
+                healthStateStore
+        );
+
+        DistributedKeyView keyView = new DistributedKeyView(
+                1L, "test", "sk-gw-test", "masked", List.of("openai"), List.of(), List.of(), null,
+                null, null, null, null, null, null, List.of(), false,
+                List.of(new DistributedCredentialBindingView(11L, 101L, "openai", ProviderType.OPENAI_DIRECT, "https://api.openai.com", 10, 100))
+        );
+        when(keyQueryService.findActiveByKeyPrefix("sk-gw-test")).thenReturn(Optional.of(keyView));
+        when(governanceService.evaluate(any(), any(), any(), Mockito.anyBoolean()))
+                .thenReturn(new DistributedKeyGovernanceService.GovernanceDecision(List.of(), List.of(), 1, 1000, null));
+        when(modelCatalogQueryService.resolveRequestedModel("gpt-4o", "openai")).thenReturn(Optional.of(new ResolvedModelView(
+                "gpt-4o", "gpt-4o", "gpt-4o", false,
+                List.of(new CatalogCandidateView(101L, "openai", ProviderType.OPENAI_DIRECT, 1L, null, null, null, null, null, "https://api.openai.com", "gpt-4o", "gpt-4o", List.of("openai"), true, true, true, true, false, false, false, false, ReasoningTransport.OPENAI_CHAT, InteropCapabilityLevel.NATIVE))
+        )));
+        when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.any()))
+                .thenReturn(new GatewayRequestSemantics(
+                        TranslationResourceType.CHAT,
+                        TranslationOperation.CHAT_COMPLETION,
+                        List.of(InteropFeature.CHAT_TEXT),
+                        true
+                ));
+        when(siteCapabilityTruthService.resolve(Mockito.any(), Mockito.any()))
+                .thenReturn(new CapabilityResolutionReport(
+                        Map.of("chat_text", new CapabilityResolution(
+                                InteropFeature.CHAT_TEXT,
+                                InteropCapabilityLevel.NATIVE,
+                                InteropCapabilityLevel.NATIVE,
+                                InteropCapabilityLevel.NATIVE,
+                                InteropCapabilityLevel.NATIVE,
+                                List.of(),
+                                List.of()
+                        )),
+                        InteropCapabilityLevel.NATIVE,
+                        InteropCapabilityLevel.NATIVE,
+                        InteropCapabilityLevel.NATIVE,
+                        ExecutionKind.NATIVE,
+                        "direct_upstream_execution",
+                        List.of(),
+                        List.of()
+                ));
+        com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity credential = new com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity();
+        credential.setProviderType(ProviderType.OPENAI_DIRECT);
+        credential.setBaseUrl("https://api.openai.com");
+        when(upstreamCredentialRepository.findById(101L)).thenReturn(Optional.of(credential));
+        when(routeCacheStore.get(Mockito.anyLong(), Mockito.anyString(), Mockito.anyString(), Mockito.anyString(), Mockito.any()))
+                .thenReturn(Optional.empty());
+        when(healthStateStore.getCredentialState(101L)).thenReturn(Optional.empty());
+        when(accountSelectionService.hasHealthyAccountBinding(1L, ProviderType.OPENAI_DIRECT, GatewayClientFamily.GENERIC_OPENAI)).thenReturn(true);
+        when(governancePolicyEngine.evaluate(Mockito.any()))
+                .thenReturn(new GovernanceDecision(false, "POLICY_BLOCKED", "manual block", GovernanceActionType.NONE, Instant.now().plusSeconds(300), List.of(1L), List.of()));
+
+        assertThrows(IllegalArgumentException.class, () -> service.select(new RouteSelectionRequest(
+                "sk-gw-test", "openai", "/v1/chat/completions", "gpt-4o",
+                Map.of("messages", List.of(Map.of("role", "user", "content", "hi"))),
+                GatewayClientFamily.GENERIC_OPENAI, false
         )));
     }
 }

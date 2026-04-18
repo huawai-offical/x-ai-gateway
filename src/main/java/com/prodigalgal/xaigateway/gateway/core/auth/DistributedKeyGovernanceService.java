@@ -86,6 +86,45 @@ public class DistributedKeyGovernanceService {
         rateLimitStore.decrement(reservationKey);
     }
 
+    public GovernanceWindowSnapshot snapshot(DistributedKeyView distributedKey) {
+        long currentBudgetMicros = currentValue(distributedKey.budgetLimitMicros() == null ? null : budgetKey(distributedKey.id()));
+        long currentRpm = currentValue(distributedKey.rpmLimit() == null ? null : rpmKey(distributedKey.id()));
+        long currentTpm = currentValue(distributedKey.tpmLimit() == null ? null : tpmKey(distributedKey.id()));
+        long currentConcurrency = currentValue(distributedKey.concurrencyLimit() == null ? null : concurrencyKey(distributedKey.id()));
+
+        double budgetUtilization = utilization(currentBudgetMicros, distributedKey.budgetLimitMicros());
+        double rpmUtilization = utilization(currentRpm, distributedKey.rpmLimit() == null ? null : distributedKey.rpmLimit().longValue());
+        double tpmUtilization = utilization(currentTpm, distributedKey.tpmLimit() == null ? null : distributedKey.tpmLimit().longValue());
+        double concurrencyUtilization = utilization(currentConcurrency, distributedKey.concurrencyLimit() == null ? null : distributedKey.concurrencyLimit().longValue());
+
+        List<String> notes = new ArrayList<>();
+        if (budgetUtilization >= 0.85D) {
+            notes.add("budget usage is close to the current window limit");
+        }
+        if (rpmUtilization >= 0.85D) {
+            notes.add("rpm usage is close to the current window limit");
+        }
+        if (tpmUtilization >= 0.85D) {
+            notes.add("tpm usage is close to the current window limit");
+        }
+        if (concurrencyUtilization >= 0.85D) {
+            notes.add("concurrency usage is close to the current window limit");
+        }
+
+        return new GovernanceWindowSnapshot(
+                currentBudgetMicros,
+                currentRpm,
+                currentTpm,
+                currentConcurrency,
+                budgetUtilization,
+                rpmUtilization,
+                tpmUtilization,
+                concurrencyUtilization,
+                pressureLevel(budgetUtilization, rpmUtilization, tpmUtilization, concurrencyUtilization),
+                List.copyOf(notes)
+        );
+    }
+
     private long estimateTokens(Object requestBody) {
         try {
             String payload = requestBody == null ? "" : objectMapper.writeValueAsString(requestBody);
@@ -104,6 +143,37 @@ public class DistributedKeyGovernanceService {
             return rateLimitStore.get(key);
         }
         return rateLimitStore.increment(key, amount, Duration.ofSeconds(windowSeconds));
+    }
+
+    private long currentValue(String key) {
+        if (key == null) {
+            return 0L;
+        }
+        return rateLimitStore.get(key);
+    }
+
+    private double utilization(long current, Long limit) {
+        if (limit == null || limit <= 0L) {
+            return 0D;
+        }
+        return (double) current / limit;
+    }
+
+    private String pressureLevel(double budgetUtilization, double rpmUtilization, double tpmUtilization, double concurrencyUtilization) {
+        double max = Math.max(Math.max(budgetUtilization, rpmUtilization), Math.max(tpmUtilization, concurrencyUtilization));
+        if (max >= 1D) {
+            return "CRITICAL";
+        }
+        if (max >= 0.85D) {
+            return "HIGH";
+        }
+        if (max >= 0.60D) {
+            return "MEDIUM";
+        }
+        if (max > 0D) {
+            return "LOW";
+        }
+        return "HEALTHY";
     }
 
     private String budgetKey(Long distributedKeyId) {
@@ -128,6 +198,20 @@ public class DistributedKeyGovernanceService {
             long estimatedTokens,
             long estimatedBudgetMicros,
             String concurrencyReservationKey
+    ) {
+    }
+
+    public record GovernanceWindowSnapshot(
+            long currentBudgetMicros,
+            long currentRpm,
+            long currentTpm,
+            long currentConcurrency,
+            double budgetUtilization,
+            double rpmUtilization,
+            double tpmUtilization,
+            double concurrencyUtilization,
+            String pressureLevel,
+            List<String> notes
     ) {
     }
 }

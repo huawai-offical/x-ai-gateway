@@ -1,6 +1,7 @@
 package com.prodigalgal.xaigateway.admin.api;
 
 import com.prodigalgal.xaigateway.admin.application.ProviderSiteAdminService;
+import com.prodigalgal.xaigateway.admin.application.ProviderSiteDossierService;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,9 +17,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class ProviderSiteAdminController {
 
     private final ProviderSiteAdminService providerSiteAdminService;
+    private final ProviderSiteDossierService providerSiteDossierService;
 
-    public ProviderSiteAdminController(ProviderSiteAdminService providerSiteAdminService) {
+    public ProviderSiteAdminController(
+            ProviderSiteAdminService providerSiteAdminService,
+            ProviderSiteDossierService providerSiteDossierService
+    ) {
         this.providerSiteAdminService = providerSiteAdminService;
+        this.providerSiteDossierService = providerSiteDossierService;
     }
 
     @GetMapping
@@ -34,6 +40,11 @@ public class ProviderSiteAdminController {
     @GetMapping("/{id}")
     public ProviderSiteResponse get(@PathVariable Long id) {
         return providerSiteAdminService.get(id);
+    }
+
+    @GetMapping("/{id}/dossier")
+    public ProviderSiteDossierResponse dossier(@PathVariable Long id) {
+        return providerSiteDossierService.get(id);
     }
 
     @PutMapping("/{id}")

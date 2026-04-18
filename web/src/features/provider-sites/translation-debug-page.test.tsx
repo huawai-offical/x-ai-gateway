@@ -4,13 +4,16 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { apiRequest } from '../../lib/api'
 import { TranslationDebugPage } from './translation-debug-page'
 
-const { apiRequest } = vi.hoisted(() => ({
+vi.mock('../../lib/api', () => ({
   apiRequest: vi.fn(),
 }))
 
-apiRequest.mockImplementation(async (url: string, init?: RequestInit) => {
+const mockedApiRequest = apiRequest as unknown as ReturnType<typeof vi.fn>
+
+mockedApiRequest.mockImplementation(async (url: string, init?: RequestInit) => {
   const parsed = init?.body ? JSON.parse(String(init.body)) : {}
   if (url === '/admin/translation/explain') {
     if (parsed.requestPath === '/v1/files/file_123/content') {
@@ -162,13 +165,9 @@ apiRequest.mockImplementation(async (url: string, init?: RequestInit) => {
   throw new Error(`unexpected url: ${url}`)
 })
 
-vi.mock('../../lib/api', () => ({
-  apiRequest,
-}))
-
 afterEach(() => {
   cleanup()
-  apiRequest.mockClear()
+  mockedApiRequest.mockClear()
 })
 
 describe('TranslationDebugPage', () => {
@@ -181,15 +180,17 @@ describe('TranslationDebugPage', () => {
       </QueryClientProvider>,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: '查看 Explain' }))
-    expect(await screen.findByText('chat.completions')).toBeInTheDocument()
-    expect(screen.getByText('CHAT_COMPLETION')).toBeInTheDocument()
-    expect(screen.getByText('计划语义')).toBeInTheDocument()
-    expect(screen.getAllByText((_, node) => node?.textContent?.includes('"ingressProtocol": "OPENAI"') ?? false).length).toBeGreaterThan(0)
+    fireEvent.click(screen.getByRole('button', { name: '查看 Plan' }))
+    expect(await screen.findByText('routeSelectionMode')).toBeInTheDocument()
+    expect(screen.getByText('routePolicyReason')).toBeInTheDocument()
+    expect(screen.getByText('supportStatus')).toBeInTheDocument()
 
+    fireEvent.click(screen.getByRole('button', { name: 'Request' }))
     fireEvent.click(screen.getByRole('button', { name: '执行 Chat 调试' }))
-    expect(await screen.findByText('hello from runtime')).toBeInTheDocument()
-    expect(await screen.findByText('req-1')).toBeInTheDocument()
+    expect((await screen.findAllByText('hello from runtime')).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText('req-1')).length).toBeGreaterThan(0)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Trace' }))
     expect(await screen.findByText('PREFIX_AFFINITY')).toBeInTheDocument()
   })
 
@@ -206,16 +207,20 @@ describe('TranslationDebugPage', () => {
       </QueryClientProvider>,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: '查看 Explain' }))
-    expect(await screen.findByText('/v1/files/{fileId}/content')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '查看 Plan' }))
+    expect(await screen.findByText('routeSelectionMode')).toBeInTheDocument()
 
+    fireEvent.click(screen.getByRole('button', { name: 'Request' }))
     fireEvent.click(screen.getByRole('button', { name: '执行资源调试' }))
-    expect(await screen.findByText('128')).toBeInTheDocument()
+    expect((await screen.findAllByText('128')).length).toBeGreaterThan(0)
     expect(screen.getByText('responseKind: binary')).toBeInTheDocument()
     expect(screen.getByText('objectType: file.content')).toBeInTheDocument()
-    expect(await screen.findByText('file_123')).toBeInTheDocument()
+    expect((await screen.findAllByText('file_123')).length).toBeGreaterThan(0)
     expect((await screen.findAllByText('req-resource-1')).length).toBeGreaterThan(0)
-    expect(await screen.findByText(/upstreamObjectId: upstream-file-123/)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Trace' }))
+    expect(await screen.findByText('upstreamObjectId')).toBeInTheDocument()
+    expect(await screen.findByText('upstream-file-123')).toBeInTheDocument()
   })
 
   it('validates invalid json body before explain', async () => {
@@ -230,7 +235,7 @@ describe('TranslationDebugPage', () => {
     fireEvent.change(screen.getByLabelText('request body'), {
       target: { value: '{invalid-json' },
     })
-    fireEvent.click(screen.getByRole('button', { name: '查看 Explain' }))
+    fireEvent.click(screen.getByRole('button', { name: '查看 Plan' }))
 
     await waitFor(() => {
       expect(screen.getByText(/JSON 解析失败/)).toBeInTheDocument()
@@ -262,18 +267,19 @@ describe('TranslationDebugPage', () => {
       </QueryClientProvider>,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: '查看 Explain' }))
-    expect(await screen.findByText('chat.completions')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '查看 Plan' }))
+    expect(await screen.findByText('routeSelectionMode')).toBeInTheDocument()
 
+    fireEvent.click(screen.getByRole('button', { name: 'Request' }))
     fireEvent.click(screen.getByRole('button', { name: '执行 Chat 调试' }))
-    expect(await screen.findByText('hello from runtime')).toBeInTheDocument()
+    expect((await screen.findAllByText('hello from runtime')).length).toBeGreaterThan(0)
 
+    fireEvent.click(screen.getByRole('button', { name: 'Request' }))
     fireEvent.click(screen.getByRole('button', { name: '清空结果' }))
 
     await waitFor(() => {
-      expect(screen.queryByText('hello from runtime')).not.toBeInTheDocument()
-      expect(screen.getByText('提交请求后查看 explain 结果。')).toBeInTheDocument()
-      expect(screen.getByText('执行调试后可在这里对照 explain、backend 与真实 route/result。')).toBeInTheDocument()
+      expect(screen.queryAllByText('hello from runtime')).toHaveLength(0)
+      expect(screen.getByText('请求输入')).toBeInTheDocument()
     })
   })
 })

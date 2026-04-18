@@ -137,6 +137,16 @@ function NavigationGlyph({ icon }: { icon: NavigationIcon }) {
           <path d="M12 8v5l3 2" />
         </>
       )
+    case 'integration':
+      return (
+        <>
+          <path d="M5 12h14" />
+          <path d="M8 7h8" />
+          <path d="M8 17h8" />
+          <path d="M5 12a2 2 0 1 0 0 .01" />
+          <path d="M19 12a2 2 0 1 0 0 .01" />
+        </>
+      )
   }
 }
 

@@ -1,6 +1,7 @@
 package com.prodigalgal.xaigateway.admin.api;
 
 import com.prodigalgal.xaigateway.admin.application.ProviderSiteAdminService;
+import com.prodigalgal.xaigateway.admin.application.ProviderSiteDossierService;
 import com.prodigalgal.xaigateway.gateway.core.catalog.SurfaceCapabilityView;
 import com.prodigalgal.xaigateway.gateway.core.interop.CapabilityResolutionView;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
@@ -34,6 +35,9 @@ class ProviderSiteAdminControllerTests {
     @MockitoBean
     private ProviderSiteAdminService providerSiteAdminService;
 
+    @MockitoBean
+    private ProviderSiteDossierService providerSiteDossierService;
+
     @Test
     void shouldListProviderSites() {
         Mockito.when(providerSiteAdminService.list()).thenReturn(List.of(sampleSite()));
@@ -45,6 +49,36 @@ class ProviderSiteAdminControllerTests {
                 .expectBody()
                 .jsonPath("$[0].profileCode").isEqualTo("site:openai_direct")
                 .jsonPath("$[0].providerFamily").isEqualTo("OPENAI");
+    }
+
+    @Test
+    void shouldExposeProviderSiteDossier() {
+        Mockito.when(providerSiteDossierService.get(1L)).thenReturn(new ProviderSiteDossierResponse(
+                sampleSite(),
+                List.of(),
+                List.of(new SurfaceDossierItemResponse(
+                        "file_create",
+                        "FILE_CREATE",
+                        "/v1/files",
+                        "BLOCKED",
+                        "UNSUPPORTED",
+                        "UNSUPPORTED",
+                        List.of("accepted exception"),
+                        List.of()
+                )),
+                List.of(),
+                List.of(),
+                List.of("打开 Workbench")
+        ));
+
+        webTestClient.get()
+                .uri("/admin/provider-sites/1/dossier")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.site.profileCode").isEqualTo("site:openai_direct")
+                .jsonPath("$.blockedSurfaces[0].surfaceKey").isEqualTo("file_create")
+                .jsonPath("$.recommendedActions[0]").isEqualTo("打开 Workbench");
     }
 
     @Test

@@ -1,0 +1,396 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0024-change-plan-orchestration
+      author: codex
+      changes:
+        - createTable:
+            tableName: maintenance_window
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: window_name
+                  type: VARCHAR(128)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: scope_type
+                  type: VARCHAR(32)
+              - column:
+                  name: scope_ref
+                  type: VARCHAR(128)
+              - column:
+                  name: starts_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints:
+                    nullable: false
+              - column:
+                  name: ends_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints:
+                    nullable: false
+              - column:
+                  name: enabled
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+              - column:
+                  name: description
+                  type: VARCHAR(512)
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: maintenance_window
+            indexName: idx_maintenance_window_active
+            columns:
+              - column:
+                  name: enabled
+              - column:
+                  name: starts_at
+              - column:
+                  name: ends_at
+        - createTable:
+            tableName: change_plan
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: plan_name
+                  type: VARCHAR(128)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: plan_type
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: execution_class
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: release_artifact_id
+                  type: BIGINT
+              - column:
+                  name: recovery_checkpoint_id
+                  type: BIGINT
+              - column:
+                  name: maintenance_window_id
+                  type: BIGINT
+              - column:
+                  name: rollback_playbook_id
+                  type: BIGINT
+              - column:
+                  name: requested_by
+                  type: VARCHAR(128)
+              - column:
+                  name: approved_by
+                  type: VARCHAR(128)
+              - column:
+                  name: manual_override
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: override_reason
+                  type: VARCHAR(512)
+              - column:
+                  name: emergency_reason
+                  type: VARCHAR(512)
+              - column:
+                  name: risk_level
+                  type: VARCHAR(32)
+              - column:
+                  name: current_stage
+                  type: VARCHAR(64)
+              - column:
+                  name: current_message
+                  type: VARCHAR(512)
+              - column:
+                  name: preflight_json
+                  type: TEXT
+              - column:
+                  name: summary_json
+                  type: TEXT
+              - column:
+                  name: metadata_json
+                  type: TEXT
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: change_plan
+            indexName: idx_change_plan_status
+            columns:
+              - column:
+                  name: status
+        - createIndex:
+            tableName: change_plan
+            indexName: idx_change_plan_type
+            columns:
+              - column:
+                  name: plan_type
+              - column:
+                  name: execution_class
+        - createTable:
+            tableName: approval_record
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: change_plan_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: decision
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: actor
+                  type: VARCHAR(128)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: reason
+                  type: VARCHAR(512)
+              - column:
+                  name: decision_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: approval_record
+            indexName: idx_approval_record_plan
+            columns:
+              - column:
+                  name: change_plan_id
+              - column:
+                  name: decision_at
+        - createTable:
+            tableName: release_rollout
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: change_plan_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: stage
+                  type: VARCHAR(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: message
+                  type: VARCHAR(512)
+              - column:
+                  name: started_at
+                  type: TIMESTAMP WITH TIME ZONE
+              - column:
+                  name: completed_at
+                  type: TIMESTAMP WITH TIME ZONE
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: release_rollout
+            indexName: idx_release_rollout_plan
+            columns:
+              - column:
+                  name: change_plan_id
+              - column:
+                  name: created_at
+        - createTable:
+            tableName: rollback_playbook
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: change_plan_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: recovery_checkpoint_id
+                  type: BIGINT
+              - column:
+                  name: rollback_release_artifact_id
+                  type: BIGINT
+              - column:
+                  name: status
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: trigger_conditions_json
+                  type: TEXT
+              - column:
+                  name: latest_rollback_plan_id
+                  type: BIGINT
+              - column:
+                  name: last_triggered_at
+                  type: TIMESTAMP WITH TIME ZONE
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: rollback_playbook
+            indexName: idx_rollback_playbook_plan
+            columns:
+              - column:
+                  name: change_plan_id
+        - createTable:
+            tableName: recovery_checkpoint
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: checkpoint_name
+                  type: VARCHAR(128)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: change_plan_id
+                  type: BIGINT
+              - column:
+                  name: status
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: metadata_snapshot_path
+                  type: VARCHAR(1024)
+              - column:
+                  name: runtime_snapshot_path
+                  type: VARCHAR(1024)
+              - column:
+                  name: data_snapshot_path
+                  type: VARCHAR(1024)
+              - column:
+                  name: manifest_json
+                  type: TEXT
+              - column:
+                  name: verification_status
+                  type: VARCHAR(32)
+              - column:
+                  name: verification_message
+                  type: VARCHAR(512)
+              - column:
+                  name: verified_at
+                  type: TIMESTAMP WITH TIME ZONE
+              - column:
+                  name: verified_by
+                  type: VARCHAR(128)
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: recovery_checkpoint
+            indexName: idx_recovery_checkpoint_created
+            columns:
+              - column:
+                  name: created_at

@@ -41,3 +41,11 @@ databaseChangeLog:
       file: db/changelog/changes/db.changelog-0020-gateway-file-binding-site-profile.yaml
   - include:
       file: db/changelog/changes/db.changelog-0021-gateway-async-resource-upstream-object.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0022-governance-policy-engine.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0023-slo-capacity-guard.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0024-change-plan-orchestration.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0025-outbound-integrations.yaml

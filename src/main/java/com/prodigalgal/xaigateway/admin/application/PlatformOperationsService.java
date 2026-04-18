@@ -87,16 +87,7 @@ public class PlatformOperationsService {
     }
 
     public BackupJobResponse createBackup(boolean dryRun) {
-        BackupJobEntity entity = new BackupJobEntity();
-        entity.setDryRun(dryRun);
-        entity.setStatus(dryRun ? "DRY_RUN_OK" : "COMPLETED");
-        entity.setSummaryJson(writeJson(snapshotSummary()));
-        if (!dryRun) {
-            entity.setSnapshotPath(writeSnapshot("backup", entity.getSummaryJson()));
-        }
-        BackupJobEntity saved = backupJobRepository.save(entity);
-        opsAuditService.record("PLATFORM", "BACKUP_CREATED", "backup_job", String.valueOf(saved.getId()), saved.getSummaryJson());
-        return toBackupResponse(saved);
+        return recordBackupJob(dryRun, dryRun ? "DRY_RUN_OK" : "COMPLETED", null, writeJson(snapshotSummary()));
     }
 
     public RestoreJobResponse restoreBackup(Long backupJobId, boolean dryRun) {
@@ -279,5 +270,75 @@ public class PlatformOperationsService {
 
     private RollbackJobResponse toRollbackResponse(RollbackJobEntity entity) {
         return new RollbackJobResponse(entity.getId(), entity.getUpgradeJobId(), entity.getReleaseArtifactId(), entity.getBackupJobId(), entity.getStatus(), entity.getMessage(), entity.getCreatedAt(), entity.getUpdatedAt());
+    }
+
+    public BackupJobResponse recordBackupJob(boolean dryRun, String status, String snapshotPath, String summaryJson) {
+        BackupJobEntity entity = new BackupJobEntity();
+        entity.setDryRun(dryRun);
+        entity.setStatus(status);
+        entity.setSnapshotPath(snapshotPath == null && !dryRun && summaryJson != null ? writeSnapshot("backup", summaryJson) : snapshotPath);
+        entity.setSummaryJson(summaryJson);
+        BackupJobEntity saved = backupJobRepository.save(entity);
+        opsAuditService.record("PLATFORM", "BACKUP_CREATED", "backup_job", String.valueOf(saved.getId()), summaryJson);
+        return toBackupResponse(saved);
+    }
+
+    public RestoreJobResponse recordRestoreJob(Long backupJobId, boolean dryRun, String status, String summaryJson) {
+        RestoreJobEntity entity = new RestoreJobEntity();
+        entity.setBackupJobId(backupJobId);
+        entity.setDryRun(dryRun);
+        entity.setStatus(status);
+        entity.setSummaryJson(summaryJson);
+        RestoreJobEntity saved = restoreJobRepository.save(entity);
+        opsAuditService.record("PLATFORM", "RESTORE_CREATED", "restore_job", String.valueOf(saved.getId()), summaryJson);
+        return toRestoreResponse(saved);
+    }
+
+    public UpgradeJobResponse recordUpgradeJob(Long targetReleaseArtifactId, Long preBackupJobId, String status, String message, boolean autoRollbackTriggered) {
+        UpgradeJobEntity entity = new UpgradeJobEntity();
+        entity.setTargetReleaseArtifactId(targetReleaseArtifactId);
+        entity.setPreBackupJobId(preBackupJobId);
+        entity.setStatus(status);
+        entity.setMessage(message);
+        entity.setAutoRollbackTriggered(autoRollbackTriggered);
+        UpgradeJobEntity saved = upgradeJobRepository.save(entity);
+        opsAuditService.record("PLATFORM", "UPGRADE_RECORDED", "upgrade_job", String.valueOf(saved.getId()), writeJson(Map.of(
+                "targetReleaseArtifactId", targetReleaseArtifactId,
+                "preBackupJobId", preBackupJobId,
+                "status", status,
+                "message", message,
+                "autoRollbackTriggered", autoRollbackTriggered
+        )));
+        return toUpgradeResponse(saved);
+    }
+
+    public RollbackJobResponse recordRollbackJob(Long upgradeJobId, Long releaseArtifactId, Long backupJobId, String status, String message) {
+        RollbackJobEntity entity = new RollbackJobEntity();
+        entity.setUpgradeJobId(upgradeJobId);
+        entity.setReleaseArtifactId(releaseArtifactId);
+        entity.setBackupJobId(backupJobId);
+        entity.setStatus(status);
+        entity.setMessage(message);
+        RollbackJobEntity saved = rollbackJobRepository.save(entity);
+        opsAuditService.record("PLATFORM", "ROLLBACK_RECORDED", "rollback_job", String.valueOf(saved.getId()), writeJson(Map.of(
+                "upgradeJobId", upgradeJobId,
+                "releaseArtifactId", releaseArtifactId,
+                "backupJobId", backupJobId,
+                "status", status,
+                "message", message
+        )));
+        return toRollbackResponse(saved);
+    }
+
+    public void activateRelease(Long releaseArtifactId, String status) {
+        InstallationStateEntity state = getOrCreateInstallationState();
+        state.setActiveReleaseArtifactId(releaseArtifactId);
+        state.setStatus(status);
+        state.setLastHealthCheckAt(Instant.now());
+        installationStateRepository.save(state);
+        releaseArtifactRepository.findAll().forEach(item -> {
+            item.setActive(item.getId().equals(releaseArtifactId));
+            releaseArtifactRepository.save(item);
+        });
     }
 }

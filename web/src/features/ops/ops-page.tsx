@@ -16,11 +16,68 @@ type OpsSummary = {
   alerts: Array<{ id: number; title: string; severity: string; status: string }>
 }
 
+type OpsSloSummary = {
+  summary: {
+    requestCount: number
+    failedRequestCount: number
+    errorRate: number
+    errorBudgetRatio: number
+    errorBudgetRemainingRatio: number
+    burnRate: number
+    riskLevel: string
+    silencedAlertCount: number
+  }
+  risks: Array<{
+    scopeType: string
+    scopeRef?: string | null
+    policyName: string
+    burnRate: number
+    errorBudgetRemainingRatio: number
+    riskLevel: string
+    suspectedCauses: string[]
+    suggestedActions: string[]
+  }>
+  recommendedActions: string[]
+}
+
+type OpsCapacitySummary = {
+  distributedKeys: Array<{
+    distributedKeyId: number
+    keyName: string
+    maskedKey: string
+    pressureLevel: string
+    budgetLimitMicros?: number | null
+    currentBudgetMicros?: number | null
+    remainingBudgetMicros?: number | null
+    rpmLimit?: number | null
+    currentRpm?: number | null
+    remainingRpm?: number | null
+    tpmLimit?: number | null
+    currentTpm?: number | null
+    remainingTpm?: number | null
+    concurrencyLimit?: number | null
+    currentConcurrency?: number | null
+    remainingConcurrency?: number | null
+    notes: string[]
+  }>
+  recommendedActions: string[]
+}
+
 export function OpsPage() {
   const [events, setEvents] = useState<string[]>([])
   const summaryQuery = useQuery({
     queryKey: ['ops-summary'],
     queryFn: () => apiRequest<OpsSummary>('/admin/ops/summary'),
+    refetchInterval: 10_000,
+  })
+  const sloQuery = useQuery({
+    queryKey: ['ops-slo'],
+    queryFn: () => apiRequest<OpsSloSummary>('/admin/ops/slo'),
+    refetchInterval: 10_000,
+  })
+  const capacityQuery = useQuery({
+    queryKey: ['ops-capacity'],
+    queryFn: () => apiRequest<OpsCapacitySummary>('/admin/ops/capacity'),
     refetchInterval: 10_000,
   })
 
@@ -63,6 +120,77 @@ export function OpsPage() {
           <Link className="action-link" to="/ops/alerts">查看告警</Link>
           <Link className="action-link" to="/ops/probes">查看 Probe</Link>
           <Link className="action-link" to="/ops/logs">查看日志</Link>
+        </div>
+      </div>
+
+      <div className="panel panel-wide">
+        <div className="panel-head">
+          <p className="panel-kicker">SLO</p>
+          <h2>错误预算</h2>
+        </div>
+        <div className="detail-grid">
+          <div className="detail-card">
+            <strong>风险等级</strong>
+            <span>{sloQuery.data?.summary.riskLevel ?? '-'}</span>
+          </div>
+          <div className="detail-card">
+            <strong>Error budget remaining</strong>
+            <span>{sloQuery.data ? `${(sloQuery.data.summary.errorBudgetRemainingRatio * 100).toFixed(1)}%` : '-'}</span>
+          </div>
+          <div className="detail-card">
+            <strong>Burn rate</strong>
+            <span>{sloQuery.data?.summary.burnRate?.toFixed(2) ?? '-'}</span>
+          </div>
+          <div className="detail-card">
+            <strong>Silenced alerts</strong>
+            <span>{sloQuery.data?.summary.silencedAlertCount ?? '-'}</span>
+          </div>
+        </div>
+        <div className="card-list">
+          {sloQuery.data?.risks.map((risk: OpsSloSummary['risks'][number]) => (
+            <div key={`${risk.policyName}-${risk.scopeType}-${risk.scopeRef ?? 'global'}`} className="detail-card">
+              <strong>{risk.policyName}</strong>
+              <span>{risk.scopeType}{risk.scopeRef ? ` / ${risk.scopeRef}` : ''}</span>
+              <span>{risk.riskLevel} · burn rate {risk.burnRate.toFixed(2)}</span>
+              <span>{risk.suspectedCauses[0] ?? '当前没有额外风险说明。'}</span>
+            </div>
+          ))}
+          {sloQuery.data?.recommendedActions.map((action: string) => (
+            <div key={action} className="detail-card">
+              <strong>Recommended action</strong>
+              <span>{action}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="panel panel-wide">
+        <div className="panel-head">
+          <p className="panel-kicker">Capacity</p>
+          <h2>预算压力</h2>
+        </div>
+        <div className="card-list">
+          {capacityQuery.data?.distributedKeys.map((item: OpsCapacitySummary['distributedKeys'][number]) => (
+            <div key={item.distributedKeyId} className="detail-card">
+              <strong>{item.keyName}</strong>
+              <span>{item.pressureLevel} · {item.maskedKey}</span>
+              <span>
+                budget {item.currentBudgetMicros ?? 0}/{item.budgetLimitMicros ?? 0} ·
+                rpm {item.currentRpm ?? 0}/{item.rpmLimit ?? 0}
+              </span>
+              <span>
+                tpm {item.currentTpm ?? 0}/{item.tpmLimit ?? 0} ·
+                concurrency {item.currentConcurrency ?? 0}/{item.concurrencyLimit ?? 0}
+              </span>
+              <span>{item.notes[0] ?? '当前窗口压力平稳。'}</span>
+            </div>
+          ))}
+          {capacityQuery.data?.recommendedActions.map((action: string) => (
+            <div key={action} className="detail-card">
+              <strong>Recommended action</strong>
+              <span>{action}</span>
+            </div>
+          ))}
         </div>
       </div>
 
