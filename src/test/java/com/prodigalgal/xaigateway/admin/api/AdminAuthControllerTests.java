@@ -1,6 +1,7 @@
 package com.prodigalgal.xaigateway.admin.api;
 
 import com.prodigalgal.xaigateway.admin.application.AdminAuthService;
+import com.prodigalgal.xaigateway.admin.application.AdminConsoleCredentialService;
 import com.prodigalgal.xaigateway.admin.application.SystemSettingsAdminService;
 import com.prodigalgal.xaigateway.infra.config.GatewayProperties;
 import com.prodigalgal.xaigateway.infra.config.web.AdminConsoleSecurityConfiguration;
@@ -37,6 +38,9 @@ class AdminAuthControllerTests {
     @MockitoBean
     private SystemSettingsAdminService systemSettingsAdminService;
 
+    @MockitoBean
+    private AdminConsoleCredentialService adminConsoleCredentialService;
+
     @BeforeEach
     void setUp() {
         when(systemSettingsAdminService.get()).thenReturn(new SystemSettingsResponse(
@@ -56,6 +60,25 @@ class AdminAuthControllerTests {
                         600000
                 ),
                 Instant.parse("2026-04-20T08:00:00Z")
+        ));
+        when(adminConsoleCredentialService.matches("console-admin", "secret-123")).thenReturn(true);
+        when(adminConsoleCredentialService.getSettings()).thenReturn(new AdminAuthSettingsResponse(
+                "console-admin",
+                true,
+                "RANDOM_BOOTSTRAP",
+                Instant.parse("2026-04-20T08:00:00Z"),
+                Instant.parse("2026-04-20T08:15:00Z")
+        ));
+        when(adminConsoleCredentialService.updateSettings(new AdminAuthSettingsUpdateRequest(
+                "rotated-admin",
+                "secret-123",
+                "rotated-secret-123"
+        ))).thenReturn(new AdminAuthSettingsResponse(
+                "rotated-admin",
+                true,
+                "MANUAL_UPDATE",
+                Instant.parse("2026-04-20T08:00:00Z"),
+                Instant.parse("2026-04-20T09:00:00Z")
         ));
     }
 
@@ -117,6 +140,30 @@ class AdminAuthControllerTests {
                 .expectBody()
                 .jsonPath("$.authenticated").isEqualTo(true)
                 .jsonPath("$.username").isEqualTo("console-admin");
+
+        authenticatedClient.get()
+                .uri("/admin/auth/settings")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.username").isEqualTo("console-admin")
+                .jsonPath("$.credentialSource").isEqualTo("RANDOM_BOOTSTRAP");
+
+        authenticatedClient.put()
+                .uri("/admin/auth/settings")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "username":"rotated-admin",
+                          "currentPassword":"secret-123",
+                          "newPassword":"rotated-secret-123"
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.username").isEqualTo("rotated-admin")
+                .jsonPath("$.credentialSource").isEqualTo("MANUAL_UPDATE");
 
         authenticatedClient.get()
                 .uri("/admin/settings")

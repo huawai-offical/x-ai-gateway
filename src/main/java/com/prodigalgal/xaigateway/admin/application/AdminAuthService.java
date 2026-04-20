@@ -18,7 +18,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextImpl;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.server.context.ServerSecurityContextRepository;
 import org.springframework.security.web.server.context.WebSessionServerSecurityContextRepository;
 import org.springframework.stereotype.Service;
@@ -34,15 +33,15 @@ public class AdminAuthService {
     private static final String AUTHENTICATED_AT_SESSION_KEY = "adminConsoleAuthenticatedAt";
 
     private final GatewayProperties gatewayProperties;
-    private final PasswordEncoder passwordEncoder;
+    private final AdminConsoleCredentialService adminConsoleCredentialService;
     private final ServerSecurityContextRepository securityContextRepository;
     private final SecureRandom secureRandom = new SecureRandom();
 
     public AdminAuthService(
             GatewayProperties gatewayProperties,
-            PasswordEncoder passwordEncoder) {
+            AdminConsoleCredentialService adminConsoleCredentialService) {
         this.gatewayProperties = gatewayProperties;
-        this.passwordEncoder = passwordEncoder;
+        this.adminConsoleCredentialService = adminConsoleCredentialService;
         this.securityContextRepository = new WebSessionServerSecurityContextRepository();
     }
 
@@ -90,7 +89,7 @@ public class AdminAuthService {
 
             validateMathAnswer(request, challenge);
             validatePow(request, challenge);
-            validateCredentials(username, request.password(), adminConsole);
+            validateCredentials(username, request.password());
 
             Instant authenticatedAt = Instant.now();
             session.setMaxIdleTime(adminConsole.getSessionTtl());
@@ -142,12 +141,8 @@ public class AdminAuthService {
         }
     }
 
-    private void validateCredentials(
-            String username,
-            String password,
-            GatewayProperties.AdminConsole adminConsole) {
-        if (!adminConsole.getUsername().equals(username)
-                || !passwordEncoder.matches(password, adminConsole.getPassword())) {
+    private void validateCredentials(String username, String password) {
+        if (!adminConsoleCredentialService.matches(username, password)) {
             throw new GatewayUnauthorizedException("账号或密码错误。");
         }
     }

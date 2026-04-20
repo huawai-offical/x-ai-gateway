@@ -243,7 +243,7 @@ public class GatewayProperties {
     public static class AdminConsole {
         private boolean enabled = true;
         private String username = "admin";
-        private String password = "{noop}admin123456";
+        private String password;
         private Duration sessionTtl = Duration.ofHours(8);
         private Duration challengeTtl = Duration.ofMinutes(5);
         private int powDifficulty = 4;
