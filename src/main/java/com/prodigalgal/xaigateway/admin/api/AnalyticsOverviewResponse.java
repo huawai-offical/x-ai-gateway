@@ -40,7 +40,11 @@ public record AnalyticsOverviewResponse(
             long cacheHitCount,
             long cacheHitTokens,
             long cacheWriteTokens,
-            long savedInputTokens
+            long savedInputTokens,
+            long usageRecordCount,
+            long totalTokens,
+            long failedRequestCount,
+            double p95LatencyMs
     ) {
     }
 

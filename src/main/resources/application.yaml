@@ -20,9 +20,9 @@ spring:
     virtual:
       enabled: true
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/x_ai_gateway}
-    username: ${DB_USERNAME:x_ai_gateway}
-    password: ${DB_PASSWORD:x_ai_gateway}
+    url: ${DB_URL:jdbc:postgresql://192.168.154.143:5432/x_ai_gateway?connectionTimeZone=UTC}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:fuckharkadmin}
     driver-class-name: org.postgresql.Driver
   jpa:
     open-in-view: false
@@ -34,9 +34,9 @@ spring:
           time_zone: UTC
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
+      host: ${REDIS_HOST:192.168.154.143}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
+      password: ${REDIS_PASSWORD:nj363600}
       timeout: 5s
   liquibase:
     change-log: classpath:/db/changelog/db.changelog-master.yaml

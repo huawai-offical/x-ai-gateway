@@ -48,6 +48,11 @@ public class CredentialAdminService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public CredentialResponse get(Long id) {
+        return toResponse(getRequired(id));
+    }
+
     public CredentialResponse create(CredentialRequest request) {
         String secret = requireSecret(request.resolvedSecret());
         String fingerprint = credentialCryptoService.fingerprint(secret);

@@ -47,7 +47,7 @@ class DashboardQueryServiceTests {
                         List.of(new AnalyticsOverviewResponse.BreakdownItem("gpt-4o", 7, 1200, 0, 1200)),
                         List.of(new AnalyticsOverviewResponse.BreakdownItem("prompt_cache", 6, 1800, 120, 1800)),
                         List.of(new AnalyticsOverviewResponse.CountBreakdownItem("FINAL", 4)),
-                        List.of(new AnalyticsOverviewResponse.TimelineBucket(from, 4, 2, 600, 40, 600))
+                        List.of(new AnalyticsOverviewResponse.TimelineBucket(from, 4, 2, 600, 40, 600, 3, 1800, 1, 820D))
                 ));
         when(observabilityQueryService.listRouteDecisions(1L, ProviderType.OPENAI_DIRECT, from, to))
                 .thenReturn(IntStream.range(0, 6)

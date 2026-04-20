@@ -52,7 +52,11 @@ class AnalyticsAdminControllerTests {
                                 2,
                                 600,
                                 40,
-                                600
+                                600,
+                                3,
+                                1800,
+                                1,
+                                820D
                         ))
                 ));
 
@@ -73,6 +77,8 @@ class AnalyticsAdminControllerTests {
                 .jsonPath("$.modelGroupBreakdown[0].savedInputTokens").isEqualTo(1200)
                 .jsonPath("$.cacheSourceBreakdown[0].key").isEqualTo("prompt_cache")
                 .jsonPath("$.usageCompletenessBreakdown[0].key").isEqualTo("FINAL")
-                .jsonPath("$.timeline[0].cacheHitTokens").isEqualTo(600);
+                .jsonPath("$.timeline[0].cacheHitTokens").isEqualTo(600)
+                .jsonPath("$.timeline[0].totalTokens").isEqualTo(1800)
+                .jsonPath("$.timeline[0].p95LatencyMs").isEqualTo(820D);
     }
 }

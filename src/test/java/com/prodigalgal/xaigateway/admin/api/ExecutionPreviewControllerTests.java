@@ -86,7 +86,11 @@ class ExecutionPreviewControllerTests {
                 .jsonPath("$.selection.selectionSource").isEqualTo("PREFIX_AFFINITY")
                 .jsonPath("$.providerBinding.candidate.credentialId").isEqualTo(101)
                 .jsonPath("$.plan.ingressProtocol").isEqualTo("OPENAI")
-                .jsonPath("$.providerOptions.promptCacheKey").isEqualTo("xag:pc:1:gpt-4o:prefix");
+                .jsonPath("$.providerOptions.promptCacheKey").isEqualTo("xag:pc:1:gpt-4o:prefix")
+                .jsonPath("$.translatedUpstreamPayload.providerType").isEqualTo("OPENAI_DIRECT")
+                .jsonPath("$.translatedUpstreamPayload.requestPath").isEqualTo("/v1/chat/completions")
+                .jsonPath("$.providerBindingSummary.credentialId").isEqualTo(101)
+                .jsonPath("$.normalizedResponsePreview.notes[0]").exists();
     }
 
     private RouteSelectionResult selectionResult() {

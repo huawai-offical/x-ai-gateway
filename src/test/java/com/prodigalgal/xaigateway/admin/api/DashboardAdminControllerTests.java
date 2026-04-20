@@ -78,7 +78,11 @@ class DashboardAdminControllerTests {
                                 2,
                                 600,
                                 40,
-                                600
+                                600,
+                                3,
+                                1800,
+                                1,
+                                820D
                         )),
                         List.of(new RouteDecisionLogResponse(
                                 1L,

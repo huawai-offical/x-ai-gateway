@@ -171,7 +171,10 @@ class ObservabilityAdminControllerTests {
                         com.prodigalgal.xaigateway.gateway.core.observability.GatewayRequestStatus.COMPLETED,
                         from,
                         to,
-                        from
+                        from,
+                        820L,
+                        null,
+                        null
                 )));
 
         webTestClient.get()
@@ -268,7 +271,10 @@ class ObservabilityAdminControllerTests {
                                 com.prodigalgal.xaigateway.gateway.core.observability.GatewayRequestStatus.COMPLETED,
                                 now,
                                 now,
-                                now
+                                now,
+                                120L,
+                                null,
+                                null
                         ),
                         new RouteDecisionLogResponse(
                                 2L,

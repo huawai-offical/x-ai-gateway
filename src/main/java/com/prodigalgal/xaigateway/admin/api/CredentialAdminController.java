@@ -30,6 +30,11 @@ public class CredentialAdminController {
         return credentialAdminService.list();
     }
 
+    @GetMapping("/{id}")
+    public CredentialResponse get(@PathVariable Long id) {
+        return credentialAdminService.get(id);
+    }
+
     @PostMapping
     public CredentialResponse create(@Valid @RequestBody CredentialRequest request) {
         return credentialAdminService.create(request);

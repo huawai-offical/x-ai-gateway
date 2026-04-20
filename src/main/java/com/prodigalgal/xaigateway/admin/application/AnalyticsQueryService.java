@@ -2,6 +2,7 @@ package com.prodigalgal.xaigateway.admin.application;
 
 import com.prodigalgal.xaigateway.admin.api.AnalyticsOverviewResponse;
 import com.prodigalgal.xaigateway.admin.api.CacheHitLogResponse;
+import com.prodigalgal.xaigateway.admin.api.RequestLogResponse;
 import com.prodigalgal.xaigateway.admin.api.RouteDecisionLogResponse;
 import com.prodigalgal.xaigateway.admin.api.UpstreamCacheReferenceResponse;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageCompleteness;
@@ -66,6 +67,9 @@ public class AnalyticsQueryService {
         List<CacheHitLogResponse> cacheHits = requestedWindow == null
                 ? observabilityQueryService.listCacheHits(distributedKeyId, providerType)
                 : observabilityQueryService.listCacheHits(distributedKeyId, providerType, requestedWindow.from(), requestedWindow.to());
+        List<RequestLogResponse> requestLogs = requestedWindow == null
+                ? observabilityQueryService.listRequestLogs(distributedKeyId, providerType, null, null)
+                : observabilityQueryService.listRequestLogs(distributedKeyId, providerType, requestedWindow.from(), requestedWindow.to());
         List<UpstreamCacheReferenceResponse> activeReferences = observabilityQueryService.listUpstreamCacheReferences(
                 distributedKeyId,
                 providerType,
@@ -82,6 +86,12 @@ public class AnalyticsQueryService {
         List<CacheHitLogResponse> sortedCacheHits = cacheHits.stream()
                 .sorted(Comparator.comparing(CacheHitLogResponse::createdAt, Comparator.nullsLast(Comparator.naturalOrder())))
                 .toList();
+        List<RequestLogResponse> sortedRequestLogs = requestLogs.stream()
+                .sorted(Comparator.comparing(RequestLogResponse::createdAt, Comparator.nullsLast(Comparator.naturalOrder())))
+                .toList();
+        List<UsageRecordEntity> sortedUsageRecords = usageRecords.stream()
+                .sorted(Comparator.comparing(UsageRecordEntity::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
+                .toList();
 
         long totalCacheHitTokens = sortedCacheHits.stream().mapToLong(CacheHitLogResponse::cacheHitTokens).sum();
         long totalCacheWriteTokens = sortedCacheHits.stream().mapToLong(CacheHitLogResponse::cacheWriteTokens).sum();
@@ -92,7 +102,13 @@ public class AnalyticsQueryService {
         long partialUsageCount = usageRecords.stream()
                 .filter(entity -> entity.getCompleteness() == GatewayUsageCompleteness.PARTIAL)
                 .count();
-        TimeWindow sampledWindow = resolveSampledWindow(requestedWindow, sortedRouteDecisions, sortedCacheHits);
+        TimeWindow sampledWindow = resolveSampledWindow(
+                requestedWindow,
+                sortedRouteDecisions,
+                sortedCacheHits,
+                sortedRequestLogs,
+                sortedUsageRecords
+        );
 
         return new AnalyticsOverviewResponse(
                 sampledWindow == null ? null : sampledWindow.from(),
@@ -113,7 +129,7 @@ public class AnalyticsQueryService {
                 modelGroupBreakdown(sortedRouteDecisions, sortedCacheHits),
                 cacheSourceBreakdown(sortedCacheHits),
                 usageCompletenessBreakdown(usageRecords),
-                buildTimeline(sortedRouteDecisions, sortedCacheHits, sampledWindow, resolvedBucketMinutes)
+                buildTimeline(sortedRouteDecisions, sortedCacheHits, sortedRequestLogs, sortedUsageRecords, sampledWindow, resolvedBucketMinutes)
         );
     }
 
@@ -228,6 +244,8 @@ public class AnalyticsQueryService {
     private List<AnalyticsOverviewResponse.TimelineBucket> buildTimeline(
             List<RouteDecisionLogResponse> routeDecisions,
             List<CacheHitLogResponse> cacheHits,
+            List<RequestLogResponse> requestLogs,
+            List<UsageRecordEntity> usageRecords,
             TimeWindow sampledWindow,
             int bucketMinutes) {
         if (sampledWindow == null) {
@@ -272,6 +290,34 @@ public class AnalyticsQueryService {
             }
         }
 
+        for (RequestLogResponse requestLog : requestLogs) {
+            if (requestLog.createdAt() == null) {
+                continue;
+            }
+            Instant bucketStart = alignToBucket(requestLog.createdAt(), bucketSize);
+            TimelineAccumulator accumulator = buckets.get(bucketStart);
+            if (accumulator != null) {
+                if (requestLog.status() != null && requestLog.status().name().equals("FAILED")) {
+                    accumulator.failedRequestCount++;
+                }
+                if (requestLog.durationMs() != null && requestLog.durationMs() > 0) {
+                    accumulator.latencySamples.add(requestLog.durationMs());
+                }
+            }
+        }
+
+        for (UsageRecordEntity usageRecord : usageRecords) {
+            if (usageRecord.getCreatedAt() == null) {
+                continue;
+            }
+            Instant bucketStart = alignToBucket(usageRecord.getCreatedAt(), bucketSize);
+            TimelineAccumulator accumulator = buckets.get(bucketStart);
+            if (accumulator != null) {
+                accumulator.usageRecordCount++;
+                accumulator.totalTokens += usageRecord.getTotalTokens();
+            }
+        }
+
         return buckets.entrySet().stream()
                 .map(entry -> entry.getValue().toTimelineBucket(entry.getKey()))
                 .toList();
@@ -293,7 +339,9 @@ public class AnalyticsQueryService {
     private TimeWindow resolveSampledWindow(
             TimeWindow requestedWindow,
             List<RouteDecisionLogResponse> routeDecisions,
-            List<CacheHitLogResponse> cacheHits) {
+            List<CacheHitLogResponse> cacheHits,
+            List<RequestLogResponse> requestLogs,
+            List<UsageRecordEntity> usageRecords) {
         if (requestedWindow != null) {
             return requestedWindow;
         }
@@ -304,6 +352,14 @@ public class AnalyticsQueryService {
                 .toList());
         timestamps.addAll(cacheHits.stream()
                 .map(CacheHitLogResponse::createdAt)
+                .filter(Objects::nonNull)
+                .toList());
+        timestamps.addAll(requestLogs.stream()
+                .map(RequestLogResponse::createdAt)
+                .filter(Objects::nonNull)
+                .toList());
+        timestamps.addAll(usageRecords.stream()
+                .map(UsageRecordEntity::getCreatedAt)
                 .filter(Objects::nonNull)
                 .toList());
 
@@ -346,6 +402,10 @@ public class AnalyticsQueryService {
         private long cacheHitTokens;
         private long cacheWriteTokens;
         private long savedInputTokens;
+        private long usageRecordCount;
+        private long totalTokens;
+        private long failedRequestCount;
+        private final List<Long> latencySamples = new ArrayList<>();
 
         private AnalyticsOverviewResponse.TimelineBucket toTimelineBucket(Instant bucketStart) {
             return new AnalyticsOverviewResponse.TimelineBucket(
@@ -354,8 +414,22 @@ public class AnalyticsQueryService {
                     cacheHitCount,
                     cacheHitTokens,
                     cacheWriteTokens,
-                    savedInputTokens
+                    savedInputTokens,
+                    usageRecordCount,
+                    totalTokens,
+                    failedRequestCount,
+                    percentile95(latencySamples)
             );
+        }
+
+        private double percentile95(List<Long> values) {
+            if (values.isEmpty()) {
+                return 0D;
+            }
+            List<Long> sorted = values.stream().sorted().toList();
+            int index = (int) Math.ceil(sorted.size() * 0.95D) - 1;
+            int boundedIndex = Math.max(0, Math.min(index, sorted.size() - 1));
+            return sorted.get(boundedIndex);
         }
     }
 }

@@ -674,7 +674,10 @@ public class ObservabilityQueryService {
                 entity.getStatus(),
                 entity.getStartedAt(),
                 entity.getCompletedAt(),
-                entity.getCreatedAt()
+                entity.getCreatedAt(),
+                entity.getDurationMs(),
+                entity.getErrorCode(),
+                entity.getErrorMessage()
         );
     }
 

@@ -33,6 +33,9 @@ public record RequestLogResponse(
         GatewayRequestStatus status,
         Instant startedAt,
         Instant completedAt,
-        Instant createdAt
+        Instant createdAt,
+        Long durationMs,
+        String errorCode,
+        String errorMessage
 ) {
 }

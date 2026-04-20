@@ -11,6 +11,9 @@ public record ExecutionPreviewResponse(
         CanonicalRequest canonicalRequest,
         CanonicalExecutionPlan plan,
         RouteCandidateView providerBinding,
-        Map<String, Object> providerOptions
+        Map<String, Object> providerOptions,
+        ExecutionPreviewPayloadResponse translatedUpstreamPayload,
+        ExecutionPreviewBindingSummaryResponse providerBindingSummary,
+        NormalizedResponsePreviewResponse normalizedResponsePreview
 ) {
 }

@@ -2,6 +2,7 @@ package com.prodigalgal.xaigateway.admin.application;
 
 import com.prodigalgal.xaigateway.admin.api.AnalyticsOverviewResponse;
 import com.prodigalgal.xaigateway.admin.api.CacheHitLogResponse;
+import com.prodigalgal.xaigateway.admin.api.RequestLogResponse;
 import com.prodigalgal.xaigateway.admin.api.RouteDecisionLogResponse;
 import com.prodigalgal.xaigateway.admin.api.UpstreamCacheReferenceResponse;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
@@ -11,7 +12,7 @@ import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
-import org.springframework.data.domain.PageRequest;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -57,10 +58,15 @@ class AnalyticsQueryServiceTests {
                         Instant.parse("2026-04-07T08:00:00Z"),
                         Instant.parse("2026-04-07T10:00:00Z")
                 )));
+        when(observabilityQueryService.listRequestLogs(1L, ProviderType.OPENAI_DIRECT, from, to))
+                .thenReturn(List.of(
+                        requestLog("route-1", ProviderType.OPENAI_DIRECT, 480L, "COMPLETED", Instant.parse("2026-04-07T08:22:00Z")),
+                        requestLog("route-2", ProviderType.OPENAI_DIRECT, 980L, "FAILED", Instant.parse("2026-04-07T09:18:00Z"))
+                ));
         when(usageRecordRepository.searchWithinWindow(1L, ProviderType.OPENAI_DIRECT, from, to))
                 .thenReturn(List.of(
-                        usageRecord(com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageCompleteness.FINAL),
-                        usageRecord(com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageCompleteness.PARTIAL)
+                        usageRecord(com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageCompleteness.FINAL, 420, Instant.parse("2026-04-07T08:30:00Z")),
+                        usageRecord(com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageCompleteness.PARTIAL, 680, Instant.parse("2026-04-07T09:30:00Z"))
                 ));
 
         AnalyticsOverviewResponse response = service.overview(1L, ProviderType.OPENAI_DIRECT, from, to, 60);
@@ -76,7 +82,11 @@ class AnalyticsQueryServiceTests {
         assertEquals(3, response.timeline().size());
         assertEquals(1, response.timeline().get(0).routeDecisionCount());
         assertEquals(1, response.timeline().get(0).cacheHitCount());
+        assertEquals(420, response.timeline().get(0).totalTokens());
+        assertEquals(480D, response.timeline().get(0).p95LatencyMs());
         assertEquals(700, response.timeline().get(2).cacheHitTokens());
+        assertEquals(1, response.timeline().get(1).failedRequestCount());
+        assertEquals(680, response.timeline().get(1).totalTokens());
         assertEquals("prompt_cache", response.cacheSourceBreakdown().get(0).key());
         assertTrue(response.usageCompletenessBreakdown().stream().anyMatch(item -> item.key().equals("FINAL") && item.count() == 1));
         assertTrue(response.providerBreakdown().stream().anyMatch(item ->
@@ -85,10 +95,62 @@ class AnalyticsQueryServiceTests {
                         && item.cacheHitTokens() == 700));
     }
 
-    private UsageRecordEntity usageRecord(com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageCompleteness completeness) {
+    private UsageRecordEntity usageRecord(
+            com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageCompleteness completeness,
+            int totalTokens,
+            Instant createdAt) {
         UsageRecordEntity entity = new UsageRecordEntity();
         entity.setCompleteness(completeness);
+        entity.setTotalTokens(totalTokens);
+        entity.setProtocol("openai");
+        entity.setRequestPath("/v1/chat/completions");
+        entity.setModelGroup("gpt-4o");
+        entity.setProviderType(ProviderType.OPENAI_DIRECT);
+        entity.setCredentialId(101L);
+        ReflectionTestUtils.setField(entity, "createdAt", createdAt);
         return entity;
+    }
+
+    private RequestLogResponse requestLog(
+            String requestId,
+            ProviderType providerType,
+            Long durationMs,
+            String status,
+            Instant createdAt) {
+        return new RequestLogResponse(
+                1L,
+                requestId,
+                1L,
+                "sk-gw-test",
+                "openai",
+                "/v1/chat/completions",
+                "chat",
+                "chat_completion",
+                "gpt-4o",
+                "gpt-4o",
+                "gpt-4o",
+                "gpt-4o",
+                providerType,
+                101L,
+                "PREFIX_AFFINITY",
+                "NATIVE",
+                "NATIVE",
+                "NATIVE",
+                "chat",
+                null,
+                "chat",
+                "chat.completion",
+                "chatcmpl-1",
+                "completed",
+                1,
+                com.prodigalgal.xaigateway.gateway.core.observability.GatewayRequestStatus.valueOf(status),
+                createdAt,
+                createdAt,
+                createdAt,
+                durationMs,
+                status.equals("FAILED") ? "UPSTREAM_ERROR" : null,
+                status.equals("FAILED") ? "simulated failure" : null
+        );
     }
 
     private RouteDecisionLogResponse routeDecision(
