@@ -12,6 +12,7 @@ public class GatewayProperties {
     private final Storage storage = new Storage();
     private final Web web = new Web();
     private final Oauth oauth = new Oauth();
+    private final AdminConsole adminConsole = new AdminConsole();
 
     public Routing getRouting() {
         return routing;
@@ -35,6 +36,10 @@ public class GatewayProperties {
 
     public Oauth getOauth() {
         return oauth;
+    }
+
+    public AdminConsole getAdminConsole() {
+        return adminConsole;
     }
 
     public static class Routing {
@@ -233,5 +238,80 @@ public class GatewayProperties {
         public void setGeminiClientId(String geminiClientId) { this.geminiClientId = geminiClientId; }
         public String getClaudeClientId() { return claudeClientId; }
         public void setClaudeClientId(String claudeClientId) { this.claudeClientId = claudeClientId; }
+    }
+
+    public static class AdminConsole {
+        private boolean enabled = true;
+        private String username = "admin";
+        private String password = "{noop}admin123456";
+        private Duration sessionTtl = Duration.ofHours(8);
+        private Duration challengeTtl = Duration.ofMinutes(5);
+        private int powDifficulty = 4;
+        private int mathMin = 1;
+        private int mathMax = 12;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getUsername() {
+            return username;
+        }
+
+        public void setUsername(String username) {
+            this.username = username;
+        }
+
+        public String getPassword() {
+            return password;
+        }
+
+        public void setPassword(String password) {
+            this.password = password;
+        }
+
+        public Duration getSessionTtl() {
+            return sessionTtl;
+        }
+
+        public void setSessionTtl(Duration sessionTtl) {
+            this.sessionTtl = sessionTtl;
+        }
+
+        public Duration getChallengeTtl() {
+            return challengeTtl;
+        }
+
+        public void setChallengeTtl(Duration challengeTtl) {
+            this.challengeTtl = challengeTtl;
+        }
+
+        public int getPowDifficulty() {
+            return powDifficulty;
+        }
+
+        public void setPowDifficulty(int powDifficulty) {
+            this.powDifficulty = powDifficulty;
+        }
+
+        public int getMathMin() {
+            return mathMin;
+        }
+
+        public void setMathMin(int mathMin) {
+            this.mathMin = mathMin;
+        }
+
+        public int getMathMax() {
+            return mathMax;
+        }
+
+        public void setMathMax(int mathMax) {
+            this.mathMax = mathMax;
+        }
     }
 }

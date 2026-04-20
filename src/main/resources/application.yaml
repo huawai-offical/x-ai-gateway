@@ -57,6 +57,15 @@ management:
     enabled: true
 
 gateway:
+  admin-console:
+    enabled: ${GATEWAY_ADMIN_CONSOLE_ENABLED:true}
+    username: ${GATEWAY_ADMIN_CONSOLE_USERNAME:admin}
+    password: ${GATEWAY_ADMIN_CONSOLE_PASSWORD:{noop}admin123456}
+    session-ttl: ${GATEWAY_ADMIN_CONSOLE_SESSION_TTL:PT8H}
+    challenge-ttl: ${GATEWAY_ADMIN_CONSOLE_CHALLENGE_TTL:PT5M}
+    pow-difficulty: ${GATEWAY_ADMIN_CONSOLE_POW_DIFFICULTY:4}
+    math-min: ${GATEWAY_ADMIN_CONSOLE_MATH_MIN:1}
+    math-max: ${GATEWAY_ADMIN_CONSOLE_MATH_MAX:12}
   routing:
     interop-plan-enabled: true
     route-decision-logging-enabled: true
