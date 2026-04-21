@@ -13,6 +13,7 @@ public class GatewayProperties {
     private final Web web = new Web();
     private final Oauth oauth = new Oauth();
     private final AdminConsole adminConsole = new AdminConsole();
+    private final Observability observability = new Observability();
 
     public Routing getRouting() {
         return routing;
@@ -40,6 +41,10 @@ public class GatewayProperties {
 
     public AdminConsole getAdminConsole() {
         return adminConsole;
+    }
+
+    public Observability getObservability() {
+        return observability;
     }
 
     public static class Routing {
@@ -312,6 +317,54 @@ public class GatewayProperties {
 
         public void setMathMax(int mathMax) {
             this.mathMax = mathMax;
+        }
+    }
+
+    public static class Observability {
+
+        private final Async async = new Async();
+
+        public Async getAsync() {
+            return async;
+        }
+
+        public static class Async {
+            private boolean enabled = true;
+            private String queueKey = "xag:observability:hot-path";
+            private Duration flushInterval = Duration.ofSeconds(1);
+            private int batchSize = 200;
+
+            public boolean isEnabled() {
+                return enabled;
+            }
+
+            public void setEnabled(boolean enabled) {
+                this.enabled = enabled;
+            }
+
+            public String getQueueKey() {
+                return queueKey;
+            }
+
+            public void setQueueKey(String queueKey) {
+                this.queueKey = queueKey;
+            }
+
+            public Duration getFlushInterval() {
+                return flushInterval;
+            }
+
+            public void setFlushInterval(Duration flushInterval) {
+                this.flushInterval = flushInterval;
+            }
+
+            public int getBatchSize() {
+                return batchSize;
+            }
+
+            public void setBatchSize(int batchSize) {
+                this.batchSize = batchSize;
+            }
         }
     }
 }

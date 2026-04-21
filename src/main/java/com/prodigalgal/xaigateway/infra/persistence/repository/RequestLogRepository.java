@@ -13,6 +13,7 @@ import org.springframework.data.repository.query.Param;
 public interface RequestLogRepository extends JpaRepository<RequestLogEntity, Long> {
 
     Optional<RequestLogEntity> findByRequestId(String requestId);
+    List<RequestLogEntity> findAllByRequestIdIn(Iterable<String> requestIds);
 
     List<RequestLogEntity> findTop100ByGatewayResourceKeyOrderByCreatedAtDesc(String gatewayResourceKey);
 

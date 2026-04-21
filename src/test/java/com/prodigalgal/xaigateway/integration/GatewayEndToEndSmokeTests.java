@@ -231,6 +231,22 @@ class GatewayEndToEndSmokeTests {
     }
 
     @Test
+    void shouldExposePrometheusMetrics() {
+        callOpenAiChat("hello prometheus");
+
+        webTestClient.get()
+                .uri("/actuator/prometheus")
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentTypeCompatibleWith(MediaType.TEXT_PLAIN)
+                .expectBody(String.class)
+                .value(body -> {
+                    assertTrue(body.contains("jvm_memory_used_bytes"));
+                    assertTrue(body.contains("gateway_request_total"));
+                });
+    }
+
+    @Test
     void shouldReusePrefixAffinityInvalidateAfterFailureAndSwitchOnCooldown() {
         callOpenAiChat("sticky prefix");
         Long initialCredentialId = latestRequestLog().getCredentialId();

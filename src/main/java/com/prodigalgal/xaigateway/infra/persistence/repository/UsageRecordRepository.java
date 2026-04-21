@@ -13,6 +13,7 @@ import org.springframework.data.repository.query.Param;
 public interface UsageRecordRepository extends JpaRepository<UsageRecordEntity, Long> {
 
     Optional<UsageRecordEntity> findByRequestId(String requestId);
+    List<UsageRecordEntity> findAllByRequestIdIn(Iterable<String> requestIds);
 
     @Query("""
             select entity

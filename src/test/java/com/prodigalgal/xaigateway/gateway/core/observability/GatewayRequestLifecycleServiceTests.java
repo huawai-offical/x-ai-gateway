@@ -4,12 +4,15 @@ import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceResponse;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
 import com.prodigalgal.xaigateway.gateway.core.interop.SupportStatus;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageCompleteness;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageSource;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageView;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
@@ -24,6 +27,7 @@ import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.shared.ReasoningTransport;
 import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
 import com.prodigalgal.xaigateway.infra.persistence.entity.RequestLogEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UsageRecordEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.RequestLogRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UsageRecordRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -36,6 +40,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 class GatewayRequestLifecycleServiceTests {
 
@@ -506,6 +511,87 @@ class GatewayRequestLifecycleServiceTests {
         assertEquals("realtime blocked", entity.getErrorMessage());
         assertEquals("BLOCKED", entity.getSupportStatus());
         assertEquals("UNSUPPORTED", entity.getDegradationLevel());
+    }
+
+    @Test
+    void shouldFallbackToSynchronousPersistenceWhenAsyncEnqueueFails() {
+        RequestLogRepository requestLogRepository = Mockito.mock(RequestLogRepository.class);
+        UsageRecordRepository usageRecordRepository = Mockito.mock(UsageRecordRepository.class);
+        GatewayAuditLogService gatewayAuditLogService = Mockito.mock(GatewayAuditLogService.class);
+        GatewayObservabilityAsyncPersistenceService asyncPersistenceService = Mockito.mock(GatewayObservabilityAsyncPersistenceService.class);
+        AtomicReference<RequestLogEntity> storedRequest = new AtomicReference<>();
+        AtomicReference<UsageRecordEntity> storedUsage = new AtomicReference<>();
+
+        Mockito.when(asyncPersistenceService.enqueueRequestLogStart(Mockito.any())).thenReturn(false);
+        Mockito.when(asyncPersistenceService.enqueueRequestLogFinish(Mockito.any())).thenReturn(false);
+        Mockito.when(asyncPersistenceService.enqueueUsageRecordUpsert(Mockito.any())).thenReturn(false);
+        Mockito.when(requestLogRepository.save(Mockito.any(RequestLogEntity.class)))
+                .thenAnswer(invocation -> {
+                    RequestLogEntity entity = invocation.getArgument(0);
+                    storedRequest.set(entity);
+                    return entity;
+                });
+        Mockito.when(requestLogRepository.findByRequestId("req-fallback"))
+                .thenAnswer(invocation -> Optional.ofNullable(storedRequest.get()));
+        Mockito.when(usageRecordRepository.save(Mockito.any(UsageRecordEntity.class)))
+                .thenAnswer(invocation -> {
+                    UsageRecordEntity entity = invocation.getArgument(0);
+                    storedUsage.set(entity);
+                    return entity;
+                });
+        Mockito.when(usageRecordRepository.findByRequestId("req-fallback"))
+                .thenReturn(Optional.empty());
+
+        GatewayRequestLifecycleService service = new GatewayRequestLifecycleService(
+                requestLogRepository,
+                usageRecordRepository,
+                gatewayAuditLogService,
+                new SimpleMeterRegistry(),
+                new tools.jackson.databind.ObjectMapper(),
+                asyncPersistenceService
+        );
+
+        CanonicalRequest request = new CanonicalRequest(
+                "sk-gw-test",
+                CanonicalIngressProtocol.OPENAI,
+                "/v1/chat/completions",
+                "model-a",
+                List.of(),
+                List.of(),
+                null,
+                null,
+                null,
+                null,
+                null
+        );
+        GatewayUsageView usage = new GatewayUsageView(
+                12,
+                10,
+                5,
+                2,
+                1,
+                0,
+                1,
+                0,
+                3,
+                "cache-ref",
+                18,
+                GatewayUsageCompleteness.FINAL,
+                GatewayUsageSource.DIRECT_RESPONSE,
+                Map.of("provider", "openai")
+        );
+        Instant startedAt = Instant.now();
+
+        service.startRequest("req-fallback", selectionResult(), request, false, startedAt);
+        service.completeRequest("req-fallback", selectionResult(), request, false, usage, startedAt);
+
+        Mockito.verify(asyncPersistenceService).enqueueRequestLogStart(Mockito.any());
+        Mockito.verify(asyncPersistenceService).enqueueRequestLogFinish(Mockito.any());
+        Mockito.verify(asyncPersistenceService).enqueueUsageRecordUpsert(Mockito.any());
+        assertNotNull(storedRequest.get());
+        assertEquals(GatewayRequestStatus.COMPLETED, storedRequest.get().getStatus());
+        assertNotNull(storedUsage.get());
+        assertEquals(18, storedUsage.get().getTotalTokens());
     }
 
     private RouteSelectionResult selectionResult() {

@@ -22,6 +22,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,16 +34,28 @@ public class GatewayObservabilityService {
     private final CacheHitLogRepository cacheHitLogRepository;
     private final UpstreamCacheReferenceRepository upstreamCacheReferenceRepository;
     private final ObjectMapper objectMapper;
+    private final GatewayObservabilityAsyncPersistenceService asyncPersistenceService;
+
+    @Autowired
+    public GatewayObservabilityService(
+            RouteDecisionLogRepository routeDecisionLogRepository,
+            CacheHitLogRepository cacheHitLogRepository,
+            UpstreamCacheReferenceRepository upstreamCacheReferenceRepository,
+            ObjectMapper objectMapper,
+            GatewayObservabilityAsyncPersistenceService asyncPersistenceService) {
+        this.routeDecisionLogRepository = routeDecisionLogRepository;
+        this.cacheHitLogRepository = cacheHitLogRepository;
+        this.upstreamCacheReferenceRepository = upstreamCacheReferenceRepository;
+        this.objectMapper = objectMapper;
+        this.asyncPersistenceService = asyncPersistenceService;
+    }
 
     public GatewayObservabilityService(
             RouteDecisionLogRepository routeDecisionLogRepository,
             CacheHitLogRepository cacheHitLogRepository,
             UpstreamCacheReferenceRepository upstreamCacheReferenceRepository,
             ObjectMapper objectMapper) {
-        this.routeDecisionLogRepository = routeDecisionLogRepository;
-        this.cacheHitLogRepository = cacheHitLogRepository;
-        this.upstreamCacheReferenceRepository = upstreamCacheReferenceRepository;
-        this.objectMapper = objectMapper;
+        this(routeDecisionLogRepository, cacheHitLogRepository, upstreamCacheReferenceRepository, objectMapper, null);
     }
 
     public String nextRequestId() {
@@ -84,31 +97,33 @@ public class GatewayObservabilityService {
             SupportStatus supportStatus,
             String objectMode,
             InteropCapabilityLevel degradationLevel) {
-        RouteDecisionLogEntity entity = new RouteDecisionLogEntity();
-        entity.setRequestId(requestId);
-        entity.setDistributedKeyId(selectionResult.distributedKeyId());
-        entity.setDistributedKeyPrefix(selectionResult.distributedKeyPrefix());
-        entity.setRequestedModel(selectionResult.requestedModel());
-        entity.setPublicModel(selectionResult.publicModel());
-        entity.setResolvedModelKey(selectionResult.resolvedModelKey());
-        entity.setProtocol(selectionResult.protocol());
-        entity.setRequestPath(requestPath);
-        entity.setResourceType(resourceType);
-        entity.setOperation(operation);
-        entity.setModelGroup(selectionResult.modelGroup());
-        entity.setSelectionSource(selectionResult.selectionSource().name());
-        entity.setExecutionBackend(executionBackend == null ? null : executionBackend.wireName());
-        entity.setSupportStatus(supportStatus == null ? null : supportStatus.name());
-        entity.setDegradationLevel(degradationLevel == null ? null : degradationLevel.name());
-        entity.setObjectMode(objectMode);
-        entity.setSelectedCredentialId(selectionResult.selectedCandidate().candidate().credentialId());
-        entity.setSelectedProviderType(selectionResult.selectedCandidate().candidate().providerType());
-        entity.setSelectedBaseUrl(selectionResult.selectedCandidate().candidate().baseUrl());
-        entity.setPrefixHash(selectionResult.prefixHash());
-        entity.setFingerprint(selectionResult.fingerprint());
-        entity.setCandidateCount(selectionResult.candidates().size());
-        entity.setCandidateSummaryJson(serializeCandidates(selectionResult));
-        routeDecisionLogRepository.save(entity);
+        GatewayObservabilityAsyncPersistenceService.RouteDecisionLogSnapshot snapshot =
+                new GatewayObservabilityAsyncPersistenceService.RouteDecisionLogSnapshot(
+                        requestId,
+                        selectionResult.distributedKeyId(),
+                        selectionResult.distributedKeyPrefix(),
+                        selectionResult.requestedModel(),
+                        selectionResult.publicModel(),
+                        selectionResult.resolvedModelKey(),
+                        selectionResult.protocol(),
+                        requestPath,
+                        resourceType,
+                        operation,
+                        selectionResult.modelGroup(),
+                        selectionResult.selectionSource().name(),
+                        executionBackend == null ? null : executionBackend.wireName(),
+                        supportStatus == null ? null : supportStatus.name(),
+                        degradationLevel == null ? null : degradationLevel.name(),
+                        objectMode,
+                        selectionResult.selectedCandidate().candidate().credentialId(),
+                        selectionResult.selectedCandidate().candidate().providerType(),
+                        selectionResult.selectedCandidate().candidate().baseUrl(),
+                        selectionResult.prefixHash(),
+                        selectionResult.fingerprint(),
+                        selectionResult.candidates().size(),
+                        serializeCandidates(selectionResult)
+                );
+        enqueueOrPersistRouteDecision(snapshot);
     }
 
     public void recordCacheUsage(String requestId, RouteSelectionResult selectionResult, GatewayUsage usage, String cacheKind, String cachedContentRef) {
@@ -164,28 +179,30 @@ public class GatewayObservabilityService {
             return;
         }
 
-        CacheHitLogEntity entity = new CacheHitLogEntity();
-        entity.setRequestId(requestId);
-        entity.setDistributedKeyId(selectionResult.distributedKeyId());
-        entity.setProtocol(selectionResult.protocol());
-        entity.setRequestPath(requestPath);
-        entity.setResourceType(resourceType);
-        entity.setOperation(operation);
-        entity.setProviderType(selectionResult.selectedCandidate().candidate().providerType());
-        entity.setCredentialId(selectionResult.selectedCandidate().candidate().credentialId());
-        entity.setModelGroup(selectionResult.modelGroup());
-        entity.setPrefixHash(selectionResult.prefixHash());
-        entity.setFingerprint(selectionResult.fingerprint());
-        entity.setCacheKind(cacheKind);
-        entity.setExecutionBackend(executionBackend == null ? null : executionBackend.wireName());
-        entity.setSupportStatus(supportStatus == null ? null : supportStatus.name());
-        entity.setDegradationLevel(degradationLevel == null ? null : degradationLevel.name());
-        entity.setObjectMode(objectMode);
-        entity.setCacheHitTokens(usage.cacheHitTokens());
-        entity.setCacheWriteTokens(usage.cacheWriteTokens());
-        entity.setSavedInputTokens(usage.savedInputTokens());
-        entity.setCachedContentRef(cachedContentRef);
-        cacheHitLogRepository.save(entity);
+        GatewayObservabilityAsyncPersistenceService.CacheHitLogSnapshot snapshot =
+                new GatewayObservabilityAsyncPersistenceService.CacheHitLogSnapshot(
+                        requestId,
+                        selectionResult.distributedKeyId(),
+                        selectionResult.protocol(),
+                        requestPath,
+                        resourceType,
+                        operation,
+                        selectionResult.selectedCandidate().candidate().providerType(),
+                        selectionResult.selectedCandidate().candidate().credentialId(),
+                        selectionResult.modelGroup(),
+                        selectionResult.prefixHash(),
+                        selectionResult.fingerprint(),
+                        cacheKind,
+                        executionBackend == null ? null : executionBackend.wireName(),
+                        supportStatus == null ? null : supportStatus.name(),
+                        degradationLevel == null ? null : degradationLevel.name(),
+                        objectMode,
+                        usage.cacheHitTokens(),
+                        usage.cacheWriteTokens(),
+                        usage.savedInputTokens(),
+                        cachedContentRef
+                );
+        enqueueOrPersistCacheHit(snapshot);
     }
 
     public void recordUpstreamCacheReference(
@@ -235,6 +252,67 @@ public class GatewayObservabilityService {
                     entity.setLastUsedAt(Instant.now());
                     upstreamCacheReferenceRepository.save(entity);
                 });
+    }
+
+    private void enqueueOrPersistRouteDecision(
+            GatewayObservabilityAsyncPersistenceService.RouteDecisionLogSnapshot snapshot) {
+        if (asyncPersistenceService != null && asyncPersistenceService.enqueueRouteDecisionLogInsert(snapshot)) {
+            return;
+        }
+        RouteDecisionLogEntity entity = new RouteDecisionLogEntity();
+        entity.setRequestId(snapshot.requestId());
+        entity.setDistributedKeyId(snapshot.distributedKeyId());
+        entity.setDistributedKeyPrefix(snapshot.distributedKeyPrefix());
+        entity.setRequestedModel(snapshot.requestedModel());
+        entity.setPublicModel(snapshot.publicModel());
+        entity.setResolvedModelKey(snapshot.resolvedModelKey());
+        entity.setProtocol(snapshot.protocol());
+        entity.setRequestPath(snapshot.requestPath());
+        entity.setResourceType(snapshot.resourceType());
+        entity.setOperation(snapshot.operation());
+        entity.setModelGroup(snapshot.modelGroup());
+        entity.setSelectionSource(snapshot.selectionSource());
+        entity.setExecutionBackend(snapshot.executionBackend());
+        entity.setSupportStatus(snapshot.supportStatus());
+        entity.setDegradationLevel(snapshot.degradationLevel());
+        entity.setObjectMode(snapshot.objectMode());
+        entity.setSelectedCredentialId(snapshot.selectedCredentialId());
+        entity.setSelectedProviderType(snapshot.selectedProviderType());
+        entity.setSelectedBaseUrl(snapshot.selectedBaseUrl());
+        entity.setPrefixHash(snapshot.prefixHash());
+        entity.setFingerprint(snapshot.fingerprint());
+        entity.setCandidateCount(snapshot.candidateCount());
+        entity.setCandidateSummaryJson(snapshot.candidateSummaryJson());
+        routeDecisionLogRepository.save(entity);
+    }
+
+    private void enqueueOrPersistCacheHit(
+            GatewayObservabilityAsyncPersistenceService.CacheHitLogSnapshot snapshot) {
+        if (asyncPersistenceService != null && asyncPersistenceService.enqueueCacheHitLogInsert(snapshot)) {
+            return;
+        }
+        CacheHitLogEntity entity = new CacheHitLogEntity();
+        entity.setRequestId(snapshot.requestId());
+        entity.setDistributedKeyId(snapshot.distributedKeyId());
+        entity.setProtocol(snapshot.protocol());
+        entity.setRequestPath(snapshot.requestPath());
+        entity.setResourceType(snapshot.resourceType());
+        entity.setOperation(snapshot.operation());
+        entity.setProviderType(snapshot.providerType());
+        entity.setCredentialId(snapshot.credentialId());
+        entity.setModelGroup(snapshot.modelGroup());
+        entity.setPrefixHash(snapshot.prefixHash());
+        entity.setFingerprint(snapshot.fingerprint());
+        entity.setCacheKind(snapshot.cacheKind());
+        entity.setExecutionBackend(snapshot.executionBackend());
+        entity.setSupportStatus(snapshot.supportStatus());
+        entity.setDegradationLevel(snapshot.degradationLevel());
+        entity.setObjectMode(snapshot.objectMode());
+        entity.setCacheHitTokens(snapshot.cacheHitTokens());
+        entity.setCacheWriteTokens(snapshot.cacheWriteTokens());
+        entity.setSavedInputTokens(snapshot.savedInputTokens());
+        entity.setCachedContentRef(snapshot.cachedContentRef());
+        cacheHitLogRepository.save(entity);
     }
 
     private String serializeCandidates(RouteSelectionResult selectionResult) {

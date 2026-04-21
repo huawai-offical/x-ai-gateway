@@ -81,6 +81,56 @@ class GatewayObservabilityServiceTests {
         assertEquals("LOSSY", cacheCaptor.getValue().getDegradationLevel());
     }
 
+    @Test
+    void shouldFallbackToSynchronousPersistenceWhenAsyncEnqueueFails() {
+        RouteDecisionLogRepository routeDecisionLogRepository = Mockito.mock(RouteDecisionLogRepository.class);
+        CacheHitLogRepository cacheHitLogRepository = Mockito.mock(CacheHitLogRepository.class);
+        UpstreamCacheReferenceRepository upstreamCacheReferenceRepository = Mockito.mock(UpstreamCacheReferenceRepository.class);
+        GatewayObservabilityAsyncPersistenceService asyncPersistenceService = Mockito.mock(GatewayObservabilityAsyncPersistenceService.class);
+        Mockito.when(asyncPersistenceService.enqueueRouteDecisionLogInsert(Mockito.any())).thenReturn(false);
+        Mockito.when(asyncPersistenceService.enqueueCacheHitLogInsert(Mockito.any())).thenReturn(false);
+
+        GatewayObservabilityService service = new GatewayObservabilityService(
+                routeDecisionLogRepository,
+                cacheHitLogRepository,
+                upstreamCacheReferenceRepository,
+                new ObjectMapper(),
+                asyncPersistenceService
+        );
+
+        RouteSelectionResult selectionResult = selectionResult();
+        service.recordRouteDecision(
+                "req-fallback",
+                selectionResult,
+                "/v1/files/file_123/content",
+                "file",
+                "file_content_get",
+                ExecutionBackend.NATIVE,
+                SupportStatus.DEGRADED,
+                "resource-orchestration",
+                InteropCapabilityLevel.LOSSY
+        );
+        service.recordCacheUsage(
+                "req-fallback",
+                selectionResult,
+                GatewayUsage.empty(),
+                "none",
+                null,
+                "/v1/files/file_123/content",
+                "file",
+                "file_content_get",
+                ExecutionBackend.NATIVE,
+                SupportStatus.DEGRADED,
+                "resource-orchestration",
+                InteropCapabilityLevel.LOSSY
+        );
+
+        Mockito.verify(asyncPersistenceService).enqueueRouteDecisionLogInsert(Mockito.any());
+        Mockito.verify(asyncPersistenceService).enqueueCacheHitLogInsert(Mockito.any());
+        Mockito.verify(routeDecisionLogRepository).save(Mockito.any(RouteDecisionLogEntity.class));
+        Mockito.verify(cacheHitLogRepository).save(Mockito.any(CacheHitLogEntity.class));
+    }
+
     private RouteSelectionResult selectionResult() {
         CatalogCandidateView candidate = new CatalogCandidateView(
                 101L,

@@ -20,7 +20,9 @@ import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.Timer;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Locale;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +35,23 @@ public class GatewayRequestLifecycleService {
     private final GatewayAuditLogService gatewayAuditLogService;
     private final MeterRegistry meterRegistry;
     private final ObjectMapper objectMapper;
+    private final GatewayObservabilityAsyncPersistenceService asyncPersistenceService;
+
+    @Autowired
+    public GatewayRequestLifecycleService(
+            RequestLogRepository requestLogRepository,
+            UsageRecordRepository usageRecordRepository,
+            GatewayAuditLogService gatewayAuditLogService,
+            MeterRegistry meterRegistry,
+            ObjectMapper objectMapper,
+            GatewayObservabilityAsyncPersistenceService asyncPersistenceService) {
+        this.requestLogRepository = requestLogRepository;
+        this.usageRecordRepository = usageRecordRepository;
+        this.gatewayAuditLogService = gatewayAuditLogService;
+        this.meterRegistry = meterRegistry;
+        this.objectMapper = objectMapper;
+        this.asyncPersistenceService = asyncPersistenceService;
+    }
 
     public GatewayRequestLifecycleService(
             RequestLogRepository requestLogRepository,
@@ -40,11 +59,7 @@ public class GatewayRequestLifecycleService {
             GatewayAuditLogService gatewayAuditLogService,
             MeterRegistry meterRegistry,
             ObjectMapper objectMapper) {
-        this.requestLogRepository = requestLogRepository;
-        this.usageRecordRepository = usageRecordRepository;
-        this.gatewayAuditLogService = gatewayAuditLogService;
-        this.meterRegistry = meterRegistry;
-        this.objectMapper = objectMapper;
+        this(requestLogRepository, usageRecordRepository, gatewayAuditLogService, meterRegistry, objectMapper, null);
     }
 
     public void startRequest(
@@ -88,26 +103,43 @@ public class GatewayRequestLifecycleService {
             CanonicalExecutionPlan plan,
             boolean stream,
             Instant startedAt) {
-        RequestLogEntity entity = new RequestLogEntity();
-        entity.setRequestId(requestId);
-        entity.setDistributedKeyId(distributedKeyId);
-        entity.setDistributedKeyPrefix(distributedKeyPrefix);
-        entity.setProtocol(protocol);
-        entity.setRequestPath(request.requestPath());
-        entity.setResourceType(plan == null || plan.resourceType() == null ? null : plan.resourceType().wireName());
-        entity.setOperation(plan == null || plan.operation() == null ? null : plan.operation().wireName());
-        entity.setRequestedModel(request.requestedModel());
-        entity.setPublicModel(request.requestedModel());
-        entity.setResolvedModelKey(request.requestedModel());
-        entity.setExecutionBackend(plan == null || plan.executionBackend() == null ? null : plan.executionBackend().wireName());
-        entity.setSupportStatus(plan == null || plan.supportStatus() == null ? null : plan.supportStatus().name());
-        entity.setDegradationLevel(plan == null || plan.degradationLevel() == null ? null : plan.degradationLevel().name());
-        entity.setObjectMode(plan == null ? null : plan.objectMode());
-        entity.setGatewayResourceKey(gatewayResourceKey(request, plan, null));
-        entity.setStream(stream);
-        entity.setStatus(GatewayRequestStatus.IN_PROGRESS);
-        entity.setStartedAt(startedAt);
-        requestLogRepository.save(entity);
+        GatewayObservabilityAsyncPersistenceService.RequestLogSnapshot snapshot =
+                new GatewayObservabilityAsyncPersistenceService.RequestLogSnapshot(
+                        requestId,
+                        distributedKeyId,
+                        distributedKeyPrefix,
+                        protocol,
+                        request.requestPath(),
+                        plan == null || plan.resourceType() == null ? null : plan.resourceType().wireName(),
+                        plan == null || plan.operation() == null ? null : plan.operation().wireName(),
+                        request.requestedModel(),
+                        request.requestedModel(),
+                        request.requestedModel(),
+                        request.requestedModel(),
+                        null,
+                        null,
+                        "NO_ROUTE",
+                        plan == null || plan.executionBackend() == null ? null : plan.executionBackend().wireName(),
+                        plan == null || plan.supportStatus() == null ? null : plan.supportStatus().name(),
+                        plan == null || plan.degradationLevel() == null ? null : plan.degradationLevel().name(),
+                        plan == null ? null : plan.objectMode(),
+                        gatewayResourceKey(request, plan, null),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        request.requestPath(),
+                        distributedKeyPrefix == null ? null : distributedKeyPrefix.toLowerCase(Locale.ROOT),
+                        stream,
+                        GatewayRequestStatus.IN_PROGRESS,
+                        null,
+                        null,
+                        null,
+                        startedAt,
+                        null
+                );
+        enqueueOrPersistRequestLogStart(snapshot);
     }
 
     private void startRequest(
@@ -123,32 +155,43 @@ public class GatewayRequestLifecycleService {
             String gatewayResourceKey,
             boolean stream,
             Instant startedAt) {
-        RequestLogEntity entity = new RequestLogEntity();
-        entity.setRequestId(requestId);
-        entity.setDistributedKeyId(selectionResult.distributedKeyId());
-        entity.setDistributedKeyPrefix(selectionResult.distributedKeyPrefix());
-        entity.setProtocol(selectionResult.protocol());
-        entity.setRequestPath(requestPath);
-        entity.setResourceType(resourceType);
-        entity.setOperation(operation);
-        entity.setRequestedModel(selectionResult.requestedModel());
-        entity.setPublicModel(selectionResult.publicModel());
-        entity.setResolvedModelKey(selectionResult.resolvedModelKey());
-        entity.setModelGroup(selectionResult.modelGroup());
-        entity.setProviderType(selectionResult.selectedCandidate().candidate().providerType());
-        entity.setCredentialId(selectionResult.selectedCandidate().candidate().credentialId());
-        entity.setSelectionSource(selectionResult.selectionSource().name());
-        entity.setExecutionBackend(executionBackend);
-        entity.setSupportStatus(supportStatus);
-        entity.setDegradationLevel(degradationLevel);
-        entity.setObjectMode(objectMode);
-        entity.setGatewayResourceKey(gatewayResourceKey);
-        entity.setPrefixHash(selectionResult.prefixHash());
-        entity.setFingerprint(selectionResult.fingerprint());
-        entity.setStream(stream);
-        entity.setStatus(GatewayRequestStatus.IN_PROGRESS);
-        entity.setStartedAt(startedAt);
-        requestLogRepository.save(entity);
+        GatewayObservabilityAsyncPersistenceService.RequestLogSnapshot snapshot =
+                new GatewayObservabilityAsyncPersistenceService.RequestLogSnapshot(
+                        requestId,
+                        selectionResult.distributedKeyId(),
+                        selectionResult.distributedKeyPrefix(),
+                        selectionResult.protocol(),
+                        requestPath,
+                        resourceType,
+                        operation,
+                        selectionResult.requestedModel(),
+                        selectionResult.publicModel(),
+                        selectionResult.resolvedModelKey(),
+                        selectionResult.modelGroup(),
+                        selectionResult.selectedCandidate().candidate().providerType(),
+                        selectionResult.selectedCandidate().candidate().credentialId(),
+                        selectionResult.selectionSource().name(),
+                        executionBackend,
+                        supportStatus,
+                        degradationLevel,
+                        objectMode,
+                        gatewayResourceKey,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        selectionResult.prefixHash(),
+                        selectionResult.fingerprint(),
+                        stream,
+                        GatewayRequestStatus.IN_PROGRESS,
+                        null,
+                        null,
+                        null,
+                        startedAt,
+                        null
+                );
+        enqueueOrPersistRequestLogStart(snapshot);
     }
 
     public void completeRequest(
@@ -237,6 +280,7 @@ public class GatewayRequestLifecycleService {
                 distributedKeyPrefix,
                 protocol,
                 request.requestPath(),
+                request.requestedModel(),
                 plan == null || plan.resourceType() == null ? null : plan.resourceType().wireName(),
                 plan == null || plan.operation() == null ? null : plan.operation().wireName(),
                 plan == null || plan.executionBackend() == null ? null : plan.executionBackend().wireName(),
@@ -326,6 +370,7 @@ public class GatewayRequestLifecycleService {
                 distributedKeyPrefix,
                 protocol,
                 request.requestPath(),
+                request.requestedModel(),
                 plan == null || plan.resourceType() == null ? null : plan.resourceType().wireName(),
                 plan == null || plan.operation() == null ? null : plan.operation().wireName(),
                 plan == null || plan.executionBackend() == null ? null : plan.executionBackend().wireName(),
@@ -387,33 +432,55 @@ public class GatewayRequestLifecycleService {
             Instant startedAt) {
         Instant completedAt = Instant.now();
         long durationMs = Duration.between(startedAt, completedAt).toMillis();
+        GatewayObservabilityAsyncPersistenceService.RequestLogSnapshot snapshot =
+                new GatewayObservabilityAsyncPersistenceService.RequestLogSnapshot(
+                        requestId,
+                        selectionResult.distributedKeyId(),
+                        selectionResult.distributedKeyPrefix(),
+                        selectionResult.protocol(),
+                        requestPath,
+                        resourceType,
+                        operation,
+                        selectionResult.requestedModel(),
+                        selectionResult.publicModel(),
+                        selectionResult.resolvedModelKey(),
+                        selectionResult.modelGroup(),
+                        selectionResult.selectedCandidate().candidate().providerType(),
+                        selectionResult.selectedCandidate().candidate().credentialId(),
+                        selectionResult.selectionSource().name(),
+                        executionBackend,
+                        supportStatus,
+                        degradationLevel,
+                        objectMode,
+                        gatewayResourceKey,
+                        canonicalResponse == null ? null : canonicalResponse.responseKind(),
+                        canonicalResponse == null ? null : canonicalResponse.objectType(),
+                        canonicalResponse == null ? null : canonicalResponse.objectId(),
+                        canonicalResponse == null ? null : canonicalResponse.status(),
+                        canonicalResponse == null ? null : canonicalResponse.events().size(),
+                        selectionResult.prefixHash(),
+                        selectionResult.fingerprint(),
+                        stream,
+                        status,
+                        errorCode,
+                        truncate(errorMessage),
+                        durationMs,
+                        startedAt,
+                        completedAt
+                );
+        enqueueOrPersistRequestLogFinish(snapshot);
 
-        requestLogRepository.findByRequestId(requestId).ifPresent(entity -> {
-            entity.setProviderType(selectionResult.selectedCandidate().candidate().providerType());
-            entity.setCredentialId(selectionResult.selectedCandidate().candidate().credentialId());
-            entity.setSelectionSource(selectionResult.selectionSource().name());
-            entity.setRequestPath(requestPath);
-            entity.setResourceType(resourceType);
-            entity.setOperation(operation);
-            entity.setExecutionBackend(executionBackend);
-            entity.setSupportStatus(supportStatus);
-            entity.setDegradationLevel(degradationLevel);
-            entity.setObjectMode(objectMode);
-            entity.setGatewayResourceKey(gatewayResourceKey);
-            entity.setResponseKind(canonicalResponse == null ? null : canonicalResponse.responseKind());
-            entity.setResponseObjectType(canonicalResponse == null ? null : canonicalResponse.objectType());
-            entity.setResponseObjectId(canonicalResponse == null ? null : canonicalResponse.objectId());
-            entity.setResponseStatus(canonicalResponse == null ? null : canonicalResponse.status());
-            entity.setCanonicalEventCount(canonicalResponse == null ? null : canonicalResponse.events().size());
-            entity.setStatus(status);
-            entity.setErrorCode(errorCode);
-            entity.setErrorMessage(truncate(errorMessage));
-            entity.setCompletedAt(completedAt);
-            entity.setDurationMs(durationMs);
-            requestLogRepository.save(entity);
-        });
-
-        saveUsageRecord(requestId, selectionResult, requestPath, resourceType, operation, executionBackend, objectMode, stream, usage);
+        saveUsageRecord(
+                requestId,
+                selectionResult,
+                requestPath,
+                resourceType,
+                operation,
+                executionBackend,
+                objectMode,
+                stream,
+                usage
+        );
         recordMetrics(selectionResult, requestPath, stream, status, usage, durationMs);
     }
 
@@ -423,6 +490,7 @@ public class GatewayRequestLifecycleService {
             String distributedKeyPrefix,
             String protocol,
             String requestPath,
+            String requestedModel,
             String resourceType,
             String operation,
             String executionBackend,
@@ -438,31 +506,143 @@ public class GatewayRequestLifecycleService {
             Instant startedAt) {
         Instant completedAt = Instant.now();
         long durationMs = Duration.between(startedAt, completedAt).toMillis();
+        GatewayObservabilityAsyncPersistenceService.RequestLogSnapshot snapshot =
+                new GatewayObservabilityAsyncPersistenceService.RequestLogSnapshot(
+                        requestId,
+                        distributedKeyId,
+                        distributedKeyPrefix,
+                        protocol,
+                        requestPath,
+                        resourceType,
+                        operation,
+                        requestedModel,
+                        requestedModel,
+                        requestedModel,
+                        requestedModel,
+                        null,
+                        null,
+                        "NO_ROUTE",
+                        executionBackend,
+                        supportStatus,
+                        degradationLevel,
+                        objectMode,
+                        gatewayResourceKey,
+                        canonicalResponse == null ? null : canonicalResponse.responseKind(),
+                        canonicalResponse == null ? null : canonicalResponse.objectType(),
+                        canonicalResponse == null ? null : canonicalResponse.objectId(),
+                        canonicalResponse == null ? null : canonicalResponse.status(),
+                        canonicalResponse == null ? null : canonicalResponse.events().size(),
+                        requestPath,
+                        distributedKeyPrefix == null ? null : distributedKeyPrefix.toLowerCase(Locale.ROOT),
+                        stream,
+                        status,
+                        errorCode,
+                        truncate(errorMessage),
+                        durationMs,
+                        startedAt,
+                        completedAt
+                );
+        enqueueOrPersistRequestLogFinish(snapshot);
+    }
 
-        requestLogRepository.findByRequestId(requestId).ifPresent(entity -> {
-            entity.setDistributedKeyId(distributedKeyId);
-            entity.setDistributedKeyPrefix(distributedKeyPrefix);
-            entity.setProtocol(protocol);
-            entity.setRequestPath(requestPath);
-            entity.setResourceType(resourceType);
-            entity.setOperation(operation);
-            entity.setExecutionBackend(executionBackend);
-            entity.setSupportStatus(supportStatus);
-            entity.setDegradationLevel(degradationLevel);
-            entity.setObjectMode(objectMode);
-            entity.setGatewayResourceKey(gatewayResourceKey);
-            entity.setResponseKind(canonicalResponse == null ? null : canonicalResponse.responseKind());
-            entity.setResponseObjectType(canonicalResponse == null ? null : canonicalResponse.objectType());
-            entity.setResponseObjectId(canonicalResponse == null ? null : canonicalResponse.objectId());
-            entity.setResponseStatus(canonicalResponse == null ? null : canonicalResponse.status());
-            entity.setCanonicalEventCount(canonicalResponse == null ? null : canonicalResponse.events().size());
-            entity.setStatus(status);
-            entity.setErrorCode(errorCode);
-            entity.setErrorMessage(truncate(errorMessage));
-            entity.setCompletedAt(completedAt);
-            entity.setDurationMs(durationMs);
-            requestLogRepository.save(entity);
-        });
+    private void enqueueOrPersistRequestLogStart(
+            GatewayObservabilityAsyncPersistenceService.RequestLogSnapshot snapshot) {
+        if (asyncPersistenceService != null && asyncPersistenceService.enqueueRequestLogStart(snapshot)) {
+            return;
+        }
+        requestLogRepository.save(toLegacyRequestLogEntity(snapshot));
+    }
+
+    private void enqueueOrPersistRequestLogFinish(
+            GatewayObservabilityAsyncPersistenceService.RequestLogSnapshot snapshot) {
+        if (asyncPersistenceService != null && asyncPersistenceService.enqueueRequestLogFinish(snapshot)) {
+            return;
+        }
+        RequestLogEntity entity = requestLogRepository.findByRequestId(snapshot.requestId()).orElseGet(RequestLogEntity::new);
+        applyLegacyRequestLogSnapshot(entity, snapshot);
+        requestLogRepository.save(entity);
+    }
+
+    private void enqueueOrPersistUsageRecord(
+            GatewayObservabilityAsyncPersistenceService.UsageRecordSnapshot snapshot) {
+        if (asyncPersistenceService != null && asyncPersistenceService.enqueueUsageRecordUpsert(snapshot)) {
+            return;
+        }
+        UsageRecordEntity entity = usageRecordRepository.findByRequestId(snapshot.requestId()).orElseGet(UsageRecordEntity::new);
+        applyLegacyUsageRecordSnapshot(entity, snapshot);
+        usageRecordRepository.save(entity);
+    }
+
+    private RequestLogEntity toLegacyRequestLogEntity(
+            GatewayObservabilityAsyncPersistenceService.RequestLogSnapshot snapshot) {
+        RequestLogEntity entity = new RequestLogEntity();
+        applyLegacyRequestLogSnapshot(entity, snapshot);
+        return entity;
+    }
+
+    private void applyLegacyRequestLogSnapshot(
+            RequestLogEntity entity,
+            GatewayObservabilityAsyncPersistenceService.RequestLogSnapshot snapshot) {
+        entity.setRequestId(snapshot.requestId());
+        entity.setDistributedKeyId(snapshot.distributedKeyId());
+        entity.setDistributedKeyPrefix(snapshot.distributedKeyPrefix());
+        entity.setProtocol(snapshot.protocol());
+        entity.setRequestPath(snapshot.requestPath());
+        entity.setResourceType(snapshot.resourceType());
+        entity.setOperation(snapshot.operation());
+        entity.setRequestedModel(snapshot.requestedModel());
+        entity.setPublicModel(snapshot.publicModel());
+        entity.setResolvedModelKey(snapshot.resolvedModelKey());
+        entity.setModelGroup(snapshot.modelGroup());
+        entity.setProviderType(snapshot.providerType());
+        entity.setCredentialId(snapshot.credentialId());
+        entity.setSelectionSource(snapshot.selectionSource());
+        entity.setExecutionBackend(snapshot.executionBackend());
+        entity.setSupportStatus(snapshot.supportStatus());
+        entity.setDegradationLevel(snapshot.degradationLevel());
+        entity.setObjectMode(snapshot.objectMode());
+        entity.setGatewayResourceKey(snapshot.gatewayResourceKey());
+        entity.setResponseKind(snapshot.responseKind());
+        entity.setResponseObjectType(snapshot.responseObjectType());
+        entity.setResponseObjectId(snapshot.responseObjectId());
+        entity.setResponseStatus(snapshot.responseStatus());
+        entity.setCanonicalEventCount(snapshot.canonicalEventCount());
+        entity.setPrefixHash(snapshot.prefixHash());
+        entity.setFingerprint(snapshot.fingerprint());
+        entity.setStream(snapshot.stream());
+        entity.setStatus(snapshot.status());
+        entity.setErrorCode(snapshot.errorCode());
+        entity.setErrorMessage(snapshot.errorMessage());
+        entity.setDurationMs(snapshot.durationMs());
+        entity.setStartedAt(snapshot.startedAt());
+        entity.setCompletedAt(snapshot.completedAt());
+    }
+
+    private void applyLegacyUsageRecordSnapshot(
+            UsageRecordEntity entity,
+            GatewayObservabilityAsyncPersistenceService.UsageRecordSnapshot snapshot) {
+        entity.setRequestId(snapshot.requestId());
+        entity.setDistributedKeyId(snapshot.distributedKeyId());
+        entity.setProtocol(snapshot.protocol());
+        entity.setRequestPath(snapshot.requestPath());
+        entity.setModelGroup(snapshot.modelGroup());
+        entity.setProviderType(snapshot.providerType());
+        entity.setCredentialId(snapshot.credentialId());
+        entity.setStream(snapshot.stream());
+        entity.setCompleteness(snapshot.completeness());
+        entity.setUsageSource(snapshot.usageSource());
+        entity.setRawPromptTokens(snapshot.rawPromptTokens());
+        entity.setPromptTokens(snapshot.promptTokens());
+        entity.setCompletionTokens(snapshot.completionTokens());
+        entity.setReasoningTokens(snapshot.reasoningTokens());
+        entity.setCacheHitTokens(snapshot.cacheHitTokens());
+        entity.setCacheWriteTokens(snapshot.cacheWriteTokens());
+        entity.setUpstreamCacheHitTokens(snapshot.upstreamCacheHitTokens());
+        entity.setUpstreamCacheWriteTokens(snapshot.upstreamCacheWriteTokens());
+        entity.setSavedInputTokens(snapshot.savedInputTokens());
+        entity.setCachedContentRef(snapshot.cachedContentRef());
+        entity.setTotalTokens(snapshot.totalTokens());
+        entity.setNativeUsagePayloadJson(snapshot.nativeUsagePayloadJson());
     }
 
     private String gatewayResourceKey(
@@ -509,30 +689,32 @@ public class GatewayRequestLifecycleService {
             return;
         }
 
-        UsageRecordEntity entity = usageRecordRepository.findByRequestId(requestId).orElseGet(UsageRecordEntity::new);
-        entity.setRequestId(requestId);
-        entity.setDistributedKeyId(selectionResult.distributedKeyId());
-        entity.setProtocol(selectionResult.protocol());
-        entity.setRequestPath(requestPath);
-        entity.setModelGroup(selectionResult.modelGroup());
-        entity.setProviderType(selectionResult.selectedCandidate().candidate().providerType());
-        entity.setCredentialId(selectionResult.selectedCandidate().candidate().credentialId());
-        entity.setStream(stream);
-        entity.setCompleteness(usage.completeness());
-        entity.setUsageSource(usage.source());
-        entity.setRawPromptTokens(usage.rawPromptTokens());
-        entity.setPromptTokens(usage.promptTokens());
-        entity.setCompletionTokens(usage.completionTokens());
-        entity.setReasoningTokens(usage.reasoningTokens());
-        entity.setCacheHitTokens(usage.cacheHitTokens());
-        entity.setCacheWriteTokens(usage.cacheWriteTokens());
-        entity.setUpstreamCacheHitTokens(usage.upstreamCacheHitTokens());
-        entity.setUpstreamCacheWriteTokens(usage.upstreamCacheWriteTokens());
-        entity.setSavedInputTokens(usage.savedInputTokens());
-        entity.setCachedContentRef(usage.cachedContentRef());
-        entity.setTotalTokens(usage.totalTokens());
-        entity.setNativeUsagePayloadJson(toJson(usage.nativeUsagePayload()));
-        usageRecordRepository.save(entity);
+        GatewayObservabilityAsyncPersistenceService.UsageRecordSnapshot snapshot =
+                new GatewayObservabilityAsyncPersistenceService.UsageRecordSnapshot(
+                        requestId,
+                        selectionResult.distributedKeyId(),
+                        selectionResult.protocol(),
+                        requestPath,
+                        selectionResult.modelGroup(),
+                        selectionResult.selectedCandidate().candidate().providerType(),
+                        selectionResult.selectedCandidate().candidate().credentialId(),
+                        stream,
+                        usage.completeness(),
+                        usage.source(),
+                        usage.rawPromptTokens(),
+                        usage.promptTokens(),
+                        usage.completionTokens(),
+                        usage.reasoningTokens(),
+                        usage.cacheHitTokens(),
+                        usage.cacheWriteTokens(),
+                        usage.upstreamCacheHitTokens(),
+                        usage.upstreamCacheWriteTokens(),
+                        usage.savedInputTokens(),
+                        usage.cachedContentRef(),
+                        usage.totalTokens(),
+                        toJson(usage.nativeUsagePayload())
+                );
+        enqueueOrPersistUsageRecord(snapshot);
     }
 
     private void recordMetrics(
