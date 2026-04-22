@@ -7,6 +7,7 @@ import com.prodigalgal.xaigateway.gateway.core.shared.ErrorSchemaStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend;
 import com.prodigalgal.xaigateway.gateway.core.shared.PathStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderFamily;
+import com.prodigalgal.xaigateway.gateway.core.shared.SiteProfileSource;
 import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
 import java.time.Instant;
 import java.util.List;
@@ -18,6 +19,7 @@ public record CapabilityMatrixRowResponse(
         String displayName,
         ProviderFamily providerFamily,
         UpstreamSiteKind siteKind,
+        SiteProfileSource profileSource,
         AuthStrategy authStrategy,
         PathStrategy pathStrategy,
         ErrorSchemaStrategy errorSchemaStrategy,
@@ -30,6 +32,10 @@ public record CapabilityMatrixRowResponse(
         String fallbackStrategy,
         int cooldownCredentialCount,
         Instant cooldownUntil,
+        long linkedCredentialCount,
+        boolean hasSnapshot,
+        int modelCount,
+        Instant refreshedAt,
         ExecutionBackend preferredBackend,
         List<ExecutionBackend> supportedBackends,
         Map<String, CapabilityResolutionView> features,
@@ -51,6 +57,7 @@ public record CapabilityMatrixRowResponse(
             String displayName,
             ProviderFamily providerFamily,
             UpstreamSiteKind siteKind,
+            SiteProfileSource profileSource,
             AuthStrategy authStrategy,
             PathStrategy pathStrategy,
             ErrorSchemaStrategy errorSchemaStrategy,
@@ -63,6 +70,10 @@ public record CapabilityMatrixRowResponse(
             String fallbackStrategy,
             int cooldownCredentialCount,
             Instant cooldownUntil,
+            long linkedCredentialCount,
+            boolean hasSnapshot,
+            int modelCount,
+            Instant refreshedAt,
             Map<String, CapabilityResolutionView> features,
             Map<String, SurfaceCapabilityView> surfaces,
             boolean supportsResponses,
@@ -82,6 +93,7 @@ public record CapabilityMatrixRowResponse(
                 displayName,
                 providerFamily,
                 siteKind,
+                profileSource,
                 authStrategy,
                 pathStrategy,
                 errorSchemaStrategy,
@@ -94,6 +106,10 @@ public record CapabilityMatrixRowResponse(
                 fallbackStrategy,
                 cooldownCredentialCount,
                 cooldownUntil,
+                linkedCredentialCount,
+                hasSnapshot,
+                modelCount,
+                refreshedAt,
                 ExecutionBackend.SPRING_AI,
                 List.of(ExecutionBackend.SPRING_AI),
                 features,

@@ -9,6 +9,8 @@ import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeySecrets;
 import com.prodigalgal.xaigateway.gateway.core.shared.ModelIdNormalizer;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyEntity;
+import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAccountPoolBindingRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyBindingRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyRepository;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -24,12 +26,18 @@ public class DistributedKeyAdminService {
 
     private final DistributedKeyRepository distributedKeyRepository;
     private final DistributedKeySecretService distributedKeySecretService;
+    private final DistributedKeyBindingRepository distributedKeyBindingRepository;
+    private final DistributedKeyAccountPoolBindingRepository distributedKeyAccountPoolBindingRepository;
 
     public DistributedKeyAdminService(
             DistributedKeyRepository distributedKeyRepository,
-            DistributedKeySecretService distributedKeySecretService) {
+            DistributedKeySecretService distributedKeySecretService,
+            DistributedKeyBindingRepository distributedKeyBindingRepository,
+            DistributedKeyAccountPoolBindingRepository distributedKeyAccountPoolBindingRepository) {
         this.distributedKeyRepository = distributedKeyRepository;
         this.distributedKeySecretService = distributedKeySecretService;
+        this.distributedKeyBindingRepository = distributedKeyBindingRepository;
+        this.distributedKeyAccountPoolBindingRepository = distributedKeyAccountPoolBindingRepository;
     }
 
     @Transactional(readOnly = true)
@@ -71,6 +79,13 @@ public class DistributedKeyAdminService {
         DistributedKeyEntity entity = getRequired(id);
         entity.setActive(active);
         return toResponse(distributedKeyRepository.save(entity));
+    }
+
+    public void delete(Long id) {
+        DistributedKeyEntity entity = getRequired(id);
+        distributedKeyBindingRepository.deleteAllByDistributedKey_Id(id);
+        distributedKeyAccountPoolBindingRepository.deleteAllByDistributedKey_Id(id);
+        distributedKeyRepository.delete(entity);
     }
 
     private DistributedKeyEntity getRequired(Long id) {

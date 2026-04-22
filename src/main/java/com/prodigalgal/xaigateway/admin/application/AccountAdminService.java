@@ -1,8 +1,11 @@
 package com.prodigalgal.xaigateway.admin.application;
 
 import com.prodigalgal.xaigateway.admin.api.ExportedClientConfigResponse;
+import com.prodigalgal.xaigateway.admin.api.AccountImportAuthJsonRequest;
 import com.prodigalgal.xaigateway.admin.api.UpstreamAccountResponse;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountPoolEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountEntity;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountPoolRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,12 +18,15 @@ import java.util.List;
 public class AccountAdminService {
 
     private final UpstreamAccountRepository upstreamAccountRepository;
+    private final UpstreamAccountPoolRepository upstreamAccountPoolRepository;
     private final CredentialCryptoService credentialCryptoService;
 
     public AccountAdminService(
             UpstreamAccountRepository upstreamAccountRepository,
+            UpstreamAccountPoolRepository upstreamAccountPoolRepository,
             CredentialCryptoService credentialCryptoService) {
         this.upstreamAccountRepository = upstreamAccountRepository;
+        this.upstreamAccountPoolRepository = upstreamAccountPoolRepository;
         this.credentialCryptoService = credentialCryptoService;
     }
 
@@ -67,9 +73,53 @@ public class AccountAdminService {
         return new ExportedClientConfigResponse(entity.getAccountName(), clientFamily, config);
     }
 
+    public UpstreamAccountResponse importAuthJson(AccountImportAuthJsonRequest request) {
+        UpstreamAccountPoolEntity pool = upstreamAccountPoolRepository.findById(request.poolId())
+                .orElseThrow(() -> new IllegalArgumentException("未找到指定账号池。"));
+
+        String accessToken = request.accessToken().trim();
+        if (accessToken.isBlank()) {
+            throw new IllegalArgumentException("accessToken 不能为空。");
+        }
+
+        UpstreamAccountEntity entity = new UpstreamAccountEntity();
+        entity.setPool(pool);
+        entity.setProviderType(pool.getProviderType());
+        entity.setAccountName(resolveAccountName(request.accountName(), pool.getPoolName()));
+        entity.setExternalAccountId(resolveExternalAccountId(request.externalAccountId(), pool.getProviderType().name()));
+        entity.setAccessTokenCiphertext(credentialCryptoService.encrypt(accessToken));
+        entity.setRefreshTokenCiphertext(request.refreshToken() == null || request.refreshToken().isBlank()
+                ? null
+                : credentialCryptoService.encrypt(request.refreshToken().trim()));
+        entity.setActive(request.active() == null || request.active());
+        entity.setFrozen(false);
+        entity.setHealthy(true);
+        entity.setLastRefreshAt(Instant.now());
+        entity.setMetadataJson(request.metadataJson() == null || request.metadataJson().isBlank() ? "{}" : request.metadataJson().trim());
+        entity.setProxyId(request.proxyId());
+        entity.setTlsFingerprintProfileId(request.tlsFingerprintProfileId());
+        entity.setSiteProfileId(request.siteProfileId());
+
+        return toResponse(upstreamAccountRepository.save(entity));
+    }
+
     private UpstreamAccountEntity getRequired(Long id) {
         return upstreamAccountRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("未找到指定账号。"));
+    }
+
+    private String resolveAccountName(String accountName, String poolName) {
+        if (accountName != null && !accountName.isBlank()) {
+            return accountName.trim();
+        }
+        return poolName + "-" + Instant.now().toEpochMilli();
+    }
+
+    private String resolveExternalAccountId(String externalAccountId, String providerName) {
+        if (externalAccountId != null && !externalAccountId.isBlank()) {
+            return externalAccountId.trim();
+        }
+        return providerName.toLowerCase() + ":" + Instant.now().toEpochMilli();
     }
 
     private UpstreamAccountResponse toResponse(UpstreamAccountEntity entity) {

@@ -5,6 +5,7 @@ import com.prodigalgal.xaigateway.gateway.core.shared.ErrorSchemaStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ModelAddressingStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.PathStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderFamily;
+import com.prodigalgal.xaigateway.gateway.core.shared.SiteProfileSource;
 import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -86,6 +87,11 @@ public class UpstreamSiteProfileEntity {
     @Column(name = "description", length = 512)
     @Comment("备注说明。")
     private String description;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "profile_source", nullable = false, length = 32)
+    @Comment("站点档案来源。")
+    private SiteProfileSource profileSource = SiteProfileSource.MANUAL;
 
     @Column(name = "is_active", nullable = false)
     @Comment("是否启用。")
@@ -183,6 +189,14 @@ public class UpstreamSiteProfileEntity {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public SiteProfileSource getProfileSource() {
+        return profileSource;
+    }
+
+    public void setProfileSource(SiteProfileSource profileSource) {
+        this.profileSource = profileSource;
     }
 
     public boolean isActive() {

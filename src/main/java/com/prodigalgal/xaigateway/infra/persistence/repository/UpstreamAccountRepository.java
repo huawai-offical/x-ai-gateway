@@ -10,4 +10,5 @@ public interface UpstreamAccountRepository extends JpaRepository<UpstreamAccount
     List<UpstreamAccountEntity> findAllByPool_IdAndActiveTrueAndFrozenFalseAndHealthyTrueOrderByUpdatedAtDesc(Long poolId);
     List<UpstreamAccountEntity> findAllByProviderTypeAndActiveTrueAndFrozenFalseAndHealthyTrueOrderByUpdatedAtDesc(UpstreamAccountProviderType providerType);
     List<UpstreamAccountEntity> findAllBySiteProfileIdAndActiveTrueAndFrozenFalseAndHealthyTrueOrderByUpdatedAtDesc(Long siteProfileId);
+    long countByPool_Id(Long poolId);
 }

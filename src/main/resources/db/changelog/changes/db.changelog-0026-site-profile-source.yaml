@@ -1,0 +1,21 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0026-site-profile-source
+      author: codex
+      changes:
+        - addColumn:
+            tableName: upstream_site_profile
+            columns:
+              - column:
+                  name: profile_source
+                  type: VARCHAR(32)
+                  defaultValue: MANUAL
+                  constraints:
+                    nullable: false
+        - update:
+            tableName: upstream_site_profile
+            columns:
+              - column:
+                  name: profile_source
+                  value: AUTO_DISCOVERED
+            where: description = '由凭证自动推断生成的站点档案。'

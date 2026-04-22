@@ -49,3 +49,5 @@ databaseChangeLog:
       file: db/changelog/changes/db.changelog-0024-change-plan-orchestration.yaml
   - include:
       file: db/changelog/changes/db.changelog-0025-outbound-integrations.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0026-site-profile-source.yaml

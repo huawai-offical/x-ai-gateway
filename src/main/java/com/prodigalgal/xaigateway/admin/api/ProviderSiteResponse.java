@@ -8,6 +8,7 @@ import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend;
 import com.prodigalgal.xaigateway.gateway.core.shared.ModelAddressingStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.PathStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderFamily;
+import com.prodigalgal.xaigateway.gateway.core.shared.SiteProfileSource;
 import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
 import java.time.Instant;
 import java.util.List;
@@ -25,6 +26,7 @@ public record ProviderSiteResponse(
         ErrorSchemaStrategy errorSchemaStrategy,
         String baseUrlPattern,
         String description,
+        SiteProfileSource profileSource,
         boolean active,
         String healthState,
         String blockedReason,
@@ -35,6 +37,8 @@ public record ProviderSiteResponse(
         String fallbackStrategy,
         int cooldownCredentialCount,
         Instant cooldownUntil,
+        long linkedCredentialCount,
+        boolean hasSnapshot,
         ExecutionBackend preferredBackend,
         List<ExecutionBackend> supportedBackends,
         Map<String, CapabilityResolutionView> features,
@@ -56,6 +60,7 @@ public record ProviderSiteResponse(
             ErrorSchemaStrategy errorSchemaStrategy,
             String baseUrlPattern,
             String description,
+            SiteProfileSource profileSource,
             boolean active,
             String healthState,
             String blockedReason,
@@ -66,6 +71,8 @@ public record ProviderSiteResponse(
             String fallbackStrategy,
             int cooldownCredentialCount,
             Instant cooldownUntil,
+            long linkedCredentialCount,
+            boolean hasSnapshot,
             Map<String, CapabilityResolutionView> features,
             Map<String, SurfaceCapabilityView> surfaces,
             int modelCount,
@@ -85,6 +92,7 @@ public record ProviderSiteResponse(
                 errorSchemaStrategy,
                 baseUrlPattern,
                 description,
+                profileSource,
                 active,
                 healthState,
                 blockedReason,
@@ -95,6 +103,8 @@ public record ProviderSiteResponse(
                 fallbackStrategy,
                 cooldownCredentialCount,
                 cooldownUntil,
+                linkedCredentialCount,
+                hasSnapshot,
                 ExecutionBackend.SPRING_AI,
                 List.of(ExecutionBackend.SPRING_AI),
                 features,

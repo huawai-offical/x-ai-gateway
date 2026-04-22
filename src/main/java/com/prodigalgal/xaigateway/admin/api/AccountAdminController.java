@@ -1,6 +1,7 @@
 package com.prodigalgal.xaigateway.admin.api;
 
 import com.prodigalgal.xaigateway.admin.application.AccountAdminService;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -43,5 +44,10 @@ public class AccountAdminController {
     @GetMapping("/{id}/export")
     public ExportedClientConfigResponse export(@PathVariable Long id, @RequestParam(defaultValue = "GENERIC_OPENAI") String clientFamily) {
         return accountAdminService.exportConfig(id, clientFamily);
+    }
+
+    @PostMapping("/import-auth-json")
+    public UpstreamAccountResponse importAuthJson(@Valid @RequestBody AccountImportAuthJsonRequest request) {
+        return accountAdminService.importAuthJson(request);
     }
 }

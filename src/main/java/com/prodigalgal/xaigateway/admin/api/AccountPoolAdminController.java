@@ -34,4 +34,14 @@ public class AccountPoolAdminController {
             @Valid @RequestBody DistributedKeyAccountPoolBindingRequest request) {
         return accountPoolAdminService.bindDistributedKey(id, request);
     }
+
+    @PostMapping("/{id}/status")
+    public AccountPoolResponse toggle(@PathVariable Long id, @RequestParam boolean active) {
+        return accountPoolAdminService.toggle(id, active);
+    }
+
+    @DeleteMapping("/{id}")
+    public void delete(@PathVariable Long id) {
+        accountPoolAdminService.delete(id);
+    }
 }

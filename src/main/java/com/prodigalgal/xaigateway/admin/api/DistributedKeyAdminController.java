@@ -4,6 +4,7 @@ import com.prodigalgal.xaigateway.admin.application.DistributedKeyAdminService;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -51,5 +52,10 @@ public class DistributedKeyAdminController {
             @PathVariable Long id,
             @RequestParam boolean active) {
         return distributedKeyAdminService.toggle(id, active);
+    }
+
+    @DeleteMapping("/{id}")
+    public void delete(@PathVariable Long id) {
+        distributedKeyAdminService.delete(id);
     }
 }

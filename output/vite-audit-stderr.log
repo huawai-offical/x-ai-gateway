@@ -1,0 +1,11 @@
+$ vite --host 0.0.0.0 --port "4173"
+[2m15:11:57[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m加载控制台会话失败。 ApiError: 服务暂时不可用，请稍后重试。
+    at toApiError (http://127.0.0.1:4173/src/lib/api.ts:136:10)
+    at async apiRequest (http://127.0.0.1:4173/src/lib/api.ts:38:21)
+    at async bootstrapSession (http://127.0.0.1:4173/src/features/auth/auth-provider.tsx:25:25)
+[2m15:20:58[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mNo `HydrateFallback` element provided to render during initial hydration
+[2m15:20:58[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m加载控制台会话失败。 ApiError: 服务暂时不可用，请稍后重试。
+    at toApiError (http://127.0.0.1:4173/src/lib/api.ts:136:10)
+    at async apiRequest (http://127.0.0.1:4173/src/lib/api.ts:38:21)
+    at async bootstrapSession (http://127.0.0.1:4173/src/features/auth/auth-provider.tsx?t=1776756058190:25:25)
+error: script "dev" exited with code 58

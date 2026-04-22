@@ -3,6 +3,7 @@ package com.prodigalgal.xaigateway.admin.application;
 import com.prodigalgal.xaigateway.gateway.core.catalog.DiscoveredModelDefinition;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
+import com.prodigalgal.xaigateway.gateway.core.shared.SiteProfileSource;
 import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
 import com.prodigalgal.xaigateway.gateway.core.site.UpstreamSitePolicyService;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SiteCapabilitySnapshotEntity;
@@ -106,6 +107,7 @@ public class ProviderSiteRegistryService {
         entity.setErrorSchemaStrategy(policy.errorSchemaStrategy());
         entity.setBaseUrlPattern(baseUrl == null || baseUrl.isBlank() ? null : baseUrl.trim());
         entity.setDescription("由凭证自动推断生成的站点档案。");
+        entity.setProfileSource(SiteProfileSource.AUTO_DISCOVERED);
         entity.setActive(true);
         return entity;
     }

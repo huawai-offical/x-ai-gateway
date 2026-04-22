@@ -12,6 +12,7 @@ import com.prodigalgal.xaigateway.gateway.core.shared.ErrorSchemaStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ModelAddressingStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.PathStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderFamily;
+import com.prodigalgal.xaigateway.gateway.core.shared.SiteProfileSource;
 import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
 import com.prodigalgal.xaigateway.testsupport.PermitAllSecurityTestConfig;
 import java.time.Instant;
@@ -90,6 +91,7 @@ class ProviderSiteAdminControllerTests {
                         "OPENAI_DIRECT",
                         ProviderFamily.OPENAI,
                         UpstreamSiteKind.OPENAI_DIRECT,
+                        SiteProfileSource.MANUAL,
                         AuthStrategy.BEARER,
                         PathStrategy.OPENAI_V1,
                         ErrorSchemaStrategy.OPENAI_ERROR,
@@ -102,6 +104,10 @@ class ProviderSiteAdminControllerTests {
                         "provider-native",
                         1,
                         Instant.parse("2026-04-13T03:00:00Z"),
+                        2L,
+                        true,
+                        3,
+                        Instant.parse("2026-04-13T03:30:00Z"),
                         java.util.Map.of(
                                 "response_object",
                                 new CapabilityResolutionView("emulated", "emulated", "emulated", List.of(), List.of())
@@ -140,9 +146,12 @@ class ProviderSiteAdminControllerTests {
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$[0].supportsResponses").isEqualTo(true)
+                .jsonPath("$[0].profileSource").isEqualTo("MANUAL")
                 .jsonPath("$[0].streamTransport").isEqualTo("sse")
                 .jsonPath("$[0].fallbackStrategy").isEqualTo("provider-native")
                 .jsonPath("$[0].cooldownCredentialCount").isEqualTo(1)
+                .jsonPath("$[0].linkedCredentialCount").isEqualTo(2)
+                .jsonPath("$[0].hasSnapshot").isEqualTo(true)
                 .jsonPath("$[0].features.response_object.effectiveLevel").isEqualTo("emulated")
                 .jsonPath("$[0].features.response_object.supportStatus").isEqualTo("degraded")
                 .jsonPath("$[0].features.response_object.degradationLevel").isEqualTo("emulated")
@@ -185,6 +194,7 @@ class ProviderSiteAdminControllerTests {
                 ErrorSchemaStrategy.OPENAI_ERROR,
                 "https://api.openai.com",
                 "sample",
+                SiteProfileSource.MANUAL,
                 true,
                 "READY",
                 null,
@@ -195,6 +205,8 @@ class ProviderSiteAdminControllerTests {
                 "provider-native",
                 1,
                 Instant.parse("2026-04-13T03:00:00Z"),
+                2L,
+                true,
                 java.util.Map.of(
                         "response_object",
                         new CapabilityResolutionView("emulated", "emulated", "emulated", List.of(), List.of())

@@ -18,6 +18,7 @@ import com.prodigalgal.xaigateway.gateway.core.interop.SupportStatus;
 import com.prodigalgal.xaigateway.gateway.core.interop.SurfaceCompatibilityReport;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
+import com.prodigalgal.xaigateway.gateway.core.shared.SiteProfileSource;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SiteCapabilitySnapshotEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SiteModelCapabilityEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
@@ -165,6 +166,8 @@ public class ProviderSiteAdminService {
     private CapabilityMatrixRowResponse toCapabilityMatrixRow(UpstreamSiteProfileEntity entity) {
         SiteCapabilitySnapshotEntity snapshot = siteCapabilitySnapshotRepository.findBySiteProfile_Id(entity.getId()).orElse(null);
         CooldownSummary cooldown = cooldownSummary(entity.getId());
+        int modelCount = siteModelCapabilityRepository.findAllBySiteProfile_IdOrderByModelKeyAsc(entity.getId()).size();
+        long linkedCredentialCount = upstreamCredentialRepository.countBySiteProfileIdAndDeletedFalse(entity.getId());
         ExecutionBackendDecision backendDecision = executionBackendPolicyService.forSiteSurface(
                 entity,
                 snapshot,
@@ -177,6 +180,7 @@ public class ProviderSiteAdminService {
                 entity.getDisplayName(),
                 entity.getProviderFamily(),
                 entity.getSiteKind(),
+                entity.getProfileSource(),
                 entity.getAuthStrategy(),
                 entity.getPathStrategy(),
                 entity.getErrorSchemaStrategy(),
@@ -189,6 +193,10 @@ public class ProviderSiteAdminService {
                 snapshot == null ? null : snapshot.getFallbackStrategy(),
                 cooldown.credentialCount(),
                 cooldown.cooldownUntil(),
+                linkedCredentialCount,
+                snapshot != null,
+                modelCount,
+                snapshot == null ? null : snapshot.getRefreshedAt(),
                 backendDecision.preferredBackend(),
                 backendDecision.supportedBackends(),
                 buildFeatureViews(entity, snapshot),
@@ -210,6 +218,7 @@ public class ProviderSiteAdminService {
         SiteCapabilitySnapshotEntity snapshot = siteCapabilitySnapshotRepository.findBySiteProfile_Id(entity.getId()).orElse(null);
         int modelCount = siteModelCapabilityRepository.findAllBySiteProfile_IdOrderByModelKeyAsc(entity.getId()).size();
         CooldownSummary cooldown = cooldownSummary(entity.getId());
+        long linkedCredentialCount = upstreamCredentialRepository.countBySiteProfileIdAndDeletedFalse(entity.getId());
         ExecutionBackendDecision backendDecision = executionBackendPolicyService.forSiteSurface(
                 entity,
                 snapshot,
@@ -228,6 +237,7 @@ public class ProviderSiteAdminService {
                 entity.getErrorSchemaStrategy(),
                 entity.getBaseUrlPattern(),
                 entity.getDescription(),
+                entity.getProfileSource(),
                 entity.isActive(),
                 snapshot == null ? "UNKNOWN" : snapshot.getHealthState(),
                 snapshot == null ? null : snapshot.getBlockedReason(),
@@ -238,6 +248,8 @@ public class ProviderSiteAdminService {
                 snapshot == null ? null : snapshot.getFallbackStrategy(),
                 cooldown.credentialCount(),
                 cooldown.cooldownUntil(),
+                linkedCredentialCount,
+                snapshot != null,
                 backendDecision.preferredBackend(),
                 backendDecision.supportedBackends(),
                 buildFeatureViews(entity, snapshot),
@@ -586,6 +598,9 @@ public class ProviderSiteAdminService {
         entity.setErrorSchemaStrategy(policy.errorSchemaStrategy());
         entity.setBaseUrlPattern(request.baseUrlPattern() == null ? null : request.baseUrlPattern().trim());
         entity.setDescription(request.description() == null ? null : request.description().trim());
+        if (entity.getProfileSource() == null) {
+            entity.setProfileSource(SiteProfileSource.MANUAL);
+        }
         entity.setActive(request.active() == null || request.active());
     }
 

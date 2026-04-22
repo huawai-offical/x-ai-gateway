@@ -9,6 +9,7 @@ import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountPoolEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAccountPoolBindingRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountPoolRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,14 +21,17 @@ import java.util.List;
 public class AccountPoolAdminService {
 
     private final UpstreamAccountPoolRepository upstreamAccountPoolRepository;
+    private final UpstreamAccountRepository upstreamAccountRepository;
     private final DistributedKeyRepository distributedKeyRepository;
     private final DistributedKeyAccountPoolBindingRepository distributedKeyAccountPoolBindingRepository;
 
     public AccountPoolAdminService(
             UpstreamAccountPoolRepository upstreamAccountPoolRepository,
+            UpstreamAccountRepository upstreamAccountRepository,
             DistributedKeyRepository distributedKeyRepository,
             DistributedKeyAccountPoolBindingRepository distributedKeyAccountPoolBindingRepository) {
         this.upstreamAccountPoolRepository = upstreamAccountPoolRepository;
+        this.upstreamAccountRepository = upstreamAccountRepository;
         this.distributedKeyRepository = distributedKeyRepository;
         this.distributedKeyAccountPoolBindingRepository = distributedKeyAccountPoolBindingRepository;
     }
@@ -52,6 +56,21 @@ public class AccountPoolAdminService {
         UpstreamAccountPoolEntity entity = getRequired(id);
         apply(entity, request);
         return toResponse(upstreamAccountPoolRepository.save(entity));
+    }
+
+    public AccountPoolResponse toggle(Long id, boolean active) {
+        UpstreamAccountPoolEntity entity = getRequired(id);
+        entity.setActive(active);
+        return toResponse(upstreamAccountPoolRepository.save(entity));
+    }
+
+    public void delete(Long id) {
+        UpstreamAccountPoolEntity entity = getRequired(id);
+        if (upstreamAccountRepository.countByPool_Id(id) > 0) {
+            throw new IllegalArgumentException("账号池下仍有账号，请先迁移或清理账号后再删除。");
+        }
+        distributedKeyAccountPoolBindingRepository.deleteAllByPool_Id(id);
+        upstreamAccountPoolRepository.delete(entity);
     }
 
     public DistributedKeyAccountPoolBindingResponse bindDistributedKey(Long poolId, DistributedKeyAccountPoolBindingRequest request) {
