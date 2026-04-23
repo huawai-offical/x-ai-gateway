@@ -1,6 +1,7 @@
 package com.prodigalgal.xaigateway.admin.api;
 
 import com.prodigalgal.xaigateway.admin.application.CredentialAdminService;
+import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.validation.annotation.Validated;
@@ -28,6 +29,19 @@ public class CredentialAdminController {
     @GetMapping
     public List<CredentialResponse> list() {
         return credentialAdminService.list();
+    }
+
+    @GetMapping("/model-catalog")
+    public List<String> modelCatalog(@RequestParam(required = false) ProviderType providerType) {
+        if (providerType == null) {
+            return List.of();
+        }
+        return credentialAdminService.listSupportedModelCatalog(providerType);
+    }
+
+    @GetMapping("/pool/{poolId}")
+    public List<CredentialResponse> listByPool(@PathVariable Long poolId) {
+        return credentialAdminService.listByPool(poolId);
     }
 
     @GetMapping("/{id}")

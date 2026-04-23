@@ -1,10 +1,10 @@
 package com.prodigalgal.xaigateway.admin.api;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import java.util.List;
 
 public record AccountImportAuthJsonRequest(
-        @NotNull Long poolId,
+        Long poolId,
         String accountName,
         String externalAccountId,
         @NotBlank String accessToken,
@@ -13,7 +13,7 @@ public record AccountImportAuthJsonRequest(
         Boolean active,
         Long proxyId,
         Long tlsFingerprintProfileId,
-        Long siteProfileId
+        Long siteProfileId,
+        List<String> supportedModels
 ) {
 }
-

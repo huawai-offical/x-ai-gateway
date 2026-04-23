@@ -29,4 +29,9 @@ public class OperationsMaintenanceWindowAdminController {
     public MaintenanceWindowResponse update(@PathVariable Long id, @RequestBody MaintenanceWindowRequest request) {
         return maintenanceWindowService.save(id, request);
     }
+
+    @DeleteMapping("/{id}")
+    public void delete(@PathVariable Long id) {
+        maintenanceWindowService.delete(id);
+    }
 }

@@ -59,6 +59,12 @@ public class ErrorRuleService {
         return toResponse(errorRuleRepository.save(entity));
     }
 
+    public void delete(Long id) {
+        ErrorRuleEntity entity = errorRuleRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("未找到错误规则。"));
+        errorRuleRepository.delete(entity);
+    }
+
     @Transactional(readOnly = true)
     public ErrorRulePreviewResponse preview(ErrorRulePreviewRequest request) {
         return new ErrorRulePreviewResponse(errorRuleRepository.findAllByEnabledTrueOrderByPriorityAscCreatedAtAsc().stream()

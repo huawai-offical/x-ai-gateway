@@ -2,6 +2,7 @@ package com.prodigalgal.xaigateway.gateway.core.auth;
 
 import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyBindingEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyEntity;
+import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAccountPoolBindingRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyBindingRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyRepository;
 import java.util.List;
@@ -15,29 +16,40 @@ public class DistributedKeyQueryService {
 
     private final DistributedKeyRepository distributedKeyRepository;
     private final DistributedKeyBindingRepository distributedKeyBindingRepository;
+    private final DistributedKeyAccountPoolBindingRepository distributedKeyAccountPoolBindingRepository;
 
     public DistributedKeyQueryService(
             DistributedKeyRepository distributedKeyRepository,
-            DistributedKeyBindingRepository distributedKeyBindingRepository) {
+            DistributedKeyBindingRepository distributedKeyBindingRepository,
+            DistributedKeyAccountPoolBindingRepository distributedKeyAccountPoolBindingRepository) {
         this.distributedKeyRepository = distributedKeyRepository;
         this.distributedKeyBindingRepository = distributedKeyBindingRepository;
+        this.distributedKeyAccountPoolBindingRepository = distributedKeyAccountPoolBindingRepository;
     }
 
     public Optional<DistributedKeyView> findActiveByKeyPrefix(String keyPrefix) {
         return distributedKeyRepository.findByKeyPrefixAndActiveTrue(keyPrefix)
+                .filter(entity -> hasActivePoolBinding(entity.getId()))
                 .map(this::toView);
     }
 
     public Optional<DistributedKeyView> findActiveById(Long id) {
         return distributedKeyRepository.findByIdAndActiveTrue(id)
+                .filter(entity -> hasActivePoolBinding(entity.getId()))
                 .map(this::toView);
     }
 
     public List<DistributedKeyView> listActive() {
         return distributedKeyRepository.findAll().stream()
                 .filter(DistributedKeyEntity::isActive)
+                .filter(entity -> hasActivePoolBinding(entity.getId()))
                 .map(this::toView)
                 .toList();
+    }
+
+    private boolean hasActivePoolBinding(Long distributedKeyId) {
+        return distributedKeyAccountPoolBindingRepository
+                .countByDistributedKey_IdAndActiveTrue(distributedKeyId) > 0;
     }
 
     private DistributedKeyView toView(DistributedKeyEntity entity) {

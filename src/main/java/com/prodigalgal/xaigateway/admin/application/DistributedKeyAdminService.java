@@ -51,7 +51,10 @@ public class DistributedKeyAdminService {
     public DistributedKeyCreateResponse create(DistributedKeyRequest request) {
         DistributedKeySecrets secrets = distributedKeySecretService.generate();
         DistributedKeyEntity entity = new DistributedKeyEntity();
-        apply(entity, request);
+        apply(entity, request, true);
+        if (entity.isActive()) {
+            throw new IllegalArgumentException("分发 key 启用前必须先绑定账号池。");
+        }
         entity.setKeyPrefix(secrets.keyPrefix());
         entity.setSecretHash(secrets.secretHash());
         entity.setMaskedKey(secrets.maskedKey());
@@ -61,7 +64,10 @@ public class DistributedKeyAdminService {
 
     public DistributedKeyResponse update(Long id, DistributedKeyRequest request) {
         DistributedKeyEntity entity = getRequired(id);
-        apply(entity, request);
+        apply(entity, request, false);
+        if (entity.isActive()) {
+            assertHasActivePoolBinding(id);
+        }
         return toResponse(distributedKeyRepository.save(entity));
     }
 
@@ -77,6 +83,9 @@ public class DistributedKeyAdminService {
 
     public DistributedKeyResponse toggle(Long id, boolean active) {
         DistributedKeyEntity entity = getRequired(id);
+        if (active) {
+            assertHasActivePoolBinding(id);
+        }
         entity.setActive(active);
         return toResponse(distributedKeyRepository.save(entity));
     }
@@ -96,10 +105,10 @@ public class DistributedKeyAdminService {
         return entity.get();
     }
 
-    private void apply(DistributedKeyEntity entity, DistributedKeyRequest request) {
+    private void apply(DistributedKeyEntity entity, DistributedKeyRequest request, boolean isCreate) {
         entity.setKeyName(request.keyName().trim());
         entity.setDescription(blankToNull(request.description()));
-        entity.setActive(request.active() == null || request.active());
+        entity.setActive(resolveActive(request.active(), entity.isActive(), isCreate));
         entity.setAllowedProtocols(normalizeProtocols(request.allowedProtocols()));
         entity.setAllowedModels(normalizeModels(request.allowedModels()));
         entity.setAllowedProviderTypes(normalizeProviderTypes(request.allowedProviderTypes()));
@@ -112,6 +121,24 @@ public class DistributedKeyAdminService {
         entity.setStickySessionTtlSeconds(request.stickySessionTtlSeconds());
         entity.setAllowedClientFamilies(normalizeClientFamilies(request.allowedClientFamilies()));
         entity.setRequireClientFamilyMatch(Boolean.TRUE.equals(request.requireClientFamilyMatch()));
+    }
+
+    private boolean resolveActive(Boolean requestedActive, boolean currentActive, boolean isCreate) {
+        if (requestedActive != null) {
+            return requestedActive;
+        }
+        if (isCreate) {
+            return false;
+        }
+        return currentActive;
+    }
+
+    private void assertHasActivePoolBinding(Long distributedKeyId) {
+        long activeBindings = distributedKeyAccountPoolBindingRepository
+                .countByDistributedKey_IdAndActiveTrue(distributedKeyId);
+        if (activeBindings <= 0) {
+            throw new IllegalArgumentException("分发 key 启用前必须先绑定账号池。");
+        }
     }
 
     private List<String> normalizeProtocols(List<String> protocols) {

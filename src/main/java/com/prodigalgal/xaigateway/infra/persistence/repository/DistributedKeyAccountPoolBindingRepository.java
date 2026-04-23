@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface DistributedKeyAccountPoolBindingRepository extends JpaRepository<DistributedKeyAccountPoolBindingEntity, Long> {
     List<DistributedKeyAccountPoolBindingEntity> findAllByDistributedKey_IdAndActiveTrueOrderByPriorityAscCreatedAtAsc(Long distributedKeyId);
     List<DistributedKeyAccountPoolBindingEntity> findAllByDistributedKey_IdAndProviderTypeAndActiveTrueOrderByPriorityAscCreatedAtAsc(Long distributedKeyId, ProviderType providerType);
+    List<DistributedKeyAccountPoolBindingEntity> findAllByPool_Id(Long poolId);
+    long countByDistributedKey_IdAndActiveTrue(Long distributedKeyId);
     void deleteAllByPool_Id(Long poolId);
     void deleteAllByDistributedKey_Id(Long distributedKeyId);
 }

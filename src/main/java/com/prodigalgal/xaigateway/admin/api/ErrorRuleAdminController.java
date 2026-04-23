@@ -31,6 +31,11 @@ public class ErrorRuleAdminController {
         return errorRuleService.save(id, request);
     }
 
+    @DeleteMapping("/{id}")
+    public void delete(@PathVariable Long id) {
+        errorRuleService.delete(id);
+    }
+
     @PostMapping("/preview")
     public ErrorRulePreviewResponse preview(@RequestBody ErrorRulePreviewRequest request) {
         return errorRuleService.preview(request);

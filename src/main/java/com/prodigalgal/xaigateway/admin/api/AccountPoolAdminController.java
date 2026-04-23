@@ -1,6 +1,7 @@
 package com.prodigalgal.xaigateway.admin.api;
 
 import com.prodigalgal.xaigateway.admin.application.AccountPoolAdminService;
+import com.prodigalgal.xaigateway.gateway.core.account.UpstreamAccountProviderType;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,6 +19,11 @@ public class AccountPoolAdminController {
 
     @GetMapping
     public List<AccountPoolResponse> list() { return accountPoolAdminService.list(); }
+
+    @GetMapping("/model-catalog")
+    public List<String> modelCatalog(@RequestParam(required = false) UpstreamAccountProviderType providerType) {
+        return accountPoolAdminService.listSupportedModelCatalog(providerType);
+    }
 
     @GetMapping("/{id}")
     public AccountPoolResponse get(@PathVariable Long id) { return accountPoolAdminService.get(id); }

@@ -20,14 +20,25 @@ public class AccountAdminService {
     private final UpstreamAccountRepository upstreamAccountRepository;
     private final UpstreamAccountPoolRepository upstreamAccountPoolRepository;
     private final CredentialCryptoService credentialCryptoService;
+    private final SupportedModelCatalogService supportedModelCatalogService;
 
     public AccountAdminService(
             UpstreamAccountRepository upstreamAccountRepository,
             UpstreamAccountPoolRepository upstreamAccountPoolRepository,
-            CredentialCryptoService credentialCryptoService) {
+            CredentialCryptoService credentialCryptoService,
+            SupportedModelCatalogService supportedModelCatalogService) {
         this.upstreamAccountRepository = upstreamAccountRepository;
         this.upstreamAccountPoolRepository = upstreamAccountPoolRepository;
         this.credentialCryptoService = credentialCryptoService;
+        this.supportedModelCatalogService = supportedModelCatalogService;
+    }
+
+    @Transactional(readOnly = true)
+    public List<UpstreamAccountResponse> list(Long poolId) {
+        if (poolId == null) {
+            return upstreamAccountRepository.findAllByOrderByCreatedAtDesc().stream().map(this::toResponse).toList();
+        }
+        return listByPool(poolId);
     }
 
     @Transactional(readOnly = true)
@@ -74,8 +85,7 @@ public class AccountAdminService {
     }
 
     public UpstreamAccountResponse importAuthJson(AccountImportAuthJsonRequest request) {
-        UpstreamAccountPoolEntity pool = upstreamAccountPoolRepository.findById(request.poolId())
-                .orElseThrow(() -> new IllegalArgumentException("未找到指定账号池。"));
+        UpstreamAccountPoolEntity pool = resolvePool(request.poolId());
 
         String accessToken = request.accessToken().trim();
         if (accessToken.isBlank()) {
@@ -84,9 +94,13 @@ public class AccountAdminService {
 
         UpstreamAccountEntity entity = new UpstreamAccountEntity();
         entity.setPool(pool);
-        entity.setProviderType(pool.getProviderType());
-        entity.setAccountName(resolveAccountName(request.accountName(), pool.getPoolName()));
-        entity.setExternalAccountId(resolveExternalAccountId(request.externalAccountId(), pool.getProviderType().name()));
+        com.prodigalgal.xaigateway.gateway.core.account.UpstreamAccountProviderType providerType =
+                pool != null
+                        ? pool.getProviderType()
+                        : com.prodigalgal.xaigateway.gateway.core.account.UpstreamAccountProviderType.OPENAI_OAUTH;
+        entity.setProviderType(providerType);
+        entity.setAccountName(resolveAccountName(request.accountName(), pool == null ? null : pool.getPoolName()));
+        entity.setExternalAccountId(resolveExternalAccountId(request.externalAccountId(), providerType.name()));
         entity.setAccessTokenCiphertext(credentialCryptoService.encrypt(accessToken));
         entity.setRefreshTokenCiphertext(request.refreshToken() == null || request.refreshToken().isBlank()
                 ? null
@@ -96,6 +110,7 @@ public class AccountAdminService {
         entity.setHealthy(true);
         entity.setLastRefreshAt(Instant.now());
         entity.setMetadataJson(request.metadataJson() == null || request.metadataJson().isBlank() ? "{}" : request.metadataJson().trim());
+        entity.setSupportedModels(supportedModelCatalogService.resolveForAccountImport(pool, request.supportedModels()));
         entity.setProxyId(request.proxyId());
         entity.setTlsFingerprintProfileId(request.tlsFingerprintProfileId());
         entity.setSiteProfileId(request.siteProfileId());
@@ -108,11 +123,20 @@ public class AccountAdminService {
                 .orElseThrow(() -> new IllegalArgumentException("未找到指定账号。"));
     }
 
+    private UpstreamAccountPoolEntity resolvePool(Long poolId) {
+        if (poolId == null) {
+            return null;
+        }
+        return upstreamAccountPoolRepository.findById(poolId)
+                .orElseThrow(() -> new IllegalArgumentException("未找到指定账号池。"));
+    }
+
     private String resolveAccountName(String accountName, String poolName) {
         if (accountName != null && !accountName.isBlank()) {
             return accountName.trim();
         }
-        return poolName + "-" + Instant.now().toEpochMilli();
+        String namePrefix = poolName == null || poolName.isBlank() ? "unassigned" : poolName;
+        return namePrefix + "-" + Instant.now().toEpochMilli();
     }
 
     private String resolveExternalAccountId(String externalAccountId, String providerName) {
@@ -123,11 +147,18 @@ public class AccountAdminService {
     }
 
     private UpstreamAccountResponse toResponse(UpstreamAccountEntity entity) {
+        long totalRequests = entity.getTotalRequestCount();
+        long successRequests = entity.getSuccessfulRequestCount();
+        long totalTokens = entity.getTotalTokenCount();
+        long cacheHitTokens = entity.getTotalCacheHitTokenCount();
+        long durationSamples = entity.getDurationSampleCount();
+        long firstTokenSamples = entity.getFirstTokenSampleCount();
         return new UpstreamAccountResponse(
                 entity.getId(),
-                entity.getPool().getId(),
+                entity.getPool() == null ? null : entity.getPool().getId(),
                 entity.getAccountName(),
                 entity.getProviderType(),
+                supportedModelCatalogService.normalize(entity.getSupportedModels()),
                 entity.getExternalAccountId(),
                 entity.isActive(),
                 entity.isFrozen(),
@@ -137,8 +168,34 @@ public class AccountAdminService {
                 entity.getTlsFingerprintProfileId(),
                 entity.getLastRefreshAt(),
                 entity.getLastUsedAt(),
+                totalRequests,
+                successRequests,
+                entity.getFailedRequestCount(),
+                entity.getCanceledRequestCount(),
+                totalTokens,
+                cacheHitTokens,
+                entity.getTotalCacheWriteTokenCount(),
+                entity.getTotalSavedInputTokenCount(),
+                ratio(successRequests, totalRequests),
+                ratio(cacheHitTokens, totalTokens),
+                entity.getTotalDurationMs(),
+                durationSamples,
+                ratio(entity.getTotalDurationMs(), durationSamples),
+                entity.getTotalFirstTokenMs(),
+                firstTokenSamples,
+                ratio(entity.getTotalFirstTokenMs(), firstTokenSamples),
+                entity.getLastFirstTokenMs(),
+                entity.getMinFirstTokenMs(),
+                entity.getMaxFirstTokenMs(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
         );
+    }
+
+    private double ratio(long numerator, long denominator) {
+        if (denominator <= 0) {
+            return 0D;
+        }
+        return ((double) numerator) / denominator;
     }
 }

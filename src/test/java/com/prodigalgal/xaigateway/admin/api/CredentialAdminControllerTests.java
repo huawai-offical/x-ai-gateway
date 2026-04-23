@@ -53,25 +53,12 @@ class CredentialAdminControllerTests {
         Mockito.when(credentialAdminService.create(Mockito.any()))
                 .thenReturn(credentialResponse(11L, "Gemini Key"));
         Mockito.when(credentialAdminService.toggle(11L, false))
-                .thenReturn(new CredentialResponse(
+                .thenReturn(credentialResponse(
                         11L,
                         "Gemini Key",
-                        ProviderType.GEMINI_DIRECT,
-                        "https://generativelanguage.googleapis.com",
-                        CredentialAuthKind.API_KEY,
-                        "fp",
-                        Map.of(),
                         false,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        21L,
-                        Instant.now(),
-                        Instant.now()
+                        ProviderType.GEMINI_DIRECT,
+                        "https://generativelanguage.googleapis.com"
                 ));
 
         webTestClient.post()
@@ -100,25 +87,57 @@ class CredentialAdminControllerTests {
     }
 
     private CredentialResponse credentialResponse(Long id, String name) {
+        return credentialResponse(id, name, true, ProviderType.OPENAI_DIRECT, "https://api.openai.com");
+    }
+
+    private CredentialResponse credentialResponse(
+            Long id,
+            String name,
+            boolean active,
+            ProviderType providerType,
+            String baseUrl) {
+        Instant now = Instant.now();
         return new CredentialResponse(
                 id,
                 name,
-                ProviderType.OPENAI_DIRECT,
-                "https://api.openai.com",
+                providerType,
+                baseUrl,
                 CredentialAuthKind.API_KEY,
+                List.of("gpt-4o"),
                 "fp",
                 Map.of("tenant", "prod"),
-                true,
+                active,
                 null,
                 null,
                 null,
                 null,
-                Instant.now(),
+                now,
+                0L,
+                0L,
+                0L,
+                0L,
+                0L,
+                0L,
+                0L,
+                0L,
+                0D,
+                0D,
+                0L,
+                0L,
+                0D,
+                0L,
+                0L,
+                0D,
+                null,
+                null,
+                null,
                 null,
                 null,
                 15L,
-                Instant.now(),
-                Instant.now()
+                15L,
+                "default",
+                now,
+                now
         );
     }
 }

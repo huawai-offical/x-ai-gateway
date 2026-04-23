@@ -39,6 +39,12 @@ public class RunbookLinkService {
         return toResponse(runbookLinkRepository.save(entity));
     }
 
+    public void delete(Long id) {
+        RunbookLinkEntity entity = runbookLinkRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("未找到 runbook link。"));
+        runbookLinkRepository.delete(entity);
+    }
+
     @Transactional(readOnly = true)
     public String resolveUrl(String eventType, String entityType) {
         String normalizedEventType = normalizeUpper(eventType);

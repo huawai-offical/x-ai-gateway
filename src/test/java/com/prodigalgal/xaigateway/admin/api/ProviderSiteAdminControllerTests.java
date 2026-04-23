@@ -181,6 +181,16 @@ class ProviderSiteAdminControllerTests {
                 .jsonPath("$[0].cooldownCredentialCount").isEqualTo(1);
     }
 
+    @Test
+    void shouldDeleteProviderSite() {
+        webTestClient.delete()
+                .uri("/admin/provider-sites/5")
+                .exchange()
+                .expectStatus().isOk();
+
+        Mockito.verify(providerSiteAdminService).delete(5L);
+    }
+
     private ProviderSiteResponse sampleSite() {
         return new ProviderSiteResponse(
                 1L,

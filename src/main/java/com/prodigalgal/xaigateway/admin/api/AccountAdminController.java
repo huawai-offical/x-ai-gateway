@@ -16,6 +16,11 @@ public class AccountAdminController {
         this.accountAdminService = accountAdminService;
     }
 
+    @GetMapping
+    public List<UpstreamAccountResponse> list(@RequestParam(required = false) Long poolId) {
+        return accountAdminService.list(poolId);
+    }
+
     @GetMapping("/pool/{poolId}")
     public List<UpstreamAccountResponse> listByPool(@PathVariable Long poolId) {
         return accountAdminService.listByPool(poolId);

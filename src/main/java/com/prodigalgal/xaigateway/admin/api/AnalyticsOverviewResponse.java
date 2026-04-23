@@ -22,8 +22,53 @@ public record AnalyticsOverviewResponse(
         List<BreakdownItem> modelGroupBreakdown,
         List<BreakdownItem> cacheSourceBreakdown,
         List<CountBreakdownItem> usageCompletenessBreakdown,
+        List<DistributedKeyUsageItem> distributedKeyBreakdown,
         List<TimelineBucket> timeline
 ) {
+
+    public AnalyticsOverviewResponse(
+            Instant sampledFrom,
+            Instant sampledTo,
+            int bucketMinutes,
+            long sampledRouteDecisionCount,
+            long sampledCacheHitCount,
+            long sampledActiveCacheReferenceCount,
+            long sampledUsageRecordCount,
+            long sampledFinalUsageRecordCount,
+            long sampledPartialUsageRecordCount,
+            long totalCacheHitTokens,
+            long totalCacheWriteTokens,
+            long totalSavedInputTokens,
+            List<BreakdownItem> providerBreakdown,
+            List<BreakdownItem> protocolBreakdown,
+            List<BreakdownItem> selectionSourceBreakdown,
+            List<BreakdownItem> modelGroupBreakdown,
+            List<BreakdownItem> cacheSourceBreakdown,
+            List<CountBreakdownItem> usageCompletenessBreakdown,
+            List<TimelineBucket> timeline) {
+        this(
+                sampledFrom,
+                sampledTo,
+                bucketMinutes,
+                sampledRouteDecisionCount,
+                sampledCacheHitCount,
+                sampledActiveCacheReferenceCount,
+                sampledUsageRecordCount,
+                sampledFinalUsageRecordCount,
+                sampledPartialUsageRecordCount,
+                totalCacheHitTokens,
+                totalCacheWriteTokens,
+                totalSavedInputTokens,
+                providerBreakdown,
+                protocolBreakdown,
+                selectionSourceBreakdown,
+                modelGroupBreakdown,
+                cacheSourceBreakdown,
+                usageCompletenessBreakdown,
+                List.of(),
+                timeline
+        );
+    }
 
     public record BreakdownItem(
             String key,
@@ -51,6 +96,27 @@ public record AnalyticsOverviewResponse(
     public record CountBreakdownItem(
             String key,
             long count
+    ) {
+    }
+
+    public record DistributedKeyUsageItem(
+            Long distributedKeyId,
+            String keyName,
+            String keyPrefix,
+            long routeDecisionCount,
+            long cacheHitCount,
+            long cacheHitTokens,
+            long cacheWriteTokens,
+            long savedInputTokens,
+            long usageRecordCount,
+            long finalUsageRecordCount,
+            long partialUsageRecordCount,
+            long promptTokens,
+            long completionTokens,
+            long totalTokens,
+            long failedRequestCount,
+            long avgLatencyMs,
+            double cacheHitRatio
     ) {
     }
 }

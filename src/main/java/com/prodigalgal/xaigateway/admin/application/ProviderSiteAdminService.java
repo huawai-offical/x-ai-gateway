@@ -114,6 +114,17 @@ public class ProviderSiteAdminService {
         return toResponse(upstreamSiteProfileRepository.save(entity));
     }
 
+    public void delete(Long id) {
+        UpstreamSiteProfileEntity entity = getRequired(id);
+        long linkedCredentialCount = upstreamCredentialRepository.countBySiteProfileIdAndDeletedFalse(id);
+        if (linkedCredentialCount > 0) {
+            throw new IllegalArgumentException("该站点档案仍有绑定凭证，请先解除绑定后再删除。");
+        }
+        siteModelCapabilityRepository.deleteAllBySiteProfile_Id(id);
+        siteCapabilitySnapshotRepository.findBySiteProfile_Id(id).ifPresent(siteCapabilitySnapshotRepository::delete);
+        upstreamSiteProfileRepository.delete(entity);
+    }
+
     public ProviderSiteResponse refreshCapabilities(Long id) {
         return refreshCapabilitiesInternal(getRequired(id));
     }

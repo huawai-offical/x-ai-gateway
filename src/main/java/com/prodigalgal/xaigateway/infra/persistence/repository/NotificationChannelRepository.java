@@ -7,4 +7,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface NotificationChannelRepository extends JpaRepository<NotificationChannelEntity, Long> {
 
     List<NotificationChannelEntity> findAllByOrderByCreatedAtDesc();
+
+    long countByWebhookEndpointId(Long webhookEndpointId);
 }

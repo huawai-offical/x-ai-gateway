@@ -13,6 +13,8 @@ import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
 import com.prodigalgal.xaigateway.infra.persistence.entity.RequestLogEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UsageRecordEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.RequestLogRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UsageRecordRepository;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -35,6 +37,8 @@ public class GatewayRequestLifecycleService {
     private final GatewayAuditLogService gatewayAuditLogService;
     private final MeterRegistry meterRegistry;
     private final ObjectMapper objectMapper;
+    private final UpstreamAccountRepository upstreamAccountRepository;
+    private final UpstreamCredentialRepository upstreamCredentialRepository;
     private final GatewayObservabilityAsyncPersistenceService asyncPersistenceService;
 
     @Autowired
@@ -44,12 +48,16 @@ public class GatewayRequestLifecycleService {
             GatewayAuditLogService gatewayAuditLogService,
             MeterRegistry meterRegistry,
             ObjectMapper objectMapper,
+            UpstreamAccountRepository upstreamAccountRepository,
+            UpstreamCredentialRepository upstreamCredentialRepository,
             GatewayObservabilityAsyncPersistenceService asyncPersistenceService) {
         this.requestLogRepository = requestLogRepository;
         this.usageRecordRepository = usageRecordRepository;
         this.gatewayAuditLogService = gatewayAuditLogService;
         this.meterRegistry = meterRegistry;
         this.objectMapper = objectMapper;
+        this.upstreamAccountRepository = upstreamAccountRepository;
+        this.upstreamCredentialRepository = upstreamCredentialRepository;
         this.asyncPersistenceService = asyncPersistenceService;
     }
 
@@ -58,8 +66,27 @@ public class GatewayRequestLifecycleService {
             UsageRecordRepository usageRecordRepository,
             GatewayAuditLogService gatewayAuditLogService,
             MeterRegistry meterRegistry,
+            ObjectMapper objectMapper,
+            GatewayObservabilityAsyncPersistenceService asyncPersistenceService) {
+        this(
+                requestLogRepository,
+                usageRecordRepository,
+                gatewayAuditLogService,
+                meterRegistry,
+                objectMapper,
+                null,
+                null,
+                asyncPersistenceService
+        );
+    }
+
+    public GatewayRequestLifecycleService(
+            RequestLogRepository requestLogRepository,
+            UsageRecordRepository usageRecordRepository,
+            GatewayAuditLogService gatewayAuditLogService,
+            MeterRegistry meterRegistry,
             ObjectMapper objectMapper) {
-        this(requestLogRepository, usageRecordRepository, gatewayAuditLogService, meterRegistry, objectMapper, null);
+        this(requestLogRepository, usageRecordRepository, gatewayAuditLogService, meterRegistry, objectMapper, null, null, null);
     }
 
     public void startRequest(
@@ -201,6 +228,18 @@ public class GatewayRequestLifecycleService {
             boolean stream,
             GatewayUsageView usage,
             Instant startedAt) {
+        completeRequest(requestId, selectionResult, request, stream, usage, startedAt, null, null);
+    }
+
+    public void completeRequest(
+            String requestId,
+            RouteSelectionResult selectionResult,
+            CanonicalRequest request,
+            boolean stream,
+            GatewayUsageView usage,
+            Instant startedAt,
+            Long accountId,
+            Long firstTokenLatencyMs) {
         finishRequest(
                 requestId,
                 selectionResult,
@@ -218,7 +257,9 @@ public class GatewayRequestLifecycleService {
                 null,
                 usage,
                 null,
-                startedAt
+                startedAt,
+                accountId,
+                firstTokenLatencyMs
         );
     }
 
@@ -230,7 +271,7 @@ public class GatewayRequestLifecycleService {
             boolean stream,
             GatewayUsageView usage,
             Instant startedAt) {
-        completeRequest(requestId, selectionResult, request, plan, stream, usage, null, startedAt);
+        completeRequest(requestId, selectionResult, request, plan, stream, usage, null, startedAt, null, null);
     }
 
     public void completeRequest(
@@ -242,6 +283,20 @@ public class GatewayRequestLifecycleService {
             GatewayUsageView usage,
             CanonicalResourceResponse canonicalResponse,
             Instant startedAt) {
+        completeRequest(requestId, selectionResult, request, plan, stream, usage, canonicalResponse, startedAt, null, null);
+    }
+
+    public void completeRequest(
+            String requestId,
+            RouteSelectionResult selectionResult,
+            CanonicalResourceRequest request,
+            CanonicalExecutionPlan plan,
+            boolean stream,
+            GatewayUsageView usage,
+            CanonicalResourceResponse canonicalResponse,
+            Instant startedAt,
+            Long accountId,
+            Long firstTokenLatencyMs) {
         finishRequest(
                 requestId,
                 selectionResult,
@@ -259,7 +314,9 @@ public class GatewayRequestLifecycleService {
                 null,
                 usage,
                 canonicalResponse,
-                startedAt
+                startedAt,
+                accountId,
+                firstTokenLatencyMs
         );
     }
 
@@ -305,12 +362,27 @@ public class GatewayRequestLifecycleService {
             Throwable error,
             GatewayUsageView usage,
             Instant startedAt) {
+        failRequest(requestId, selectionResult, request, stream, error, usage, startedAt, null, null);
+    }
+
+    public void failRequest(
+            String requestId,
+            RouteSelectionResult selectionResult,
+            CanonicalRequest request,
+            boolean stream,
+            Throwable error,
+            GatewayUsageView usage,
+            Instant startedAt,
+            Long accountId,
+            Long firstTokenLatencyMs) {
         finishRequest(requestId, selectionResult, request.requestPath(), null, null, null, null, null, null, null, stream, GatewayRequestStatus.FAILED,
                 error == null ? null : error.getClass().getSimpleName(),
                 error == null ? null : error.getMessage(),
                 usage,
                 null,
-                startedAt);
+                startedAt,
+                accountId,
+                firstTokenLatencyMs);
         gatewayAuditLogService.recordGatewayEvent(
                 requestId,
                 "REQUEST_FAILED",
@@ -333,6 +405,20 @@ public class GatewayRequestLifecycleService {
             Throwable error,
             GatewayUsageView usage,
             Instant startedAt) {
+        failRequest(requestId, selectionResult, request, plan, stream, error, usage, startedAt, null, null);
+    }
+
+    public void failRequest(
+            String requestId,
+            RouteSelectionResult selectionResult,
+            CanonicalResourceRequest request,
+            CanonicalExecutionPlan plan,
+            boolean stream,
+            Throwable error,
+            GatewayUsageView usage,
+            Instant startedAt,
+            Long accountId,
+            Long firstTokenLatencyMs) {
         finishRequest(
                 requestId,
                 selectionResult,
@@ -350,7 +436,9 @@ public class GatewayRequestLifecycleService {
                 error == null ? null : error.getMessage(),
                 usage,
                 null,
-                startedAt
+                startedAt,
+                accountId,
+                firstTokenLatencyMs
         );
     }
 
@@ -394,12 +482,26 @@ public class GatewayRequestLifecycleService {
             boolean stream,
             GatewayUsageView usage,
             Instant startedAt) {
+        cancelRequest(requestId, selectionResult, request, stream, usage, startedAt, null, null);
+    }
+
+    public void cancelRequest(
+            String requestId,
+            RouteSelectionResult selectionResult,
+            CanonicalRequest request,
+            boolean stream,
+            GatewayUsageView usage,
+            Instant startedAt,
+            Long accountId,
+            Long firstTokenLatencyMs) {
         finishRequest(requestId, selectionResult, request.requestPath(), null, null, null, null, null, null, null, stream, GatewayRequestStatus.CANCELED,
                 "CLIENT_CANCELLED",
                 "Request stream cancelled by client",
                 usage,
                 null,
-                startedAt);
+                startedAt,
+                accountId,
+                firstTokenLatencyMs);
         gatewayAuditLogService.recordGatewayEvent(
                 requestId,
                 "REQUEST_CANCELLED",
@@ -429,7 +531,9 @@ public class GatewayRequestLifecycleService {
             String errorMessage,
             GatewayUsageView usage,
             CanonicalResourceResponse canonicalResponse,
-            Instant startedAt) {
+            Instant startedAt,
+            Long accountId,
+            Long firstTokenLatencyMs) {
         Instant completedAt = Instant.now();
         long durationMs = Duration.between(startedAt, completedAt).toMillis();
         GatewayObservabilityAsyncPersistenceService.RequestLogSnapshot snapshot =
@@ -482,6 +586,15 @@ public class GatewayRequestLifecycleService {
                 usage
         );
         recordMetrics(selectionResult, requestPath, stream, status, usage, durationMs);
+        recordCredentialMetrics(
+                selectionResult.selectedCandidate().candidate().credentialId(),
+                status,
+                usage,
+                durationMs,
+                firstTokenLatencyMs,
+                completedAt
+        );
+        recordAccountMetrics(accountId, status, usage, durationMs, firstTokenLatencyMs, completedAt);
     }
 
     private void finishRequestWithoutSelection(
@@ -762,6 +875,99 @@ public class GatewayRequestLifecycleService {
                 .tags(tags)
                 .register(meterRegistry)
                 .record(usage.cacheWriteTokens());
+    }
+
+    private void recordCredentialMetrics(
+            Long credentialId,
+            GatewayRequestStatus status,
+            GatewayUsageView usage,
+            long durationMs,
+            Long firstTokenLatencyMs,
+            Instant completedAt) {
+        if (credentialId == null || upstreamCredentialRepository == null) {
+            return;
+        }
+        upstreamCredentialRepository.findById(credentialId).ifPresent(credential -> {
+            if (credential.isDeleted()) {
+                return;
+            }
+            credential.setTotalRequestCount(credential.getTotalRequestCount() + 1);
+            switch (status) {
+                case COMPLETED -> credential.setSuccessfulRequestCount(credential.getSuccessfulRequestCount() + 1);
+                case FAILED -> credential.setFailedRequestCount(credential.getFailedRequestCount() + 1);
+                case CANCELED -> credential.setCanceledRequestCount(credential.getCanceledRequestCount() + 1);
+                default -> {
+                }
+            }
+
+            long safeDuration = Math.max(0L, durationMs);
+            credential.setTotalDurationMs(credential.getTotalDurationMs() + safeDuration);
+            credential.setDurationSampleCount(credential.getDurationSampleCount() + 1);
+
+            if (usage != null) {
+                credential.setTotalTokenCount(credential.getTotalTokenCount() + Math.max(usage.totalTokens(), 0));
+                credential.setTotalCacheHitTokenCount(credential.getTotalCacheHitTokenCount() + Math.max(usage.cacheHitTokens(), 0));
+                credential.setTotalCacheWriteTokenCount(credential.getTotalCacheWriteTokenCount() + Math.max(usage.cacheWriteTokens(), 0));
+                credential.setTotalSavedInputTokenCount(credential.getTotalSavedInputTokenCount() + Math.max(usage.savedInputTokens(), 0));
+            }
+
+            if (firstTokenLatencyMs != null && firstTokenLatencyMs >= 0) {
+                long ttft = firstTokenLatencyMs;
+                credential.setTotalFirstTokenMs(credential.getTotalFirstTokenMs() + ttft);
+                credential.setFirstTokenSampleCount(credential.getFirstTokenSampleCount() + 1);
+                credential.setLastFirstTokenMs(ttft);
+                credential.setMinFirstTokenMs(credential.getMinFirstTokenMs() == null ? ttft : Math.min(credential.getMinFirstTokenMs(), ttft));
+                credential.setMaxFirstTokenMs(credential.getMaxFirstTokenMs() == null ? ttft : Math.max(credential.getMaxFirstTokenMs(), ttft));
+            }
+
+            credential.setLastUsedAt(completedAt);
+            upstreamCredentialRepository.save(credential);
+        });
+    }
+
+    private void recordAccountMetrics(
+            Long accountId,
+            GatewayRequestStatus status,
+            GatewayUsageView usage,
+            long durationMs,
+            Long firstTokenLatencyMs,
+            Instant completedAt) {
+        if (accountId == null || upstreamAccountRepository == null) {
+            return;
+        }
+        upstreamAccountRepository.findById(accountId).ifPresent(account -> {
+            account.setTotalRequestCount(account.getTotalRequestCount() + 1);
+            switch (status) {
+                case COMPLETED -> account.setSuccessfulRequestCount(account.getSuccessfulRequestCount() + 1);
+                case FAILED -> account.setFailedRequestCount(account.getFailedRequestCount() + 1);
+                case CANCELED -> account.setCanceledRequestCount(account.getCanceledRequestCount() + 1);
+                default -> {
+                }
+            }
+
+            long safeDuration = Math.max(0L, durationMs);
+            account.setTotalDurationMs(account.getTotalDurationMs() + safeDuration);
+            account.setDurationSampleCount(account.getDurationSampleCount() + 1);
+
+            if (usage != null) {
+                account.setTotalTokenCount(account.getTotalTokenCount() + Math.max(usage.totalTokens(), 0));
+                account.setTotalCacheHitTokenCount(account.getTotalCacheHitTokenCount() + Math.max(usage.cacheHitTokens(), 0));
+                account.setTotalCacheWriteTokenCount(account.getTotalCacheWriteTokenCount() + Math.max(usage.cacheWriteTokens(), 0));
+                account.setTotalSavedInputTokenCount(account.getTotalSavedInputTokenCount() + Math.max(usage.savedInputTokens(), 0));
+            }
+
+            if (firstTokenLatencyMs != null && firstTokenLatencyMs >= 0) {
+                long ttft = firstTokenLatencyMs;
+                account.setTotalFirstTokenMs(account.getTotalFirstTokenMs() + ttft);
+                account.setFirstTokenSampleCount(account.getFirstTokenSampleCount() + 1);
+                account.setLastFirstTokenMs(ttft);
+                account.setMinFirstTokenMs(account.getMinFirstTokenMs() == null ? ttft : Math.min(account.getMinFirstTokenMs(), ttft));
+                account.setMaxFirstTokenMs(account.getMaxFirstTokenMs() == null ? ttft : Math.max(account.getMaxFirstTokenMs(), ttft));
+            }
+
+            account.setLastUsedAt(completedAt);
+            upstreamAccountRepository.save(account);
+        });
     }
 
     private String cacheKind(GatewayUsageView usage) {

@@ -392,7 +392,9 @@ public class GatewayResourceExecutionService {
                             false,
                             GatewayUsageView.empty(),
                             result.canonicalResponse(),
-                            startedAt
+                            startedAt,
+                            context.credentialMaterial() == null ? null : context.credentialMaterial().accountId(),
+                            null
                     );
                     return result;
                 } catch (RuntimeException exception) {
@@ -417,7 +419,9 @@ public class GatewayResourceExecutionService {
                                 false,
                                 exception,
                                 GatewayUsageView.empty(),
-                                startedAt
+                                startedAt,
+                                context.credentialMaterial() == null ? null : context.credentialMaterial().accountId(),
+                                null
                         );
                         throw exception;
                     }
@@ -552,7 +556,9 @@ public class GatewayResourceExecutionService {
                             false,
                             GatewayUsageView.empty(),
                             result.canonicalResponse(),
-                            startedAt
+                            startedAt,
+                            context.credentialMaterial() == null ? null : context.credentialMaterial().accountId(),
+                            null
                     );
                     return result;
                 } catch (RuntimeException exception) {
@@ -577,7 +583,9 @@ public class GatewayResourceExecutionService {
                                 false,
                                 exception,
                                 GatewayUsageView.empty(),
-                                startedAt
+                                startedAt,
+                                context.credentialMaterial() == null ? null : context.credentialMaterial().accountId(),
+                                null
                         );
                         throw exception;
                     }
@@ -759,7 +767,9 @@ public class GatewayResourceExecutionService {
                                 true,
                                 GatewayUsageView.empty(),
                                 result.canonicalResponse(),
-                                startedAt
+                                startedAt,
+                                context.credentialMaterial() == null ? null : context.credentialMaterial().accountId(),
+                                null
                         );
                     }
                     return Mono.just(result);
@@ -800,7 +810,9 @@ public class GatewayResourceExecutionService {
                             true,
                             error,
                             GatewayUsageView.empty(),
-                            startedAt
+                            startedAt,
+                            context.credentialMaterial() == null ? null : context.credentialMaterial().accountId(),
+                            null
                     );
                     return Mono.error(error);
                 });

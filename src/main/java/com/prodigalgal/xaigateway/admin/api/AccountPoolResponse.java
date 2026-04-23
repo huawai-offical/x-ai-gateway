@@ -12,6 +12,10 @@ public record AccountPoolResponse(
         List<String> supportedProtocols,
         List<String> allowedClientFamilies,
         String description,
+        boolean defaultPool,
+        long oauthAccountCount,
+        long apiCredentialCount,
+        long totalAccountCount,
         boolean active,
         Instant createdAt,
         Instant updatedAt

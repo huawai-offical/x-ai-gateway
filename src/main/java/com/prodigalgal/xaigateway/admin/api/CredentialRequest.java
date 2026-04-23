@@ -4,6 +4,7 @@ import com.prodigalgal.xaigateway.gateway.core.credential.CredentialAuthKind;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import java.util.List;
 import java.util.Map;
 
 public record CredentialRequest(
@@ -20,7 +21,9 @@ public record CredentialRequest(
         Boolean active,
         Long proxyId,
         Long tlsFingerprintProfileId,
-        Long siteProfileId
+        Long siteProfileId,
+        Long poolId,
+        List<String> supportedModels
 ) {
     public String resolvedSecret() {
         if (secret != null && !secret.isBlank()) {
@@ -35,5 +38,9 @@ public record CredentialRequest(
 
     public Map<String, Object> resolvedCredentialMetadata() {
         return credentialMetadata == null ? Map.of() : Map.copyOf(credentialMetadata);
+    }
+
+    public List<String> resolvedSupportedModels() {
+        return supportedModels == null ? List.of() : List.copyOf(supportedModels);
     }
 }

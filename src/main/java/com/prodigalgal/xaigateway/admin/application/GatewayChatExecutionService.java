@@ -56,6 +56,7 @@ import com.prodigalgal.xaigateway.protocol.ingress.google.GeminiGenerateContentR
 import com.prodigalgal.xaigateway.protocol.ingress.openai.OpenAiChatCompletionRequest;
 import com.prodigalgal.xaigateway.protocol.ingress.openai.OpenAiChatCompletionRequestMapper;
 import com.prodigalgal.xaigateway.protocol.ingress.openai.OpenAiResponsesRequestMapper;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -217,7 +218,9 @@ public class GatewayChatExecutionService {
                             request,
                             false,
                             usageView,
-                            startedAt
+                            startedAt,
+                            credentialMaterial.accountId(),
+                            null
                     );
                     return new CanonicalExecutionResult(requestId, finalSelection, executionPlanCompilation.canonicalPlan(), enriched);
                 } catch (RuntimeException exception) {
@@ -241,7 +244,9 @@ public class GatewayChatExecutionService {
                                 false,
                                 exception,
                                 GatewayUsageView.empty(),
-                                startedAt
+                                startedAt,
+                                credentialMaterial.accountId(),
+                                null
                         );
                         throw exception;
                     }
@@ -277,6 +282,8 @@ public class GatewayChatExecutionService {
         AtomicBoolean terminalRecorded = new AtomicBoolean(false);
         AtomicReference<RouteSelectionResult> finalSelectionRef = new AtomicReference<>(selectionResult);
         AtomicReference<CanonicalExecutionPlan> planRef = new AtomicReference<>();
+        AtomicReference<Long> selectedAccountIdRef = new AtomicReference<>(null);
+        AtomicReference<Long> firstTokenLatencyMsRef = new AtomicReference<>(null);
         List<RouteExecutionAttempt> attempts = new java.util.concurrent.CopyOnWriteArrayList<>();
         int maxAttempts = Math.min(selectionResult.candidates().size(), gatewayProperties.getRouting().getMaxFallbackAttempts());
         Flux<CanonicalStreamEvent> chunks = streamAttempt(
@@ -289,7 +296,10 @@ public class GatewayChatExecutionService {
                         maxAttempts,
                         attempts,
                         finalSelectionRef,
-                        planRef
+                        planRef,
+                        selectedAccountIdRef,
+                        firstTokenLatencyMsRef,
+                        startedAt
                 )
                 .doOnNext(event -> {
                     if (event.usage() != null && event.usage().present()) {
@@ -299,7 +309,17 @@ public class GatewayChatExecutionService {
                         GatewayUsageView usageView = terminalUsageView(event.usage(), lastVisibleUsage.get());
                         RouteSelectionResult finalSelection = finalSelectionRef.get().withAttempts(List.copyOf(attempts));
                         gatewayObservabilityService.recordRouteDecision(requestId, finalSelection);
-                        recordTerminalUsage(requestId, finalSelection, request, startedAt, usageView, event.usage(), lastVisibleUsage.get());
+                        recordTerminalUsage(
+                                requestId,
+                                finalSelection,
+                                request,
+                                startedAt,
+                                usageView,
+                                event.usage(),
+                                lastVisibleUsage.get(),
+                                selectedAccountIdRef.get(),
+                                firstTokenLatencyMsRef.get()
+                        );
                         terminalRecorded.set(true);
                     }
                 })
@@ -308,7 +328,17 @@ public class GatewayChatExecutionService {
                         GatewayUsageView usageView = terminalUsageView(null, lastVisibleUsage.get());
                         RouteSelectionResult finalSelection = finalSelectionRef.get().withAttempts(List.copyOf(attempts));
                         gatewayObservabilityService.recordRouteDecision(requestId, finalSelection);
-                        recordTerminalUsage(requestId, finalSelection, request, startedAt, usageView, null, lastVisibleUsage.get());
+                        recordTerminalUsage(
+                                requestId,
+                                finalSelection,
+                                request,
+                                startedAt,
+                                usageView,
+                                null,
+                                lastVisibleUsage.get(),
+                                selectedAccountIdRef.get(),
+                                firstTokenLatencyMsRef.get()
+                        );
                     }
                 })
                 .doOnError(error -> {
@@ -322,7 +352,9 @@ public class GatewayChatExecutionService {
                             true,
                             error,
                             terminalUsageView(null, lastVisibleUsage.get()),
-                            startedAt
+                            startedAt,
+                            selectedAccountIdRef.get(),
+                            firstTokenLatencyMsRef.get()
                     );
                 })
                 .doOnCancel(() -> {
@@ -335,7 +367,9 @@ public class GatewayChatExecutionService {
                             request,
                             true,
                             terminalUsageView(null, lastVisibleUsage.get()),
-                            startedAt
+                            startedAt,
+                            selectedAccountIdRef.get(),
+                            firstTokenLatencyMsRef.get()
                     );
                 })
                 .doFinally(signalType -> distributedKeyGovernanceService.releaseConcurrency(selectionResult.governanceReservationKey()));
@@ -353,13 +387,17 @@ public class GatewayChatExecutionService {
             int maxAttempts,
             List<RouteExecutionAttempt> attempts,
             AtomicReference<RouteSelectionResult> finalSelectionRef,
-            AtomicReference<CanonicalExecutionPlan> planRef) {
+            AtomicReference<CanonicalExecutionPlan> planRef,
+            AtomicReference<Long> selectedAccountIdRef,
+            AtomicReference<Long> firstTokenLatencyMsRef,
+            Instant startedAt) {
         RouteCandidateView candidate = baseSelection.candidates().get(candidateIndex);
         RouteSelectionResult candidateSelection = selectionForCandidate(baseSelection, candidate, attempts);
         finalSelectionRef.set(candidateSelection);
 
         UpstreamCredentialEntity credential = getRequiredCredential(candidate.candidate().credentialId());
         ResolvedCredentialMaterial credentialMaterial = credentialMaterialResolver.resolve(candidateSelection, credential);
+        selectedAccountIdRef.set(credentialMaterial.accountId());
         CanonicalExecutionPlanCompilation executionPlanCompilation = translationExecutionPlanCompiler.compileSelected(
                 candidateSelection,
                 request,
@@ -380,6 +418,7 @@ public class GatewayChatExecutionService {
                 ))
                 .doOnNext(event -> {
                     if (isVisibleStreamEvent(event)) {
+                        firstTokenLatencyMsRef.compareAndSet(null, Duration.between(startedAt, Instant.now()).toMillis());
                         firstOutputCommitted.set(true);
                     }
                     if (event.terminal() && successRecorded.compareAndSet(false, true)) {
@@ -436,7 +475,10 @@ public class GatewayChatExecutionService {
                                 maxAttempts,
                                 attempts,
                                 finalSelectionRef,
-                                planRef
+                                planRef,
+                                selectedAccountIdRef,
+                                firstTokenLatencyMsRef,
+                                startedAt
                         );
                     }
                     return Flux.error(error);
@@ -450,7 +492,9 @@ public class GatewayChatExecutionService {
             Instant startedAt,
             GatewayUsageView usageView,
             CanonicalUsage terminalUsage,
-            CanonicalUsage lastVisibleUsage) {
+            CanonicalUsage lastVisibleUsage,
+            Long accountId,
+            Long firstTokenLatencyMs) {
         GatewayUsage usageForLog = terminalUsage != null && terminalUsage.present()
                 ? toGatewayUsage(terminalUsage)
                 : toGatewayUsage(lastVisibleUsage);
@@ -469,7 +513,9 @@ public class GatewayChatExecutionService {
                 request,
                 true,
                 usageView,
-                startedAt
+                startedAt,
+                accountId,
+                firstTokenLatencyMs
         );
     }
 

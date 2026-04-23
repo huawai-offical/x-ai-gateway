@@ -3,6 +3,7 @@ package com.prodigalgal.xaigateway.admin.application;
 import com.prodigalgal.xaigateway.admin.api.MaintenanceWindowRequest;
 import com.prodigalgal.xaigateway.admin.api.MaintenanceWindowResponse;
 import com.prodigalgal.xaigateway.infra.persistence.entity.MaintenanceWindowEntity;
+import com.prodigalgal.xaigateway.infra.persistence.repository.ChangePlanRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.MaintenanceWindowRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,9 +16,13 @@ import java.util.List;
 public class MaintenanceWindowService {
 
     private final MaintenanceWindowRepository maintenanceWindowRepository;
+    private final ChangePlanRepository changePlanRepository;
 
-    public MaintenanceWindowService(MaintenanceWindowRepository maintenanceWindowRepository) {
+    public MaintenanceWindowService(
+            MaintenanceWindowRepository maintenanceWindowRepository,
+            ChangePlanRepository changePlanRepository) {
         this.maintenanceWindowRepository = maintenanceWindowRepository;
+        this.changePlanRepository = changePlanRepository;
     }
 
     @Transactional(readOnly = true)
@@ -40,6 +45,16 @@ public class MaintenanceWindowService {
         entity.setEnabled(request.enabled() == null || request.enabled());
         entity.setDescription(request.description());
         return toResponse(maintenanceWindowRepository.save(entity), Instant.now());
+    }
+
+    public void delete(Long id) {
+        MaintenanceWindowEntity entity = maintenanceWindowRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("未找到维护窗口。"));
+        long planCount = changePlanRepository.countByMaintenanceWindowId(id);
+        if (planCount > 0) {
+            throw new IllegalArgumentException("该维护窗口仍被变更计划引用，请先调整相关计划。");
+        }
+        maintenanceWindowRepository.delete(entity);
     }
 
     @Transactional(readOnly = true)

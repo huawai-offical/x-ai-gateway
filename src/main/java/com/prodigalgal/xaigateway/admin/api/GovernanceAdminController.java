@@ -3,6 +3,7 @@ package com.prodigalgal.xaigateway.admin.api;
 import com.prodigalgal.xaigateway.admin.application.GovernanceAdminService;
 import jakarta.validation.Valid;
 import java.util.List;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -37,6 +38,11 @@ public class GovernanceAdminController {
         return governanceAdminService.saveRouteGuard(id, request);
     }
 
+    @DeleteMapping("/policies/route-guards/{id}")
+    public void deleteRouteGuard(@PathVariable Long id) {
+        governanceAdminService.deleteRouteGuard(id);
+    }
+
     @GetMapping("/policies/auto-actions")
     public List<AutoActionRuleResponse> listAutoActions() {
         return governanceAdminService.listAutoActions();
@@ -50,6 +56,11 @@ public class GovernanceAdminController {
     @PutMapping("/policies/auto-actions/{id}")
     public AutoActionRuleResponse updateAutoAction(@PathVariable Long id, @Valid @RequestBody AutoActionRuleRequest request) {
         return governanceAdminService.saveAutoAction(id, request);
+    }
+
+    @DeleteMapping("/policies/auto-actions/{id}")
+    public void deleteAutoAction(@PathVariable Long id) {
+        governanceAdminService.deleteAutoAction(id);
     }
 
     @GetMapping("/quarantines")

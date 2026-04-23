@@ -11,6 +11,7 @@ import com.prodigalgal.xaigateway.infra.persistence.entity.TlsFingerprintProfile
 import com.prodigalgal.xaigateway.infra.persistence.repository.NetworkProxyProbeResultRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.NetworkProxyRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.TlsFingerprintProfileRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,14 +27,17 @@ public class NetworkGovernanceService {
     private final NetworkProxyRepository networkProxyRepository;
     private final NetworkProxyProbeResultRepository networkProxyProbeResultRepository;
     private final TlsFingerprintProfileRepository tlsFingerprintProfileRepository;
+    private final UpstreamAccountRepository upstreamAccountRepository;
 
     public NetworkGovernanceService(
             NetworkProxyRepository networkProxyRepository,
             NetworkProxyProbeResultRepository networkProxyProbeResultRepository,
-            TlsFingerprintProfileRepository tlsFingerprintProfileRepository) {
+            TlsFingerprintProfileRepository tlsFingerprintProfileRepository,
+            UpstreamAccountRepository upstreamAccountRepository) {
         this.networkProxyRepository = networkProxyRepository;
         this.networkProxyProbeResultRepository = networkProxyProbeResultRepository;
         this.tlsFingerprintProfileRepository = tlsFingerprintProfileRepository;
+        this.upstreamAccountRepository = upstreamAccountRepository;
     }
 
     @Transactional(readOnly = true)
@@ -50,6 +54,16 @@ public class NetworkGovernanceService {
         entity.setDescription(request.description());
         entity.setActive(request.active() == null || request.active());
         return toResponse(networkProxyRepository.save(entity));
+    }
+
+    public void deleteProxy(Long id) {
+        NetworkProxyEntity entity = networkProxyRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("未找到代理。"));
+        long bindingCount = upstreamAccountRepository.countByProxyId(id);
+        if (bindingCount > 0) {
+            throw new IllegalArgumentException("该代理仍被上游账号引用，请先解除账号绑定。");
+        }
+        networkProxyRepository.delete(entity);
     }
 
     public ProxyProbeResultResponse probe(Long proxyId) {
@@ -102,6 +116,16 @@ public class NetworkGovernanceService {
         entity.setDescription(request.description());
         entity.setActive(request.active() == null || request.active());
         return toTlsResponse(tlsFingerprintProfileRepository.save(entity));
+    }
+
+    public void deleteTlsProfile(Long id) {
+        TlsFingerprintProfileEntity entity = tlsFingerprintProfileRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("未找到 TLS 指纹画像。"));
+        long bindingCount = upstreamAccountRepository.countByTlsFingerprintProfileId(id);
+        if (bindingCount > 0) {
+            throw new IllegalArgumentException("该 TLS 指纹画像仍被上游账号引用，请先解除账号绑定。");
+        }
+        tlsFingerprintProfileRepository.delete(entity);
     }
 
     private ProxyResponse toResponse(NetworkProxyEntity entity) {

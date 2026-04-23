@@ -33,9 +33,72 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ProviderSiteAdminServiceTests {
+
+    @Test
+    void shouldRejectDeletingSiteWithLinkedCredentials() {
+        UpstreamSiteProfileRepository profileRepository = Mockito.mock(UpstreamSiteProfileRepository.class);
+        SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        SiteModelCapabilityRepository modelCapabilityRepository = Mockito.mock(SiteModelCapabilityRepository.class);
+        UpstreamCredentialRepository credentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        ProviderSiteRegistryService providerSiteRegistryService = Mockito.mock(ProviderSiteRegistryService.class);
+        CredentialModelDiscoveryService credentialModelDiscoveryService = Mockito.mock(CredentialModelDiscoveryService.class);
+        SiteCapabilityTruthService truthService = Mockito.mock(SiteCapabilityTruthService.class);
+
+        ProviderSiteAdminService service = new ProviderSiteAdminService(
+                profileRepository,
+                snapshotRepository,
+                modelCapabilityRepository,
+                credentialRepository,
+                providerSiteRegistryService,
+                credentialModelDiscoveryService,
+                truthService
+        );
+
+        UpstreamSiteProfileEntity site = sampleSite(1L, "OPENAI_DIRECT", true);
+        Mockito.when(profileRepository.findById(1L)).thenReturn(Optional.of(site));
+        Mockito.when(credentialRepository.countBySiteProfileIdAndDeletedFalse(1L)).thenReturn(1L);
+
+        assertThrows(IllegalArgumentException.class, () -> service.delete(1L));
+        Mockito.verify(profileRepository, Mockito.never()).delete(site);
+        Mockito.verify(modelCapabilityRepository, Mockito.never()).deleteAllBySiteProfile_Id(1L);
+    }
+
+    @Test
+    void shouldDeleteSiteAndCleanCapabilityData() {
+        UpstreamSiteProfileRepository profileRepository = Mockito.mock(UpstreamSiteProfileRepository.class);
+        SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        SiteModelCapabilityRepository modelCapabilityRepository = Mockito.mock(SiteModelCapabilityRepository.class);
+        UpstreamCredentialRepository credentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        ProviderSiteRegistryService providerSiteRegistryService = Mockito.mock(ProviderSiteRegistryService.class);
+        CredentialModelDiscoveryService credentialModelDiscoveryService = Mockito.mock(CredentialModelDiscoveryService.class);
+        SiteCapabilityTruthService truthService = Mockito.mock(SiteCapabilityTruthService.class);
+
+        ProviderSiteAdminService service = new ProviderSiteAdminService(
+                profileRepository,
+                snapshotRepository,
+                modelCapabilityRepository,
+                credentialRepository,
+                providerSiteRegistryService,
+                credentialModelDiscoveryService,
+                truthService
+        );
+
+        UpstreamSiteProfileEntity site = sampleSite(1L, "OPENAI_DIRECT", true);
+        SiteCapabilitySnapshotEntity snapshot = sampleSnapshot(site);
+        Mockito.when(profileRepository.findById(1L)).thenReturn(Optional.of(site));
+        Mockito.when(credentialRepository.countBySiteProfileIdAndDeletedFalse(1L)).thenReturn(0L);
+        Mockito.when(snapshotRepository.findBySiteProfile_Id(1L)).thenReturn(Optional.of(snapshot));
+
+        service.delete(1L);
+
+        Mockito.verify(modelCapabilityRepository).deleteAllBySiteProfile_Id(1L);
+        Mockito.verify(snapshotRepository).delete(snapshot);
+        Mockito.verify(profileRepository).delete(site);
+    }
 
     @Test
     void shouldProjectStreamFallbackAndCooldownSummary() {

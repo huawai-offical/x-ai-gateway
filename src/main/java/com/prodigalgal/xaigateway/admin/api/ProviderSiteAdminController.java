@@ -4,6 +4,7 @@ import com.prodigalgal.xaigateway.admin.application.ProviderSiteAdminService;
 import com.prodigalgal.xaigateway.admin.application.ProviderSiteDossierService;
 import jakarta.validation.Valid;
 import java.util.List;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -50,6 +51,11 @@ public class ProviderSiteAdminController {
     @PutMapping("/{id}")
     public ProviderSiteResponse update(@PathVariable Long id, @Valid @RequestBody ProviderSiteRequest request) {
         return providerSiteAdminService.update(id, request);
+    }
+
+    @DeleteMapping("/{id}")
+    public void delete(@PathVariable Long id) {
+        providerSiteAdminService.delete(id);
     }
 
     @PostMapping("/{id}/refresh-capabilities")

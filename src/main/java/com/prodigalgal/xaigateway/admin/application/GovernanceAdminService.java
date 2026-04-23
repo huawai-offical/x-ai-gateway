@@ -114,6 +114,13 @@ public class GovernanceAdminService {
         return toRouteGuardResponse(saved);
     }
 
+    public void deleteRouteGuard(Long id) {
+        RouteGuardPolicyEntity entity = routeGuardPolicyRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("未找到治理规则。"));
+        routeGuardPolicyRepository.delete(entity);
+        opsAuditService.record("GOVERNANCE", "ROUTE_GUARD_DELETED", "ROUTE_GUARD", String.valueOf(id), null);
+    }
+
     @Transactional(readOnly = true)
     public List<AutoActionRuleResponse> listAutoActions() {
         return autoActionRuleRepository.findAllByOrderByCreatedAtDesc().stream()
@@ -140,6 +147,13 @@ public class GovernanceAdminService {
                 "actionType", saved.getActionType().name()
         )));
         return toAutoActionResponse(saved);
+    }
+
+    public void deleteAutoAction(Long id) {
+        AutoActionRuleEntity entity = autoActionRuleRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("未找到自动动作规则。"));
+        autoActionRuleRepository.delete(entity);
+        opsAuditService.record("GOVERNANCE", "AUTO_ACTION_DELETED", "AUTO_ACTION_RULE", String.valueOf(id), null);
     }
 
     @Transactional(readOnly = true)

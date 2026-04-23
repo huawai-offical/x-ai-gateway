@@ -93,6 +93,11 @@ class AnalyticsQueryServiceTests {
                 item.key().equals("GEMINI_DIRECT")
                         && item.count() == 0
                         && item.cacheHitTokens() == 700));
+        assertEquals(1L, response.distributedKeyBreakdown().get(0).distributedKeyId());
+        assertEquals(2, response.distributedKeyBreakdown().get(0).routeDecisionCount());
+        assertEquals(2, response.distributedKeyBreakdown().get(0).cacheHitCount());
+        assertEquals(1100, response.distributedKeyBreakdown().get(0).totalTokens());
+        assertEquals(730, response.distributedKeyBreakdown().get(0).avgLatencyMs());
     }
 
     private UsageRecordEntity usageRecord(
@@ -105,8 +110,11 @@ class AnalyticsQueryServiceTests {
         entity.setProtocol("openai");
         entity.setRequestPath("/v1/chat/completions");
         entity.setModelGroup("gpt-4o");
+        entity.setDistributedKeyId(1L);
         entity.setProviderType(ProviderType.OPENAI_DIRECT);
         entity.setCredentialId(101L);
+        entity.setPromptTokens(totalTokens / 2);
+        entity.setCompletionTokens(totalTokens / 2);
         ReflectionTestUtils.setField(entity, "createdAt", createdAt);
         return entity;
     }

@@ -11,4 +11,6 @@ public interface ChangePlanRepository extends JpaRepository<ChangePlanEntity, Lo
     List<ChangePlanEntity> findTop200ByOrderByCreatedAtDesc();
 
     boolean existsByStatusIn(Collection<String> statuses);
+
+    long countByMaintenanceWindowId(Long maintenanceWindowId);
 }

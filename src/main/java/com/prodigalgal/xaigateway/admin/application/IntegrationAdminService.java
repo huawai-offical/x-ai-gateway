@@ -84,6 +84,16 @@ public class IntegrationAdminService {
         return toWebhookResponse(webhookEndpointRepository.save(entity));
     }
 
+    public void deleteWebhook(Long id) {
+        WebhookEndpointEntity entity = webhookEndpointRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("未找到 webhook endpoint。"));
+        long bindingCount = notificationChannelRepository.countByWebhookEndpointId(id);
+        if (bindingCount > 0) {
+            throw new IllegalArgumentException("该 webhook endpoint 仍被通知通道引用，请先解除关联或删除相关通道。");
+        }
+        webhookEndpointRepository.delete(entity);
+    }
+
     @Transactional(readOnly = true)
     public List<NotificationChannelResponse> listChannels() {
         return notificationChannelRepository.findAllByOrderByCreatedAtDesc().stream().map(this::toChannelResponse).toList();
@@ -104,6 +114,16 @@ public class IntegrationAdminService {
         return toChannelResponse(notificationChannelRepository.save(entity));
     }
 
+    public void deleteChannel(Long id) {
+        NotificationChannelEntity entity = notificationChannelRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("未找到 notification channel。"));
+        long subscriptionCount = outboundEventSubscriptionRepository.countByChannelId(id);
+        if (subscriptionCount > 0) {
+            throw new IllegalArgumentException("该通知通道仍被订阅规则引用，请先删除相关订阅。");
+        }
+        notificationChannelRepository.delete(entity);
+    }
+
     @Transactional(readOnly = true)
     public List<RunbookLinkResponse> listRunbooks() {
         return runbookLinkService.list();
@@ -111,6 +131,10 @@ public class IntegrationAdminService {
 
     public RunbookLinkResponse saveRunbook(Long id, RunbookLinkRequest request) {
         return runbookLinkService.save(id, request);
+    }
+
+    public void deleteRunbook(Long id) {
+        runbookLinkService.delete(id);
     }
 
     @Transactional(readOnly = true)
@@ -133,6 +157,12 @@ public class IntegrationAdminService {
         entity.setSiteProfileId(request.siteProfileId());
         entity.setEnabled(request.enabled() == null || request.enabled());
         return toSubscriptionResponse(outboundEventSubscriptionRepository.save(entity));
+    }
+
+    public void deleteSubscription(Long id) {
+        OutboundEventSubscriptionEntity entity = outboundEventSubscriptionRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("未找到 outbound subscription。"));
+        outboundEventSubscriptionRepository.delete(entity);
     }
 
     @Transactional(readOnly = true)

@@ -110,4 +110,31 @@ class IntegrationAdminControllerTests {
                 .expectBody()
                 .jsonPath("$.responseSummary").isEqualTo("resent");
     }
+
+    @Test
+    void shouldDeleteIntegrationResources() {
+        webTestClient.delete()
+                .uri("/admin/integrations/webhooks/1")
+                .exchange()
+                .expectStatus().isOk();
+        Mockito.verify(integrationAdminService).deleteWebhook(1L);
+
+        webTestClient.delete()
+                .uri("/admin/integrations/channels/2")
+                .exchange()
+                .expectStatus().isOk();
+        Mockito.verify(integrationAdminService).deleteChannel(2L);
+
+        webTestClient.delete()
+                .uri("/admin/integrations/runbooks/3")
+                .exchange()
+                .expectStatus().isOk();
+        Mockito.verify(integrationAdminService).deleteRunbook(3L);
+
+        webTestClient.delete()
+                .uri("/admin/integrations/subscriptions/4")
+                .exchange()
+                .expectStatus().isOk();
+        Mockito.verify(integrationAdminService).deleteSubscription(4L);
+    }
 }

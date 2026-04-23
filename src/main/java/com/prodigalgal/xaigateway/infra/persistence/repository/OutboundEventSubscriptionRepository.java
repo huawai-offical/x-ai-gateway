@@ -9,4 +9,6 @@ public interface OutboundEventSubscriptionRepository extends JpaRepository<Outbo
     List<OutboundEventSubscriptionEntity> findAllByEnabledTrueOrderByCreatedAtDesc();
 
     List<OutboundEventSubscriptionEntity> findAllByOrderByCreatedAtDesc();
+
+    long countByChannelId(Long channelId);
 }

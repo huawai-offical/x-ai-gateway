@@ -147,6 +147,26 @@ class GovernanceAdminControllerTests {
     }
 
     @Test
+    void shouldDeleteRouteGuard() {
+        webTestClient.delete()
+                .uri("/admin/ops/policies/route-guards/7")
+                .exchange()
+                .expectStatus().isOk();
+
+        Mockito.verify(governanceAdminService).deleteRouteGuard(7L);
+    }
+
+    @Test
+    void shouldDeleteAutoAction() {
+        webTestClient.delete()
+                .uri("/admin/ops/policies/auto-actions/8")
+                .exchange()
+                .expectStatus().isOk();
+
+        Mockito.verify(governanceAdminService).deleteAutoAction(8L);
+    }
+
+    @Test
     void shouldReturnHealthScores() {
         Mockito.when(governanceAdminService.listHealthScores())
                 .thenReturn(new GovernanceHealthScoreResponse(

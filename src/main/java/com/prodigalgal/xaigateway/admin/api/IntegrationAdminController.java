@@ -3,6 +3,7 @@ package com.prodigalgal.xaigateway.admin.api;
 import com.prodigalgal.xaigateway.admin.application.IntegrationAdminService;
 import jakarta.validation.Valid;
 import java.util.List;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -37,6 +38,11 @@ public class IntegrationAdminController {
         return integrationAdminService.saveWebhook(id, request);
     }
 
+    @DeleteMapping("/webhooks/{id}")
+    public void deleteWebhook(@PathVariable Long id) {
+        integrationAdminService.deleteWebhook(id);
+    }
+
     @GetMapping("/channels")
     public List<NotificationChannelResponse> listChannels() {
         return integrationAdminService.listChannels();
@@ -50,6 +56,11 @@ public class IntegrationAdminController {
     @PutMapping("/channels/{id}")
     public NotificationChannelResponse updateChannel(@PathVariable Long id, @Valid @RequestBody NotificationChannelRequest request) {
         return integrationAdminService.saveChannel(id, request);
+    }
+
+    @DeleteMapping("/channels/{id}")
+    public void deleteChannel(@PathVariable Long id) {
+        integrationAdminService.deleteChannel(id);
     }
 
     @GetMapping("/runbooks")
@@ -67,6 +78,11 @@ public class IntegrationAdminController {
         return integrationAdminService.saveRunbook(id, request);
     }
 
+    @DeleteMapping("/runbooks/{id}")
+    public void deleteRunbook(@PathVariable Long id) {
+        integrationAdminService.deleteRunbook(id);
+    }
+
     @GetMapping("/subscriptions")
     public List<OutboundEventSubscriptionResponse> listSubscriptions() {
         return integrationAdminService.listSubscriptions();
@@ -80,6 +96,11 @@ public class IntegrationAdminController {
     @PutMapping("/subscriptions/{id}")
     public OutboundEventSubscriptionResponse updateSubscription(@PathVariable Long id, @Valid @RequestBody OutboundEventSubscriptionRequest request) {
         return integrationAdminService.saveSubscription(id, request);
+    }
+
+    @DeleteMapping("/subscriptions/{id}")
+    public void deleteSubscription(@PathVariable Long id) {
+        integrationAdminService.deleteSubscription(id);
     }
 
     @GetMapping("/deliveries")

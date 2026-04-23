@@ -24,4 +24,7 @@ public class TlsFingerprintProfileAdminController {
 
     @PutMapping("/{id}")
     public TlsFingerprintProfileResponse update(@PathVariable Long id, @Valid @RequestBody TlsFingerprintProfileRequest request) { return networkGovernanceService.saveTlsProfile(id, request); }
+
+    @DeleteMapping("/{id}")
+    public void delete(@PathVariable Long id) { networkGovernanceService.deleteTlsProfile(id); }
 }

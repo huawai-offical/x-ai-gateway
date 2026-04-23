@@ -6,10 +6,15 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface UpstreamCredentialRepository extends JpaRepository<UpstreamCredentialEntity, Long> {
 
     List<UpstreamCredentialEntity> findAllByDeletedFalseOrderByCreatedAtDesc();
+
+    List<UpstreamCredentialEntity> findAllByPoolIdAndDeletedFalseOrderByCreatedAtDesc(Long poolId);
 
     List<UpstreamCredentialEntity> findAllByIdInAndDeletedFalse(Collection<Long> ids);
 
@@ -23,5 +28,11 @@ public interface UpstreamCredentialRepository extends JpaRepository<UpstreamCred
 
     long countBySiteProfileIdAndDeletedFalse(Long siteProfileId);
 
+    long countByPoolIdAndDeletedFalse(Long poolId);
+
     Optional<UpstreamCredentialEntity> findByApiKeyFingerprintAndDeletedFalse(String apiKeyFingerprint);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("update UpstreamCredentialEntity credential set credential.poolId = null where credential.poolId = :poolId")
+    int clearPoolReferenceByPoolId(@Param("poolId") Long poolId);
 }

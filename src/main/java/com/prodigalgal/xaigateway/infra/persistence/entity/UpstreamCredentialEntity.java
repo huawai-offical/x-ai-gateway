@@ -2,7 +2,9 @@ package com.prodigalgal.xaigateway.infra.persistence.entity;
 
 import com.prodigalgal.xaigateway.gateway.core.credential.CredentialAuthKind;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
+import com.prodigalgal.xaigateway.infra.persistence.converter.StringListJsonConverter;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -13,6 +15,7 @@ import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
+import java.util.List;
 import org.hibernate.annotations.Comment;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -68,6 +71,11 @@ public class UpstreamCredentialEntity {
     @Comment("凭证附加 metadata，例如 Vertex project/location。")
     private String credentialMetadataJson;
 
+    @Convert(converter = StringListJsonConverter.class)
+    @Column(name = "supported_models_json", columnDefinition = "text")
+    @Comment("该凭证支持的模型列表。")
+    private List<String> supportedModels = List.of();
+
     @Column(name = "is_active", nullable = false)
     @Comment("是否启用。")
     private boolean active = true;
@@ -92,6 +100,66 @@ public class UpstreamCredentialEntity {
     @Comment("最后一次被选中调用的时间（UTC）。")
     private Instant lastUsedAt;
 
+    @Column(name = "total_request_count", nullable = false)
+    @Comment("累计请求数。")
+    private long totalRequestCount = 0;
+
+    @Column(name = "successful_request_count", nullable = false)
+    @Comment("累计成功请求数。")
+    private long successfulRequestCount = 0;
+
+    @Column(name = "failed_request_count", nullable = false)
+    @Comment("累计失败请求数。")
+    private long failedRequestCount = 0;
+
+    @Column(name = "canceled_request_count", nullable = false)
+    @Comment("累计取消请求数。")
+    private long canceledRequestCount = 0;
+
+    @Column(name = "total_token_count", nullable = false)
+    @Comment("累计 token 总量。")
+    private long totalTokenCount = 0;
+
+    @Column(name = "total_cache_hit_token_count", nullable = false)
+    @Comment("累计缓存命中 token 数。")
+    private long totalCacheHitTokenCount = 0;
+
+    @Column(name = "total_cache_write_token_count", nullable = false)
+    @Comment("累计缓存写入 token 数。")
+    private long totalCacheWriteTokenCount = 0;
+
+    @Column(name = "total_saved_input_token_count", nullable = false)
+    @Comment("累计节省输入 token 数。")
+    private long totalSavedInputTokenCount = 0;
+
+    @Column(name = "total_duration_ms", nullable = false)
+    @Comment("累计请求耗时（毫秒）。")
+    private long totalDurationMs = 0;
+
+    @Column(name = "duration_sample_count", nullable = false)
+    @Comment("耗时样本数。")
+    private long durationSampleCount = 0;
+
+    @Column(name = "total_first_token_ms", nullable = false)
+    @Comment("累计首 token 延迟（毫秒）。")
+    private long totalFirstTokenMs = 0;
+
+    @Column(name = "first_token_sample_count", nullable = false)
+    @Comment("首 token 样本数。")
+    private long firstTokenSampleCount = 0;
+
+    @Column(name = "last_first_token_ms")
+    @Comment("最近一次首 token 延迟（毫秒）。")
+    private Long lastFirstTokenMs;
+
+    @Column(name = "min_first_token_ms")
+    @Comment("最小首 token 延迟（毫秒）。")
+    private Long minFirstTokenMs;
+
+    @Column(name = "max_first_token_ms")
+    @Comment("最大首 token 延迟（毫秒）。")
+    private Long maxFirstTokenMs;
+
     @Column(name = "proxy_id")
     @Comment("绑定的代理 ID。")
     private Long proxyId;
@@ -103,6 +171,10 @@ public class UpstreamCredentialEntity {
     @Column(name = "site_profile_id")
     @Comment("绑定的站点档案 ID。")
     private Long siteProfileId;
+
+    @Column(name = "pool_id", nullable = true)
+    @Comment("账号池 ID。")
+    private Long poolId;
 
     @Column(name = "deleted", nullable = false)
     @Comment("逻辑删除标记。")
@@ -178,6 +250,14 @@ public class UpstreamCredentialEntity {
         this.credentialMetadataJson = credentialMetadataJson;
     }
 
+    public List<String> getSupportedModels() {
+        return supportedModels;
+    }
+
+    public void setSupportedModels(List<String> supportedModels) {
+        this.supportedModels = supportedModels;
+    }
+
     public boolean isActive() {
         return active;
     }
@@ -226,6 +306,126 @@ public class UpstreamCredentialEntity {
         this.lastUsedAt = lastUsedAt;
     }
 
+    public long getTotalRequestCount() {
+        return totalRequestCount;
+    }
+
+    public void setTotalRequestCount(long totalRequestCount) {
+        this.totalRequestCount = totalRequestCount;
+    }
+
+    public long getSuccessfulRequestCount() {
+        return successfulRequestCount;
+    }
+
+    public void setSuccessfulRequestCount(long successfulRequestCount) {
+        this.successfulRequestCount = successfulRequestCount;
+    }
+
+    public long getFailedRequestCount() {
+        return failedRequestCount;
+    }
+
+    public void setFailedRequestCount(long failedRequestCount) {
+        this.failedRequestCount = failedRequestCount;
+    }
+
+    public long getCanceledRequestCount() {
+        return canceledRequestCount;
+    }
+
+    public void setCanceledRequestCount(long canceledRequestCount) {
+        this.canceledRequestCount = canceledRequestCount;
+    }
+
+    public long getTotalTokenCount() {
+        return totalTokenCount;
+    }
+
+    public void setTotalTokenCount(long totalTokenCount) {
+        this.totalTokenCount = totalTokenCount;
+    }
+
+    public long getTotalCacheHitTokenCount() {
+        return totalCacheHitTokenCount;
+    }
+
+    public void setTotalCacheHitTokenCount(long totalCacheHitTokenCount) {
+        this.totalCacheHitTokenCount = totalCacheHitTokenCount;
+    }
+
+    public long getTotalCacheWriteTokenCount() {
+        return totalCacheWriteTokenCount;
+    }
+
+    public void setTotalCacheWriteTokenCount(long totalCacheWriteTokenCount) {
+        this.totalCacheWriteTokenCount = totalCacheWriteTokenCount;
+    }
+
+    public long getTotalSavedInputTokenCount() {
+        return totalSavedInputTokenCount;
+    }
+
+    public void setTotalSavedInputTokenCount(long totalSavedInputTokenCount) {
+        this.totalSavedInputTokenCount = totalSavedInputTokenCount;
+    }
+
+    public long getTotalDurationMs() {
+        return totalDurationMs;
+    }
+
+    public void setTotalDurationMs(long totalDurationMs) {
+        this.totalDurationMs = totalDurationMs;
+    }
+
+    public long getDurationSampleCount() {
+        return durationSampleCount;
+    }
+
+    public void setDurationSampleCount(long durationSampleCount) {
+        this.durationSampleCount = durationSampleCount;
+    }
+
+    public long getTotalFirstTokenMs() {
+        return totalFirstTokenMs;
+    }
+
+    public void setTotalFirstTokenMs(long totalFirstTokenMs) {
+        this.totalFirstTokenMs = totalFirstTokenMs;
+    }
+
+    public long getFirstTokenSampleCount() {
+        return firstTokenSampleCount;
+    }
+
+    public void setFirstTokenSampleCount(long firstTokenSampleCount) {
+        this.firstTokenSampleCount = firstTokenSampleCount;
+    }
+
+    public Long getLastFirstTokenMs() {
+        return lastFirstTokenMs;
+    }
+
+    public void setLastFirstTokenMs(Long lastFirstTokenMs) {
+        this.lastFirstTokenMs = lastFirstTokenMs;
+    }
+
+    public Long getMinFirstTokenMs() {
+        return minFirstTokenMs;
+    }
+
+    public void setMinFirstTokenMs(Long minFirstTokenMs) {
+        this.minFirstTokenMs = minFirstTokenMs;
+    }
+
+    public Long getMaxFirstTokenMs() {
+        return maxFirstTokenMs;
+    }
+
+    public void setMaxFirstTokenMs(Long maxFirstTokenMs) {
+        this.maxFirstTokenMs = maxFirstTokenMs;
+    }
+
     public Long getProxyId() {
         return proxyId;
     }
@@ -248,6 +448,14 @@ public class UpstreamCredentialEntity {
 
     public void setSiteProfileId(Long siteProfileId) {
         this.siteProfileId = siteProfileId;
+    }
+
+    public Long getPoolId() {
+        return poolId;
+    }
+
+    public void setPoolId(Long poolId) {
+        this.poolId = poolId;
     }
 
     public boolean isDeleted() {

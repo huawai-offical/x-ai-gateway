@@ -1,12 +1,14 @@
 package com.prodigalgal.xaigateway.infra.persistence.entity;
 
 import com.prodigalgal.xaigateway.gateway.core.account.UpstreamAccountProviderType;
+import com.prodigalgal.xaigateway.infra.persistence.converter.StringListJsonConverter;
 import jakarta.persistence.*;
 import org.hibernate.annotations.Comment;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.Instant;
+import java.util.List;
 
 @Entity
 @Table(name = "upstream_account")
@@ -17,8 +19,8 @@ public class UpstreamAccountEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "pool_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "pool_id", nullable = true)
     private UpstreamAccountPoolEntity pool;
 
     @Column(name = "account_name", nullable = false, length = 128)
@@ -58,6 +60,10 @@ public class UpstreamAccountEntity {
     @Column(name = "metadata_json", columnDefinition = "text")
     private String metadataJson;
 
+    @Convert(converter = StringListJsonConverter.class)
+    @Column(name = "supported_models_json", columnDefinition = "text")
+    private List<String> supportedModels = List.of();
+
     @Column(name = "proxy_id")
     private Long proxyId;
 
@@ -66,6 +72,51 @@ public class UpstreamAccountEntity {
 
     @Column(name = "site_profile_id")
     private Long siteProfileId;
+
+    @Column(name = "total_request_count", nullable = false)
+    private long totalRequestCount = 0;
+
+    @Column(name = "successful_request_count", nullable = false)
+    private long successfulRequestCount = 0;
+
+    @Column(name = "failed_request_count", nullable = false)
+    private long failedRequestCount = 0;
+
+    @Column(name = "canceled_request_count", nullable = false)
+    private long canceledRequestCount = 0;
+
+    @Column(name = "total_token_count", nullable = false)
+    private long totalTokenCount = 0;
+
+    @Column(name = "total_cache_hit_token_count", nullable = false)
+    private long totalCacheHitTokenCount = 0;
+
+    @Column(name = "total_cache_write_token_count", nullable = false)
+    private long totalCacheWriteTokenCount = 0;
+
+    @Column(name = "total_saved_input_token_count", nullable = false)
+    private long totalSavedInputTokenCount = 0;
+
+    @Column(name = "total_duration_ms", nullable = false)
+    private long totalDurationMs = 0;
+
+    @Column(name = "duration_sample_count", nullable = false)
+    private long durationSampleCount = 0;
+
+    @Column(name = "total_first_token_ms", nullable = false)
+    private long totalFirstTokenMs = 0;
+
+    @Column(name = "first_token_sample_count", nullable = false)
+    private long firstTokenSampleCount = 0;
+
+    @Column(name = "last_first_token_ms")
+    private Long lastFirstTokenMs;
+
+    @Column(name = "min_first_token_ms")
+    private Long minFirstTokenMs;
+
+    @Column(name = "max_first_token_ms")
+    private Long maxFirstTokenMs;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false, columnDefinition = "timestamp with time zone")
@@ -102,12 +153,44 @@ public class UpstreamAccountEntity {
     public void setLastErrorMessage(String lastErrorMessage) { this.lastErrorMessage = lastErrorMessage; }
     public String getMetadataJson() { return metadataJson; }
     public void setMetadataJson(String metadataJson) { this.metadataJson = metadataJson; }
+    public List<String> getSupportedModels() { return supportedModels; }
+    public void setSupportedModels(List<String> supportedModels) { this.supportedModels = supportedModels; }
     public Long getProxyId() { return proxyId; }
     public void setProxyId(Long proxyId) { this.proxyId = proxyId; }
     public Long getTlsFingerprintProfileId() { return tlsFingerprintProfileId; }
     public void setTlsFingerprintProfileId(Long tlsFingerprintProfileId) { this.tlsFingerprintProfileId = tlsFingerprintProfileId; }
     public Long getSiteProfileId() { return siteProfileId; }
     public void setSiteProfileId(Long siteProfileId) { this.siteProfileId = siteProfileId; }
+    public long getTotalRequestCount() { return totalRequestCount; }
+    public void setTotalRequestCount(long totalRequestCount) { this.totalRequestCount = totalRequestCount; }
+    public long getSuccessfulRequestCount() { return successfulRequestCount; }
+    public void setSuccessfulRequestCount(long successfulRequestCount) { this.successfulRequestCount = successfulRequestCount; }
+    public long getFailedRequestCount() { return failedRequestCount; }
+    public void setFailedRequestCount(long failedRequestCount) { this.failedRequestCount = failedRequestCount; }
+    public long getCanceledRequestCount() { return canceledRequestCount; }
+    public void setCanceledRequestCount(long canceledRequestCount) { this.canceledRequestCount = canceledRequestCount; }
+    public long getTotalTokenCount() { return totalTokenCount; }
+    public void setTotalTokenCount(long totalTokenCount) { this.totalTokenCount = totalTokenCount; }
+    public long getTotalCacheHitTokenCount() { return totalCacheHitTokenCount; }
+    public void setTotalCacheHitTokenCount(long totalCacheHitTokenCount) { this.totalCacheHitTokenCount = totalCacheHitTokenCount; }
+    public long getTotalCacheWriteTokenCount() { return totalCacheWriteTokenCount; }
+    public void setTotalCacheWriteTokenCount(long totalCacheWriteTokenCount) { this.totalCacheWriteTokenCount = totalCacheWriteTokenCount; }
+    public long getTotalSavedInputTokenCount() { return totalSavedInputTokenCount; }
+    public void setTotalSavedInputTokenCount(long totalSavedInputTokenCount) { this.totalSavedInputTokenCount = totalSavedInputTokenCount; }
+    public long getTotalDurationMs() { return totalDurationMs; }
+    public void setTotalDurationMs(long totalDurationMs) { this.totalDurationMs = totalDurationMs; }
+    public long getDurationSampleCount() { return durationSampleCount; }
+    public void setDurationSampleCount(long durationSampleCount) { this.durationSampleCount = durationSampleCount; }
+    public long getTotalFirstTokenMs() { return totalFirstTokenMs; }
+    public void setTotalFirstTokenMs(long totalFirstTokenMs) { this.totalFirstTokenMs = totalFirstTokenMs; }
+    public long getFirstTokenSampleCount() { return firstTokenSampleCount; }
+    public void setFirstTokenSampleCount(long firstTokenSampleCount) { this.firstTokenSampleCount = firstTokenSampleCount; }
+    public Long getLastFirstTokenMs() { return lastFirstTokenMs; }
+    public void setLastFirstTokenMs(Long lastFirstTokenMs) { this.lastFirstTokenMs = lastFirstTokenMs; }
+    public Long getMinFirstTokenMs() { return minFirstTokenMs; }
+    public void setMinFirstTokenMs(Long minFirstTokenMs) { this.minFirstTokenMs = minFirstTokenMs; }
+    public Long getMaxFirstTokenMs() { return maxFirstTokenMs; }
+    public void setMaxFirstTokenMs(Long maxFirstTokenMs) { this.maxFirstTokenMs = maxFirstTokenMs; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
 }

@@ -51,3 +51,13 @@ databaseChangeLog:
       file: db/changelog/changes/db.changelog-0025-outbound-integrations.yaml
   - include:
       file: db/changelog/changes/db.changelog-0026-site-profile-source.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0027-credential-pool-default.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0028-optional-account-pool.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0029-account-usage-metrics.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0030-credential-usage-metrics.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0031-account-supported-models.yaml

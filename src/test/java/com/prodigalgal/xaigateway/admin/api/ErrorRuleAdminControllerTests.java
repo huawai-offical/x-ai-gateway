@@ -50,4 +50,14 @@ class ErrorRuleAdminControllerTests {
                 .expectBody()
                 .jsonPath("$.matchedRules[0].action").isEqualTo("REWRITE");
     }
+
+    @Test
+    void shouldDeleteRule() {
+        webTestClient.delete()
+                .uri("/admin/error-rules/9")
+                .exchange()
+                .expectStatus().isOk();
+
+        Mockito.verify(errorRuleService).delete(9L);
+    }
 }

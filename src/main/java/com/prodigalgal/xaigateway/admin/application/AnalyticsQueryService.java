@@ -7,7 +7,9 @@ import com.prodigalgal.xaigateway.admin.api.RouteDecisionLogResponse;
 import com.prodigalgal.xaigateway.admin.api.UpstreamCacheReferenceResponse;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageCompleteness;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
+import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UsageRecordEntity;
+import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UsageRecordRepository;
 import java.time.Duration;
 import java.time.Instant;
@@ -20,6 +22,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,12 +39,22 @@ public class AnalyticsQueryService {
 
     private final ObservabilityQueryService observabilityQueryService;
     private final UsageRecordRepository usageRecordRepository;
+    private final DistributedKeyRepository distributedKeyRepository;
+
+    @Autowired
+    public AnalyticsQueryService(
+            ObservabilityQueryService observabilityQueryService,
+            UsageRecordRepository usageRecordRepository,
+            DistributedKeyRepository distributedKeyRepository) {
+        this.observabilityQueryService = observabilityQueryService;
+        this.usageRecordRepository = usageRecordRepository;
+        this.distributedKeyRepository = distributedKeyRepository;
+    }
 
     public AnalyticsQueryService(
             ObservabilityQueryService observabilityQueryService,
             UsageRecordRepository usageRecordRepository) {
-        this.observabilityQueryService = observabilityQueryService;
-        this.usageRecordRepository = usageRecordRepository;
+        this(observabilityQueryService, usageRecordRepository, null);
     }
 
     public AnalyticsOverviewResponse overview(Long distributedKeyId, ProviderType providerType) {
@@ -129,6 +142,7 @@ public class AnalyticsQueryService {
                 modelGroupBreakdown(sortedRouteDecisions, sortedCacheHits),
                 cacheSourceBreakdown(sortedCacheHits),
                 usageCompletenessBreakdown(usageRecords),
+                distributedKeyBreakdown(sortedRouteDecisions, sortedCacheHits, sortedRequestLogs, sortedUsageRecords),
                 buildTimeline(sortedRouteDecisions, sortedCacheHits, sortedRequestLogs, sortedUsageRecords, sampledWindow, resolvedBucketMinutes)
         );
     }
@@ -205,6 +219,104 @@ public class AnalyticsQueryService {
                 .entrySet().stream()
                 .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
                 .map(entry -> new AnalyticsOverviewResponse.CountBreakdownItem(entry.getKey(), entry.getValue()))
+                .toList();
+    }
+
+    private List<AnalyticsOverviewResponse.DistributedKeyUsageItem> distributedKeyBreakdown(
+            List<RouteDecisionLogResponse> routeDecisions,
+            List<CacheHitLogResponse> cacheHits,
+            List<RequestLogResponse> requestLogs,
+            List<UsageRecordEntity> usageRecords) {
+        Map<Long, DistributedKeyAccumulator> groups = new LinkedHashMap<>();
+        Map<Long, String> fallbackPrefixes = new LinkedHashMap<>();
+
+        for (RouteDecisionLogResponse routeDecision : routeDecisions) {
+            Long keyId = routeDecision.distributedKeyId();
+            groups.computeIfAbsent(keyId, unused -> new DistributedKeyAccumulator()).routeDecisionCount++;
+            if (keyId != null && routeDecision.distributedKeyPrefix() != null && !routeDecision.distributedKeyPrefix().isBlank()) {
+                fallbackPrefixes.putIfAbsent(keyId, routeDecision.distributedKeyPrefix());
+            }
+        }
+
+        for (CacheHitLogResponse cacheHit : cacheHits) {
+            DistributedKeyAccumulator accumulator = groups.computeIfAbsent(cacheHit.distributedKeyId(), unused -> new DistributedKeyAccumulator());
+            accumulator.cacheHitCount++;
+            accumulator.cacheHitTokens += cacheHit.cacheHitTokens();
+            accumulator.cacheWriteTokens += cacheHit.cacheWriteTokens();
+            accumulator.savedInputTokens += cacheHit.savedInputTokens();
+        }
+
+        for (RequestLogResponse requestLog : requestLogs) {
+            Long keyId = requestLog.distributedKeyId();
+            DistributedKeyAccumulator accumulator = groups.computeIfAbsent(keyId, unused -> new DistributedKeyAccumulator());
+            if (requestLog.status() != null && requestLog.status().name().equals("FAILED")) {
+                accumulator.failedRequestCount++;
+            }
+            if (requestLog.durationMs() != null && requestLog.durationMs() > 0) {
+                accumulator.latencyTotalMs += requestLog.durationMs();
+                accumulator.latencySampleCount++;
+            }
+            if (keyId != null && requestLog.distributedKeyPrefix() != null && !requestLog.distributedKeyPrefix().isBlank()) {
+                fallbackPrefixes.putIfAbsent(keyId, requestLog.distributedKeyPrefix());
+            }
+        }
+
+        for (UsageRecordEntity usageRecord : usageRecords) {
+            DistributedKeyAccumulator accumulator = groups.computeIfAbsent(usageRecord.getDistributedKeyId(), unused -> new DistributedKeyAccumulator());
+            accumulator.usageRecordCount++;
+            accumulator.promptTokens += usageRecord.getPromptTokens();
+            accumulator.completionTokens += usageRecord.getCompletionTokens();
+            accumulator.totalTokens += usageRecord.getTotalTokens();
+            if (usageRecord.getCompleteness() == GatewayUsageCompleteness.FINAL) {
+                accumulator.finalUsageRecordCount++;
+            } else if (usageRecord.getCompleteness() == GatewayUsageCompleteness.PARTIAL) {
+                accumulator.partialUsageRecordCount++;
+            }
+        }
+
+        if (groups.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, DistributedKeyEntity> distributedKeys = loadDistributedKeys(groups.keySet());
+
+        return groups.entrySet().stream()
+                .map(entry -> {
+                    Long distributedKeyId = entry.getKey();
+                    DistributedKeyAccumulator accumulator = entry.getValue();
+                    DistributedKeyEntity distributedKey = distributedKeyId == null ? null : distributedKeys.get(distributedKeyId);
+                    long avgLatencyMs = accumulator.latencySampleCount <= 0
+                            ? 0
+                            : Math.round((double) accumulator.latencyTotalMs / accumulator.latencySampleCount);
+                    double cacheHitRatio = accumulator.routeDecisionCount <= 0
+                            ? 0D
+                            : (double) accumulator.cacheHitCount / accumulator.routeDecisionCount;
+
+                    return new AnalyticsOverviewResponse.DistributedKeyUsageItem(
+                            distributedKeyId,
+                            resolveKeyName(distributedKeyId, distributedKey),
+                            resolveKeyPrefix(distributedKey, fallbackPrefixes.get(distributedKeyId)),
+                            accumulator.routeDecisionCount,
+                            accumulator.cacheHitCount,
+                            accumulator.cacheHitTokens,
+                            accumulator.cacheWriteTokens,
+                            accumulator.savedInputTokens,
+                            accumulator.usageRecordCount,
+                            accumulator.finalUsageRecordCount,
+                            accumulator.partialUsageRecordCount,
+                            accumulator.promptTokens,
+                            accumulator.completionTokens,
+                            accumulator.totalTokens,
+                            accumulator.failedRequestCount,
+                            avgLatencyMs,
+                            cacheHitRatio
+                    );
+                })
+                .sorted(Comparator
+                        .comparingLong(AnalyticsOverviewResponse.DistributedKeyUsageItem::totalTokens)
+                        .reversed()
+                        .thenComparing(Comparator.comparingLong(AnalyticsOverviewResponse.DistributedKeyUsageItem::routeDecisionCount).reversed())
+                        .thenComparing(Comparator.comparingLong(AnalyticsOverviewResponse.DistributedKeyUsageItem::cacheHitTokens).reversed()))
                 .toList();
     }
 
@@ -393,7 +505,58 @@ public class AnalyticsQueryService {
         return value == null ? "UNKNOWN" : value.toString();
     }
 
+    private Map<Long, DistributedKeyEntity> loadDistributedKeys(Iterable<Long> keyIds) {
+        if (distributedKeyRepository == null) {
+            return Map.of();
+        }
+        List<Long> ids = new ArrayList<>();
+        for (Long keyId : keyIds) {
+            if (keyId != null) {
+                ids.add(keyId);
+            }
+        }
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        return distributedKeyRepository.findAllById(ids).stream()
+                .collect(Collectors.toMap(DistributedKeyEntity::getId, Function.identity()));
+    }
+
+    private String resolveKeyName(Long distributedKeyId, DistributedKeyEntity distributedKey) {
+        if (distributedKey != null && distributedKey.getKeyName() != null && !distributedKey.getKeyName().isBlank()) {
+            return distributedKey.getKeyName();
+        }
+        return distributedKeyId == null ? "UNKNOWN" : "Key #" + distributedKeyId;
+    }
+
+    private String resolveKeyPrefix(DistributedKeyEntity distributedKey, String fallbackPrefix) {
+        if (distributedKey != null && distributedKey.getKeyPrefix() != null && !distributedKey.getKeyPrefix().isBlank()) {
+            return distributedKey.getKeyPrefix();
+        }
+        if (fallbackPrefix != null && !fallbackPrefix.isBlank()) {
+            return fallbackPrefix;
+        }
+        return "-";
+    }
+
     private record TimeWindow(Instant from, Instant to) {
+    }
+
+    private static final class DistributedKeyAccumulator {
+        private long routeDecisionCount;
+        private long cacheHitCount;
+        private long cacheHitTokens;
+        private long cacheWriteTokens;
+        private long savedInputTokens;
+        private long usageRecordCount;
+        private long finalUsageRecordCount;
+        private long partialUsageRecordCount;
+        private long promptTokens;
+        private long completionTokens;
+        private long totalTokens;
+        private long failedRequestCount;
+        private long latencyTotalMs;
+        private long latencySampleCount;
     }
 
     private static final class TimelineAccumulator {
