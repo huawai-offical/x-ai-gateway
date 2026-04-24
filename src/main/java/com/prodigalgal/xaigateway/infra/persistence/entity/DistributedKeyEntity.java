@@ -4,10 +4,13 @@ import com.prodigalgal.xaigateway.infra.persistence.converter.StringListJsonConv
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
@@ -24,6 +27,7 @@ import org.hibernate.annotations.UpdateTimestamp;
         },
         indexes = {
                 @Index(name = "idx_distributed_key_is_active", columnList = "is_active"),
+                @Index(name = "idx_distributed_key_owner_user_id", columnList = "owner_user_id"),
                 @Index(name = "idx_distributed_key_last_used_at", columnList = "last_used_at"),
                 @Index(name = "idx_distributed_key_updated_at", columnList = "updated_at")
         }
@@ -56,6 +60,11 @@ public class DistributedKeyEntity {
     @Column(name = "description", length = 512)
     @Comment("分发 key 说明。")
     private String description;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "owner_user_id")
+    @Comment("门户所属用户，可为空。")
+    private GatewayUserEntity ownerUser;
 
     @Column(name = "is_active", nullable = false)
     @Comment("是否启用。")
@@ -169,6 +178,14 @@ public class DistributedKeyEntity {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public GatewayUserEntity getOwnerUser() {
+        return ownerUser;
+    }
+
+    public void setOwnerUser(GatewayUserEntity ownerUser) {
+        this.ownerUser = ownerUser;
     }
 
     public boolean isActive() {

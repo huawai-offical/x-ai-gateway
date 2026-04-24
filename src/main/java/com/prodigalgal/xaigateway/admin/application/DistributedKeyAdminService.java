@@ -1,6 +1,7 @@
 package com.prodigalgal.xaigateway.admin.application;
 
 import com.prodigalgal.xaigateway.admin.api.DistributedKeyCreateResponse;
+import com.prodigalgal.xaigateway.admin.api.DistributedKeyClientConfigResponse;
 import com.prodigalgal.xaigateway.admin.api.DistributedKeyRequest;
 import com.prodigalgal.xaigateway.admin.api.DistributedKeyResponse;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
@@ -9,9 +10,11 @@ import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeySecrets;
 import com.prodigalgal.xaigateway.gateway.core.shared.ModelIdNormalizer;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayUserEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAccountPoolBindingRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyBindingRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayUserRepository;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -28,16 +31,22 @@ public class DistributedKeyAdminService {
     private final DistributedKeySecretService distributedKeySecretService;
     private final DistributedKeyBindingRepository distributedKeyBindingRepository;
     private final DistributedKeyAccountPoolBindingRepository distributedKeyAccountPoolBindingRepository;
+    private final GatewayUserRepository gatewayUserRepository;
+    private final Optional<OpsAuditService> opsAuditService;
 
     public DistributedKeyAdminService(
             DistributedKeyRepository distributedKeyRepository,
             DistributedKeySecretService distributedKeySecretService,
             DistributedKeyBindingRepository distributedKeyBindingRepository,
-            DistributedKeyAccountPoolBindingRepository distributedKeyAccountPoolBindingRepository) {
+            DistributedKeyAccountPoolBindingRepository distributedKeyAccountPoolBindingRepository,
+            GatewayUserRepository gatewayUserRepository,
+            Optional<OpsAuditService> opsAuditService) {
         this.distributedKeyRepository = distributedKeyRepository;
         this.distributedKeySecretService = distributedKeySecretService;
         this.distributedKeyBindingRepository = distributedKeyBindingRepository;
         this.distributedKeyAccountPoolBindingRepository = distributedKeyAccountPoolBindingRepository;
+        this.gatewayUserRepository = gatewayUserRepository;
+        this.opsAuditService = opsAuditService;
     }
 
     @Transactional(readOnly = true)
@@ -97,6 +106,51 @@ public class DistributedKeyAdminService {
         distributedKeyRepository.delete(entity);
     }
 
+    public DistributedKeyClientConfigResponse exportClientConfig(Long id, String format, String clientFamily, String baseUrl) {
+        DistributedKeyEntity entity = getRequired(id);
+        String normalizedFormat = normalizeConfigFormat(format);
+        String normalizedClientFamily = GatewayClientFamily.from(clientFamily).name();
+        String normalizedBaseUrl = normalizeBaseUrl(baseUrl);
+        String apiBaseUrl = normalizedBaseUrl + "/v1";
+        String maskedKey = entity.getMaskedKey() == null || entity.getMaskedKey().isBlank()
+                ? entity.getKeyPrefix() + "..."
+                : entity.getMaskedKey();
+        String secretPlaceholder = "<仅创建或轮换时展示一次；当前为 " + maskedKey + ">";
+        String config = switch (normalizedFormat) {
+            case "auth_json" -> """
+                    {
+                      "OPENAI_API_KEY": "%s",
+                      "OPENAI_BASE_URL": "%s",
+                      "X_AI_GATEWAY_API_KEY": "%s"
+                    }
+                    """.formatted(secretPlaceholder, apiBaseUrl, secretPlaceholder).trim();
+            case "env" -> """
+                    export OPENAI_API_KEY="%s"
+                    export OPENAI_BASE_URL="%s"
+                    export X_AI_GATEWAY_API_KEY="%s"
+                    """.formatted(secretPlaceholder, apiBaseUrl, secretPlaceholder).trim();
+            default -> """
+                    [model_providers.x-ai-gateway]
+                    name = "x-ai-gateway"
+                    base_url = "%s"
+                    env_key = "X_AI_GATEWAY_API_KEY"
+                    wire_api = "chat"
+
+                    # 将下方环境变量替换为创建或轮换时一次性展示的完整 key。
+                    # 当前 key: %s
+                    """.formatted(apiBaseUrl, maskedKey).trim();
+        };
+        recordClientConfigExport(entity, normalizedFormat, normalizedClientFamily, normalizedBaseUrl);
+        return new DistributedKeyClientConfigResponse(
+                entity.getKeyName(),
+                normalizedClientFamily,
+                normalizedFormat,
+                maskedKey,
+                "安全导出不会返回完整 secret；完整 key 仅在创建或轮换时展示一次。",
+                config
+        );
+    }
+
     private DistributedKeyEntity getRequired(Long id) {
         Optional<DistributedKeyEntity> entity = distributedKeyRepository.findById(id);
         if (entity.isEmpty()) {
@@ -108,6 +162,7 @@ public class DistributedKeyAdminService {
     private void apply(DistributedKeyEntity entity, DistributedKeyRequest request, boolean isCreate) {
         entity.setKeyName(request.keyName().trim());
         entity.setDescription(blankToNull(request.description()));
+        entity.setOwnerUser(resolveOwnerUser(request.ownerUserId()));
         entity.setActive(resolveActive(request.active(), entity.isActive(), isCreate));
         entity.setAllowedProtocols(normalizeProtocols(request.allowedProtocols()));
         entity.setAllowedModels(normalizeModels(request.allowedModels()));
@@ -131,6 +186,14 @@ public class DistributedKeyAdminService {
             return false;
         }
         return currentActive;
+    }
+
+    private GatewayUserEntity resolveOwnerUser(Long ownerUserId) {
+        if (ownerUserId == null) {
+            return null;
+        }
+        return gatewayUserRepository.findById(ownerUserId)
+                .orElseThrow(() -> new IllegalArgumentException("未找到指定 Key 所属用户。"));
     }
 
     private void assertHasActivePoolBinding(Long distributedKeyId) {
@@ -212,6 +275,62 @@ public class DistributedKeyAdminService {
         return value.trim();
     }
 
+    private String normalizeConfigFormat(String format) {
+        if (format == null || format.isBlank()) {
+            return "config_toml";
+        }
+        String normalized = format.trim().toLowerCase(Locale.ROOT).replace('-', '_');
+        return switch (normalized) {
+            case "toml", "config_toml" -> "config_toml";
+            case "auth", "auth_json", "json" -> "auth_json";
+            case "env", "shell" -> "env";
+            default -> throw new IllegalArgumentException("不支持的客户端配置格式。");
+        };
+    }
+
+    private String normalizeBaseUrl(String baseUrl) {
+        if (baseUrl == null || baseUrl.isBlank()) {
+            return "http://localhost:8080";
+        }
+        String value = baseUrl.trim();
+        while (value.endsWith("/")) {
+            value = value.substring(0, value.length() - 1);
+        }
+        if (value.endsWith("/v1")) {
+            return value.substring(0, value.length() - 3);
+        }
+        return value;
+    }
+
+    private void recordClientConfigExport(
+            DistributedKeyEntity entity,
+            String format,
+            String clientFamily,
+            String baseUrl) {
+        opsAuditService.ifPresent(service -> service.record(
+                "DISTRIBUTED_KEY",
+                "EXPORT_CLIENT_CONFIG",
+                "DistributedKey",
+                String.valueOf(entity.getId()),
+                "{"
+                        + "\"keyName\":\"" + escapeJson(entity.getKeyName()) + "\","
+                        + "\"format\":\"" + escapeJson(format) + "\","
+                        + "\"clientFamily\":\"" + escapeJson(clientFamily) + "\","
+                        + "\"baseUrl\":\"" + escapeJson(baseUrl) + "\","
+                        + "\"secretPolicy\":\"masked_only\""
+                        + "}"
+        ));
+    }
+
+    private String escapeJson(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"");
+    }
+
     private DistributedKeyResponse toResponse(DistributedKeyEntity entity) {
         return new DistributedKeyResponse(
                 entity.getId(),
@@ -219,6 +338,8 @@ public class DistributedKeyAdminService {
                 entity.getKeyPrefix(),
                 entity.getMaskedKey(),
                 entity.getDescription(),
+                entity.getOwnerUser() == null ? null : entity.getOwnerUser().getId(),
+                entity.getOwnerUser() == null ? null : entity.getOwnerUser().getEmail(),
                 entity.isActive(),
                 entity.getAllowedProtocols(),
                 entity.getAllowedModels(),

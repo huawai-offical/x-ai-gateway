@@ -37,6 +37,9 @@ public class GatewayUserEntity {
     @Column(name = "display_name", length = 128)
     private String displayName;
 
+    @Column(name = "password_hash", length = 256)
+    private String passwordHash;
+
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
 
@@ -72,6 +75,14 @@ public class GatewayUserEntity {
 
     public void setDisplayName(String displayName) {
         this.displayName = displayName;
+    }
+
+    public String getPasswordHash() {
+        return passwordHash;
+    }
+
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
     }
 
     public boolean isActive() {

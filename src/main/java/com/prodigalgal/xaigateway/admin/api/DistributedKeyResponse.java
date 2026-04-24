@@ -9,6 +9,8 @@ public record DistributedKeyResponse(
         String keyPrefix,
         String maskedKey,
         String description,
+        Long ownerUserId,
+        String ownerUserEmail,
         boolean active,
         List<String> allowedProtocols,
         List<String> allowedModels,

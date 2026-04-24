@@ -8,6 +8,7 @@ public record DistributedKeyRequest(
         @NotBlank(message = "分发 key 名称不能为空。")
         String keyName,
         String description,
+        Long ownerUserId,
         Boolean active,
         List<String> allowedProtocols,
         List<String> allowedModels,

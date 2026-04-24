@@ -63,3 +63,13 @@ databaseChangeLog:
       file: db/changelog/changes/db.changelog-0031-account-supported-models.yaml
   - include:
       file: db/changelog/changes/db.changelog-0032-user-domain-core.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0033-portal-user-session.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0034-announcements.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0035-promo-redeem-ledger.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0036-oauth-session-governance.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0037-external-app-maintenance-native.yaml

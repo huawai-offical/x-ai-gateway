@@ -54,6 +54,39 @@ public class UpstreamAccountEntity {
     @Column(name = "last_used_at", columnDefinition = "timestamp with time zone")
     private Instant lastUsedAt;
 
+    @Column(name = "token_expires_at", columnDefinition = "timestamp with time zone")
+    private Instant tokenExpiresAt;
+
+    @Column(name = "refresh_status", nullable = false, length = 32)
+    private String refreshStatus = "UNKNOWN";
+
+    @Column(name = "refresh_failure_count", nullable = false)
+    private int refreshFailureCount = 0;
+
+    @Column(name = "next_refresh_after", columnDefinition = "timestamp with time zone")
+    private Instant nextRefreshAfter;
+
+    @Column(name = "cooldown_until", columnDefinition = "timestamp with time zone")
+    private Instant cooldownUntil;
+
+    @Column(name = "quota_window_started_at", columnDefinition = "timestamp with time zone")
+    private Instant quotaWindowStartedAt;
+
+    @Column(name = "quota_window_seconds")
+    private Integer quotaWindowSeconds;
+
+    @Column(name = "quota_remaining_tokens")
+    private Long quotaRemainingTokens;
+
+    @Column(name = "quota_remaining_requests")
+    private Long quotaRemainingRequests;
+
+    @Column(name = "header_snapshot_json", columnDefinition = "text")
+    private String headerSnapshotJson;
+
+    @Column(name = "last_refresh_result_json", columnDefinition = "text")
+    private String lastRefreshResultJson;
+
     @Column(name = "last_error_message", length = 512)
     private String lastErrorMessage;
 
@@ -149,6 +182,28 @@ public class UpstreamAccountEntity {
     public void setLastRefreshAt(Instant lastRefreshAt) { this.lastRefreshAt = lastRefreshAt; }
     public Instant getLastUsedAt() { return lastUsedAt; }
     public void setLastUsedAt(Instant lastUsedAt) { this.lastUsedAt = lastUsedAt; }
+    public Instant getTokenExpiresAt() { return tokenExpiresAt; }
+    public void setTokenExpiresAt(Instant tokenExpiresAt) { this.tokenExpiresAt = tokenExpiresAt; }
+    public String getRefreshStatus() { return refreshStatus; }
+    public void setRefreshStatus(String refreshStatus) { this.refreshStatus = refreshStatus; }
+    public int getRefreshFailureCount() { return refreshFailureCount; }
+    public void setRefreshFailureCount(int refreshFailureCount) { this.refreshFailureCount = refreshFailureCount; }
+    public Instant getNextRefreshAfter() { return nextRefreshAfter; }
+    public void setNextRefreshAfter(Instant nextRefreshAfter) { this.nextRefreshAfter = nextRefreshAfter; }
+    public Instant getCooldownUntil() { return cooldownUntil; }
+    public void setCooldownUntil(Instant cooldownUntil) { this.cooldownUntil = cooldownUntil; }
+    public Instant getQuotaWindowStartedAt() { return quotaWindowStartedAt; }
+    public void setQuotaWindowStartedAt(Instant quotaWindowStartedAt) { this.quotaWindowStartedAt = quotaWindowStartedAt; }
+    public Integer getQuotaWindowSeconds() { return quotaWindowSeconds; }
+    public void setQuotaWindowSeconds(Integer quotaWindowSeconds) { this.quotaWindowSeconds = quotaWindowSeconds; }
+    public Long getQuotaRemainingTokens() { return quotaRemainingTokens; }
+    public void setQuotaRemainingTokens(Long quotaRemainingTokens) { this.quotaRemainingTokens = quotaRemainingTokens; }
+    public Long getQuotaRemainingRequests() { return quotaRemainingRequests; }
+    public void setQuotaRemainingRequests(Long quotaRemainingRequests) { this.quotaRemainingRequests = quotaRemainingRequests; }
+    public String getHeaderSnapshotJson() { return headerSnapshotJson; }
+    public void setHeaderSnapshotJson(String headerSnapshotJson) { this.headerSnapshotJson = headerSnapshotJson; }
+    public String getLastRefreshResultJson() { return lastRefreshResultJson; }
+    public void setLastRefreshResultJson(String lastRefreshResultJson) { this.lastRefreshResultJson = lastRefreshResultJson; }
     public String getLastErrorMessage() { return lastErrorMessage; }
     public void setLastErrorMessage(String lastErrorMessage) { this.lastErrorMessage = lastErrorMessage; }
     public String getMetadataJson() { return metadataJson; }

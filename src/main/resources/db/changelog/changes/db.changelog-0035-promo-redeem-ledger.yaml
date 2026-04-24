@@ -1,0 +1,125 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0035-promo-redeem-ledger
+      author: codex
+      changes:
+        - createTable:
+            tableName: promo_campaign
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: campaign_name, type: VARCHAR(128), constraints: { nullable: false } }
+              - column: { name: description, type: TEXT }
+              - column: { name: is_active, type: BOOLEAN, defaultValueBoolean: true, constraints: { nullable: false } }
+              - column: { name: reward_token_credits, type: BIGINT, defaultValueNumeric: 0, constraints: { nullable: false } }
+              - column: { name: max_redemptions_per_user, type: INT, defaultValueNumeric: 1, constraints: { nullable: false } }
+              - column: { name: starts_at, type: TIMESTAMP WITH TIME ZONE }
+              - column: { name: expires_at, type: TIMESTAMP WITH TIME ZONE }
+              - column: { name: created_at, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }
+              - column: { name: updated_at, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }
+        - addUniqueConstraint:
+            tableName: promo_campaign
+            columnNames: campaign_name
+            constraintName: uk_promo_campaign_name
+        - createIndex:
+            tableName: promo_campaign
+            indexName: idx_promo_campaign_active
+            columns:
+              - column: { name: is_active }
+        - createTable:
+            tableName: redeem_code
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: campaign_id, type: BIGINT, constraints: { nullable: false } }
+              - column: { name: code, type: VARCHAR(128), constraints: { nullable: false } }
+              - column: { name: is_active, type: BOOLEAN, defaultValueBoolean: true, constraints: { nullable: false } }
+              - column: { name: max_uses, type: INT, defaultValueNumeric: 1, constraints: { nullable: false } }
+              - column: { name: used_count, type: INT, defaultValueNumeric: 0, constraints: { nullable: false } }
+              - column: { name: expires_at, type: TIMESTAMP WITH TIME ZONE }
+              - column: { name: created_at, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }
+              - column: { name: updated_at, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }
+        - addForeignKeyConstraint:
+            baseTableName: redeem_code
+            baseColumnNames: campaign_id
+            referencedTableName: promo_campaign
+            referencedColumnNames: id
+            constraintName: fk_redeem_code_campaign_id
+        - addUniqueConstraint:
+            tableName: redeem_code
+            columnNames: code
+            constraintName: uk_redeem_code_code
+        - createIndex:
+            tableName: redeem_code
+            indexName: idx_redeem_code_campaign
+            columns:
+              - column: { name: campaign_id }
+        - createIndex:
+            tableName: redeem_code
+            indexName: idx_redeem_code_active
+            columns:
+              - column: { name: is_active }
+        - createTable:
+            tableName: redeem_code_usage
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: redeem_code_id, type: BIGINT, constraints: { nullable: false } }
+              - column: { name: campaign_id, type: BIGINT, constraints: { nullable: false } }
+              - column: { name: user_id, type: BIGINT, constraints: { nullable: false } }
+              - column: { name: used_at, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }
+              - column: { name: created_at, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }
+        - addForeignKeyConstraint:
+            baseTableName: redeem_code_usage
+            baseColumnNames: redeem_code_id
+            referencedTableName: redeem_code
+            referencedColumnNames: id
+            constraintName: fk_redeem_usage_code_id
+        - addForeignKeyConstraint:
+            baseTableName: redeem_code_usage
+            baseColumnNames: campaign_id
+            referencedTableName: promo_campaign
+            referencedColumnNames: id
+            constraintName: fk_redeem_usage_campaign_id
+        - addForeignKeyConstraint:
+            baseTableName: redeem_code_usage
+            baseColumnNames: user_id
+            referencedTableName: gateway_user
+            referencedColumnNames: id
+            constraintName: fk_redeem_usage_user_id
+        - addUniqueConstraint:
+            tableName: redeem_code_usage
+            columnNames: redeem_code_id,user_id
+            constraintName: uk_redeem_usage_code_user
+        - createIndex:
+            tableName: redeem_code_usage
+            indexName: idx_redeem_usage_user_used
+            columns:
+              - column: { name: user_id }
+              - column: { name: used_at }
+        - createIndex:
+            tableName: redeem_code_usage
+            indexName: idx_redeem_usage_campaign_user
+            columns:
+              - column: { name: campaign_id }
+              - column: { name: user_id }
+        - createTable:
+            tableName: gateway_user_balance_ledger
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: user_id, type: BIGINT, constraints: { nullable: false } }
+              - column: { name: delta_token_credits, type: BIGINT, constraints: { nullable: false } }
+              - column: { name: balance_after_token_credits, type: BIGINT, constraints: { nullable: false } }
+              - column: { name: reason, type: VARCHAR(64), constraints: { nullable: false } }
+              - column: { name: reference_type, type: VARCHAR(64) }
+              - column: { name: reference_id, type: VARCHAR(128) }
+              - column: { name: created_at, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }
+        - addForeignKeyConstraint:
+            baseTableName: gateway_user_balance_ledger
+            baseColumnNames: user_id
+            referencedTableName: gateway_user
+            referencedColumnNames: id
+            constraintName: fk_user_balance_ledger_user_id
+        - createIndex:
+            tableName: gateway_user_balance_ledger
+            indexName: idx_user_balance_ledger_user_created
+            columns:
+              - column: { name: user_id }
+              - column: { name: created_at }

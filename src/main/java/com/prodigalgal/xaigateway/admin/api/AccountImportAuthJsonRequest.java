@@ -1,6 +1,7 @@
 package com.prodigalgal.xaigateway.admin.api;
 
 import jakarta.validation.constraints.NotBlank;
+import java.time.Instant;
 import java.util.List;
 
 public record AccountImportAuthJsonRequest(
@@ -14,6 +15,16 @@ public record AccountImportAuthJsonRequest(
         Long proxyId,
         Long tlsFingerprintProfileId,
         Long siteProfileId,
-        List<String> supportedModels
+        List<String> supportedModels,
+        Instant tokenExpiresAt,
+        String refreshStatus,
+        Instant nextRefreshAfter,
+        Instant cooldownUntil,
+        Instant quotaWindowStartedAt,
+        Integer quotaWindowSeconds,
+        Long quotaRemainingTokens,
+        Long quotaRemainingRequests,
+        String headerSnapshotJson,
+        String lastRefreshResultJson
 ) {
 }

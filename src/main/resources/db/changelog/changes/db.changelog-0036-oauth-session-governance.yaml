@@ -1,0 +1,47 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0036-oauth-session-governance
+      author: codex
+      changes:
+        - addColumn:
+            tableName: upstream_account
+            columns:
+              - column:
+                  name: token_expires_at
+                  type: TIMESTAMP WITH TIME ZONE
+              - column:
+                  name: refresh_status
+                  type: VARCHAR(32)
+                  defaultValue: "UNKNOWN"
+                  constraints:
+                    nullable: false
+              - column:
+                  name: refresh_failure_count
+                  type: INT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: next_refresh_after
+                  type: TIMESTAMP WITH TIME ZONE
+              - column:
+                  name: cooldown_until
+                  type: TIMESTAMP WITH TIME ZONE
+              - column:
+                  name: quota_window_started_at
+                  type: TIMESTAMP WITH TIME ZONE
+              - column:
+                  name: quota_window_seconds
+                  type: INT
+              - column:
+                  name: quota_remaining_tokens
+                  type: BIGINT
+              - column:
+                  name: quota_remaining_requests
+                  type: BIGINT
+              - column:
+                  name: header_snapshot_json
+                  type: TEXT
+              - column:
+                  name: last_refresh_result_json
+                  type: TEXT

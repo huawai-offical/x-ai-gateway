@@ -58,4 +58,13 @@ public class DistributedKeyAdminController {
     public void delete(@PathVariable Long id) {
         distributedKeyAdminService.delete(id);
     }
+
+    @GetMapping("/{id}/client-config")
+    public DistributedKeyClientConfigResponse exportClientConfig(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "config_toml") String format,
+            @RequestParam(defaultValue = "GENERIC_OPENAI") String clientFamily,
+            @RequestParam(required = false) String baseUrl) {
+        return distributedKeyAdminService.exportClientConfig(id, format, clientFamily, baseUrl);
+    }
 }

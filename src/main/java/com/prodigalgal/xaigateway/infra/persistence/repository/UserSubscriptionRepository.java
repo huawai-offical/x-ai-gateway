@@ -8,6 +8,8 @@ public interface UserSubscriptionRepository extends JpaRepository<UserSubscripti
 
     List<UserSubscriptionEntity> findAllByOrderByCreatedAtDesc();
 
+    List<UserSubscriptionEntity> findAllByUser_IdOrderByCreatedAtDesc(Long userId);
+
     long countByUser_Id(Long userId);
 
     long countByPlan_Id(Long planId);

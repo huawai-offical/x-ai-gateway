@@ -1,0 +1,75 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0034-announcements
+      author: codex
+      changes:
+        - createTable:
+            tableName: announcement
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: title, type: VARCHAR(160), constraints: { nullable: false } }
+              - column: { name: summary, type: VARCHAR(512) }
+              - column: { name: body, type: TEXT }
+              - column: { name: status, type: VARCHAR(24), defaultValue: DRAFT, constraints: { nullable: false } }
+              - column: { name: audience_type, type: VARCHAR(24), defaultValue: GLOBAL, constraints: { nullable: false } }
+              - column: { name: audience_user_id, type: BIGINT }
+              - column: { name: audience_plan_id, type: BIGINT }
+              - column: { name: published_at, type: TIMESTAMP WITH TIME ZONE }
+              - column: { name: expires_at, type: TIMESTAMP WITH TIME ZONE }
+              - column: { name: created_at, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }
+              - column: { name: updated_at, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }
+        - addForeignKeyConstraint:
+            baseTableName: announcement
+            baseColumnNames: audience_user_id
+            referencedTableName: gateway_user
+            referencedColumnNames: id
+            constraintName: fk_announcement_audience_user_id
+        - addForeignKeyConstraint:
+            baseTableName: announcement
+            baseColumnNames: audience_plan_id
+            referencedTableName: subscription_plan
+            referencedColumnNames: id
+            constraintName: fk_announcement_audience_plan_id
+        - createIndex:
+            tableName: announcement
+            indexName: idx_announcement_status_published
+            columns:
+              - column: { name: status }
+              - column: { name: published_at }
+        - createIndex:
+            tableName: announcement
+            indexName: idx_announcement_audience
+            columns:
+              - column: { name: audience_type }
+              - column: { name: audience_user_id }
+              - column: { name: audience_plan_id }
+        - createTable:
+            tableName: announcement_read_state
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: announcement_id, type: BIGINT, constraints: { nullable: false } }
+              - column: { name: user_id, type: BIGINT, constraints: { nullable: false } }
+              - column: { name: read_at, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }
+              - column: { name: created_at, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }
+        - addForeignKeyConstraint:
+            baseTableName: announcement_read_state
+            baseColumnNames: announcement_id
+            referencedTableName: announcement
+            referencedColumnNames: id
+            constraintName: fk_announcement_read_announcement_id
+        - addForeignKeyConstraint:
+            baseTableName: announcement_read_state
+            baseColumnNames: user_id
+            referencedTableName: gateway_user
+            referencedColumnNames: id
+            constraintName: fk_announcement_read_user_id
+        - addUniqueConstraint:
+            tableName: announcement_read_state
+            columnNames: announcement_id,user_id
+            constraintName: uk_announcement_read_user
+        - createIndex:
+            tableName: announcement_read_state
+            indexName: idx_announcement_read_user_read
+            columns:
+              - column: { name: user_id }
+              - column: { name: read_at }
