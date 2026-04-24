@@ -118,9 +118,19 @@ public class OpsAdminController {
         return opsProbeJobService.save(null, request);
     }
 
+    @PutMapping("/probes/{id}")
+    public OpsScheduledProbeJobResponse updateProbeJob(@PathVariable Long id, @Valid @RequestBody OpsScheduledProbeJobRequest request) {
+        return opsProbeJobService.save(id, request);
+    }
+
     @PostMapping("/probes/{id}/run")
     public OpsScheduledProbeJobResponse runProbeJob(@PathVariable Long id) {
         return opsProbeJobService.trigger(id);
+    }
+
+    @DeleteMapping("/probes/{id}")
+    public void deleteProbeJob(@PathVariable Long id) {
+        opsProbeJobService.delete(id);
     }
 
     @GetMapping("/logs/system")

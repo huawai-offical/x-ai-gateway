@@ -15,6 +15,11 @@ public class ProxyProbeAdminController {
         this.networkGovernanceService = networkGovernanceService;
     }
 
+    @GetMapping
+    public List<ProxyProbeResultResponse> listAll() {
+        return networkGovernanceService.listProbeResults();
+    }
+
     @GetMapping("/{proxyId}")
     public List<ProxyProbeResultResponse> list(@PathVariable Long proxyId) {
         return networkGovernanceService.listProbeResults(proxyId);

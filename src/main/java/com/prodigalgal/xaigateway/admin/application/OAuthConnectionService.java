@@ -75,7 +75,9 @@ public class OAuthConnectionService {
             throw new IllegalArgumentException("OAuth 会话已过期。");
         }
 
-        UpstreamAccountPoolEntity pool = upstreamAccountPoolRepository.findById(session.getPoolId())
+        UpstreamAccountPoolEntity pool = session.getPoolId() == null
+                ? null
+                : upstreamAccountPoolRepository.findById(session.getPoolId())
                 .orElseThrow(() -> new IllegalArgumentException("未找到账号池。"));
 
         UpstreamAccountEntity account = new UpstreamAccountEntity();

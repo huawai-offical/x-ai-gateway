@@ -58,6 +58,12 @@ public class OpsProbeJobService {
         return toResponse(entity);
     }
 
+    public void delete(Long id) {
+        OpsScheduledProbeJobEntity entity = opsScheduledProbeJobRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("未找到 probe job。"));
+        opsScheduledProbeJobRepository.delete(entity);
+    }
+
     @Scheduled(fixedDelay = 30000)
     public void runDueJobs() {
         Instant now = Instant.now();

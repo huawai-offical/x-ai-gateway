@@ -97,6 +97,11 @@ public class NetworkGovernanceService {
     }
 
     @Transactional(readOnly = true)
+    public List<ProxyProbeResultResponse> listProbeResults() {
+        return networkProxyProbeResultRepository.findTop100ByOrderByCreatedAtDesc().stream().map(this::toProbeResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<ProxyProbeResultResponse> listProbeResults(Long proxyId) {
         return networkProxyProbeResultRepository.findTop50ByProxyIdOrderByCreatedAtDesc(proxyId).stream().map(this::toProbeResponse).toList();
     }

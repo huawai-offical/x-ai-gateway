@@ -5,5 +5,6 @@ import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface NetworkProxyProbeResultRepository extends JpaRepository<NetworkProxyProbeResultEntity, Long> {
+    List<NetworkProxyProbeResultEntity> findTop100ByOrderByCreatedAtDesc();
     List<NetworkProxyProbeResultEntity> findTop50ByProxyIdOrderByCreatedAtDesc(Long proxyId);
 }
