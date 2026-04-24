@@ -61,3 +61,5 @@ databaseChangeLog:
       file: db/changelog/changes/db.changelog-0030-credential-usage-metrics.yaml
   - include:
       file: db/changelog/changes/db.changelog-0031-account-supported-models.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0032-user-domain-core.yaml
