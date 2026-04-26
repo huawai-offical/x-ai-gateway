@@ -1,0 +1,136 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0039-access-groups
+      author: codex
+      changes:
+        - createTable:
+            tableName: access_group
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: group_name, type: VARCHAR(128), constraints: { nullable: false } }
+              - column: { name: description, type: TEXT }
+              - column: { name: is_active, type: BOOLEAN, defaultValueBoolean: true, constraints: { nullable: false } }
+              - column: { name: priority, type: INT, defaultValueNumeric: 100, constraints: { nullable: false } }
+              - column: { name: allowed_protocols_json, type: TEXT, defaultValue: "[]", constraints: { nullable: false } }
+              - column: { name: allowed_models_json, type: TEXT, defaultValue: "[]", constraints: { nullable: false } }
+              - column: { name: allowed_provider_types_json, type: TEXT, defaultValue: "[]", constraints: { nullable: false } }
+              - column: { name: allowed_client_families_json, type: TEXT, defaultValue: "[]", constraints: { nullable: false } }
+              - column: { name: rpm_limit, type: INT }
+              - column: { name: tpm_limit, type: INT }
+              - column: { name: concurrency_limit, type: INT }
+              - column: { name: daily_token_limit, type: BIGINT }
+              - column: { name: created_at, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }
+              - column: { name: updated_at, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }
+        - addUniqueConstraint:
+            tableName: access_group
+            columnNames: group_name
+            constraintName: uk_access_group_name
+        - createIndex:
+            tableName: access_group
+            indexName: idx_access_group_active
+            columns:
+              - column: { name: is_active }
+        - createIndex:
+            tableName: access_group
+            indexName: idx_access_group_priority
+            columns:
+              - column: { name: priority }
+        - createTable:
+            tableName: plan_access_group
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: plan_id, type: BIGINT, constraints: { nullable: false } }
+              - column: { name: access_group_id, type: BIGINT, constraints: { nullable: false } }
+              - column: { name: is_active, type: BOOLEAN, defaultValueBoolean: true, constraints: { nullable: false } }
+              - column: { name: priority, type: INT, defaultValueNumeric: 100, constraints: { nullable: false } }
+              - column: { name: created_at, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }
+              - column: { name: updated_at, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }
+        - addForeignKeyConstraint:
+            baseTableName: plan_access_group
+            baseColumnNames: plan_id
+            referencedTableName: subscription_plan
+            referencedColumnNames: id
+            constraintName: fk_plan_access_group_plan_id
+        - addForeignKeyConstraint:
+            baseTableName: plan_access_group
+            baseColumnNames: access_group_id
+            referencedTableName: access_group
+            referencedColumnNames: id
+            constraintName: fk_plan_access_group_group_id
+        - addUniqueConstraint:
+            tableName: plan_access_group
+            columnNames: plan_id,access_group_id
+            constraintName: uk_plan_access_group
+        - createIndex:
+            tableName: plan_access_group
+            indexName: idx_plan_access_group_plan
+            columns:
+              - column: { name: plan_id }
+        - createIndex:
+            tableName: plan_access_group
+            indexName: idx_plan_access_group_group
+            columns:
+              - column: { name: access_group_id }
+        - createIndex:
+            tableName: plan_access_group
+            indexName: idx_plan_access_group_active
+            columns:
+              - column: { name: is_active }
+        - createTable:
+            tableName: distributed_key_access_group_grant
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: distributed_key_id, type: BIGINT, constraints: { nullable: false } }
+              - column: { name: access_group_id, type: BIGINT, constraints: { nullable: false } }
+              - column: { name: grant_mode, type: VARCHAR(24), defaultValue: INHERIT, constraints: { nullable: false } }
+              - column: { name: is_active, type: BOOLEAN, defaultValueBoolean: true, constraints: { nullable: false } }
+              - column: { name: priority, type: INT, defaultValueNumeric: 100, constraints: { nullable: false } }
+              - column: { name: reason, type: VARCHAR(512) }
+              - column: { name: created_at, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }
+              - column: { name: updated_at, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }
+        - addForeignKeyConstraint:
+            baseTableName: distributed_key_access_group_grant
+            baseColumnNames: distributed_key_id
+            referencedTableName: distributed_key
+            referencedColumnNames: id
+            constraintName: fk_key_access_group_key_id
+        - addForeignKeyConstraint:
+            baseTableName: distributed_key_access_group_grant
+            baseColumnNames: access_group_id
+            referencedTableName: access_group
+            referencedColumnNames: id
+            constraintName: fk_key_access_group_group_id
+        - addUniqueConstraint:
+            tableName: distributed_key_access_group_grant
+            columnNames: distributed_key_id,access_group_id
+            constraintName: uk_distributed_key_access_group_grant
+        - createIndex:
+            tableName: distributed_key_access_group_grant
+            indexName: idx_key_access_group_key
+            columns:
+              - column: { name: distributed_key_id }
+        - createIndex:
+            tableName: distributed_key_access_group_grant
+            indexName: idx_key_access_group_group
+            columns:
+              - column: { name: access_group_id }
+        - createIndex:
+            tableName: distributed_key_access_group_grant
+            indexName: idx_key_access_group_mode
+            columns:
+              - column: { name: grant_mode }
+        - addColumn:
+            tableName: announcement
+            columns:
+              - column: { name: audience_access_group_id, type: BIGINT }
+        - addForeignKeyConstraint:
+            baseTableName: announcement
+            baseColumnNames: audience_access_group_id
+            referencedTableName: access_group
+            referencedColumnNames: id
+            constraintName: fk_announcement_audience_access_group_id
+        - createIndex:
+            tableName: announcement
+            indexName: idx_announcement_access_group
+            columns:
+              - column: { name: audience_access_group_id }

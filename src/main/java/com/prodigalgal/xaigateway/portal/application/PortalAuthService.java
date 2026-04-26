@@ -1,6 +1,7 @@
 package com.prodigalgal.xaigateway.portal.application;
 
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayUnauthorizedException;
+import com.prodigalgal.xaigateway.gateway.core.auth.AccessGroupEntitlementService;
 import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.AnnouncementEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.AnnouncementReadStateEntity;
@@ -57,6 +58,7 @@ public class PortalAuthService {
     private final RedeemCodeUsageRepository redeemCodeUsageRepository;
     private final GatewayUserBalanceLedgerRepository balanceLedgerRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AccessGroupEntitlementService accessGroupEntitlementService;
 
     public PortalAuthService(
             GatewayUserRepository gatewayUserRepository,
@@ -67,7 +69,8 @@ public class PortalAuthService {
             RedeemCodeRepository redeemCodeRepository,
             RedeemCodeUsageRepository redeemCodeUsageRepository,
             GatewayUserBalanceLedgerRepository balanceLedgerRepository,
-            PasswordEncoder passwordEncoder) {
+            PasswordEncoder passwordEncoder,
+            AccessGroupEntitlementService accessGroupEntitlementService) {
         this.gatewayUserRepository = gatewayUserRepository;
         this.userSubscriptionRepository = userSubscriptionRepository;
         this.distributedKeyRepository = distributedKeyRepository;
@@ -77,6 +80,7 @@ public class PortalAuthService {
         this.redeemCodeUsageRepository = redeemCodeUsageRepository;
         this.balanceLedgerRepository = balanceLedgerRepository;
         this.passwordEncoder = passwordEncoder;
+        this.accessGroupEntitlementService = accessGroupEntitlementService;
     }
 
     @Transactional(readOnly = true)
@@ -152,12 +156,13 @@ public class PortalAuthService {
     public List<PortalAnnouncementResponse> listAnnouncements(WebSession session) {
         GatewayUserEntity user = requireCurrentUser(session);
         Set<Long> activePlanIds = activePlanIds(user.getId());
+        Set<Long> activeAccessGroupIds = accessGroupEntitlementService.activeAccessGroupIdsForUser(user.getId());
         Set<Long> readIds = announcementReadStateRepository.findAllByUser_Id(user.getId()).stream()
                 .map(state -> state.getAnnouncement().getId())
                 .collect(Collectors.toSet());
         Instant now = Instant.now();
         return announcementRepository.findAllByStatusOrderByPublishedAtDescCreatedAtDesc("PUBLISHED").stream()
-                .filter(entity -> isAnnouncementVisible(entity, user.getId(), activePlanIds, now))
+                .filter(entity -> isAnnouncementVisible(entity, user.getId(), activePlanIds, activeAccessGroupIds, now))
                 .map(entity -> toAnnouncementResponse(entity, readIds.contains(entity.getId())))
                 .toList();
     }
@@ -172,7 +177,12 @@ public class PortalAuthService {
         GatewayUserEntity user = requireCurrentUser(session);
         AnnouncementEntity announcement = announcementRepository.findById(announcementId)
                 .orElseThrow(() -> new IllegalArgumentException("未找到指定公告。"));
-        if (!isAnnouncementVisible(announcement, user.getId(), activePlanIds(user.getId()), Instant.now())) {
+        if (!isAnnouncementVisible(
+                announcement,
+                user.getId(),
+                activePlanIds(user.getId()),
+                accessGroupEntitlementService.activeAccessGroupIdsForUser(user.getId()),
+                Instant.now())) {
             throw new GatewayUnauthorizedException("无权读取该公告。");
         }
         announcementReadStateRepository.findByAnnouncement_IdAndUser_Id(announcementId, user.getId())
@@ -320,7 +330,12 @@ public class PortalAuthService {
         );
     }
 
-    private boolean isAnnouncementVisible(AnnouncementEntity entity, Long userId, Set<Long> activePlanIds, Instant now) {
+    private boolean isAnnouncementVisible(
+            AnnouncementEntity entity,
+            Long userId,
+            Set<Long> activePlanIds,
+            Set<Long> activeAccessGroupIds,
+            Instant now) {
         if (!"PUBLISHED".equals(entity.getStatus())) {
             return false;
         }
@@ -334,6 +349,8 @@ public class PortalAuthService {
             case "GLOBAL" -> true;
             case "USER" -> entity.getAudienceUser() != null && userId.equals(entity.getAudienceUser().getId());
             case "PLAN" -> entity.getAudiencePlan() != null && activePlanIds.contains(entity.getAudiencePlan().getId());
+            case "ACCESS_GROUP" -> entity.getAudienceAccessGroup() != null
+                    && activeAccessGroupIds.contains(entity.getAudienceAccessGroup().getId());
             default -> false;
         };
     }

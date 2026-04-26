@@ -20,11 +20,13 @@ class DistributedKeyAuthenticationServiceTests {
         DistributedKeySecretService secretService = Mockito.mock(DistributedKeySecretService.class);
         AuthCacheStore authCacheStore = Mockito.mock(AuthCacheStore.class);
         GatewayProperties gatewayProperties = new GatewayProperties();
+        AccessGroupEntitlementService accessGroupEntitlementService = Mockito.mock(AccessGroupEntitlementService.class);
         DistributedKeyAuthenticationService service = new DistributedKeyAuthenticationService(
                 repository,
                 secretService,
                 authCacheStore,
-                gatewayProperties
+                gatewayProperties,
+                accessGroupEntitlementService
         );
 
         Mockito.when(secretService.hashSecret("secret")).thenReturn("hash");
@@ -44,11 +46,13 @@ class DistributedKeyAuthenticationServiceTests {
         DistributedKeySecretService secretService = Mockito.mock(DistributedKeySecretService.class);
         AuthCacheStore authCacheStore = Mockito.mock(AuthCacheStore.class);
         GatewayProperties gatewayProperties = new GatewayProperties();
+        AccessGroupEntitlementService accessGroupEntitlementService = Mockito.mock(AccessGroupEntitlementService.class);
         DistributedKeyAuthenticationService service = new DistributedKeyAuthenticationService(
                 repository,
                 secretService,
                 authCacheStore,
-                gatewayProperties
+                gatewayProperties,
+                accessGroupEntitlementService
         );
         DistributedKeyEntity entity = new DistributedKeyEntity();
         entity.setKeyName("test");
@@ -61,6 +65,9 @@ class DistributedKeyAuthenticationServiceTests {
         Mockito.when(secretService.hashSecret("secret")).thenReturn("hash");
         Mockito.when(authCacheStore.get("sk-gw-test")).thenReturn(Optional.empty());
         Mockito.when(repository.findByKeyPrefixAndActiveTrue("sk-gw-test")).thenReturn(Optional.of(entity));
+        Mockito.when(accessGroupEntitlementService.resolveForDistributedKey(entity)).thenReturn(
+                new ResolvedAccessPolicy(List.of("default"), List.of(), List.of(), List.of(), List.of("CODEX"), null, null, null, null)
+        );
 
         service.authenticateRawToken("sk-gw-test.secret");
 

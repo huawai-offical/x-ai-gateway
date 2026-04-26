@@ -9,6 +9,8 @@ public interface RedeemCodeRepository extends JpaRepository<RedeemCodeEntity, Lo
 
     List<RedeemCodeEntity> findAllByCampaign_IdOrderByCreatedAtDesc(Long campaignId);
 
+    Optional<RedeemCodeEntity> findByIdAndCampaign_Id(Long id, Long campaignId);
+
     Optional<RedeemCodeEntity> findByCodeIgnoreCase(String code);
 
     boolean existsByCodeIgnoreCase(String code);

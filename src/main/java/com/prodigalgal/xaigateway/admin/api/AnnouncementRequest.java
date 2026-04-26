@@ -12,6 +12,7 @@ public record AnnouncementRequest(
         String audienceType,
         Long audienceUserId,
         Long audiencePlanId,
+        Long audienceAccessGroupId,
         Instant publishedAt,
         Instant expiresAt
 ) {

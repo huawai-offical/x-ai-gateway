@@ -75,3 +75,5 @@ databaseChangeLog:
       file: db/changelog/changes/db.changelog-0037-external-app-maintenance-native.yaml
   - include:
       file: db/changelog/changes/db.changelog-0038-live-ops-cost.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0039-access-groups.yaml

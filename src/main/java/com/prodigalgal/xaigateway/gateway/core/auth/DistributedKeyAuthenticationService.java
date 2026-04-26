@@ -15,16 +15,19 @@ public class DistributedKeyAuthenticationService {
     private final DistributedKeySecretService distributedKeySecretService;
     private final AuthCacheStore authCacheStore;
     private final GatewayProperties gatewayProperties;
+    private final AccessGroupEntitlementService accessGroupEntitlementService;
 
     public DistributedKeyAuthenticationService(
             DistributedKeyRepository distributedKeyRepository,
             DistributedKeySecretService distributedKeySecretService,
             AuthCacheStore authCacheStore,
-            GatewayProperties gatewayProperties) {
+            GatewayProperties gatewayProperties,
+            AccessGroupEntitlementService accessGroupEntitlementService) {
         this.distributedKeyRepository = distributedKeyRepository;
         this.distributedKeySecretService = distributedKeySecretService;
         this.authCacheStore = authCacheStore;
         this.gatewayProperties = gatewayProperties;
+        this.accessGroupEntitlementService = accessGroupEntitlementService;
     }
 
     public AuthenticatedDistributedKey authenticateBearerToken(String authorizationHeader) {
@@ -67,13 +70,14 @@ public class DistributedKeyAuthenticationService {
     private DistributedKeyAuthSnapshot loadAndCache(String keyPrefix) {
         DistributedKeyEntity entity = distributedKeyRepository.findByKeyPrefixAndActiveTrue(keyPrefix)
                 .orElseThrow(() -> new GatewayUnauthorizedException("未找到可用的网关 key。"));
+        ResolvedAccessPolicy policy = accessGroupEntitlementService.resolveForDistributedKey(entity);
         DistributedKeyAuthSnapshot snapshot = new DistributedKeyAuthSnapshot(
                 entity.getId(),
                 entity.getKeyPrefix(),
                 entity.getKeyName(),
                 entity.getMaskedKey(),
                 entity.getSecretHash(),
-                entity.getAllowedClientFamilies()
+                policy.allowedClientFamilies()
         );
         authCacheStore.put(snapshot, gatewayProperties.getCache().getAuthTtl());
         return snapshot;

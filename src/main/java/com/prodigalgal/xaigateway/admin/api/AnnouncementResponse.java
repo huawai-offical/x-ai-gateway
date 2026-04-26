@@ -13,6 +13,8 @@ public record AnnouncementResponse(
         String audienceUserEmail,
         Long audiencePlanId,
         String audiencePlanName,
+        Long audienceAccessGroupId,
+        String audienceAccessGroupName,
         Instant publishedAt,
         Instant expiresAt,
         Instant createdAt,

@@ -12,6 +12,7 @@ import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayUserEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAccountPoolBindingRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAccessGroupGrantRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyBindingRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayUserRepository;
@@ -31,6 +32,7 @@ public class DistributedKeyAdminService {
     private final DistributedKeySecretService distributedKeySecretService;
     private final DistributedKeyBindingRepository distributedKeyBindingRepository;
     private final DistributedKeyAccountPoolBindingRepository distributedKeyAccountPoolBindingRepository;
+    private final DistributedKeyAccessGroupGrantRepository keyGrantRepository;
     private final GatewayUserRepository gatewayUserRepository;
     private final Optional<OpsAuditService> opsAuditService;
 
@@ -39,12 +41,14 @@ public class DistributedKeyAdminService {
             DistributedKeySecretService distributedKeySecretService,
             DistributedKeyBindingRepository distributedKeyBindingRepository,
             DistributedKeyAccountPoolBindingRepository distributedKeyAccountPoolBindingRepository,
+            DistributedKeyAccessGroupGrantRepository keyGrantRepository,
             GatewayUserRepository gatewayUserRepository,
             Optional<OpsAuditService> opsAuditService) {
         this.distributedKeyRepository = distributedKeyRepository;
         this.distributedKeySecretService = distributedKeySecretService;
         this.distributedKeyBindingRepository = distributedKeyBindingRepository;
         this.distributedKeyAccountPoolBindingRepository = distributedKeyAccountPoolBindingRepository;
+        this.keyGrantRepository = keyGrantRepository;
         this.gatewayUserRepository = gatewayUserRepository;
         this.opsAuditService = opsAuditService;
     }
@@ -103,6 +107,7 @@ public class DistributedKeyAdminService {
         DistributedKeyEntity entity = getRequired(id);
         distributedKeyBindingRepository.deleteAllByDistributedKey_Id(id);
         distributedKeyAccountPoolBindingRepository.deleteAllByDistributedKey_Id(id);
+        keyGrantRepository.deleteAllByDistributedKey_Id(id);
         distributedKeyRepository.delete(entity);
     }
 

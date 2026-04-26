@@ -2,9 +2,11 @@ package com.prodigalgal.xaigateway.admin.application;
 
 import com.prodigalgal.xaigateway.admin.api.AnnouncementRequest;
 import com.prodigalgal.xaigateway.admin.api.AnnouncementResponse;
+import com.prodigalgal.xaigateway.infra.persistence.entity.AccessGroupEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.AnnouncementEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayUserEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SubscriptionPlanEntity;
+import com.prodigalgal.xaigateway.infra.persistence.repository.AccessGroupRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.AnnouncementRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayUserRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.SubscriptionPlanRepository;
@@ -21,19 +23,22 @@ import org.springframework.transaction.annotation.Transactional;
 public class AnnouncementAdminService {
 
     private static final Set<String> STATUSES = Set.of("DRAFT", "PUBLISHED", "ARCHIVED");
-    private static final Set<String> AUDIENCE_TYPES = Set.of("GLOBAL", "USER", "PLAN");
+    private static final Set<String> AUDIENCE_TYPES = Set.of("GLOBAL", "USER", "PLAN", "ACCESS_GROUP");
 
     private final AnnouncementRepository announcementRepository;
     private final GatewayUserRepository gatewayUserRepository;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
+    private final AccessGroupRepository accessGroupRepository;
 
     public AnnouncementAdminService(
             AnnouncementRepository announcementRepository,
             GatewayUserRepository gatewayUserRepository,
-            SubscriptionPlanRepository subscriptionPlanRepository) {
+            SubscriptionPlanRepository subscriptionPlanRepository,
+            AccessGroupRepository accessGroupRepository) {
         this.announcementRepository = announcementRepository;
         this.gatewayUserRepository = gatewayUserRepository;
         this.subscriptionPlanRepository = subscriptionPlanRepository;
+        this.accessGroupRepository = accessGroupRepository;
     }
 
     @Transactional(readOnly = true)
@@ -85,11 +90,14 @@ public class AnnouncementAdminService {
         entity.setAudienceType(audienceType);
         entity.setAudienceUser(null);
         entity.setAudiencePlan(null);
+        entity.setAudienceAccessGroup(null);
 
         if ("USER".equals(audienceType)) {
             entity.setAudienceUser(getUser(request.audienceUserId()));
         } else if ("PLAN".equals(audienceType)) {
             entity.setAudiencePlan(getPlan(request.audiencePlanId()));
+        } else if ("ACCESS_GROUP".equals(audienceType)) {
+            entity.setAudienceAccessGroup(getAccessGroup(request.audienceAccessGroupId()));
         }
 
         Instant publishedAt = request.publishedAt();
@@ -117,6 +125,14 @@ public class AnnouncementAdminService {
         }
         return subscriptionPlanRepository.findById(planId)
                 .orElseThrow(() -> new IllegalArgumentException("未找到指定受众套餐。"));
+    }
+
+    private AccessGroupEntity getAccessGroup(Long accessGroupId) {
+        if (accessGroupId == null) {
+            throw new IllegalArgumentException("ACCESS_GROUP 受众必须选择访问组。");
+        }
+        return accessGroupRepository.findById(accessGroupId)
+                .orElseThrow(() -> new IllegalArgumentException("未找到指定受众访问组。"));
     }
 
     private String normalizeOption(String value, String defaultValue, Set<String> allowed, String errorMessage) {
@@ -156,6 +172,8 @@ public class AnnouncementAdminService {
                 entity.getAudienceUser() == null ? null : entity.getAudienceUser().getEmail(),
                 entity.getAudiencePlan() == null ? null : entity.getAudiencePlan().getId(),
                 entity.getAudiencePlan() == null ? null : entity.getAudiencePlan().getPlanName(),
+                entity.getAudienceAccessGroup() == null ? null : entity.getAudienceAccessGroup().getId(),
+                entity.getAudienceAccessGroup() == null ? null : entity.getAudienceAccessGroup().getGroupName(),
                 entity.getPublishedAt(),
                 entity.getExpiresAt(),
                 entity.getCreatedAt(),

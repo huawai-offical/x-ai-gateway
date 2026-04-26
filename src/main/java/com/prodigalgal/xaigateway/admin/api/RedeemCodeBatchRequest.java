@@ -5,6 +5,7 @@ import java.util.List;
 
 public record RedeemCodeBatchRequest(
         List<String> codes,
+        String rawText,
         Integer generateCount,
         String prefix,
         Integer maxUses,

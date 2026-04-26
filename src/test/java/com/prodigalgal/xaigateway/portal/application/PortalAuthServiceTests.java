@@ -1,6 +1,8 @@
 package com.prodigalgal.xaigateway.portal.application;
 
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayUnauthorizedException;
+import com.prodigalgal.xaigateway.gateway.core.auth.AccessGroupEntitlementService;
+import com.prodigalgal.xaigateway.infra.persistence.entity.AccessGroupEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.AnnouncementEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayUserBalanceLedgerEntity;
@@ -22,6 +24,7 @@ import com.prodigalgal.xaigateway.portal.api.PortalRegisterRequest;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
@@ -45,6 +48,7 @@ class PortalAuthServiceTests {
     private final RedeemCodeUsageRepository redeemCodeUsageRepository = Mockito.mock(RedeemCodeUsageRepository.class);
     private final GatewayUserBalanceLedgerRepository balanceLedgerRepository = Mockito.mock(GatewayUserBalanceLedgerRepository.class);
     private final PasswordEncoder passwordEncoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
+    private final AccessGroupEntitlementService accessGroupEntitlementService = Mockito.mock(AccessGroupEntitlementService.class);
     private final PortalAuthService service = new PortalAuthService(
             userRepository,
             subscriptionRepository,
@@ -54,7 +58,8 @@ class PortalAuthServiceTests {
             redeemCodeRepository,
             redeemCodeUsageRepository,
             balanceLedgerRepository,
-            passwordEncoder
+            passwordEncoder,
+            accessGroupEntitlementService
     );
 
     @Test
@@ -107,14 +112,17 @@ class PortalAuthServiceTests {
         GatewayUserEntity user = user(8L, "beta@example.com", "password-123");
         AnnouncementEntity global = announcement(51L, "GLOBAL", null);
         AnnouncementEntity planOnly = announcement(52L, "PLAN", plan(3L));
+        AnnouncementEntity accessGroupOnly = announcement(53L, "ACCESS_GROUP", null);
+        accessGroupOnly.setAudienceAccessGroup(accessGroup(6L));
         Mockito.when(userRepository.findByEmailIgnoreCase("beta@example.com")).thenReturn(Optional.of(user));
         Mockito.when(userRepository.findById(8L)).thenReturn(Optional.of(user));
         Mockito.when(userRepository.save(Mockito.any())).thenAnswer(invocation -> invocation.getArgument(0));
         Mockito.when(subscriptionRepository.findAllByUser_IdOrderByCreatedAtDesc(8L))
                 .thenReturn(List.of(subscription(31L)));
         Mockito.when(announcementRepository.findAllByStatusOrderByPublishedAtDescCreatedAtDesc("PUBLISHED"))
-                .thenReturn(List.of(global, planOnly));
+                .thenReturn(List.of(global, planOnly, accessGroupOnly));
         Mockito.when(announcementRepository.findById(51L)).thenReturn(Optional.of(global));
+        Mockito.when(accessGroupEntitlementService.activeAccessGroupIdsForUser(8L)).thenReturn(Set.of(6L));
         Mockito.when(announcementReadStateRepository.findAllByUser_Id(8L)).thenReturn(List.of());
         Mockito.when(announcementReadStateRepository.findByAnnouncement_IdAndUser_Id(51L, 8L)).thenReturn(Optional.empty());
         Mockito.when(announcementReadStateRepository.save(Mockito.any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -124,7 +132,7 @@ class PortalAuthServiceTests {
         var announcements = service.listAnnouncements(exchange.getSession().block());
         var read = service.markAnnouncementRead(exchange.getSession().block(), 51L);
 
-        assertEquals(2, announcements.size());
+        assertEquals(3, announcements.size());
         assertEquals("公告 51", announcements.getFirst().title());
         assertTrue(read.read());
     }
@@ -224,6 +232,14 @@ class PortalAuthServiceTests {
         announcement.setAudiencePlan(plan);
         announcement.setPublishedAt(Instant.parse("2026-04-24T00:00:00Z"));
         return announcement;
+    }
+
+    private AccessGroupEntity accessGroup(Long id) {
+        AccessGroupEntity accessGroup = new AccessGroupEntity();
+        ReflectionTestUtils.setField(accessGroup, "id", id);
+        accessGroup.setGroupName("default");
+        accessGroup.setActive(true);
+        return accessGroup;
     }
 
     private RedeemCodeEntity redeemCode(Long id, String code, long reward) {

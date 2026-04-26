@@ -20,7 +20,7 @@ import org.hibernate.annotations.UpdateTimestamp;
         name = "announcement",
         indexes = {
                 @Index(name = "idx_announcement_status_published", columnList = "status,published_at"),
-                @Index(name = "idx_announcement_audience", columnList = "audience_type,audience_user_id,audience_plan_id")
+                @Index(name = "idx_announcement_audience", columnList = "audience_type,audience_user_id,audience_plan_id,audience_access_group_id")
         }
 )
 @Comment("门户公告。")
@@ -52,6 +52,10 @@ public class AnnouncementEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "audience_plan_id")
     private SubscriptionPlanEntity audiencePlan;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "audience_access_group_id")
+    private AccessGroupEntity audienceAccessGroup;
 
     @Column(name = "published_at", columnDefinition = "timestamp with time zone")
     private Instant publishedAt;
@@ -125,6 +129,14 @@ public class AnnouncementEntity {
 
     public void setAudiencePlan(SubscriptionPlanEntity audiencePlan) {
         this.audiencePlan = audiencePlan;
+    }
+
+    public AccessGroupEntity getAudienceAccessGroup() {
+        return audienceAccessGroup;
+    }
+
+    public void setAudienceAccessGroup(AccessGroupEntity audienceAccessGroup) {
+        this.audienceAccessGroup = audienceAccessGroup;
     }
 
     public Instant getPublishedAt() {

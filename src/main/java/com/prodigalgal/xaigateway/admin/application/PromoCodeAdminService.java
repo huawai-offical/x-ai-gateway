@@ -4,6 +4,7 @@ import com.prodigalgal.xaigateway.admin.api.PromoCampaignRequest;
 import com.prodigalgal.xaigateway.admin.api.PromoCampaignResponse;
 import com.prodigalgal.xaigateway.admin.api.RedeemCodeBatchRequest;
 import com.prodigalgal.xaigateway.admin.api.RedeemCodeResponse;
+import com.prodigalgal.xaigateway.admin.api.RedeemCodeUpdateRequest;
 import com.prodigalgal.xaigateway.infra.persistence.entity.PromoCampaignEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.RedeemCodeEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.PromoCampaignRepository;
@@ -97,9 +98,40 @@ public class PromoCodeAdminService {
         return created;
     }
 
+    public RedeemCodeResponse updateCode(Long campaignId, Long codeId, RedeemCodeUpdateRequest request) {
+        getCampaignRequired(campaignId);
+        RedeemCodeEntity entity = getCodeRequired(campaignId, codeId);
+        if (request.active() != null) {
+            entity.setActive(request.active());
+        }
+        if (request.maxUses() != null) {
+            int maxUses = Math.max(1, request.maxUses());
+            if (maxUses < entity.getUsedCount()) {
+                throw new IllegalArgumentException("最大使用次数不能小于已使用次数。");
+            }
+            entity.setMaxUses(maxUses);
+        }
+        entity.setExpiresAt(request.expiresAt());
+        return toCodeResponse(redeemCodeRepository.save(entity));
+    }
+
+    public void deleteCode(Long campaignId, Long codeId) {
+        getCampaignRequired(campaignId);
+        RedeemCodeEntity entity = getCodeRequired(campaignId, codeId);
+        if (entity.getUsedCount() > 0) {
+            throw new IllegalArgumentException("已被使用的兑换码不能删除，请改为停用。");
+        }
+        redeemCodeRepository.delete(entity);
+    }
+
     private PromoCampaignEntity getCampaignRequired(Long id) {
         return promoCampaignRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("未找到指定兑换活动。"));
+    }
+
+    private RedeemCodeEntity getCodeRequired(Long campaignId, Long codeId) {
+        return redeemCodeRepository.findByIdAndCampaign_Id(codeId, campaignId)
+                .orElseThrow(() -> new IllegalArgumentException("未找到指定兑换码。"));
     }
 
     private void applyCampaign(PromoCampaignEntity entity, PromoCampaignRequest request, boolean isCreate) {
@@ -119,6 +151,15 @@ public class PromoCodeAdminService {
         List<String> codes = new ArrayList<>();
         if (request.codes() != null) {
             for (String raw : request.codes()) {
+                String code = normalizeCode(raw);
+                if (code != null && !codes.contains(code)) {
+                    codes.add(code);
+                }
+            }
+        }
+        String rawText = blankToNull(request.rawText());
+        if (rawText != null) {
+            for (String raw : rawText.split("\\R")) {
                 String code = normalizeCode(raw);
                 if (code != null && !codes.contains(code)) {
                     codes.add(code);

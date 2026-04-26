@@ -17,14 +17,17 @@ public class DistributedKeyQueryService {
     private final DistributedKeyRepository distributedKeyRepository;
     private final DistributedKeyBindingRepository distributedKeyBindingRepository;
     private final DistributedKeyAccountPoolBindingRepository distributedKeyAccountPoolBindingRepository;
+    private final AccessGroupEntitlementService accessGroupEntitlementService;
 
     public DistributedKeyQueryService(
             DistributedKeyRepository distributedKeyRepository,
             DistributedKeyBindingRepository distributedKeyBindingRepository,
-            DistributedKeyAccountPoolBindingRepository distributedKeyAccountPoolBindingRepository) {
+            DistributedKeyAccountPoolBindingRepository distributedKeyAccountPoolBindingRepository,
+            AccessGroupEntitlementService accessGroupEntitlementService) {
         this.distributedKeyRepository = distributedKeyRepository;
         this.distributedKeyBindingRepository = distributedKeyBindingRepository;
         this.distributedKeyAccountPoolBindingRepository = distributedKeyAccountPoolBindingRepository;
+        this.accessGroupEntitlementService = accessGroupEntitlementService;
     }
 
     public Optional<DistributedKeyView> findActiveByKeyPrefix(String keyPrefix) {
@@ -59,22 +62,23 @@ public class DistributedKeyQueryService {
                 .map(this::toBindingView)
                 .toList();
 
+        ResolvedAccessPolicy policy = accessGroupEntitlementService.resolveForDistributedKey(entity);
         return new DistributedKeyView(
                 entity.getId(),
                 entity.getKeyName(),
                 entity.getKeyPrefix(),
                 entity.getMaskedKey(),
-                entity.getAllowedProtocols(),
-                entity.getAllowedModels(),
-                entity.getAllowedProviderTypes(),
+                policy.allowedProtocols(),
+                policy.allowedModels(),
+                policy.allowedProviderTypes(),
                 entity.getExpiresAt(),
                 entity.getBudgetLimitMicros(),
                 entity.getBudgetWindowSeconds(),
-                entity.getRpmLimit(),
-                entity.getTpmLimit(),
-                entity.getConcurrencyLimit(),
+                policy.rpmLimit(),
+                policy.tpmLimit(),
+                policy.concurrencyLimit(),
                 entity.getStickySessionTtlSeconds(),
-                entity.getAllowedClientFamilies(),
+                policy.allowedClientFamilies(),
                 entity.isRequireClientFamilyMatch(),
                 bindings
         );

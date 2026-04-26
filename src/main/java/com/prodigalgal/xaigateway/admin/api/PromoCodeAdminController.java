@@ -62,4 +62,17 @@ public class PromoCodeAdminController {
             @RequestBody RedeemCodeBatchRequest request) {
         return promoCodeAdminService.createCodes(id, request);
     }
+
+    @PutMapping("/{id}/codes/{codeId}")
+    public RedeemCodeResponse updateCode(
+            @PathVariable Long id,
+            @PathVariable Long codeId,
+            @RequestBody RedeemCodeUpdateRequest request) {
+        return promoCodeAdminService.updateCode(id, codeId, request);
+    }
+
+    @DeleteMapping("/{id}/codes/{codeId}")
+    public void deleteCode(@PathVariable Long id, @PathVariable Long codeId) {
+        promoCodeAdminService.deleteCode(id, codeId);
+    }
 }
