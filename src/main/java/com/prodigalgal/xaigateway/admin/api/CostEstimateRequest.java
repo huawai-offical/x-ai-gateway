@@ -5,6 +5,10 @@ public record CostEstimateRequest(
         String modelName,
         Long inputTokens,
         Long outputTokens,
-        Long cacheHitTokens
+        Long cacheHitTokens,
+        Long distributedKeyId,
+        String distributedKeyPrefix,
+        Long userId,
+        Long singleRequestBudgetMicros
 ) {
 }

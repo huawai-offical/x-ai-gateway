@@ -2,6 +2,12 @@ package com.prodigalgal.xaigateway.portal.application;
 
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayUnauthorizedException;
 import com.prodigalgal.xaigateway.gateway.core.auth.AccessGroupEntitlementService;
+import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeySecretService;
+import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeySecrets;
+import com.prodigalgal.xaigateway.gateway.core.shared.ModelIdNormalizer;
+import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
+import com.prodigalgal.xaigateway.gateway.core.account.UpstreamAccountProviderType;
+import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyAccountPoolBindingEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.AnnouncementEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.AnnouncementReadStateEntity;
@@ -10,17 +16,22 @@ import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayUserEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.PromoCampaignEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.RedeemCodeEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.RedeemCodeUsageEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountPoolEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UserSubscriptionEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.AnnouncementReadStateRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.AnnouncementRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAccountPoolBindingRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayUserBalanceLedgerRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayUserRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.RedeemCodeRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.RedeemCodeUsageRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountPoolRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UserSubscriptionRepository;
 import com.prodigalgal.xaigateway.portal.api.PortalAnnouncementResponse;
 import com.prodigalgal.xaigateway.portal.api.PortalBalanceLedgerResponse;
+import com.prodigalgal.xaigateway.portal.api.PortalKeyCreateRequest;
+import com.prodigalgal.xaigateway.portal.api.PortalKeyCreateResponse;
 import com.prodigalgal.xaigateway.portal.api.PortalKeyResponse;
 import com.prodigalgal.xaigateway.portal.api.PortalLoginRequest;
 import com.prodigalgal.xaigateway.portal.api.PortalRedeemStatusResponse;
@@ -47,6 +58,7 @@ public class PortalAuthService {
 
     private static final String PORTAL_USER_ID_SESSION_KEY = "portalUserId";
     private static final String PORTAL_AUTHENTICATED_AT_SESSION_KEY = "portalAuthenticatedAt";
+    private static final String DEFAULT_POOL_NAME = "default";
     private static final Duration PORTAL_SESSION_TTL = Duration.ofHours(12);
 
     private final GatewayUserRepository gatewayUserRepository;
@@ -57,6 +69,9 @@ public class PortalAuthService {
     private final RedeemCodeRepository redeemCodeRepository;
     private final RedeemCodeUsageRepository redeemCodeUsageRepository;
     private final GatewayUserBalanceLedgerRepository balanceLedgerRepository;
+    private final UpstreamAccountPoolRepository accountPoolRepository;
+    private final DistributedKeyAccountPoolBindingRepository keyPoolBindingRepository;
+    private final DistributedKeySecretService distributedKeySecretService;
     private final PasswordEncoder passwordEncoder;
     private final AccessGroupEntitlementService accessGroupEntitlementService;
 
@@ -69,6 +84,9 @@ public class PortalAuthService {
             RedeemCodeRepository redeemCodeRepository,
             RedeemCodeUsageRepository redeemCodeUsageRepository,
             GatewayUserBalanceLedgerRepository balanceLedgerRepository,
+            UpstreamAccountPoolRepository accountPoolRepository,
+            DistributedKeyAccountPoolBindingRepository keyPoolBindingRepository,
+            DistributedKeySecretService distributedKeySecretService,
             PasswordEncoder passwordEncoder,
             AccessGroupEntitlementService accessGroupEntitlementService) {
         this.gatewayUserRepository = gatewayUserRepository;
@@ -79,6 +97,9 @@ public class PortalAuthService {
         this.redeemCodeRepository = redeemCodeRepository;
         this.redeemCodeUsageRepository = redeemCodeUsageRepository;
         this.balanceLedgerRepository = balanceLedgerRepository;
+        this.accountPoolRepository = accountPoolRepository;
+        this.keyPoolBindingRepository = keyPoolBindingRepository;
+        this.distributedKeySecretService = distributedKeySecretService;
         this.passwordEncoder = passwordEncoder;
         this.accessGroupEntitlementService = accessGroupEntitlementService;
     }
@@ -151,6 +172,57 @@ public class PortalAuthService {
         return distributedKeyRepository.findAllByOwnerUser_IdOrderByCreatedAtDesc(user.getId()).stream()
                 .map(this::toKeyResponse)
                 .toList();
+    }
+
+    public PortalKeyCreateResponse createKey(WebSession session, PortalKeyCreateRequest request) {
+        GatewayUserEntity user = requireCurrentUser(session);
+        UpstreamAccountPoolEntity defaultPool = ensureDefaultPool();
+        DistributedKeySecrets secrets = distributedKeySecretService.generate();
+
+        DistributedKeyEntity key = new DistributedKeyEntity();
+        key.setKeyName(required(request.keyName(), "Key 名称"));
+        key.setDescription("用户门户自助创建");
+        key.setOwnerUser(user);
+        key.setActive(true);
+        key.setAllowedProtocols(resolveProtocols(request.allowedProtocols(), defaultPool.getSupportedProtocols()));
+        key.setAllowedModels(resolveModels(request.allowedModels(), defaultPool.getSupportedModels()));
+        key.setAllowedProviderTypes(List.of(defaultPool.getProviderType().routeProviderType().name()));
+        key.setRpmLimit(positiveOrDefault(request.rpmLimit(), 60));
+        key.setTpmLimit(positiveOrDefault(request.tpmLimit(), 120_000));
+        key.setConcurrencyLimit(positiveOrDefault(request.concurrencyLimit(), 2));
+        key.setStickySessionTtlSeconds(1_800);
+        key.setAllowedClientFamilies(defaultPool.getAllowedClientFamilies());
+        key.setKeyPrefix(secrets.keyPrefix());
+        key.setSecretHash(secrets.secretHash());
+        key.setMaskedKey(secrets.maskedKey());
+
+        DistributedKeyEntity saved = distributedKeyRepository.save(key);
+        bindToDefaultPool(saved, defaultPool);
+        return new PortalKeyCreateResponse(
+                toKeyResponse(saved),
+                secrets.fullKey(),
+                "完整 Key 仅展示一次，请立即保存；后续只能查看掩码或轮换。"
+        );
+    }
+
+    public PortalKeyCreateResponse rotateKey(WebSession session, Long keyId) {
+        DistributedKeyEntity key = requireOwnedKey(session, keyId);
+        DistributedKeySecrets secrets = distributedKeySecretService.generate();
+        key.setKeyPrefix(secrets.keyPrefix());
+        key.setSecretHash(secrets.secretHash());
+        key.setMaskedKey(secrets.maskedKey());
+        DistributedKeyEntity saved = distributedKeyRepository.save(key);
+        return new PortalKeyCreateResponse(
+                toKeyResponse(saved),
+                secrets.fullKey(),
+                "完整 Key 仅展示一次，请立即更新客户端配置。"
+        );
+    }
+
+    public PortalKeyResponse disableKey(WebSession session, Long keyId) {
+        DistributedKeyEntity key = requireOwnedKey(session, keyId);
+        key.setActive(false);
+        return toKeyResponse(distributedKeyRepository.save(key));
     }
 
     public List<PortalAnnouncementResponse> listAnnouncements(WebSession session) {
@@ -257,6 +329,43 @@ public class PortalAuthService {
         return gatewayUserRepository.findById(userId)
                 .filter(GatewayUserEntity::isActive)
                 .orElseThrow(() -> new GatewayUnauthorizedException("门户会话已失效，请重新登录。"));
+    }
+
+    private DistributedKeyEntity requireOwnedKey(WebSession session, Long keyId) {
+        GatewayUserEntity user = requireCurrentUser(session);
+        DistributedKeyEntity key = distributedKeyRepository.findById(keyId)
+                .orElseThrow(() -> new IllegalArgumentException("未找到指定 Key。"));
+        if (key.getOwnerUser() == null || !user.getId().equals(key.getOwnerUser().getId())) {
+            throw new GatewayUnauthorizedException("无权操作该 Key。");
+        }
+        return key;
+    }
+
+    private UpstreamAccountPoolEntity ensureDefaultPool() {
+        return accountPoolRepository.findByPoolNameIgnoreCase(DEFAULT_POOL_NAME)
+                .orElseGet(() -> {
+                    UpstreamAccountPoolEntity entity = new UpstreamAccountPoolEntity();
+                    entity.setPoolName(DEFAULT_POOL_NAME);
+                    entity.setProviderType(UpstreamAccountProviderType.OPENAI_OAUTH);
+                    entity.setSupportedModels(List.of());
+                    entity.setSupportedProtocols(List.of("openai", "responses"));
+                    entity.setAllowedClientFamilies(List.of("GENERIC_OPENAI", "CODEX"));
+                    entity.setDescription("系统默认账号池");
+                    entity.setActive(true);
+                    return accountPoolRepository.save(entity);
+                });
+    }
+
+    private void bindToDefaultPool(DistributedKeyEntity key, UpstreamAccountPoolEntity defaultPool) {
+        DistributedKeyAccountPoolBindingEntity binding = new DistributedKeyAccountPoolBindingEntity();
+        binding.setDistributedKey(key);
+        binding.setPool(defaultPool);
+        binding.setProviderType(defaultPool.getProviderType() == null
+                ? ProviderType.OPENAI_DIRECT
+                : defaultPool.getProviderType().routeProviderType());
+        binding.setPriority(100);
+        binding.setActive(true);
+        keyPoolBindingRepository.save(binding);
     }
 
     private Long readUserId(WebSession session) {
@@ -445,5 +554,67 @@ public class PortalAuthService {
             return null;
         }
         return value.trim();
+    }
+
+    private String required(String value, String field) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(field + "不能为空。");
+        }
+        return value.trim();
+    }
+
+    private int positiveOrDefault(Integer value, int fallback) {
+        return value == null || value <= 0 ? fallback : value;
+    }
+
+    private List<String> resolveProtocols(List<String> requested, List<String> poolProtocols) {
+        List<String> available = normalizePlainList(poolProtocols).stream()
+                .map(value -> value.toLowerCase(Locale.ROOT))
+                .toList();
+        List<String> selected = normalizePlainList(requested).stream()
+                .map(value -> value.toLowerCase(Locale.ROOT))
+                .toList();
+        if (selected.isEmpty()) {
+            return available.isEmpty() ? List.of("openai") : available;
+        }
+        if (!available.isEmpty() && !available.containsAll(selected)) {
+            throw new IllegalArgumentException("存在默认账号池不支持的协议。");
+        }
+        return selected;
+    }
+
+    private List<String> resolveModels(List<String> requested, List<String> poolModels) {
+        List<String> available = normalizeModels(poolModels);
+        List<String> selected = normalizeModels(requested);
+        if (selected.isEmpty()) {
+            return available;
+        }
+        if (!available.isEmpty() && !available.containsAll(selected)) {
+            throw new IllegalArgumentException("存在默认账号池不支持的模型。");
+        }
+        return selected;
+    }
+
+    private List<String> normalizeModels(List<String> values) {
+        if (values == null) {
+            return List.of();
+        }
+        return values.stream()
+                .filter(value -> value != null && !value.isBlank())
+                .map(ModelIdNormalizer::normalize)
+                .filter(value -> value != null && !value.isBlank())
+                .distinct()
+                .toList();
+    }
+
+    private List<String> normalizePlainList(List<String> values) {
+        if (values == null) {
+            return List.of();
+        }
+        return values.stream()
+                .filter(value -> value != null && !value.isBlank())
+                .map(String::trim)
+                .distinct()
+                .toList();
     }
 }

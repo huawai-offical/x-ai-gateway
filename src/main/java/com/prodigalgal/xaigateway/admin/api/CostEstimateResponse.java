@@ -1,5 +1,7 @@
 package com.prodigalgal.xaigateway.admin.api;
 
+import java.util.List;
+
 public record CostEstimateResponse(
         String providerType,
         String modelName,
@@ -11,6 +13,15 @@ public record CostEstimateResponse(
         String estimatedDisplay,
         long inputTokenMicros,
         long outputTokenMicros,
-        long cacheHitTokenMicros
+        long cacheHitTokenMicros,
+        Long distributedKeyId,
+        String distributedKeyName,
+        Long ownerUserId,
+        Long budgetLimitMicros,
+        Integer budgetWindowSeconds,
+        Long singleRequestBudgetMicros,
+        Long currentTokenCredits,
+        boolean allowed,
+        List<String> rejectionReasons
 ) {
 }

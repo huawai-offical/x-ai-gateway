@@ -2,29 +2,37 @@ package com.prodigalgal.xaigateway.portal.application;
 
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayUnauthorizedException;
 import com.prodigalgal.xaigateway.gateway.core.auth.AccessGroupEntitlementService;
+import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeySecretService;
+import com.prodigalgal.xaigateway.gateway.core.account.UpstreamAccountProviderType;
 import com.prodigalgal.xaigateway.infra.persistence.entity.AccessGroupEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.AnnouncementEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyAccountPoolBindingEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayUserBalanceLedgerEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayUserEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.PromoCampaignEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.RedeemCodeEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SubscriptionPlanEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountPoolEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UserSubscriptionEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.AnnouncementReadStateRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.AnnouncementRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAccountPoolBindingRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayUserBalanceLedgerRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayUserRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.RedeemCodeRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.RedeemCodeUsageRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountPoolRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UserSubscriptionRepository;
+import com.prodigalgal.xaigateway.portal.api.PortalKeyCreateRequest;
 import com.prodigalgal.xaigateway.portal.api.PortalLoginRequest;
 import com.prodigalgal.xaigateway.portal.api.PortalRegisterRequest;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
@@ -47,6 +55,9 @@ class PortalAuthServiceTests {
     private final RedeemCodeRepository redeemCodeRepository = Mockito.mock(RedeemCodeRepository.class);
     private final RedeemCodeUsageRepository redeemCodeUsageRepository = Mockito.mock(RedeemCodeUsageRepository.class);
     private final GatewayUserBalanceLedgerRepository balanceLedgerRepository = Mockito.mock(GatewayUserBalanceLedgerRepository.class);
+    private final UpstreamAccountPoolRepository accountPoolRepository = Mockito.mock(UpstreamAccountPoolRepository.class);
+    private final DistributedKeyAccountPoolBindingRepository keyPoolBindingRepository = Mockito.mock(DistributedKeyAccountPoolBindingRepository.class);
+    private final DistributedKeySecretService distributedKeySecretService = new DistributedKeySecretService();
     private final PasswordEncoder passwordEncoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
     private final AccessGroupEntitlementService accessGroupEntitlementService = Mockito.mock(AccessGroupEntitlementService.class);
     private final PortalAuthService service = new PortalAuthService(
@@ -58,6 +69,9 @@ class PortalAuthServiceTests {
             redeemCodeRepository,
             redeemCodeUsageRepository,
             balanceLedgerRepository,
+            accountPoolRepository,
+            keyPoolBindingRepository,
+            distributedKeySecretService,
             passwordEncoder,
             accessGroupEntitlementService
     );
@@ -164,6 +178,70 @@ class PortalAuthServiceTests {
     }
 
     @Test
+    void shouldCreateRotateAndDisableOwnedPortalKey() {
+        GatewayUserEntity user = user(8L, "beta@example.com", "password-123");
+        UpstreamAccountPoolEntity pool = defaultPool();
+        Mockito.when(userRepository.findByEmailIgnoreCase("beta@example.com")).thenReturn(Optional.of(user));
+        Mockito.when(userRepository.findById(8L)).thenReturn(Optional.of(user));
+        Mockito.when(userRepository.save(Mockito.any())).thenAnswer(invocation -> invocation.getArgument(0));
+        Mockito.when(accountPoolRepository.findByPoolNameIgnoreCase("default")).thenReturn(Optional.of(pool));
+        AtomicReference<DistributedKeyEntity> savedKeyRef = new AtomicReference<>();
+        Mockito.when(keyRepository.save(Mockito.any())).thenAnswer(invocation -> {
+            DistributedKeyEntity key = invocation.getArgument(0);
+            if (key.getId() == null) {
+                ReflectionTestUtils.setField(key, "id", 81L);
+            }
+            savedKeyRef.set(key);
+            return key;
+        });
+        Mockito.when(keyPoolBindingRepository.save(Mockito.any())).thenAnswer(invocation -> invocation.getArgument(0));
+        MockServerWebExchange exchange = exchange();
+        service.login(new PortalLoginRequest("beta@example.com", "password-123"), exchange).block();
+
+        var created = service.createKey(exchange.getSession().block(), new PortalKeyCreateRequest(
+                "Portal Self Key",
+                List.of("openai"),
+                List.of("gpt-5-mini"),
+                null,
+                null,
+                null
+        ));
+        DistributedKeyEntity savedKey = savedKeyRef.get();
+        savedKey.setOwnerUser(user);
+        Mockito.when(keyRepository.findById(81L)).thenReturn(Optional.of(savedKey));
+        var rotated = service.rotateKey(exchange.getSession().block(), 81L);
+        var disabled = service.disableKey(exchange.getSession().block(), 81L);
+
+        assertTrue(created.fullKey().startsWith("sk-gw-"));
+        assertEquals("Portal Self Key", created.key().keyName());
+        assertTrue(created.key().active());
+        assertTrue(rotated.fullKey().startsWith("sk-gw-"));
+        assertTrue(!disabled.active());
+        Mockito.verify(keyPoolBindingRepository).save(Mockito.any(DistributedKeyAccountPoolBindingEntity.class));
+    }
+
+    @Test
+    void shouldRejectPortalKeyOperationForOtherUser() {
+        GatewayUserEntity user = user(8L, "beta@example.com", "password-123");
+        GatewayUserEntity otherUser = user(9L, "other@example.com", "password-123");
+        DistributedKeyEntity otherKey = distributedKey(91L);
+        otherKey.setOwnerUser(otherUser);
+        Mockito.when(userRepository.findByEmailIgnoreCase("beta@example.com")).thenReturn(Optional.of(user));
+        Mockito.when(userRepository.findById(8L)).thenReturn(Optional.of(user));
+        Mockito.when(userRepository.save(Mockito.any())).thenAnswer(invocation -> invocation.getArgument(0));
+        Mockito.when(keyRepository.findById(91L)).thenReturn(Optional.of(otherKey));
+        MockServerWebExchange exchange = exchange();
+        service.login(new PortalLoginRequest("beta@example.com", "password-123"), exchange).block();
+
+        GatewayUnauthorizedException exception = assertThrows(
+                GatewayUnauthorizedException.class,
+                () -> service.disableKey(exchange.getSession().block(), 91L)
+        );
+
+        assertEquals("无权操作该 Key。", exception.getMessage());
+    }
+
+    @Test
     void shouldRejectPortalResourceWithoutSession() {
         GatewayUnauthorizedException exception = assertThrows(
                 GatewayUnauthorizedException.class,
@@ -258,5 +336,17 @@ class PortalAuthServiceTests {
         redeemCode.setMaxUses(1);
         redeemCode.setUsedCount(0);
         return redeemCode;
+    }
+
+    private UpstreamAccountPoolEntity defaultPool() {
+        UpstreamAccountPoolEntity pool = new UpstreamAccountPoolEntity();
+        ReflectionTestUtils.setField(pool, "id", 16L);
+        pool.setPoolName("default");
+        pool.setProviderType(UpstreamAccountProviderType.OPENAI_OAUTH);
+        pool.setSupportedProtocols(List.of("openai", "responses"));
+        pool.setSupportedModels(List.of("gpt-5-mini"));
+        pool.setAllowedClientFamilies(List.of("GENERIC_OPENAI", "CODEX"));
+        pool.setActive(true);
+        return pool;
     }
 }

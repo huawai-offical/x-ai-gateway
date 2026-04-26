@@ -58,6 +58,27 @@ public class PortalAuthController {
         return exchange.getSession().map(portalAuthService::listKeys);
     }
 
+    @PostMapping("/keys")
+    public Mono<PortalKeyCreateResponse> createKey(
+            @Valid @RequestBody PortalKeyCreateRequest request,
+            ServerWebExchange exchange) {
+        return exchange.getSession().map(session -> portalAuthService.createKey(session, request));
+    }
+
+    @PostMapping("/keys/{id}/rotate")
+    public Mono<PortalKeyCreateResponse> rotateKey(
+            @PathVariable Long id,
+            ServerWebExchange exchange) {
+        return exchange.getSession().map(session -> portalAuthService.rotateKey(session, id));
+    }
+
+    @PostMapping("/keys/{id}/disable")
+    public Mono<PortalKeyResponse> disableKey(
+            @PathVariable Long id,
+            ServerWebExchange exchange) {
+        return exchange.getSession().map(session -> portalAuthService.disableKey(session, id));
+    }
+
     @GetMapping("/announcements")
     public Mono<List<PortalAnnouncementResponse>> announcements(ServerWebExchange exchange) {
         return exchange.getSession().map(portalAuthService::listAnnouncements);

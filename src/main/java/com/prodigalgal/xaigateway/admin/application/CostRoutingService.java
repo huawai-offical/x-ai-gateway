@@ -6,11 +6,17 @@ import com.prodigalgal.xaigateway.admin.api.CostModelRequest;
 import com.prodigalgal.xaigateway.admin.api.CostModelResponse;
 import com.prodigalgal.xaigateway.admin.api.CostSummaryResponse;
 import com.prodigalgal.xaigateway.infra.persistence.entity.CostModelEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayUserBalanceLedgerEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.CostModelRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayUserBalanceLedgerRepository;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,9 +28,16 @@ public class CostRoutingService {
     private static final long SAMPLE_OUTPUT_TOKENS = 1_000_000;
 
     private final CostModelRepository costModelRepository;
+    private final DistributedKeyRepository distributedKeyRepository;
+    private final GatewayUserBalanceLedgerRepository balanceLedgerRepository;
 
-    public CostRoutingService(CostModelRepository costModelRepository) {
+    public CostRoutingService(
+            CostModelRepository costModelRepository,
+            DistributedKeyRepository distributedKeyRepository,
+            GatewayUserBalanceLedgerRepository balanceLedgerRepository) {
         this.costModelRepository = costModelRepository;
+        this.distributedKeyRepository = distributedKeyRepository;
+        this.balanceLedgerRepository = balanceLedgerRepository;
     }
 
     @Transactional(readOnly = true)
@@ -58,7 +71,14 @@ public class CostRoutingService {
         CostModelEntity model = costModelRepository
                 .findFirstByProviderTypeAndModelNameAndActiveTrueOrderByUpdatedAtDesc(providerType, modelName)
                 .orElseThrow(() -> new IllegalArgumentException("未找到可用成本模型。"));
-        return estimateWithModel(model, tokens(request.inputTokens()), tokens(request.outputTokens()), tokens(request.cacheHitTokens()));
+        return estimateWithModel(
+                model,
+                tokens(request.inputTokens()),
+                tokens(request.outputTokens()),
+                tokens(request.cacheHitTokens()),
+                resolveDistributedKey(request),
+                request.userId(),
+                nonNegativeOrNull(request.singleRequestBudgetMicros()));
     }
 
     @Transactional(readOnly = true)
@@ -66,7 +86,7 @@ public class CostRoutingService {
         List<CostModelEntity> models = costModelRepository.findAllByOrderByCreatedAtDesc();
         List<CostEstimateResponse> distribution = models.stream()
                 .filter(CostModelEntity::isActive)
-                .map(model -> estimateWithModel(model, SAMPLE_INPUT_TOKENS, SAMPLE_OUTPUT_TOKENS, 0L))
+                .map(model -> estimateWithModel(model, SAMPLE_INPUT_TOKENS, SAMPLE_OUTPUT_TOKENS, 0L, Optional.empty(), null, null))
                 .toList();
         long totalMicros = distribution.stream().mapToLong(CostEstimateResponse::estimatedMicros).sum();
         String currency = distribution.isEmpty() ? "USD" : distribution.get(0).currency();
@@ -80,10 +100,23 @@ public class CostRoutingService {
         );
     }
 
-    private CostEstimateResponse estimateWithModel(CostModelEntity model, long inputTokens, long outputTokens, long cacheHitTokens) {
+    private CostEstimateResponse estimateWithModel(
+            CostModelEntity model,
+            long inputTokens,
+            long outputTokens,
+            long cacheHitTokens,
+            Optional<DistributedKeyEntity> distributedKey,
+            Long requestedUserId,
+            Long singleRequestBudgetMicros) {
         long estimatedMicros = inputTokens * model.getInputTokenMicros()
                 + outputTokens * model.getOutputTokenMicros()
                 + cacheHitTokens * model.getCacheHitTokenMicros();
+        DistributedKeyEntity key = distributedKey.orElse(null);
+        Long ownerUserId = resolveOwnerUserId(key, requestedUserId);
+        Long currentTokenCredits = ownerUserId == null ? null : currentTokenCredits(ownerUserId);
+        Long budgetLimitMicros = key == null ? null : key.getBudgetLimitMicros();
+        Integer budgetWindowSeconds = key == null ? null : key.getBudgetWindowSeconds();
+        List<String> rejectionReasons = rejectionReasons(estimatedMicros, budgetLimitMicros, singleRequestBudgetMicros, currentTokenCredits);
         return new CostEstimateResponse(
                 model.getProviderType(),
                 model.getModelName(),
@@ -95,8 +128,62 @@ public class CostRoutingService {
                 display(model.getCurrency(), estimatedMicros),
                 model.getInputTokenMicros(),
                 model.getOutputTokenMicros(),
-                model.getCacheHitTokenMicros()
+                model.getCacheHitTokenMicros(),
+                key == null ? null : key.getId(),
+                key == null ? null : key.getKeyName(),
+                ownerUserId,
+                budgetLimitMicros,
+                budgetWindowSeconds,
+                singleRequestBudgetMicros,
+                currentTokenCredits,
+                rejectionReasons.isEmpty(),
+                rejectionReasons
         );
+    }
+
+    private Optional<DistributedKeyEntity> resolveDistributedKey(CostEstimateRequest request) {
+        if (request.distributedKeyId() != null) {
+            return distributedKeyRepository.findById(request.distributedKeyId());
+        }
+        String prefix = request.distributedKeyPrefix() == null ? "" : request.distributedKeyPrefix().trim();
+        if (!prefix.isEmpty()) {
+            return distributedKeyRepository.findByKeyPrefixAndActiveTrue(prefix);
+        }
+        return Optional.empty();
+    }
+
+    private Long resolveOwnerUserId(DistributedKeyEntity key, Long requestedUserId) {
+        if (requestedUserId != null) {
+            return requestedUserId;
+        }
+        if (key == null || key.getOwnerUser() == null) {
+            return null;
+        }
+        return key.getOwnerUser().getId();
+    }
+
+    private Long currentTokenCredits(Long ownerUserId) {
+        return balanceLedgerRepository.findTopByUser_IdOrderByCreatedAtDescIdDesc(ownerUserId)
+                .map(GatewayUserBalanceLedgerEntity::getBalanceAfterTokenCredits)
+                .orElse(null);
+    }
+
+    private List<String> rejectionReasons(
+            long estimatedMicros,
+            Long budgetLimitMicros,
+            Long singleRequestBudgetMicros,
+            Long currentTokenCredits) {
+        List<String> reasons = new ArrayList<>();
+        if (budgetLimitMicros != null && estimatedMicros > budgetLimitMicros) {
+            reasons.add("超过分发 Key 预算上限。");
+        }
+        if (singleRequestBudgetMicros != null && estimatedMicros > singleRequestBudgetMicros) {
+            reasons.add("超过单请求预算上限。");
+        }
+        if (currentTokenCredits != null && estimatedMicros > currentTokenCredits) {
+            reasons.add("用户余额不足。");
+        }
+        return List.copyOf(reasons);
     }
 
     private String display(String currency, long micros) {
@@ -110,6 +197,10 @@ public class CostRoutingService {
 
     private long nonNegative(Long value, long fallback) {
         return value == null ? fallback : Math.max(0L, value);
+    }
+
+    private Long nonNegativeOrNull(Long value) {
+        return value == null ? null : Math.max(0L, value);
     }
 
     private String required(String value, String field) {
