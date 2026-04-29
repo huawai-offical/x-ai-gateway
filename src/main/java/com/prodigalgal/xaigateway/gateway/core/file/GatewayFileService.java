@@ -192,6 +192,45 @@ public class GatewayFileService {
         return createFile(distributedKeyId, filePart, purpose, null);
     }
 
+    public GatewayFileResponse createFileFromBytes(
+            Long distributedKeyId,
+            String filename,
+            String mimeType,
+            String purpose,
+            byte[] bytes) {
+        return createFileFromBytes(distributedKeyId, filename, mimeType, purpose, bytes, null);
+    }
+
+    public GatewayFileResponse createFileFromBytes(
+            Long distributedKeyId,
+            String filename,
+            String mimeType,
+            String purpose,
+            byte[] bytes,
+            Long preferredCredentialId) {
+        UpstreamFileTarget upstreamTarget = resolveUpstreamFileTarget(distributedKeyId, preferredCredentialId)
+                .orElseThrow(() -> new IllegalArgumentException("当前 DistributedKey 没有可用的 files 上游编排站点。"));
+        Path directory = ensureStorageDirectory();
+        String safeFilename = sanitizeFilename(filename);
+        String fileKey = "file-" + UUID.randomUUID().toString().replace("-", "");
+        Path storagePath = directory.resolve(fileKey + "-" + safeFilename);
+        try {
+            Files.write(storagePath, bytes == null ? new byte[0] : bytes);
+            GatewayFileEntity file = persistFile(
+                    distributedKeyId,
+                    fileKey,
+                    storagePath,
+                    filename == null || filename.isBlank() ? safeFilename : filename.trim(),
+                    mimeType == null || mimeType.isBlank() ? "application/octet-stream" : mimeType.trim(),
+                    purpose
+            );
+            synchronizeUpstreamFile(file, upstreamTarget);
+            return toResponse(file);
+        } catch (IOException exception) {
+            throw new IllegalStateException("写入网关文件失败。", exception);
+        }
+    }
+
     public Mono<GatewayFileResponse> createFile(Long distributedKeyId, FilePart filePart, String purpose, Long preferredCredentialId) {
         UpstreamFileTarget upstreamTarget = resolveUpstreamFileTarget(distributedKeyId, preferredCredentialId)
                 .orElseThrow(() -> new IllegalArgumentException("当前 DistributedKey 没有可用的 files 上游编排站点。"));

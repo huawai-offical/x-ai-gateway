@@ -12,6 +12,7 @@ import com.prodigalgal.xaigateway.admin.application.CredentialCryptoService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedCredentialBindingView;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyQueryService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyView;
+import com.prodigalgal.xaigateway.gateway.core.catalog.FineTunedModelRegistrationService;
 import com.prodigalgal.xaigateway.gateway.core.credential.CredentialMaterialResolver;
 import com.prodigalgal.xaigateway.gateway.core.credential.ResolvedCredentialMaterial;
 import com.prodigalgal.xaigateway.gateway.core.interop.SiteCapabilityTruthService;
@@ -484,6 +485,7 @@ class GatewayAsyncResourceServiceTests {
         GatewayFileBindingRepository gatewayFileBindingRepository = Mockito.mock(GatewayFileBindingRepository.class);
         CredentialMaterialResolver credentialMaterialResolver = Mockito.mock(CredentialMaterialResolver.class);
         GeminiChatModelFactory geminiChatModelFactory = Mockito.mock(GeminiChatModelFactory.class);
+        FineTunedModelRegistrationService fineTunedModelRegistrationService = Mockito.mock(FineTunedModelRegistrationService.class);
 
         GatewayAsyncResourceService service = new GatewayAsyncResourceService(
                 gatewayAsyncResourceRepository,
@@ -493,9 +495,12 @@ class GatewayAsyncResourceServiceTests {
                 snapshotRepository,
                 gatewayFileRepository,
                 gatewayFileBindingRepository,
+                Mockito.mock(com.prodigalgal.xaigateway.gateway.core.file.GatewayFileService.class),
                 Mockito.mock(CredentialCryptoService.class),
                 credentialMaterialResolver,
                 new SiteCapabilityTruthService(new UpstreamSitePolicyService(), snapshotRepository),
+                fineTunedModelRegistrationService,
+                Mockito.mock(com.prodigalgal.xaigateway.provider.adapter.anthropic.AnthropicChatModelFactory.class),
                 geminiChatModelFactory,
                 new ObjectMapper(),
                 Clock.fixed(Instant.parse("2026-04-12T04:00:00Z"), ZoneOffset.UTC),
@@ -510,7 +515,16 @@ class GatewayAsyncResourceServiceTests {
         entity.setStatus("queued");
         entity.setRequestPayloadJson("{\"model\":\"gemini-2.5-pro\",\"training_file\":\"files/upstream-train\"}");
         entity.setResponsePayloadJson("{\"id\":\"ftjob_local_1\",\"object\":\"fine_tuning.job\",\"status\":\"queued\"}");
-        entity.setMetadataJson("{\"upstream_object_id\":\"tunings/upstream-1\",\"credential_id\":201,\"site_profile_id\":2,\"events\":[]}");
+        entity.setMetadataJson("""
+                {
+                  "upstream_object_id":"tunings/upstream-1",
+                  "credential_id":201,
+                  "site_profile_id":2,
+                  "registered_model_key":"tunedmodels-demo",
+                  "registered_aliases":["demo-suffix"],
+                  "events":[]
+                }
+                """);
 
         Mockito.when(gatewayAsyncResourceRepository.findByResourceKeyAndResourceTypeAndDeletedFalse("ftjob_local_1", GatewayAsyncResourceType.TUNING))
                 .thenReturn(Optional.of(entity));
@@ -532,6 +546,7 @@ class GatewayAsyncResourceServiceTests {
         assertEquals("ftjob_local_1", response.path("id").asText());
         assertEquals("cancelled", response.path("status").asText());
         Mockito.verify(tuningsFacade).cancel(Mockito.eq("tunings/upstream-1"), any(com.google.genai.types.CancelTuningJobConfig.class));
+        Mockito.verify(fineTunedModelRegistrationService).unregister(2L, "tunedmodels-demo", List.of("demo-suffix"), "ftjob_local_1");
     }
 
     @Test
@@ -589,6 +604,11 @@ class GatewayAsyncResourceServiceTests {
             stored.set(entity);
             return entity;
         });
+        Mockito.when(gatewayFileRepository.save(any())).thenAnswer(invocation -> {
+            GatewayFileEntity entity = invocation.getArgument(0);
+            ReflectionTestUtils.setField(entity, "createdAt", Instant.parse("2026-04-12T04:00:00Z"));
+            return entity;
+        });
         Mockito.when(gatewayAsyncResourceRepository.findByResourceKeyAndResourceTypeAndDeletedFalse(any(), any()))
                 .thenAnswer(invocation -> {
                     String resourceKey = invocation.getArgument(0);
@@ -604,7 +624,7 @@ class GatewayAsyncResourceServiceTests {
         JsonNode createResponse = service.createUpload(1L, mapper.readTree("""
                 {
                   "filename":"batch-input.jsonl",
-                  "bytes":1234,
+                  "bytes":5,
                   "purpose":"batch"
                 }
                 """), 201L);
@@ -639,11 +659,20 @@ class GatewayAsyncResourceServiceTests {
         assertEquals(uploadId, partResponse.path("upload_id").asText());
         assertTrue(stored.get().getMetadataJson().contains("\"object_mode\":\"gateway_upload_object\""));
         assertTrue(stored.get().getMetadataJson().contains("\"partsCount\":1"));
+        String partStoragePath = new ObjectMapper()
+                .readTree(stored.get().getMetadataJson())
+                .path("part_bindings")
+                .get(0)
+                .path("storage_path")
+                .asText();
+        assertTrue(Files.exists(Path.of(partStoragePath)));
 
         JsonNode completed = service.completeUpload(uploadId, 1L);
         assertEquals("completed", completed.path("status").asText());
-        JsonNode cancelled = service.cancelUpload(uploadId, 1L);
-        assertEquals("cancelled", cancelled.path("status").asText());
+        assertTrue(stored.get().getMetadataJson().contains("\"part_files_cleaned\":true"));
+        assertTrue(!Files.exists(Path.of(partStoragePath)));
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class, () -> service.cancelUpload(uploadId, 1L));
+        assertEquals("已完成的 Upload 不允许取消。", error.getMessage());
     }
 
     @Test

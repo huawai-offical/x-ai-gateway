@@ -1,5 +1,6 @@
 package com.prodigalgal.xaigateway.gateway.core.observability;
 
+import com.prodigalgal.xaigateway.admin.application.CostRoutingService;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
@@ -40,6 +41,7 @@ public class GatewayRequestLifecycleService {
     private final UpstreamAccountRepository upstreamAccountRepository;
     private final UpstreamCredentialRepository upstreamCredentialRepository;
     private final GatewayObservabilityAsyncPersistenceService asyncPersistenceService;
+    private final CostRoutingService costRoutingService;
 
     @Autowired
     public GatewayRequestLifecycleService(
@@ -50,7 +52,8 @@ public class GatewayRequestLifecycleService {
             ObjectMapper objectMapper,
             UpstreamAccountRepository upstreamAccountRepository,
             UpstreamCredentialRepository upstreamCredentialRepository,
-            GatewayObservabilityAsyncPersistenceService asyncPersistenceService) {
+            GatewayObservabilityAsyncPersistenceService asyncPersistenceService,
+            CostRoutingService costRoutingService) {
         this.requestLogRepository = requestLogRepository;
         this.usageRecordRepository = usageRecordRepository;
         this.gatewayAuditLogService = gatewayAuditLogService;
@@ -59,6 +62,7 @@ public class GatewayRequestLifecycleService {
         this.upstreamAccountRepository = upstreamAccountRepository;
         this.upstreamCredentialRepository = upstreamCredentialRepository;
         this.asyncPersistenceService = asyncPersistenceService;
+        this.costRoutingService = costRoutingService;
     }
 
     public GatewayRequestLifecycleService(
@@ -76,7 +80,8 @@ public class GatewayRequestLifecycleService {
                 objectMapper,
                 null,
                 null,
-                asyncPersistenceService
+                asyncPersistenceService,
+                null
         );
     }
 
@@ -86,7 +91,7 @@ public class GatewayRequestLifecycleService {
             GatewayAuditLogService gatewayAuditLogService,
             MeterRegistry meterRegistry,
             ObjectMapper objectMapper) {
-        this(requestLogRepository, usageRecordRepository, gatewayAuditLogService, meterRegistry, objectMapper, null, null, null);
+        this(requestLogRepository, usageRecordRepository, gatewayAuditLogService, meterRegistry, objectMapper, null, null, null, null);
     }
 
     public void startRequest(
@@ -583,7 +588,8 @@ public class GatewayRequestLifecycleService {
                 executionBackend,
                 objectMode,
                 stream,
-                usage
+                usage,
+                status
         );
         recordMetrics(selectionResult, requestPath, stream, status, usage, durationMs);
         recordCredentialMetrics(
@@ -797,7 +803,8 @@ public class GatewayRequestLifecycleService {
             String executionBackend,
             String objectMode,
             boolean stream,
-            GatewayUsageView usage) {
+            GatewayUsageView usage,
+            GatewayRequestStatus status) {
         if (usage == null || !usage.present()) {
             return;
         }
@@ -828,6 +835,9 @@ public class GatewayRequestLifecycleService {
                         toJson(usage.nativeUsagePayload())
                 );
         enqueueOrPersistUsageRecord(snapshot);
+        if (status == GatewayRequestStatus.COMPLETED && costRoutingService != null) {
+            costRoutingService.settleCompletedUsage(requestId, selectionResult, usage);
+        }
     }
 
     private void recordMetrics(

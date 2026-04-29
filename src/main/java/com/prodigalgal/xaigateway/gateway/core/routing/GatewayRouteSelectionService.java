@@ -1,5 +1,7 @@
 package com.prodigalgal.xaigateway.gateway.core.routing;
 
+import com.prodigalgal.xaigateway.admin.api.CostEstimateResponse;
+import com.prodigalgal.xaigateway.admin.application.CostRoutingService;
 import com.prodigalgal.xaigateway.gateway.core.account.AccountSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedCredentialBindingView;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyGovernanceService;
@@ -64,6 +66,7 @@ public class GatewayRouteSelectionService {
     private final GovernancePolicyEngine governancePolicyEngine;
     private final RouteCacheStore routeCacheStore;
     private final HealthStateStore healthStateStore;
+    private final CostRoutingService costRoutingService;
 
     @Autowired
     public GatewayRouteSelectionService(
@@ -80,7 +83,8 @@ public class GatewayRouteSelectionService {
             NonChatRoutePolicyService nonChatRoutePolicyService,
             GovernancePolicyEngine governancePolicyEngine,
             RouteCacheStore routeCacheStore,
-            HealthStateStore healthStateStore) {
+            HealthStateStore healthStateStore,
+            CostRoutingService costRoutingService) {
         this.distributedKeyQueryService = distributedKeyQueryService;
         this.modelCatalogQueryService = modelCatalogQueryService;
         this.promptFingerprintService = promptFingerprintService;
@@ -95,6 +99,7 @@ public class GatewayRouteSelectionService {
         this.governancePolicyEngine = governancePolicyEngine;
         this.routeCacheStore = routeCacheStore;
         this.healthStateStore = healthStateStore;
+        this.costRoutingService = costRoutingService;
     }
 
     public GatewayRouteSelectionService(
@@ -148,7 +153,8 @@ public class GatewayRouteSelectionService {
                     @Override
                     public void clear(Long credentialId) {
                     }
-                }
+                },
+                null
         );
     }
 
@@ -179,7 +185,42 @@ public class GatewayRouteSelectionService {
                 NonChatRoutePolicyService.forTests(siteCapabilityTruthService, new ExecutionBackendPolicyService()),
                 GovernancePolicyEngine.allowAll(),
                 routeCacheStore,
-                healthStateStore
+                healthStateStore,
+                null
+        );
+    }
+
+    public GatewayRouteSelectionService(
+            DistributedKeyQueryService distributedKeyQueryService,
+            ModelCatalogQueryService modelCatalogQueryService,
+            PromptFingerprintService promptFingerprintService,
+            AffinityCacheService affinityCacheService,
+            DistributedKeyGovernanceService distributedKeyGovernanceService,
+            UpstreamCredentialRepository upstreamCredentialRepository,
+            NetworkProxyRepository networkProxyRepository,
+            AccountSelectionService accountSelectionService,
+            GatewayRequestFeatureService gatewayRequestFeatureService,
+            SiteCapabilityTruthService siteCapabilityTruthService,
+            NonChatRoutePolicyService nonChatRoutePolicyService,
+            GovernancePolicyEngine governancePolicyEngine,
+            RouteCacheStore routeCacheStore,
+            HealthStateStore healthStateStore) {
+        this(
+                distributedKeyQueryService,
+                modelCatalogQueryService,
+                promptFingerprintService,
+                affinityCacheService,
+                distributedKeyGovernanceService,
+                upstreamCredentialRepository,
+                networkProxyRepository,
+                accountSelectionService,
+                gatewayRequestFeatureService,
+                siteCapabilityTruthService,
+                nonChatRoutePolicyService,
+                governancePolicyEngine,
+                routeCacheStore,
+                healthStateStore,
+                null
         );
     }
 
@@ -226,7 +267,15 @@ public class GatewayRouteSelectionService {
         );
 
         List<RouteCandidateEvaluation> candidateEvaluations = snapshot.candidateEvaluations().stream()
-                .map(candidate -> evaluateCandidate(candidate, distributedKey, snapshot.modelGroup(), prefixHash, fingerprint, clientFamily))
+                .map(candidate -> evaluateCandidate(
+                        candidate,
+                        distributedKey,
+                        snapshot.modelGroup(),
+                        prefixHash,
+                        fingerprint,
+                        clientFamily,
+                        governanceDecision,
+                        request.requestBody()))
                 .sorted(candidateEvaluationComparator())
                 .toList();
 
@@ -235,7 +284,11 @@ public class GatewayRouteSelectionService {
                 .map(RouteCandidateEvaluation::candidate)
                 .toList();
         if (candidates.isEmpty()) {
-            throw new IllegalArgumentException("当前 provider 候选已被健康或冷却策略阻断。");
+            List<String> reasons = candidateEvaluations.stream()
+                    .flatMap(item -> item.exclusionReasons().stream())
+                    .distinct()
+                    .toList();
+            throw new IllegalArgumentException("当前 provider 候选不可用：" + String.join("；", reasons));
         }
 
         RouteCandidateEvaluation selectedEvaluation = candidateEvaluations.stream()
@@ -461,12 +514,15 @@ public class GatewayRouteSelectionService {
             String modelGroup,
             String prefixHash,
             String fingerprint,
-            GatewayClientFamily clientFamily) {
+            GatewayClientFamily clientFamily,
+            DistributedKeyGovernanceService.GovernanceDecision governanceDecision,
+            Object requestBody) {
         List<String> exclusionReasons = new ArrayList<>(staticEvaluation.exclusionReasons());
         RouteSelectionSource selectionSource = RouteSelectionSource.WEIGHTED_HASH;
         boolean affinityMatched = false;
         Instant cooldownUntil = null;
         String healthState = "HEALTHY";
+        CostEstimateResponse costEstimate = null;
         com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity credential = upstreamCredentialRepository
                 .findById(staticEvaluation.candidate().candidate().credentialId())
                 .orElse(null);
@@ -487,19 +543,19 @@ public class GatewayRouteSelectionService {
                 cooldownUntil = storedHealth.get().cooldownUntil();
             }
 
-            GovernanceDecision governanceDecision = governancePolicyEngine.evaluate(new GovernanceContext(
+            GovernanceDecision policyDecision = governancePolicyEngine.evaluate(new GovernanceContext(
                     staticEvaluation.candidate().candidate().providerType(),
                     staticEvaluation.candidate().candidate().siteProfileId(),
                     staticEvaluation.candidate().candidate().credentialId(),
                     null,
                     credential == null ? null : credential.getProxyId()
             ));
-            if (!governanceDecision.allowed()) {
-                exclusionReasons.add(governanceDecision.healthState() != null && governanceDecision.healthState().equals("POLICY_BLOCKED")
+            if (!policyDecision.allowed()) {
+                exclusionReasons.add(policyDecision.healthState() != null && policyDecision.healthState().equals("POLICY_BLOCKED")
                         ? "governance_policy_blocked"
                         : "governance_quarantined");
-                healthState = governanceDecision.healthState();
-                cooldownUntil = governanceDecision.effectiveUntil();
+                healthState = policyDecision.healthState();
+                cooldownUntil = policyDecision.effectiveUntil();
             }
 
             if (exclusionReasons.isEmpty() && !isNetworkHealthy(credential)) {
@@ -513,6 +569,17 @@ public class GatewayRouteSelectionService {
             }
 
             if (exclusionReasons.isEmpty()) {
+                costEstimate = evaluateCost(staticEvaluation.candidate(), distributedKey, governanceDecision, requestBody);
+                if (costEstimate != null && !costEstimate.allowed()) {
+                    exclusionReasons.add("cost_guard_blocked");
+                    exclusionReasons.addAll(costEstimate.rejectionReasons().stream()
+                            .map(reason -> "cost:" + reason)
+                            .toList());
+                    healthState = "COST_BLOCKED";
+                }
+            }
+
+            if (exclusionReasons.isEmpty()) {
                 selectionSource = matchedAffinitySource(distributedKey.id(), modelGroup, prefixHash, fingerprint, staticEvaluation.candidate());
                 affinityMatched = selectionSource != RouteSelectionSource.WEIGHTED_HASH;
             }
@@ -520,8 +587,10 @@ public class GatewayRouteSelectionService {
             healthState = "FILTERED";
         }
 
-        List<String> scoreBreakdown = buildScoreBreakdown(staticEvaluation.candidate(), selectionSource, healthState);
-        double totalScore = exclusionReasons.isEmpty() ? totalScore(staticEvaluation.candidate(), selectionSource, fingerprint) : Double.NEGATIVE_INFINITY;
+        List<String> scoreBreakdown = buildScoreBreakdown(staticEvaluation.candidate(), selectionSource, healthState, costEstimate);
+        double totalScore = exclusionReasons.isEmpty()
+                ? totalScore(staticEvaluation.candidate(), selectionSource, fingerprint, costEstimate)
+                : Double.NEGATIVE_INFINITY;
 
         return new RouteCandidateEvaluation(
                 staticEvaluation.candidate(),
@@ -536,7 +605,11 @@ public class GatewayRouteSelectionService {
         );
     }
 
-    private List<String> buildScoreBreakdown(RouteCandidateView candidate, RouteSelectionSource selectionSource, String healthState) {
+    private List<String> buildScoreBreakdown(
+            RouteCandidateView candidate,
+            RouteSelectionSource selectionSource,
+            String healthState,
+            CostEstimateResponse costEstimate) {
         List<String> breakdown = new ArrayList<>();
         breakdown.add("capability_rank=" + candidate.capabilityRank());
         breakdown.add("binding_priority=" + candidate.bindingPriority());
@@ -544,10 +617,22 @@ public class GatewayRouteSelectionService {
         breakdown.add("render_capability=" + (candidate.capabilityLevel() == null ? "unsupported" : candidate.capabilityLevel().toLowerCase()));
         breakdown.add("health_state=" + healthState);
         breakdown.add("selection_source=" + selectionSource.name());
+        if (costEstimate != null) {
+            breakdown.add("estimated_cost=" + costEstimate.estimatedDisplay());
+            breakdown.add("estimated_input_tokens=" + costEstimate.inputTokens());
+            breakdown.add("estimated_output_tokens=" + costEstimate.outputTokens());
+            if (!costEstimate.rejectionReasons().isEmpty()) {
+                breakdown.add("cost_rejections=" + String.join(" | ", costEstimate.rejectionReasons()));
+            }
+        }
         return List.copyOf(breakdown);
     }
 
-    private double totalScore(RouteCandidateView candidate, RouteSelectionSource selectionSource, String seed) {
+    private double totalScore(
+            RouteCandidateView candidate,
+            RouteSelectionSource selectionSource,
+            String seed,
+            CostEstimateResponse costEstimate) {
         double capabilityScore = candidate.capabilityRank() * 10_000d;
         double priorityScore = 1_000d / Math.max(candidate.bindingPriority(), 1);
         double weightScore = candidate.bindingWeight();
@@ -557,7 +642,84 @@ public class GatewayRouteSelectionService {
             case MODEL_AFFINITY -> 150d;
             case WEIGHTED_HASH -> 0d;
         };
-        return capabilityScore + priorityScore + weightScore + affinityBonus + stablePositiveHash(seed + ":" + candidate.candidate().credentialId()) / (double) Long.MAX_VALUE;
+        return capabilityScore
+                + priorityScore
+                + weightScore
+                + affinityBonus
+                - costPenalty(costEstimate)
+                + stablePositiveHash(seed + ":" + candidate.candidate().credentialId()) / (double) Long.MAX_VALUE;
+    }
+
+    private CostEstimateResponse evaluateCost(
+            RouteCandidateView candidate,
+            DistributedKeyView distributedKey,
+            DistributedKeyGovernanceService.GovernanceDecision governanceDecision,
+            Object requestBody) {
+        if (costRoutingService == null) {
+            return null;
+        }
+        return costRoutingService.estimateCandidate(
+                        candidate.candidate().providerType().name(),
+                        candidate.candidate().modelName(),
+                        governanceDecision == null ? null : governanceDecision.estimatedTokens(),
+                        estimatedOutputTokens(requestBody),
+                        0L,
+                        distributedKey.id(),
+                        null,
+                        null)
+                .orElse(null);
+    }
+
+    private double costPenalty(CostEstimateResponse costEstimate) {
+        if (costEstimate == null) {
+            return 0D;
+        }
+        return Math.min(costEstimate.estimatedMicros() / 1_000D, 500D);
+    }
+
+    private Long estimatedOutputTokens(Object requestBody) {
+        Long direct = estimateLongField(requestBody, "max_completion_tokens", "max_output_tokens", "max_tokens");
+        if (direct != null) {
+            return direct;
+        }
+        if (requestBody instanceof tools.jackson.databind.JsonNode jsonNode) {
+            tools.jackson.databind.JsonNode generationConfig = jsonNode.path("generationConfig");
+            if (!generationConfig.isMissingNode() && !generationConfig.isNull()) {
+                return estimateLongField(generationConfig, "maxOutputTokens");
+            }
+        }
+        return 0L;
+    }
+
+    private Long estimateLongField(Object requestBody, String... fieldNames) {
+        if (requestBody == null) {
+            return null;
+        }
+        if (requestBody instanceof tools.jackson.databind.JsonNode jsonNode) {
+            for (String fieldName : fieldNames) {
+                tools.jackson.databind.JsonNode value = jsonNode.path(fieldName);
+                if (!value.isMissingNode() && !value.isNull() && value.canConvertToLong()) {
+                    return Math.max(0L, value.asLong());
+                }
+            }
+            return null;
+        }
+        if (requestBody instanceof Map<?, ?> map) {
+            for (String fieldName : fieldNames) {
+                Object value = map.get(fieldName);
+                if (value instanceof Number number) {
+                    return Math.max(0L, number.longValue());
+                }
+                if (value instanceof String text) {
+                    try {
+                        return Math.max(0L, Long.parseLong(text.trim()));
+                    } catch (NumberFormatException ignored) {
+                        return null;
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     private RouteSelectionSource matchedAffinitySource(

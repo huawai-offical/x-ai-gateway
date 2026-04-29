@@ -32,11 +32,16 @@ import com.prodigalgal.xaigateway.gateway.core.credential.ResolvedCredentialMate
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedCredentialBindingView;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyQueryService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyView;
+import com.prodigalgal.xaigateway.gateway.core.catalog.FineTunedModelRegistrationService;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileContent;
+import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileResponse;
+import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileService;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature;
 import com.prodigalgal.xaigateway.gateway.core.interop.SiteCapabilityTruthService;
+import com.prodigalgal.xaigateway.gateway.core.shared.ModelIdNormalizer;
 import com.prodigalgal.xaigateway.gateway.core.shared.AuthStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.PathStrategy;
+import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
 import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayAsyncResourceEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayFileBindingEntity;
@@ -54,9 +59,14 @@ import com.prodigalgal.xaigateway.provider.adapter.anthropic.AnthropicChatModelF
 import com.prodigalgal.xaigateway.provider.adapter.gemini.GeminiChatModelFactory;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -88,9 +98,11 @@ public class GatewayAsyncResourceService {
     private final SiteCapabilitySnapshotRepository siteCapabilitySnapshotRepository;
     private final GatewayFileRepository gatewayFileRepository;
     private final GatewayFileBindingRepository gatewayFileBindingRepository;
+    private final GatewayFileService gatewayFileService;
     private final CredentialCryptoService credentialCryptoService;
     private final CredentialMaterialResolver credentialMaterialResolver;
     private final SiteCapabilityTruthService siteCapabilityTruthService;
+    private final FineTunedModelRegistrationService fineTunedModelRegistrationService;
     private final AnthropicChatModelFactory anthropicChatModelFactory;
     private final GeminiChatModelFactory geminiChatModelFactory;
     private final ObjectMapper objectMapper;
@@ -106,9 +118,11 @@ public class GatewayAsyncResourceService {
             SiteCapabilitySnapshotRepository siteCapabilitySnapshotRepository,
             GatewayFileRepository gatewayFileRepository,
             GatewayFileBindingRepository gatewayFileBindingRepository,
+            GatewayFileService gatewayFileService,
             CredentialCryptoService credentialCryptoService,
             CredentialMaterialResolver credentialMaterialResolver,
             SiteCapabilityTruthService siteCapabilityTruthService,
+            FineTunedModelRegistrationService fineTunedModelRegistrationService,
             AnthropicChatModelFactory anthropicChatModelFactory,
             GeminiChatModelFactory geminiChatModelFactory,
             ObjectMapper objectMapper,
@@ -121,9 +135,11 @@ public class GatewayAsyncResourceService {
         this.siteCapabilitySnapshotRepository = siteCapabilitySnapshotRepository;
         this.gatewayFileRepository = gatewayFileRepository;
         this.gatewayFileBindingRepository = gatewayFileBindingRepository;
+        this.gatewayFileService = gatewayFileService;
         this.credentialCryptoService = credentialCryptoService;
         this.credentialMaterialResolver = credentialMaterialResolver;
         this.siteCapabilityTruthService = siteCapabilityTruthService;
+        this.fineTunedModelRegistrationService = fineTunedModelRegistrationService;
         this.anthropicChatModelFactory = anthropicChatModelFactory;
         this.geminiChatModelFactory = geminiChatModelFactory;
         this.objectMapper = objectMapper;
@@ -154,10 +170,49 @@ public class GatewayAsyncResourceService {
                 siteCapabilitySnapshotRepository,
                 gatewayFileRepository,
                 gatewayFileBindingRepository,
+                null,
                 credentialCryptoService,
                 credentialMaterialResolver,
                 siteCapabilityTruthService,
+                null,
                 new AnthropicChatModelFactory(ObservationRegistry.NOOP),
+                geminiChatModelFactory,
+                objectMapper,
+                clock,
+                webClientBuilder
+        );
+    }
+
+    public GatewayAsyncResourceService(
+            GatewayAsyncResourceRepository gatewayAsyncResourceRepository,
+            DistributedKeyQueryService distributedKeyQueryService,
+            UpstreamCredentialRepository upstreamCredentialRepository,
+            UpstreamSiteProfileRepository upstreamSiteProfileRepository,
+            SiteCapabilitySnapshotRepository siteCapabilitySnapshotRepository,
+            GatewayFileRepository gatewayFileRepository,
+            GatewayFileBindingRepository gatewayFileBindingRepository,
+            CredentialCryptoService credentialCryptoService,
+            CredentialMaterialResolver credentialMaterialResolver,
+            SiteCapabilityTruthService siteCapabilityTruthService,
+            AnthropicChatModelFactory anthropicChatModelFactory,
+            GeminiChatModelFactory geminiChatModelFactory,
+            ObjectMapper objectMapper,
+            Clock clock,
+            WebClient.Builder webClientBuilder) {
+        this(
+                gatewayAsyncResourceRepository,
+                distributedKeyQueryService,
+                upstreamCredentialRepository,
+                upstreamSiteProfileRepository,
+                siteCapabilitySnapshotRepository,
+                gatewayFileRepository,
+                gatewayFileBindingRepository,
+                null,
+                credentialCryptoService,
+                credentialMaterialResolver,
+                siteCapabilityTruthService,
+                null,
+                anthropicChatModelFactory,
                 geminiChatModelFactory,
                 objectMapper,
                 clock,
@@ -186,6 +241,7 @@ public class GatewayAsyncResourceService {
                 siteCapabilitySnapshotRepository,
                 gatewayFileRepository,
                 gatewayFileBindingRepository,
+                null,
                 credentialCryptoService,
                 new CredentialMaterialResolver(new com.prodigalgal.xaigateway.gateway.core.account.AccountSelectionService(
                         null,
@@ -194,6 +250,7 @@ public class GatewayAsyncResourceService {
                         null
                 ), credentialCryptoService, objectMapper),
                 siteCapabilityTruthService,
+                null,
                 new AnthropicChatModelFactory(ObservationRegistry.NOOP),
                 new GeminiChatModelFactory(ObservationRegistry.NOOP),
                 objectMapper,
@@ -270,7 +327,15 @@ public class GatewayAsyncResourceService {
         ObjectNode metadata = readObject(entity.getMetadataJson());
         String upstreamId = metadata.path("upstream_object_id").asText(null);
         if (upstreamId == null || upstreamId.isBlank()) {
-            return Mono.fromSupplier(() -> addLocalUploadPart(entity));
+            MediaType contentType = dataPart.headers() == null ? null : dataPart.headers().getContentType();
+            return readPartBytes(dataPart)
+                    .map(bytes -> addLocalUploadPart(
+                            entity,
+                            dataPart.filename(),
+                            contentType == null ? null : contentType.toString(),
+                            bytes,
+                            null
+                    ));
         }
         UpstreamTarget target = resolveUpstreamTargetForEntity(entity, metadata);
         return invokeUpstreamMultipart(target, target.path() + "/" + upstreamId + "/parts", dataPart)
@@ -283,7 +348,13 @@ public class GatewayAsyncResourceService {
         ObjectNode metadata = readObject(entity.getMetadataJson());
         String upstreamId = metadata.path("upstream_object_id").asText(null);
         if (upstreamId == null || upstreamId.isBlank()) {
-            return Mono.fromSupplier(() -> addLocalUploadPart(entity, fileContent.metadata().filename()));
+            return Mono.fromSupplier(() -> addLocalUploadPart(
+                    entity,
+                    fileContent.metadata().filename(),
+                    fileContent.mimeType(),
+                    fileContent.bytes(),
+                    fileKey
+            ));
         }
         UpstreamTarget target = resolveUpstreamTargetForEntity(entity, metadata);
         return invokeUpstreamMultipart(
@@ -466,7 +537,7 @@ public class GatewayAsyncResourceService {
             return syncPersistedResource(entity, fetchGeminiBatch(entity, metadata, target), objectName);
         }
         if (supportsGoogleGenAiBatching(target.siteProfile().getSiteKind()) && resourceType == GatewayAsyncResourceType.TUNING) {
-            return syncPersistedResource(entity, fetchGeminiTuning(entity, metadata, target), objectName);
+            return syncGeminiTuningResource(entity, fetchGeminiTuning(entity, metadata, target), target, metadata, objectName);
         }
         JsonNode upstreamResponse = target.client()
                 .get()
@@ -487,6 +558,11 @@ public class GatewayAsyncResourceService {
         ObjectNode metadata = readObject(entity.getMetadataJson());
         String upstreamId = metadata.path("upstream_object_id").asText(null);
         if (upstreamId == null || upstreamId.isBlank()) {
+            if (resourceType == GatewayAsyncResourceType.UPLOAD) {
+                return suffix.contains("cancel")
+                        ? cancelLocalUpload(entity)
+                        : completeLocalUpload(entity, distributedKeyId);
+            }
             return updateLocalStatus(resourceKey, distributedKeyId, resourceType, suffix.contains("cancel") ? "cancelled" : "completed");
         }
         if (isAnthropicNativeBatch(metadata, resourceType)) {
@@ -501,7 +577,7 @@ public class GatewayAsyncResourceService {
         }
         if (supportsGoogleGenAiBatching(target.siteProfile().getSiteKind()) && resourceType == GatewayAsyncResourceType.TUNING) {
             cancelGeminiTuning(metadata, target);
-            return syncPersistedResource(entity, fetchGeminiTuning(entity, metadata, target), inferObjectName(resourceType));
+            return syncGeminiTuningResource(entity, fetchGeminiTuning(entity, metadata, target), target, metadata, inferObjectName(resourceType));
         }
         JsonNode upstreamResponse = invokeUpstreamJson(target, target.path() + "/" + upstreamId + suffix, objectMapper.createObjectNode());
         return syncPersistedResource(entity, upstreamResponse, inferObjectName(resourceType));
@@ -645,6 +721,18 @@ public class GatewayAsyncResourceService {
         }
     }
 
+    private JsonNode syncGeminiTuningResource(
+            GatewayAsyncResourceEntity entity,
+            JsonNode upstreamResponse,
+            UpstreamTarget target,
+            ObjectNode metadata,
+            String objectName) {
+        JsonNode synced = syncPersistedResource(entity, upstreamResponse, objectName);
+        registerFineTunedModelIfReady(entity, target, metadata, synced);
+        unregisterFineTunedModelIfTerminated(entity, target, synced);
+        return synced;
+    }
+
     private void cancelGeminiTuning(ObjectNode metadata, UpstreamTarget target) {
         String upstreamObjectId = requireUpstreamObjectId(metadata, "Gemini tuning 对象缺少 upstream_object_id。");
         try (Client client = createGeminiClient(target)) {
@@ -684,6 +772,130 @@ public class GatewayAsyncResourceService {
             error.put("type", "gemini_tuning_error");
         }
         return response;
+    }
+
+    private void registerFineTunedModelIfReady(
+            GatewayAsyncResourceEntity entity,
+            UpstreamTarget target,
+            ObjectNode originalMetadata,
+            JsonNode syncedResponse) {
+        if (fineTunedModelRegistrationService == null
+                || target == null
+                || target.siteProfile() == null
+                || target.credential() == null
+                || syncedResponse == null
+                || !"succeeded".equalsIgnoreCase(syncedResponse.path("status").asText())) {
+            return;
+        }
+        String tunedModelName = syncedResponse.path("fine_tuned_model").asText(null);
+        if (tunedModelName == null || tunedModelName.isBlank()) {
+            return;
+        }
+
+        JsonNode requestPayload = readObject(entity.getRequestPayloadJson());
+        String aliasName = requestedTuningAlias(requestPayload, tunedModelName);
+        FineTunedModelRegistrationService.RegistrationResult registration = fineTunedModelRegistrationService.register(
+                target.siteProfile().getId(),
+                target.credential().getProviderType(),
+                text(requestPayload, "model"),
+                tunedModelName,
+                aliasName,
+                entity.getResourceKey()
+        );
+
+        ObjectNode response = readObject(entity.getResponsePayloadJson());
+        ObjectNode metadata = readObject(entity.getMetadataJson());
+        if (registration.modelKey() != null) {
+            metadata.put("registered_model_key", registration.modelKey());
+        }
+        if (registration.modelName() != null) {
+            metadata.put("registered_model_name", registration.modelName());
+        }
+        metadata.put("registered_at", now().getEpochSecond());
+        metadata.put("registered_alias_key", ModelIdNormalizer.normalize(firstNonBlank(aliasName, tunedModelName)));
+        metadata.remove("registered_aliases");
+        response.remove("registered_aliases");
+        if (!registration.aliases().isEmpty()) {
+            var aliasArray = metadata.putArray("registered_aliases");
+            var responseAliasArray = response.putArray("registered_aliases");
+            registration.aliases().forEach(alias -> {
+                aliasArray.add(alias);
+                responseAliasArray.add(alias);
+            });
+        }
+        entity.setResponsePayloadJson(writeJson(response));
+        entity.setMetadataJson(writeJson(appendEvent(metadata, "model_registered", entity.getStatus())));
+        gatewayAsyncResourceRepository.save(entity);
+        if (syncedResponse instanceof ObjectNode responseNode && !registration.aliases().isEmpty()) {
+            var array = responseNode.putArray("registered_aliases");
+            registration.aliases().forEach(array::add);
+        }
+    }
+
+    private void unregisterFineTunedModelIfTerminated(
+            GatewayAsyncResourceEntity entity,
+            UpstreamTarget target,
+            JsonNode syncedResponse) {
+        if (fineTunedModelRegistrationService == null
+                || entity == null
+                || target == null
+                || target.siteProfile() == null
+                || syncedResponse == null) {
+            return;
+        }
+        String status = syncedResponse.path("status").asText("");
+        if (!"failed".equalsIgnoreCase(status) && !"cancelled".equalsIgnoreCase(status)) {
+            return;
+        }
+
+        ObjectNode metadata = readObject(entity.getMetadataJson());
+        String registeredModelKey = text(metadata, "registered_model_key");
+        List<String> aliases = registeredAliases(metadata);
+        if ((registeredModelKey == null || registeredModelKey.isBlank()) && aliases.isEmpty()) {
+            return;
+        }
+
+        fineTunedModelRegistrationService.unregister(
+                target.siteProfile().getId(),
+                registeredModelKey,
+                aliases,
+                entity.getResourceKey()
+        );
+        metadata.remove("registered_model_key");
+        metadata.remove("registered_model_name");
+        metadata.remove("registered_alias_key");
+        metadata.remove("registered_aliases");
+        metadata.put("deregistered_at", now().getEpochSecond());
+        ObjectNode response = readObject(entity.getResponsePayloadJson());
+        response.remove("registered_aliases");
+        entity.setResponsePayloadJson(writeJson(response));
+        entity.setMetadataJson(writeJson(appendEvent(metadata, "model_unregistered", entity.getStatus())));
+        gatewayAsyncResourceRepository.save(entity);
+    }
+
+    private List<String> registeredAliases(ObjectNode metadata) {
+        JsonNode array = metadata.path("registered_aliases");
+        if (!array.isArray()) {
+            String aliasKey = text(metadata, "registered_alias_key");
+            return aliasKey == null ? List.of() : List.of(aliasKey);
+        }
+        List<String> aliases = new ArrayList<>();
+        for (JsonNode item : array) {
+            String alias = item.asText(null);
+            if (alias != null && !alias.isBlank()) {
+                aliases.add(alias);
+            }
+        }
+        return List.copyOf(aliases);
+    }
+
+    private String requestedTuningAlias(JsonNode requestPayload, String tunedModelName) {
+        String suffix = text(requestPayload, "suffix");
+        if (suffix != null && !suffix.isBlank()) {
+            return suffix;
+        }
+        int index = tunedModelName.lastIndexOf('/');
+        return index >= 0 ? tunedModelName.substring(index + 1) : tunedModelName;
     }
 
     private String geminiBatchStatus(BatchJob batchJob) {
@@ -1178,19 +1390,43 @@ public class GatewayAsyncResourceService {
     }
 
     private JsonNode addLocalUploadPart(GatewayAsyncResourceEntity entity) {
-        return addLocalUploadPart(entity, null);
+        return addLocalUploadPart(entity, null, null, new byte[0], null);
     }
 
     private JsonNode addLocalUploadPart(GatewayAsyncResourceEntity entity, String filename) {
+        return addLocalUploadPart(entity, filename, null, new byte[0], null);
+    }
+
+    private JsonNode addLocalUploadPart(
+            GatewayAsyncResourceEntity entity,
+            String filename,
+            String mimeType,
+            byte[] bytes,
+            String sourceGatewayFileKey) {
+        assertUploadWritable(entity, "追加 part");
         ObjectNode metadata = readObject(entity.getMetadataJson());
         String partId = "part_" + UUID.randomUUID().toString().replace("-", "");
+        Path storagePath = persistLocalUploadPartFile(entity.getResourceKey(), partId, filename, bytes);
+        long bytesLength = bytes == null ? 0L : bytes.length;
         metadata.withArray("parts").add(partId);
         metadata.put("partsCount", metadata.withArray("parts").size());
-        if (filename != null && !filename.isBlank()) {
-            metadata.withArray("part_bindings").addObject()
-                    .put("filename", filename)
-                    .put("synced_at", now().getEpochSecond());
-        }
+        metadata.put("bytesReceived", metadata.path("bytesReceived").asLong(0L) + bytesLength);
+        metadata.withArray("part_bindings").addObject()
+                .put("part_id", partId)
+                .put("filename", firstNonBlank(filename, "upload.bin"))
+                .put("mime_type", firstNonBlank(mimeType, "application/octet-stream"))
+                .put("size_bytes", bytesLength)
+                .put("storage_path", storagePath.toAbsolutePath().toString())
+                .put("sha256", sha256Hex(bytes == null ? new byte[0] : bytes))
+                .put("source_gateway_file_key", sourceGatewayFileKey)
+                .put("part_order", metadata.path("partsCount").asInt())
+                .put("synced_at", now().getEpochSecond());
+        ObjectNode uploadResponse = readObject(entity.getResponsePayloadJson());
+        uploadResponse.put("status", "in_progress");
+        uploadResponse.put("parts_count", metadata.path("partsCount").asInt());
+        uploadResponse.put("bytes_received", metadata.path("bytesReceived").asLong());
+        entity.setStatus("in_progress");
+        entity.setResponsePayloadJson(writeJson(uploadResponse));
         entity.setMetadataJson(writeJson(appendEvent(metadata, "part_added", entity.getStatus())));
         gatewayAsyncResourceRepository.save(entity);
 
@@ -1199,6 +1435,13 @@ public class GatewayAsyncResourceService {
         response.put("object", "upload.part");
         response.put("created_at", now().getEpochSecond());
         response.put("upload_id", entity.getResourceKey());
+        response.put("bytes", bytesLength);
+        if (filename != null && !filename.isBlank()) {
+            response.put("filename", filename);
+        }
+        if (mimeType != null && !mimeType.isBlank()) {
+            response.put("mime_type", mimeType);
+        }
         return response;
     }
 
@@ -1213,6 +1456,68 @@ public class GatewayAsyncResourceService {
         response.put("status", status);
         entity.setResponsePayloadJson(writeJson(response));
         entity.setMetadataJson(writeJson(appendEvent(readObject(entity.getMetadataJson()), "status_changed", status)));
+        gatewayAsyncResourceRepository.save(entity);
+        return response;
+    }
+
+    private JsonNode completeLocalUpload(GatewayAsyncResourceEntity entity, Long distributedKeyId) {
+        if ("completed".equalsIgnoreCase(entity.getStatus())) {
+            return readJson(entity.getResponsePayloadJson());
+        }
+        assertUploadWritable(entity, "完成 Upload");
+        ObjectNode metadata = readObject(entity.getMetadataJson());
+        List<LocalUploadPart> parts = localUploadParts(metadata);
+        if (parts.isEmpty()) {
+            throw new IllegalArgumentException("Upload 尚未添加任何 part。");
+        }
+
+        byte[] merged = mergeUploadParts(parts);
+        long declaredBytes = metadata.path("declaredBytes").asLong(0L);
+        if (declaredBytes > 0 && declaredBytes != merged.length) {
+            throw new IllegalArgumentException("Upload part 字节总量与声明 bytes 不一致。");
+        }
+
+        Long preferredCredentialId = metadata.path("credential_id").isNumber() ? metadata.path("credential_id").asLong() : null;
+        ObjectNode currentResponse = readObject(entity.getResponsePayloadJson());
+        String filename = firstNonBlank(text(metadata, "filename"), text(currentResponse, "filename"), "upload.bin");
+        String mimeType = inferUploadMimeType(parts, currentResponse);
+        String purpose = firstNonBlank(text(metadata, "purpose"), text(currentResponse, "purpose"), null);
+        GatewayFileResponse gatewayFile = createUploadOutputFile(distributedKeyId, filename, mimeType, purpose, merged, preferredCredentialId);
+
+        metadata.put("produced_file_key", gatewayFile.id());
+        metadata.put("produced_file_bytes", gatewayFile.bytes());
+        metadata.put("produced_file_status", gatewayFile.status());
+        metadata.put("completed_at", now().getEpochSecond());
+        cleanupUploadPartFiles(metadata);
+        metadata.put("part_files_cleaned", true);
+        currentResponse.put("status", "completed");
+        currentResponse.put("parts_count", metadata.path("partsCount").asInt());
+        currentResponse.put("bytes_received", merged.length);
+        currentResponse.put("file_id", gatewayFile.id());
+        currentResponse.put("completed_at", now().getEpochSecond());
+        entity.setStatus("completed");
+        entity.setResponsePayloadJson(writeJson(currentResponse));
+        entity.setMetadataJson(writeJson(appendEvent(metadata, "status_changed", "completed")));
+        gatewayAsyncResourceRepository.save(entity);
+        return currentResponse;
+    }
+
+    private JsonNode cancelLocalUpload(GatewayAsyncResourceEntity entity) {
+        if ("cancelled".equalsIgnoreCase(entity.getStatus())) {
+            return readJson(entity.getResponsePayloadJson());
+        }
+        if ("completed".equalsIgnoreCase(entity.getStatus())) {
+            throw new IllegalArgumentException("已完成的 Upload 不允许取消。");
+        }
+        ObjectNode metadata = readObject(entity.getMetadataJson());
+        cleanupUploadPartFiles(metadata);
+        metadata.put("part_files_cleaned", true);
+        metadata.put("cancelled_at", now().getEpochSecond());
+        ObjectNode response = readObject(entity.getResponsePayloadJson());
+        response.put("status", "cancelled");
+        entity.setStatus("cancelled");
+        entity.setResponsePayloadJson(writeJson(response));
+        entity.setMetadataJson(writeJson(appendEvent(metadata, "status_changed", "cancelled")));
         gatewayAsyncResourceRepository.save(entity);
         return response;
     }
@@ -1236,6 +1541,11 @@ public class GatewayAsyncResourceService {
         metadata.put("object_mode", "gateway_upload_object");
         metadata.put("credential_id", target.credential().getId());
         metadata.put("site_profile_id", target.siteProfile().getId());
+        copyIfPresent(requestPayload, metadata, "filename");
+        copyIfPresent(requestPayload, metadata, "purpose");
+        copyIfPresent(requestPayload, metadata, "mime_type");
+        metadata.put("declaredBytes", requestPayload.path("bytes").asLong(0L));
+        metadata.put("bytesReceived", 0L);
         metadata.putArray("parts");
         metadata.putArray("part_bindings");
         metadata.put("partsCount", 0);
@@ -1251,6 +1561,185 @@ public class GatewayAsyncResourceService {
         entity.setMetadataJson(writeJson(metadata));
         gatewayAsyncResourceRepository.save(entity);
         return response;
+    }
+
+    private void assertUploadWritable(GatewayAsyncResourceEntity entity, String action) {
+        if ("cancelled".equalsIgnoreCase(entity.getStatus())) {
+            throw new IllegalArgumentException("已取消的 Upload 不允许继续" + action + "。");
+        }
+        if ("completed".equalsIgnoreCase(entity.getStatus())) {
+            throw new IllegalArgumentException("已完成的 Upload 不允许继续" + action + "。");
+        }
+    }
+
+    private Path persistLocalUploadPartFile(String uploadKey, String partId, String filename, byte[] bytes) {
+        try {
+            Path directory = uploadPartDirectory(uploadKey);
+            Files.createDirectories(directory);
+            Path target = directory.resolve(partId + "-" + sanitizeFilename(filename));
+            Files.write(target, bytes == null ? new byte[0] : bytes);
+            return target;
+        } catch (IOException exception) {
+            throw new IllegalStateException("写入 Upload part 文件失败。", exception);
+        }
+    }
+
+    private Path uploadPartDirectory(String uploadKey) throws IOException {
+        Path root;
+        if (gatewayFileService != null) {
+            root = gatewayFileService.ensureStorageDirectoryForSync().resolve("upload-parts");
+        } else {
+            root = Path.of(System.getProperty("java.io.tmpdir"), "x-ai-gateway", "upload-parts");
+        }
+        Path directory = root.resolve(uploadKey);
+        Files.createDirectories(directory);
+        return directory;
+    }
+
+    private List<LocalUploadPart> localUploadParts(ObjectNode metadata) {
+        List<LocalUploadPart> parts = new ArrayList<>();
+        JsonNode bindings = metadata.path("part_bindings");
+        if (!bindings.isArray()) {
+            return List.of();
+        }
+        for (JsonNode binding : bindings) {
+            String partId = firstNonBlank(text(binding, "part_id"), text(binding, "upstream_part_id"), null);
+            String storagePath = text(binding, "storage_path");
+            if (partId == null || storagePath == null) {
+                continue;
+            }
+            parts.add(new LocalUploadPart(
+                    partId,
+                    firstNonBlank(text(binding, "filename"), partId),
+                    firstNonBlank(text(binding, "mime_type"), "application/octet-stream"),
+                    Path.of(storagePath),
+                    binding.path("size_bytes").asLong(0L)
+            ));
+        }
+        return List.copyOf(parts);
+    }
+
+    private byte[] mergeUploadParts(List<LocalUploadPart> parts) {
+        try {
+            java.io.ByteArrayOutputStream outputStream = new java.io.ByteArrayOutputStream();
+            for (LocalUploadPart part : parts) {
+                outputStream.write(Files.readAllBytes(part.storagePath()));
+            }
+            return outputStream.toByteArray();
+        } catch (IOException exception) {
+            throw new IllegalStateException("合并 Upload parts 失败。", exception);
+        }
+    }
+
+    private void cleanupUploadPartFiles(ObjectNode metadata) {
+        for (LocalUploadPart part : localUploadParts(metadata)) {
+            try {
+                Files.deleteIfExists(part.storagePath());
+            } catch (IOException ignored) {
+                // ignore cleanup failures for local temp parts
+            }
+        }
+    }
+
+    private String inferUploadMimeType(List<LocalUploadPart> parts, ObjectNode response) {
+        String preferred = text(response, "mime_type");
+        if (preferred != null) {
+            return preferred;
+        }
+        return parts.stream()
+                .map(LocalUploadPart::mimeType)
+                .filter(value -> value != null && !value.isBlank())
+                .findFirst()
+                .orElse("application/octet-stream");
+    }
+
+    private GatewayFileResponse createUploadOutputFile(
+            Long distributedKeyId,
+            String filename,
+            String mimeType,
+            String purpose,
+            byte[] bytes,
+            Long preferredCredentialId) {
+        if (gatewayFileService != null) {
+            return gatewayFileService.createFileFromBytes(distributedKeyId, filename, mimeType, purpose, bytes, preferredCredentialId);
+        }
+        return createLocalOnlyGatewayFile(distributedKeyId, filename, mimeType, purpose, bytes);
+    }
+
+    private GatewayFileResponse createLocalOnlyGatewayFile(
+            Long distributedKeyId,
+            String filename,
+            String mimeType,
+            String purpose,
+            byte[] bytes) {
+        try {
+            String safeFilename = sanitizeFilename(filename);
+            String fileKey = "file-" + UUID.randomUUID().toString().replace("-", "");
+            Path root = Path.of(System.getProperty("java.io.tmpdir"), "x-ai-gateway", "files");
+            Files.createDirectories(root);
+            Path storagePath = root.resolve(fileKey + "-" + safeFilename);
+            Files.write(storagePath, bytes == null ? new byte[0] : bytes);
+
+            GatewayFileEntity file = new GatewayFileEntity();
+            file.setFileKey(fileKey);
+            file.setDistributedKeyId(distributedKeyId);
+            file.setFilename(firstNonBlank(filename, safeFilename));
+            file.setMimeType(firstNonBlank(mimeType, "application/octet-stream"));
+            file.setPurpose(purpose);
+            file.setSizeBytes(bytes == null ? 0L : bytes.length);
+            file.setSha256(sha256Hex(bytes == null ? new byte[0] : bytes));
+            file.setStoragePath(storagePath.toAbsolutePath().toString());
+            file.setStatus("staged_local");
+            GatewayFileEntity saved = gatewayFileRepository.save(file);
+            return GatewayFileResponse.from(
+                    saved.getFileKey(),
+                    saved.getFilename(),
+                    saved.getPurpose(),
+                    saved.getSizeBytes(),
+                    saved.getCreatedAt(),
+                    saved.getStatus()
+            );
+        } catch (IOException exception) {
+            throw new IllegalStateException("创建 Upload 输出文件失败。", exception);
+        }
+    }
+
+    private Mono<byte[]> readPartBytes(FilePart dataPart) {
+        return DataBufferUtils.join(dataPart.content())
+                .map(buffer -> {
+                    byte[] bytes = new byte[buffer.readableByteCount()];
+                    buffer.read(bytes);
+                    DataBufferUtils.release(buffer);
+                    return bytes;
+                });
+    }
+
+    private String sanitizeFilename(String filename) {
+        if (filename == null || filename.isBlank()) {
+            return "upload.bin";
+        }
+        return filename.replaceAll("[^a-zA-Z0-9._-]", "_");
+    }
+
+    private String firstNonBlank(String primary, String fallback) {
+        if (primary != null && !primary.isBlank()) {
+            return primary.trim();
+        }
+        return fallback == null || fallback.isBlank() ? null : fallback.trim();
+    }
+
+    private String firstNonBlank(String primary, String secondary, String fallback) {
+        String resolved = firstNonBlank(primary, secondary);
+        return resolved != null ? resolved : firstNonBlank(fallback, null);
+    }
+
+    private String sha256Hex(byte[] bytes) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(digest.digest(bytes));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("当前运行环境缺少 SHA-256。", exception);
+        }
     }
 
     private void copyIfPresent(ObjectNode source, ObjectNode target, String fieldName) {
@@ -1790,6 +2279,15 @@ public class GatewayAsyncResourceService {
             GatewayAsyncResourceEntity entity,
             ObjectNode responsePayload,
             ObjectNode metadata
+    ) {
+    }
+
+    private record LocalUploadPart(
+            String partId,
+            String filename,
+            String mimeType,
+            Path storagePath,
+            long sizeBytes
     ) {
     }
 

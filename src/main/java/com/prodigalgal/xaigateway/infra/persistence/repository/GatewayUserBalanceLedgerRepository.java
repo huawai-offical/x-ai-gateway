@@ -10,4 +10,6 @@ public interface GatewayUserBalanceLedgerRepository extends JpaRepository<Gatewa
     Optional<GatewayUserBalanceLedgerEntity> findTopByUser_IdOrderByCreatedAtDescIdDesc(Long userId);
 
     List<GatewayUserBalanceLedgerEntity> findAllByUser_IdOrderByCreatedAtDesc(Long userId);
+
+    Optional<GatewayUserBalanceLedgerEntity> findByReferenceTypeAndReferenceId(String referenceType, String referenceId);
 }

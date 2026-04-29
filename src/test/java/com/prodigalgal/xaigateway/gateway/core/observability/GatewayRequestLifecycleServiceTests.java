@@ -1,5 +1,6 @@
 package com.prodigalgal.xaigateway.gateway.core.observability;
 
+import com.prodigalgal.xaigateway.admin.application.CostRoutingService;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
@@ -592,6 +593,72 @@ class GatewayRequestLifecycleServiceTests {
         assertEquals(GatewayRequestStatus.COMPLETED, storedRequest.get().getStatus());
         assertNotNull(storedUsage.get());
         assertEquals(18, storedUsage.get().getTotalTokens());
+    }
+
+    @Test
+    void shouldSettleCompletedUsageWhenPersistingUsageRecord() {
+        RequestLogRepository requestLogRepository = Mockito.mock(RequestLogRepository.class);
+        UsageRecordRepository usageRecordRepository = Mockito.mock(UsageRecordRepository.class);
+        GatewayAuditLogService gatewayAuditLogService = Mockito.mock(GatewayAuditLogService.class);
+        CostRoutingService costRoutingService = Mockito.mock(CostRoutingService.class);
+
+        Mockito.when(requestLogRepository.save(Mockito.any(RequestLogEntity.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        Mockito.when(requestLogRepository.findByRequestId("req-cost"))
+                .thenReturn(Optional.empty());
+        Mockito.when(usageRecordRepository.findByRequestId("req-cost"))
+                .thenReturn(Optional.empty());
+        Mockito.when(usageRecordRepository.save(Mockito.any(UsageRecordEntity.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        GatewayRequestLifecycleService service = new GatewayRequestLifecycleService(
+                requestLogRepository,
+                usageRecordRepository,
+                gatewayAuditLogService,
+                new SimpleMeterRegistry(),
+                new tools.jackson.databind.ObjectMapper(),
+                null,
+                null,
+                null,
+                costRoutingService
+        );
+
+        CanonicalRequest request = new CanonicalRequest(
+                "sk-gw-test",
+                CanonicalIngressProtocol.OPENAI,
+                "/v1/chat/completions",
+                "model-a",
+                List.of(),
+                List.of(),
+                null,
+                null,
+                null,
+                null,
+                null
+        );
+        GatewayUsageView usage = new GatewayUsageView(
+                12,
+                10,
+                5,
+                0,
+                1,
+                0,
+                0,
+                0,
+                0,
+                null,
+                15,
+                GatewayUsageCompleteness.FINAL,
+                GatewayUsageSource.DIRECT_RESPONSE,
+                null
+        );
+        Instant startedAt = Instant.now();
+        RouteSelectionResult selectionResult = selectionResult();
+
+        service.startRequest("req-cost", selectionResult, request, false, startedAt);
+        service.completeRequest("req-cost", selectionResult, request, false, usage, startedAt);
+
+        Mockito.verify(costRoutingService).settleCompletedUsage("req-cost", selectionResult, usage);
     }
 
     private RouteSelectionResult selectionResult() {

@@ -5,9 +5,12 @@ import com.prodigalgal.xaigateway.admin.api.CostEstimateResponse;
 import com.prodigalgal.xaigateway.admin.api.CostModelRequest;
 import com.prodigalgal.xaigateway.admin.api.CostModelResponse;
 import com.prodigalgal.xaigateway.admin.api.CostSummaryResponse;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageView;
+import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
 import com.prodigalgal.xaigateway.infra.persistence.entity.CostModelEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayUserBalanceLedgerEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayUserEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.CostModelRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayUserBalanceLedgerRepository;
@@ -26,6 +29,7 @@ public class CostRoutingService {
 
     private static final long SAMPLE_INPUT_TOKENS = 1_000_000;
     private static final long SAMPLE_OUTPUT_TOKENS = 1_000_000;
+    private static final String REQUEST_USAGE_REFERENCE_TYPE = "REQUEST_USAGE";
 
     private final CostModelRepository costModelRepository;
     private final DistributedKeyRepository distributedKeyRepository;
@@ -68,8 +72,7 @@ public class CostRoutingService {
     public CostEstimateResponse estimate(CostEstimateRequest request) {
         String providerType = required(request.providerType(), "providerType").toUpperCase(Locale.ROOT);
         String modelName = required(request.modelName(), "modelName");
-        CostModelEntity model = costModelRepository
-                .findFirstByProviderTypeAndModelNameAndActiveTrueOrderByUpdatedAtDesc(providerType, modelName)
+        CostModelEntity model = findActiveModel(providerType, modelName)
                 .orElseThrow(() -> new IllegalArgumentException("未找到可用成本模型。"));
         return estimateWithModel(
                 model,
@@ -79,6 +82,31 @@ public class CostRoutingService {
                 resolveDistributedKey(request),
                 request.userId(),
                 nonNegativeOrNull(request.singleRequestBudgetMicros()));
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<CostEstimateResponse> estimateCandidate(
+            String providerType,
+            String modelName,
+            Long inputTokens,
+            Long outputTokens,
+            Long cacheHitTokens,
+            Long distributedKeyId,
+            Long userId,
+            Long singleRequestBudgetMicros) {
+        if (providerType == null || providerType.isBlank() || modelName == null || modelName.isBlank()) {
+            return Optional.empty();
+        }
+        return findActiveModel(providerType.toUpperCase(Locale.ROOT), modelName.trim())
+                .map(model -> estimateWithModel(
+                        model,
+                        tokens(inputTokens),
+                        tokens(outputTokens),
+                        tokens(cacheHitTokens),
+                        distributedKeyId == null ? Optional.empty() : distributedKeyRepository.findById(distributedKeyId),
+                        userId,
+                        nonNegativeOrNull(singleRequestBudgetMicros)
+                ));
     }
 
     @Transactional(readOnly = true)
@@ -98,6 +126,70 @@ public class CostRoutingService {
                 display(currency, totalMicros),
                 distribution
         );
+    }
+
+    public Optional<SettledUsageCharge> settleCompletedUsage(
+            String requestId,
+            RouteSelectionResult selectionResult,
+            GatewayUsageView usage) {
+        if (requestId == null || requestId.isBlank() || selectionResult == null || usage == null || !usage.present()) {
+            return Optional.empty();
+        }
+        if (balanceLedgerRepository.findByReferenceTypeAndReferenceId(REQUEST_USAGE_REFERENCE_TYPE, requestId).isPresent()) {
+            return Optional.empty();
+        }
+
+        DistributedKeyEntity distributedKey = distributedKeyRepository.findById(selectionResult.distributedKeyId())
+                .orElse(null);
+        if (distributedKey == null) {
+            return Optional.empty();
+        }
+        GatewayUserEntity ownerUser = distributedKey.getOwnerUser();
+        if (ownerUser == null || ownerUser.getId() == null) {
+            return Optional.empty();
+        }
+
+        String settledModelName = firstNonBlank(
+                selectionResult.publicModel(),
+                selectionResult.requestedModel(),
+                selectionResult.modelGroup()
+        );
+        Optional<CostEstimateResponse> estimate = estimateCandidate(
+                selectionResult.selectedCandidate().candidate().providerType().name(),
+                settledModelName,
+                (long) usage.promptTokens(),
+                (long) usage.completionTokens(),
+                (long) usage.cacheHitTokens(),
+                selectionResult.distributedKeyId(),
+                ownerUser.getId(),
+                null
+        );
+        if (estimate.isEmpty() || estimate.get().estimatedMicros() <= 0L) {
+            return Optional.empty();
+        }
+
+        long previousBalance = balanceLedgerRepository.findTopByUser_IdOrderByCreatedAtDescIdDesc(ownerUser.getId())
+                .map(GatewayUserBalanceLedgerEntity::getBalanceAfterTokenCredits)
+                .orElse(0L);
+        long delta = -estimate.get().estimatedMicros();
+        long balanceAfter = previousBalance + delta;
+
+        GatewayUserBalanceLedgerEntity ledger = new GatewayUserBalanceLedgerEntity();
+        ledger.setUser(ownerUser);
+        ledger.setDeltaTokenCredits(delta);
+        ledger.setBalanceAfterTokenCredits(balanceAfter);
+        ledger.setReason("REQUEST_USAGE");
+        ledger.setReferenceType(REQUEST_USAGE_REFERENCE_TYPE);
+        ledger.setReferenceId(requestId);
+        GatewayUserBalanceLedgerEntity saved = balanceLedgerRepository.save(ledger);
+        return Optional.of(new SettledUsageCharge(
+                saved.getId(),
+                ownerUser.getId(),
+                selectionResult.distributedKeyId(),
+                settledModelName,
+                estimate.get().estimatedMicros(),
+                balanceAfter
+        ));
     }
 
     private CostEstimateResponse estimateWithModel(
@@ -150,6 +242,10 @@ public class CostRoutingService {
             return distributedKeyRepository.findByKeyPrefixAndActiveTrue(prefix);
         }
         return Optional.empty();
+    }
+
+    private Optional<CostModelEntity> findActiveModel(String providerType, String modelName) {
+        return costModelRepository.findFirstByProviderTypeAndModelNameAndActiveTrueOrderByUpdatedAtDesc(providerType, modelName);
     }
 
     private Long resolveOwnerUserId(DistributedKeyEntity key, Long requestedUserId) {
@@ -214,6 +310,15 @@ public class CostRoutingService {
         return value == null || value.isBlank() ? fallback : value.trim();
     }
 
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return null;
+    }
+
     private CostModelResponse toModelResponse(CostModelEntity entity) {
         return new CostModelResponse(
                 entity.getId(),
@@ -228,5 +333,15 @@ public class CostRoutingService {
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
         );
+    }
+
+    public record SettledUsageCharge(
+            Long ledgerId,
+            Long userId,
+            Long distributedKeyId,
+            String modelName,
+            long chargedMicros,
+            long balanceAfterTokenCredits
+    ) {
     }
 }
