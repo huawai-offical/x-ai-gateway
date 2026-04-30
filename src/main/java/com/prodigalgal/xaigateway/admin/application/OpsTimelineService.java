@@ -7,6 +7,13 @@ import com.prodigalgal.xaigateway.infra.persistence.entity.OpsProbeRunEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.OpsSystemEventEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.OpsProbeRunRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.OpsSystemEventRepository;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.net.Socket;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -23,6 +30,9 @@ public class OpsTimelineService {
     private final OpsProbeRunRepository probeRunRepository;
     private final OpsSystemEventRepository systemEventRepository;
     private final ObjectMapper objectMapper;
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(3))
+            .build();
 
     public OpsTimelineService(
             OpsProbeRunRepository probeRunRepository,
@@ -40,19 +50,26 @@ public class OpsTimelineService {
 
     public OpsProbeRunResponse createProbeRun(OpsProbeRunRequest request) {
         Instant startedAt = Instant.now();
-        boolean failed = Boolean.TRUE.equals(request.forceFailure());
-        Instant completedAt = Instant.now().plusMillis(failed ? 23 : 7);
+        ProbeResult probeResult = runProbe(defaultString(request.targetUrl(), "http://localhost:8080/actuator/health"), request.forceFailure());
+        Instant completedAt = Instant.now();
 
         OpsProbeRunEntity entity = new OpsProbeRunEntity();
         entity.setProbeName(defaultString(request.probeName(), "manual-probe"));
-        entity.setTargetUrl(defaultString(request.targetUrl(), "https://gateway.local/health"));
+        entity.setTargetUrl(probeResult.targetUrl());
         entity.setSource(defaultString(request.source(), "console"));
-        entity.setStatus(failed ? "FAILED" : "SUCCEEDED");
-        entity.setSeverity(failed ? "ERROR" : "INFO");
+        entity.setStatus(probeResult.status());
+        entity.setSeverity(probeResult.severity());
         entity.setLatencyMs(Duration.between(startedAt, completedAt).toMillis());
-        entity.setStatusCode(failed ? 503 : 200);
-        entity.setErrorMessage(failed ? "模拟拨测失败" : null);
-        entity.setDetailJson(defaultString(request.detailJson(), writeJson(Map.of("mode", "manual", "target", entity.getTargetUrl()))));
+        entity.setStatusCode(probeResult.statusCode());
+        entity.setErrorMessage(probeResult.errorMessage());
+        entity.setDetailJson(defaultString(request.detailJson(), writeJson(Map.of(
+                "mode", "manual",
+                "target", entity.getTargetUrl(),
+                "probeType", probeResult.probeType(),
+                "status", probeResult.status(),
+                "statusCode", probeResult.statusCode(),
+                "error", probeResult.errorMessage() == null ? "" : probeResult.errorMessage()
+        ))));
         entity.setStartedAt(startedAt);
         entity.setCompletedAt(completedAt);
         OpsProbeRunEntity saved = probeRunRepository.save(entity);
@@ -68,6 +85,65 @@ public class OpsTimelineService {
                 saved.getCompletedAt()
         );
         return toProbeRunResponse(saved);
+    }
+
+    private ProbeResult runProbe(String rawTargetUrl, Boolean forceFailure) {
+        String targetUrl = defaultString(rawTargetUrl, "http://localhost:8080/actuator/health");
+        if (Boolean.TRUE.equals(forceFailure)) {
+            return new ProbeResult(targetUrl, "forced", "FAILED", "ERROR", 599, "调用方强制失败，用于验证告警链路。");
+        }
+        try {
+            URI uri = URI.create(targetUrl);
+            String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
+            if ("http".equals(scheme) || "https".equals(scheme)) {
+                return runHttpProbe(uri);
+            }
+            if ("tcp".equals(scheme)) {
+                return runTcpProbe(uri);
+            }
+            return new ProbeResult(targetUrl, "unknown", "FAILED", "ERROR", 400, "不支持的拨测协议：" + scheme);
+        } catch (IllegalArgumentException exception) {
+            return new ProbeResult(targetUrl, "parse", "FAILED", "ERROR", 400, "拨测目标 URL 不合法：" + exception.getMessage());
+        }
+    }
+
+    private ProbeResult runHttpProbe(URI uri) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder(uri)
+                    .timeout(Duration.ofSeconds(5))
+                    .method("GET", HttpRequest.BodyPublishers.noBody())
+                    .build();
+            HttpResponse<Void> response = httpClient.send(request, HttpResponse.BodyHandlers.discarding());
+            int statusCode = response.statusCode();
+            boolean ok = statusCode >= 200 && statusCode < 500;
+            return new ProbeResult(
+                    uri.toString(),
+                    "http",
+                    ok ? "SUCCEEDED" : "FAILED",
+                    ok ? "INFO" : "ERROR",
+                    statusCode,
+                    ok ? null : "HTTP 拨测返回不可用状态码：" + statusCode
+            );
+        } catch (IOException exception) {
+            return new ProbeResult(uri.toString(), "http", "FAILED", "ERROR", 599, exception.getMessage());
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            return new ProbeResult(uri.toString(), "http", "FAILED", "ERROR", 599, "HTTP 拨测被中断。");
+        }
+    }
+
+    private ProbeResult runTcpProbe(URI uri) {
+        String host = uri.getHost();
+        int port = uri.getPort();
+        if (host == null || host.isBlank() || port <= 0) {
+            return new ProbeResult(uri.toString(), "tcp", "FAILED", "ERROR", 400, "TCP 拨测必须使用 tcp://host:port。");
+        }
+        try (Socket socket = new Socket()) {
+            socket.connect(new InetSocketAddress(host, port), 3000);
+            return new ProbeResult(uri.toString(), "tcp", "SUCCEEDED", "INFO", 200, null);
+        } catch (IOException exception) {
+            return new ProbeResult(uri.toString(), "tcp", "FAILED", "ERROR", 599, exception.getMessage());
+        }
     }
 
     public OpsSystemEventResponse recordEvent(
@@ -158,5 +234,14 @@ public class OpsTimelineService {
                 entity.getOccurredAt(),
                 entity.getCreatedAt()
         );
+    }
+
+    private record ProbeResult(
+            String targetUrl,
+            String probeType,
+            String status,
+            String severity,
+            Integer statusCode,
+            String errorMessage) {
     }
 }

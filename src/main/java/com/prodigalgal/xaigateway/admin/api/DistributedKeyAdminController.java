@@ -67,4 +67,21 @@ public class DistributedKeyAdminController {
             @RequestParam(required = false) String baseUrl) {
         return distributedKeyAdminService.exportClientConfig(id, format, clientFamily, baseUrl);
     }
+
+    @PostMapping("/{id}/client-config/downloads/{grantToken}")
+    public DistributedKeyClientConfigResponse consumeOneTimeClientConfig(
+            @PathVariable Long id,
+            @PathVariable String grantToken,
+            @RequestParam(defaultValue = "config_toml") String format,
+            @RequestParam(defaultValue = "GENERIC_OPENAI") String clientFamily,
+            @RequestParam(required = false) String baseUrl) {
+        return distributedKeyAdminService.consumeOneTimeClientConfig(id, grantToken, format, clientFamily, baseUrl);
+    }
+
+    @DeleteMapping("/{id}/client-config/downloads/{grantToken}")
+    public DistributedKeySecretExportGrantResponse revokeOneTimeClientConfig(
+            @PathVariable Long id,
+            @PathVariable String grantToken) {
+        return distributedKeyAdminService.revokeOneTimeClientConfig(id, grantToken);
+    }
 }

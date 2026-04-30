@@ -38,6 +38,8 @@ class OpsTimelineServiceTests {
 
         assertEquals("FAILED", run.status());
         assertEquals("ERROR", run.severity());
+        assertTrue(run.errorMessage().contains("强制失败"));
+        assertTrue(run.detailJson().contains("\"probeType\":\"forced\""));
         Mockito.verify(systemEventRepository).save(Mockito.argThat(event ->
                 "OPS_PROBE_RUN".equals(event.getEventType()) && "ERROR".equals(event.getSeverity())));
 

@@ -12,6 +12,8 @@ import com.prodigalgal.xaigateway.protocol.ingress.openai.OpenAiChatCompletionEn
 import com.prodigalgal.xaigateway.protocol.ingress.openai.OpenAiChatCompletionRequest;
 import com.prodigalgal.xaigateway.protocol.ingress.openai.OpenAiChatCompletionRequestMapper;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.http.HttpHeaders;
@@ -22,7 +24,9 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.JsonNodeFactory;
+import tools.jackson.databind.node.ObjectNode;
 
 @RestController
 @RequestMapping("/ollama/api")
@@ -79,23 +83,30 @@ public class OllamaNativeController {
             Flux<String> chunks = stream.events().map(event -> {
                 String text = event.textDelta();
                 boolean done = event.type() == CanonicalStreamEventType.COMPLETED;
-                return writeJson(Map.of(
-                        "model", request.model(),
-                        "message", Map.of("role", "assistant", "content", text == null ? "" : text),
-                        "done", done
-                )) + "\n";
+                Map<String, Object> payload = new LinkedHashMap<>();
+                payload.put("model", request.model());
+                payload.put("created_at", Instant.now().toString());
+                payload.put("message", Map.of("role", "assistant", "content", text == null ? "" : text));
+                payload.put("done", done);
+                if (done) {
+                    payload.put("done_reason", event.finishReason() == null ? "stop" : event.finishReason().name().toLowerCase());
+                    putUsage(payload, event.usage());
+                }
+                return writeJson(payload) + "\n";
             });
             return ResponseEntity.ok().contentType(MediaType.APPLICATION_NDJSON).body(chunks);
         }
         var response = gatewayChatExecutionService.executeGatewayResponse(canonical);
         var encoded = openAiEncoder.encode(response);
         String content = encoded.choices().isEmpty() ? "" : encoded.choices().get(0).message().content();
-        return ResponseEntity.ok(Map.of(
-                "model", request.model(),
-                "created_at", Instant.now().toString(),
-                "message", Map.of("role", "assistant", "content", content == null ? "" : content),
-                "done", true
-        ));
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("model", request.model());
+        payload.put("created_at", Instant.now().toString());
+        payload.put("message", Map.of("role", "assistant", "content", content == null ? "" : content));
+        payload.put("done", true);
+        payload.put("done_reason", response.response().finishReason() == null ? "stop" : response.response().finishReason().name().toLowerCase());
+        putUsage(payload, response.response().usage());
+        return ResponseEntity.ok(payload);
     }
 
     private AuthenticatedDistributedKey authenticate(String authorization, String apiKey) {
@@ -111,13 +122,13 @@ public class OllamaNativeController {
             throw new IllegalArgumentException("Ollama chat 请求缺少 model。");
         }
         boolean stream = body.path("stream").asBoolean(false);
-        List<OpenAiChatCompletionRequest.Message> messages = new java.util.ArrayList<>();
+        List<OpenAiChatCompletionRequest.Message> messages = new ArrayList<>();
         JsonNode sourceMessages = body.path("messages");
         if (sourceMessages.isArray()) {
             for (JsonNode item : sourceMessages) {
                 messages.add(new OpenAiChatCompletionRequest.Message(
                         item.path("role").asText("user"),
-                        JsonNodeFactory.instance.textNode(item.path("content").asText("")),
+                        toOpenAiContent(item),
                         null
                 ));
             }
@@ -139,15 +150,84 @@ public class OllamaNativeController {
 
     private Map<String, Object> toOllamaModel(GatewayPublicModelView model) {
         String family = model.providerFamily() == null ? "unknown" : model.providerFamily().name().toLowerCase();
-        return Map.of(
-                "name", model.publicModelId(),
-                "model", model.publicModelId(),
-                "modified_at", Instant.EPOCH.toString(),
-                "details", Map.of(
-                        "family", family,
-                        "format", "x-ai-gateway"
-                )
-        );
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("family", family);
+        details.put("format", "x-ai-gateway");
+        details.put("parameter_size", "unknown");
+        details.put("quantization_level", "unknown");
+        details.put("capability_level", model.capabilityLevel() == null ? "unknown" : model.capabilityLevel().name().toLowerCase());
+        details.put("preferred_backend", model.preferredBackend() == null ? "unknown" : model.preferredBackend().name().toLowerCase());
+        details.put("supports", Map.of(
+                "chat", model.supportsChat(),
+                "embeddings", model.supportsEmbeddings(),
+                "tools", hasSupportedCapability(model, "tool"),
+                "vision", hasSupportedCapability(model, "image"),
+                "reasoning", hasSupportedCapability(model, "reasoning")
+        ));
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("name", model.publicModelId());
+        result.put("model", model.publicModelId());
+        result.put("modified_at", Instant.EPOCH.toString());
+        result.put("details", details);
+        return result;
+    }
+
+    private JsonNode toOpenAiContent(JsonNode item) {
+        String text = item.path("content").asText("");
+        JsonNode images = item.path("images");
+        if (!images.isArray() || images.isEmpty()) {
+            return JsonNodeFactory.instance.textNode(text);
+        }
+        ArrayNode content = objectMapper.createArrayNode();
+        if (StringUtils.hasText(text)) {
+            ObjectNode textPart = content.addObject();
+            textPart.put("type", "text");
+            textPart.put("text", text);
+        }
+        for (JsonNode image : images) {
+            String encoded = image.asText(null);
+            if (!StringUtils.hasText(encoded)) {
+                continue;
+            }
+            ObjectNode imagePart = content.addObject();
+            imagePart.put("type", "image_url");
+            imagePart.putObject("image_url").put("url", normalizeOllamaImageUrl(encoded));
+        }
+        return content.isEmpty() ? JsonNodeFactory.instance.textNode(text) : content;
+    }
+
+    private String normalizeOllamaImageUrl(String encoded) {
+        if (encoded.startsWith("data:") || encoded.startsWith("gateway://")) {
+            return encoded;
+        }
+        return "data:image/*;base64," + encoded;
+    }
+
+    private void putUsage(Map<String, Object> payload, com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalUsage usage) {
+        if (usage == null || !usage.present()) {
+            return;
+        }
+        payload.put("prompt_eval_count", usage.promptTokens());
+        payload.put("eval_count", usage.completionTokens());
+        payload.put("total_tokens", usage.totalTokens());
+        payload.put("x_gateway_usage", Map.of(
+                "prompt_tokens", usage.promptTokens(),
+                "completion_tokens", usage.completionTokens(),
+                "total_tokens", usage.totalTokens(),
+                "cache_hit_tokens", usage.cacheHitTokens(),
+                "cache_write_tokens", usage.cacheWriteTokens(),
+                "reasoning_tokens", usage.reasoningTokens()
+        ));
+    }
+
+    private boolean hasSupportedCapability(GatewayPublicModelView model, String capabilityKey) {
+        if (model.capabilities() == null || model.capabilities().isEmpty()) {
+            return false;
+        }
+        return model.capabilities().entrySet().stream()
+                .filter(entry -> entry.getKey() != null && entry.getKey().toLowerCase().contains(capabilityKey))
+                .map(Map.Entry::getValue)
+                .anyMatch(value -> value != null && !"blocked".equalsIgnoreCase(value.supportStatus()));
     }
 
     private String writeJson(Object value) {

@@ -14,6 +14,10 @@ public interface GatewayAsyncResourceRepository extends JpaRepository<GatewayAsy
 
     Optional<GatewayAsyncResourceEntity> findByResourceKeyAndDeletedFalse(String resourceKey);
 
+    Optional<GatewayAsyncResourceEntity> findByResourceKeyAndDistributedKeyIdAndDeletedFalse(
+            String resourceKey,
+            Long distributedKeyId);
+
     Optional<GatewayAsyncResourceEntity> findByResourceKeyAndResourceTypeAndDeletedFalse(
             String resourceKey,
             GatewayAsyncResourceType resourceType);
@@ -29,6 +33,10 @@ public interface GatewayAsyncResourceRepository extends JpaRepository<GatewayAsy
             String upstreamObjectId);
 
     List<GatewayAsyncResourceEntity> findAllByUpstreamObjectIdAndDeletedFalse(String upstreamObjectId);
+
+    List<GatewayAsyncResourceEntity> findAllByDistributedKeyIdAndUpstreamObjectIdAndDeletedFalse(
+            Long distributedKeyId,
+            String upstreamObjectId);
 
     @Query("""
             select entity

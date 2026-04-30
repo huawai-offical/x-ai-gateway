@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
@@ -94,11 +95,14 @@ public class MaintenanceRunService {
     }
 
     private RunArtifact buildArtifact(String runType, boolean dryRun, String requestDetailJson) throws Exception {
+        List<Map<String, Object>> checks = runChecks(runType, dryRun, requestDetailJson);
         Map<String, Object> detail = Map.of(
                 "runType", runType,
                 "dryRun", dryRun,
                 "mode", modeFor(runType),
                 "requestDetail", requestDetailJson == null || requestDetailJson.isBlank() ? "{}" : requestDetailJson,
+                "checks", checks,
+                "summary", summarizeChecks(checks),
                 "generatedAt", Instant.now().toString()
         );
         String detailJson = writeJson(detail);
@@ -121,6 +125,53 @@ public class MaintenanceRunService {
             case "ROLLBACK_PLAN" -> "rollback_strategy_preview";
             default -> "maintenance";
         };
+    }
+
+    private List<Map<String, Object>> runChecks(String runType, boolean dryRun, String requestDetailJson) {
+        List<Map<String, Object>> checks = new ArrayList<>();
+        Path fileRoot = Path.of(gatewayProperties.getStorage().getFileRoot()).toAbsolutePath();
+        checks.add(check("storageRootConfigured", fileRoot.toString(), true, "文件根目录已解析。"));
+        checks.add(check("storageParentWritable", fileRoot.getParent() == null ? fileRoot.toString() : fileRoot.getParent().toString(),
+                Files.isWritable(fileRoot.getParent() == null ? fileRoot : fileRoot.getParent()),
+                "维护产物父目录需要可写。"));
+        checks.add(check("requestDetailJson", "detailJson", isJsonLike(requestDetailJson), "detailJson 应为空或 JSON 对象/数组。"));
+        checks.add(check("safeExecutionMode", dryRun ? "dry-run" : "confirmed", dryRun || !"RESTORE_DRY_RUN".equals(runType),
+                "危险动作默认 dry-run；非 dry-run 必须走 confirm。"));
+        if ("UPGRADE_CHECK".equals(runType)) {
+            checks.add(check("releaseCompatibility", "upgrade-check", requestDetailJson != null && requestDetailJson.contains("targetVersion"),
+                    "UPGRADE_CHECK 建议提供 targetVersion 以便前端展示兼容性结论。"));
+        }
+        if ("ROLLBACK_PLAN".equals(runType)) {
+            checks.add(check("rollbackSource", "rollback-plan", requestDetailJson != null && requestDetailJson.contains("rollback"),
+                    "ROLLBACK_PLAN 建议提供 rollback 目标或 sourceRef。"));
+        }
+        return checks;
+    }
+
+    private Map<String, Object> check(String name, String target, boolean passed, String message) {
+        return Map.of(
+                "name", name,
+                "target", target,
+                "status", passed ? "OK" : "FAILED",
+                "message", message
+        );
+    }
+
+    private Map<String, Object> summarizeChecks(List<Map<String, Object>> checks) {
+        long failed = checks.stream().filter(check -> "FAILED".equals(check.get("status"))).count();
+        return Map.of(
+                "total", checks.size(),
+                "failed", failed,
+                "status", failed == 0 ? "READY" : "ATTENTION_REQUIRED"
+        );
+    }
+
+    private boolean isJsonLike(String detailJson) {
+        if (detailJson == null || detailJson.isBlank()) {
+            return true;
+        }
+        String value = detailJson.trim();
+        return (value.startsWith("{") && value.endsWith("}")) || (value.startsWith("[") && value.endsWith("]"));
     }
 
     private boolean requiresConfirm(String runType, boolean dryRun) {

@@ -129,4 +129,25 @@ class AdminResourceExecutionServiceTests {
         assertEquals("file.content", response.canonicalResponse().objectType());
         assertEquals("file_123", response.canonicalResponse().objectId());
     }
+
+    @Test
+    void shouldExposeMultiResourceWorkbenchTemplates() {
+        AdminResourceExecutionService service = new AdminResourceExecutionService(
+                Mockito.mock(TranslationExecutionPlanCompiler.class),
+                Mockito.mock(GatewayRequestFeatureService.class),
+                Mockito.mock(GatewayResourceExecutionService.class)
+        );
+
+        var templates = service.templates();
+
+        assertEquals(7, templates.size());
+        org.junit.jupiter.api.Assertions.assertTrue(templates.stream().anyMatch(item -> "response".equals(item.resourceType())
+                && "chat_execute".equals(item.executionSurface())));
+        org.junit.jupiter.api.Assertions.assertTrue(templates.stream().anyMatch(item -> "image".equals(item.resourceType())));
+        org.junit.jupiter.api.Assertions.assertTrue(templates.stream().anyMatch(item -> "audio".equals(item.resourceType())));
+        org.junit.jupiter.api.Assertions.assertTrue(templates.stream().anyMatch(item -> "file".equals(item.resourceType())));
+        org.junit.jupiter.api.Assertions.assertTrue(templates.stream().anyMatch(item -> "batch".equals(item.resourceType())));
+        org.junit.jupiter.api.Assertions.assertTrue(templates.stream().anyMatch(item -> "tuning".equals(item.resourceType())));
+        org.junit.jupiter.api.Assertions.assertTrue(templates.stream().anyMatch(item -> "cache".equals(item.resourceType())));
+    }
 }

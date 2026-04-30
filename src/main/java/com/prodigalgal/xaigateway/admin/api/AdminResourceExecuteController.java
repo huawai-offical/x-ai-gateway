@@ -2,6 +2,8 @@ package com.prodigalgal.xaigateway.admin.api;
 
 import com.prodigalgal.xaigateway.admin.application.AdminResourceExecutionService;
 import jakarta.validation.Valid;
+import java.util.List;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -20,5 +22,10 @@ public class AdminResourceExecuteController {
     @PostMapping("/execute")
     public AdminResourceExecuteResponse execute(@Valid @RequestBody AdminResourceExecuteRequest request) {
         return adminResourceExecutionService.execute(request);
+    }
+
+    @GetMapping("/templates")
+    public List<AdminResourceTemplateResponse> templates() {
+        return adminResourceExecutionService.templates();
     }
 }

@@ -40,5 +40,7 @@ class MaintenanceRunServiceTests {
         assertTrue(response.confirmRequired());
         assertNotNull(response.artifactPath());
         assertNotNull(response.artifactChecksum());
+        assertTrue(response.detailJson().contains("\"checks\""));
+        assertTrue(response.detailJson().contains("\"summary\""));
     }
 }

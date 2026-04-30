@@ -4,23 +4,29 @@ import com.prodigalgal.xaigateway.admin.api.DistributedKeyCreateResponse;
 import com.prodigalgal.xaigateway.admin.api.DistributedKeyClientConfigResponse;
 import com.prodigalgal.xaigateway.admin.api.DistributedKeyRequest;
 import com.prodigalgal.xaigateway.admin.api.DistributedKeyResponse;
+import com.prodigalgal.xaigateway.admin.api.DistributedKeySecretExportGrantResponse;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeySecretService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeySecrets;
 import com.prodigalgal.xaigateway.gateway.core.shared.ModelIdNormalizer;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeySecretExportGrantEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayUserEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAccountPoolBindingRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAccessGroupGrantRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyBindingRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeySecretExportGrantRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayUserRepository;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,8 +39,11 @@ public class DistributedKeyAdminService {
     private final DistributedKeyBindingRepository distributedKeyBindingRepository;
     private final DistributedKeyAccountPoolBindingRepository distributedKeyAccountPoolBindingRepository;
     private final DistributedKeyAccessGroupGrantRepository keyGrantRepository;
+    private final DistributedKeySecretExportGrantRepository secretExportGrantRepository;
     private final GatewayUserRepository gatewayUserRepository;
+    private final CredentialCryptoService credentialCryptoService;
     private final Optional<OpsAuditService> opsAuditService;
+    private static final Duration SECRET_EXPORT_TTL = Duration.ofMinutes(15);
 
     public DistributedKeyAdminService(
             DistributedKeyRepository distributedKeyRepository,
@@ -42,14 +51,18 @@ public class DistributedKeyAdminService {
             DistributedKeyBindingRepository distributedKeyBindingRepository,
             DistributedKeyAccountPoolBindingRepository distributedKeyAccountPoolBindingRepository,
             DistributedKeyAccessGroupGrantRepository keyGrantRepository,
+            DistributedKeySecretExportGrantRepository secretExportGrantRepository,
             GatewayUserRepository gatewayUserRepository,
+            CredentialCryptoService credentialCryptoService,
             Optional<OpsAuditService> opsAuditService) {
         this.distributedKeyRepository = distributedKeyRepository;
         this.distributedKeySecretService = distributedKeySecretService;
         this.distributedKeyBindingRepository = distributedKeyBindingRepository;
         this.distributedKeyAccountPoolBindingRepository = distributedKeyAccountPoolBindingRepository;
         this.keyGrantRepository = keyGrantRepository;
+        this.secretExportGrantRepository = secretExportGrantRepository;
         this.gatewayUserRepository = gatewayUserRepository;
+        this.credentialCryptoService = credentialCryptoService;
         this.opsAuditService = opsAuditService;
     }
 
@@ -72,7 +85,8 @@ public class DistributedKeyAdminService {
         entity.setSecretHash(secrets.secretHash());
         entity.setMaskedKey(secrets.maskedKey());
         DistributedKeyEntity saved = distributedKeyRepository.save(entity);
-        return new DistributedKeyCreateResponse(toResponse(saved), secrets.fullKey());
+        IssuedSecretExportGrant grant = registerSecretExportGrant(saved, secrets.fullKey(), "CREATE");
+        return new DistributedKeyCreateResponse(toResponse(saved), secrets.fullKey(), grant.token(), grant.expiresAt());
     }
 
     public DistributedKeyResponse update(Long id, DistributedKeyRequest request) {
@@ -91,7 +105,8 @@ public class DistributedKeyAdminService {
         entity.setSecretHash(secrets.secretHash());
         entity.setMaskedKey(secrets.maskedKey());
         DistributedKeyEntity saved = distributedKeyRepository.save(entity);
-        return new DistributedKeyCreateResponse(toResponse(saved), secrets.fullKey());
+        IssuedSecretExportGrant grant = registerSecretExportGrant(saved, secrets.fullKey(), "ROTATE");
+        return new DistributedKeyCreateResponse(toResponse(saved), secrets.fullKey(), grant.token(), grant.expiresAt());
     }
 
     public DistributedKeyResponse toggle(Long id, boolean active) {
@@ -108,6 +123,7 @@ public class DistributedKeyAdminService {
         distributedKeyBindingRepository.deleteAllByDistributedKey_Id(id);
         distributedKeyAccountPoolBindingRepository.deleteAllByDistributedKey_Id(id);
         keyGrantRepository.deleteAllByDistributedKey_Id(id);
+        secretExportGrantRepository.deleteAllByDistributedKey_Id(id);
         distributedKeyRepository.delete(entity);
     }
 
@@ -116,11 +132,81 @@ public class DistributedKeyAdminService {
         String normalizedFormat = normalizeConfigFormat(format);
         String normalizedClientFamily = GatewayClientFamily.from(clientFamily).name();
         String normalizedBaseUrl = normalizeBaseUrl(baseUrl);
-        String apiBaseUrl = normalizedBaseUrl + "/v1";
         String maskedKey = entity.getMaskedKey() == null || entity.getMaskedKey().isBlank()
                 ? entity.getKeyPrefix() + "..."
                 : entity.getMaskedKey();
         String secretPlaceholder = "<仅创建或轮换时展示一次；当前为 " + maskedKey + ">";
+        recordClientConfigExport(entity, normalizedFormat, normalizedClientFamily, normalizedBaseUrl, "masked_only");
+        return buildClientConfigResponse(
+                entity,
+                normalizedFormat,
+                normalizedClientFamily,
+                normalizedBaseUrl,
+                secretPlaceholder,
+                "安全导出不会返回完整 secret；完整 key 仅在创建或轮换后的短窗口内可一次性下载。"
+        );
+    }
+
+    public DistributedKeyClientConfigResponse consumeOneTimeClientConfig(
+            Long id,
+            String grantToken,
+            String format,
+            String clientFamily,
+            String baseUrl) {
+        DistributedKeyEntity entity = getRequired(id);
+        DistributedKeySecretExportGrantEntity grant = requireGrant(id, grantToken);
+        if (grant.isRevoked()) {
+            throw new IllegalArgumentException("一次性配置下载 token 已撤销。");
+        }
+        if (grant.isConsumed()) {
+            throw new IllegalArgumentException("一次性配置下载 token 已被使用。");
+        }
+        if (grant.getExpiresAt().isBefore(Instant.now())) {
+            throw new IllegalArgumentException("一次性配置下载 token 已过期，请重新轮换 key。");
+        }
+        String fullKey = credentialCryptoService.decrypt(grant.getFullKeyCiphertext());
+        grant.setConsumedAt(Instant.now());
+        secretExportGrantRepository.save(grant);
+        String normalizedFormat = normalizeConfigFormat(format);
+        String normalizedClientFamily = GatewayClientFamily.from(clientFamily).name();
+        String normalizedBaseUrl = normalizeBaseUrl(baseUrl);
+        recordClientConfigExport(entity, normalizedFormat, normalizedClientFamily, normalizedBaseUrl, "one_time_secret");
+        return buildClientConfigResponse(
+                entity,
+                normalizedFormat,
+                normalizedClientFamily,
+                normalizedBaseUrl,
+                fullKey,
+                "一次性完整 secret 配置已生成；该 token 已消费，不能重复下载。"
+        );
+    }
+
+    public DistributedKeySecretExportGrantResponse revokeOneTimeClientConfig(Long id, String grantToken) {
+        DistributedKeyEntity entity = getRequired(id);
+        DistributedKeySecretExportGrantEntity grant = requireGrant(id, grantToken);
+        if (!grant.isRevoked()) {
+            grant.setRevokedAt(Instant.now());
+            secretExportGrantRepository.save(grant);
+        }
+        opsAuditService.ifPresent(service -> service.record(
+                "DISTRIBUTED_KEY",
+                "REVOKE_CLIENT_CONFIG_EXPORT",
+                "DistributedKey",
+                String.valueOf(entity.getId()),
+                "{\"keyName\":\"" + escapeJson(entity.getKeyName()) + "\",\"grantTokenHash\":\""
+                        + escapeJson(credentialCryptoService.fingerprint(grantToken)) + "\"}"
+        ));
+        return toGrantResponse(entity, grant, grantToken);
+    }
+
+    private DistributedKeyClientConfigResponse buildClientConfigResponse(
+            DistributedKeyEntity entity,
+            String normalizedFormat,
+            String normalizedClientFamily,
+            String normalizedBaseUrl,
+            String apiKey,
+            String warning) {
+        String apiBaseUrl = normalizedBaseUrl + "/v1";
         String config = switch (normalizedFormat) {
             case "auth_json" -> """
                     {
@@ -128,12 +214,18 @@ public class DistributedKeyAdminService {
                       "OPENAI_BASE_URL": "%s",
                       "X_AI_GATEWAY_API_KEY": "%s"
                     }
-                    """.formatted(secretPlaceholder, apiBaseUrl, secretPlaceholder).trim();
+                    """.formatted(apiKey, apiBaseUrl, apiKey).trim();
             case "env" -> """
                     export OPENAI_API_KEY="%s"
                     export OPENAI_BASE_URL="%s"
                     export X_AI_GATEWAY_API_KEY="%s"
-                    """.formatted(secretPlaceholder, apiBaseUrl, secretPlaceholder).trim();
+                    """.formatted(apiKey, apiBaseUrl, apiKey).trim();
+            case "curl" -> """
+                    curl %s/chat/completions \\
+                      -H "Authorization: Bearer %s" \\
+                      -H "Content-Type: application/json" \\
+                      -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"ping"}]}'
+                    """.formatted(apiBaseUrl, apiKey).trim();
             default -> """
                     [model_providers.x-ai-gateway]
                     name = "x-ai-gateway"
@@ -141,17 +233,19 @@ public class DistributedKeyAdminService {
                     env_key = "X_AI_GATEWAY_API_KEY"
                     wire_api = "chat"
 
-                    # 将下方环境变量替换为创建或轮换时一次性展示的完整 key。
-                    # 当前 key: %s
-                    """.formatted(apiBaseUrl, maskedKey).trim();
+                    # 将下方值写入安全的 secret manager；普通导出只会给出占位符。
+                    api_key = "%s"
+                    """.formatted(apiBaseUrl, apiKey).trim();
         };
-        recordClientConfigExport(entity, normalizedFormat, normalizedClientFamily, normalizedBaseUrl);
+        String maskedKey = entity.getMaskedKey() == null || entity.getMaskedKey().isBlank()
+                ? entity.getKeyPrefix() + "..."
+                : entity.getMaskedKey();
         return new DistributedKeyClientConfigResponse(
                 entity.getKeyName(),
                 normalizedClientFamily,
                 normalizedFormat,
                 maskedKey,
-                "安全导出不会返回完整 secret；完整 key 仅在创建或轮换时展示一次。",
+                warning,
                 config
         );
     }
@@ -289,6 +383,7 @@ public class DistributedKeyAdminService {
             case "toml", "config_toml" -> "config_toml";
             case "auth", "auth_json", "json" -> "auth_json";
             case "env", "shell" -> "env";
+            case "curl", "curl_config" -> "curl";
             default -> throw new IllegalArgumentException("不支持的客户端配置格式。");
         };
     }
@@ -311,7 +406,8 @@ public class DistributedKeyAdminService {
             DistributedKeyEntity entity,
             String format,
             String clientFamily,
-            String baseUrl) {
+            String baseUrl,
+            String secretPolicy) {
         opsAuditService.ifPresent(service -> service.record(
                 "DISTRIBUTED_KEY",
                 "EXPORT_CLIENT_CONFIG",
@@ -322,9 +418,59 @@ public class DistributedKeyAdminService {
                         + "\"format\":\"" + escapeJson(format) + "\","
                         + "\"clientFamily\":\"" + escapeJson(clientFamily) + "\","
                         + "\"baseUrl\":\"" + escapeJson(baseUrl) + "\","
-                        + "\"secretPolicy\":\"masked_only\""
+                        + "\"secretPolicy\":\"" + escapeJson(secretPolicy) + "\""
                         + "}"
         ));
+    }
+
+    private IssuedSecretExportGrant registerSecretExportGrant(DistributedKeyEntity entity, String fullKey, String sourceAction) {
+        String token = UUID.randomUUID() + "-" + UUID.randomUUID();
+        Instant expiresAt = Instant.now().plus(SECRET_EXPORT_TTL);
+        DistributedKeySecretExportGrantEntity grant = new DistributedKeySecretExportGrantEntity();
+        grant.setDistributedKey(entity);
+        grant.setTokenHash(credentialCryptoService.fingerprint(token));
+        grant.setFullKeyCiphertext(credentialCryptoService.encrypt(fullKey));
+        grant.setSourceAction(sourceAction);
+        grant.setExpiresAt(expiresAt);
+        secretExportGrantRepository.save(grant);
+        opsAuditService.ifPresent(service -> service.record(
+                "DISTRIBUTED_KEY",
+                "ISSUE_CLIENT_CONFIG_EXPORT",
+                "DistributedKey",
+                String.valueOf(entity.getId()),
+                "{"
+                        + "\"keyName\":\"" + escapeJson(entity.getKeyName()) + "\","
+                        + "\"sourceAction\":\"" + escapeJson(sourceAction) + "\","
+                        + "\"expiresAt\":\"" + expiresAt + "\","
+                        + "\"secretPolicy\":\"one_time\""
+                        + "}"
+        ));
+        return new IssuedSecretExportGrant(token, expiresAt);
+    }
+
+    private DistributedKeySecretExportGrantEntity requireGrant(Long distributedKeyId, String grantToken) {
+        if (grantToken == null || grantToken.isBlank()) {
+            throw new IllegalArgumentException("一次性配置下载 token 不能为空。");
+        }
+        String tokenHash = credentialCryptoService.fingerprint(grantToken);
+        return secretExportGrantRepository.findByDistributedKey_IdAndTokenHash(distributedKeyId, tokenHash)
+                .orElseThrow(() -> new IllegalArgumentException("一次性配置下载 token 不存在或不属于该 key。"));
+    }
+
+    private DistributedKeySecretExportGrantResponse toGrantResponse(
+            DistributedKeyEntity entity,
+            DistributedKeySecretExportGrantEntity grant,
+            String grantToken) {
+        return new DistributedKeySecretExportGrantResponse(
+                entity.getId(),
+                entity.getKeyName(),
+                entity.getMaskedKey(),
+                grantToken,
+                grant.getExpiresAt(),
+                grant.isConsumed(),
+                grant.isRevoked(),
+                "一次性配置下载 token 只在创建/轮换后的短窗口内有效，撤销后不能恢复。"
+        );
     }
 
     private String escapeJson(String value) {
@@ -362,5 +508,8 @@ public class DistributedKeyAdminService {
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
         );
+    }
+
+    private record IssuedSecretExportGrant(String token, Instant expiresAt) {
     }
 }

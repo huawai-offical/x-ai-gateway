@@ -19,6 +19,12 @@ public interface UpstreamCacheReferenceRepository extends JpaRepository<Upstream
             String prefixHash
     );
 
+    Optional<UpstreamCacheReferenceEntity> findByIdAndDistributedKeyId(Long id, Long distributedKeyId);
+
+    Optional<UpstreamCacheReferenceEntity> findFirstByDistributedKeyIdAndExternalCacheRefOrderByUpdatedAtDesc(
+            Long distributedKeyId,
+            String externalCacheRef);
+
     List<UpstreamCacheReferenceEntity> findTop100ByOrderByUpdatedAtDesc();
 
     List<UpstreamCacheReferenceEntity> findTop100ByDistributedKeyIdOrderByUpdatedAtDesc(Long distributedKeyId);

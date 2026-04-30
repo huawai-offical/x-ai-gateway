@@ -2,6 +2,7 @@ package com.prodigalgal.xaigateway.integration;
 
 import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.gateway.core.account.AccountSelectionService;
+import com.prodigalgal.xaigateway.gateway.core.account.UpstreamAccountProviderType;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeySecretService;
 import com.prodigalgal.xaigateway.gateway.core.cache.AffinityBindingStore;
 import com.prodigalgal.xaigateway.gateway.core.credential.CredentialAuthKind;
@@ -22,22 +23,26 @@ import com.prodigalgal.xaigateway.gateway.core.shared.ReasoningTransport;
 import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
 import com.prodigalgal.xaigateway.gateway.core.usage.GatewayUsage;
 import com.prodigalgal.xaigateway.infra.persistence.entity.AuditLogEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyAccountPoolBindingEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyBindingEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.RequestLogEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SiteCapabilitySnapshotEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SiteModelCapabilityEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountPoolEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamSiteProfileEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.AuditLogRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.CacheHitLogRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyBindingRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAccountPoolBindingRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.RequestLogRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.RouteDecisionLogRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.SiteCapabilitySnapshotRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.SiteModelCapabilityRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCacheReferenceRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountPoolRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamSiteProfileRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UsageRecordRepository;
@@ -89,6 +94,12 @@ class GatewayEndToEndSmokeTests {
 
     @Autowired
     private DistributedKeyBindingRepository distributedKeyBindingRepository;
+
+    @Autowired
+    private DistributedKeyAccountPoolBindingRepository distributedKeyAccountPoolBindingRepository;
+
+    @Autowired
+    private UpstreamAccountPoolRepository upstreamAccountPoolRepository;
 
     @Autowired
     private UpstreamCredentialRepository upstreamCredentialRepository;
@@ -149,7 +160,9 @@ class GatewayEndToEndSmokeTests {
         cacheHitLogRepository.deleteAll();
         upstreamCacheReferenceRepository.deleteAll();
         distributedKeyBindingRepository.deleteAll();
+        distributedKeyAccountPoolBindingRepository.deleteAll();
         distributedKeyRepository.deleteAll();
+        upstreamAccountPoolRepository.deleteAll();
         siteModelCapabilityRepository.deleteAll();
         siteCapabilitySnapshotRepository.deleteAll();
         upstreamCredentialRepository.deleteAll();
@@ -465,10 +478,32 @@ class GatewayEndToEndSmokeTests {
         distributedKey.setActive(true);
         distributedKey = distributedKeyRepository.save(distributedKey);
 
+        UpstreamAccountPoolEntity openAiPool = saveAccountPool(
+                "default-openai",
+                UpstreamAccountProviderType.OPENAI_OAUTH,
+                List.of("gpt-4o"),
+                List.of("openai", "responses")
+        );
+        UpstreamAccountPoolEntity anthropicPool = saveAccountPool(
+                "default-anthropic",
+                UpstreamAccountProviderType.CLAUDE_ACCOUNT,
+                List.of("claude-sonnet-4"),
+                List.of("anthropic_native")
+        );
+        UpstreamAccountPoolEntity geminiPool = saveAccountPool(
+                "default-gemini",
+                UpstreamAccountProviderType.GEMINI_OAUTH,
+                List.of("gemini-2.5-pro"),
+                List.of("google_native")
+        );
+
         saveBinding(distributedKey, openAiPrimary, 10, 100);
         saveBinding(distributedKey, openAiSecondary, 20, 100);
         saveBinding(distributedKey, anthropicPrimary, 10, 100);
         saveBinding(distributedKey, geminiPrimary, 10, 100);
+        savePoolBinding(distributedKey, openAiPool, ProviderType.OPENAI_DIRECT, 10);
+        savePoolBinding(distributedKey, anthropicPool, ProviderType.ANTHROPIC_DIRECT, 20);
+        savePoolBinding(distributedKey, geminiPool, ProviderType.GEMINI_DIRECT, 30);
 
         return new SeedData(
                 distributedKey.getKeyPrefix(),
@@ -565,6 +600,21 @@ class GatewayEndToEndSmokeTests {
         return upstreamCredentialRepository.save(entity);
     }
 
+    private UpstreamAccountPoolEntity saveAccountPool(
+            String name,
+            UpstreamAccountProviderType providerType,
+            List<String> supportedModels,
+            List<String> supportedProtocols) {
+        UpstreamAccountPoolEntity entity = new UpstreamAccountPoolEntity();
+        entity.setPoolName(name);
+        entity.setProviderType(providerType);
+        entity.setSupportedModels(supportedModels);
+        entity.setSupportedProtocols(supportedProtocols);
+        entity.setAllowedClientFamilies(List.of("GENERIC_OPENAI", "CODEX"));
+        entity.setActive(true);
+        return upstreamAccountPoolRepository.save(entity);
+    }
+
     private void saveBinding(DistributedKeyEntity distributedKey, UpstreamCredentialEntity credential, int priority, int weight) {
         DistributedKeyBindingEntity entity = new DistributedKeyBindingEntity();
         entity.setDistributedKey(distributedKey);
@@ -573,6 +623,20 @@ class GatewayEndToEndSmokeTests {
         entity.setWeight(weight);
         entity.setActive(true);
         distributedKeyBindingRepository.save(entity);
+    }
+
+    private void savePoolBinding(
+            DistributedKeyEntity distributedKey,
+            UpstreamAccountPoolEntity pool,
+            ProviderType providerType,
+            int priority) {
+        DistributedKeyAccountPoolBindingEntity entity = new DistributedKeyAccountPoolBindingEntity();
+        entity.setDistributedKey(distributedKey);
+        entity.setPool(pool);
+        entity.setProviderType(providerType);
+        entity.setPriority(priority);
+        entity.setActive(true);
+        distributedKeyAccountPoolBindingRepository.save(entity);
     }
 
     private record SeedData(

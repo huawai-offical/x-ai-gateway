@@ -3,6 +3,7 @@ package com.prodigalgal.xaigateway.admin.application;
 import com.prodigalgal.xaigateway.admin.api.AdminResourceExecuteRequest;
 import com.prodigalgal.xaigateway.admin.api.AdminResourceExecuteResponse;
 import com.prodigalgal.xaigateway.admin.api.AdminResourceFileRef;
+import com.prodigalgal.xaigateway.admin.api.AdminResourceTemplateResponse;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalFileRef;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
@@ -144,6 +145,70 @@ public class AdminResourceExecutionService {
                 response.getBody() == null ? null : response.getBody().toPrettyString(),
                 null,
                 result.canonicalResponse()
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.List<AdminResourceTemplateResponse> templates() {
+        JsonNodeFactory json = JsonNodeFactory.instance;
+        return java.util.List.of(
+                template("response", "create", "chat_execute", "openai", "POST", "/v1/responses", "gpt-4o-mini",
+                        "Responses 调试入口，复用聊天执行 Workbench，保留 request log、trace 与 usage。",
+                        json.objectNode().put("model", "gpt-4o-mini").put("input", "用一句话介绍 x-ai-gateway。"),
+                        java.util.List.of(), java.util.List.of(), java.util.List.of("requestId", "routeSelection", "usage")),
+                template("image", "generate", "resource_execute", "openai", "POST", "/v1/images/generations", "gpt-image-1",
+                        "图片生成调试入口，适合验证模型、账号池、错误规则和二进制/JSON 返回。",
+                        json.objectNode().put("model", "gpt-image-1").put("prompt", "一只在星图上巡航的机械猫。").put("size", "1024x1024"),
+                        java.util.List.of(), java.util.List.of(), java.util.List.of("requestId", "canonicalResponse", "usage")),
+                template("audio", "transcribe", "resource_execute", "openai", "POST", "/v1/audio/transcriptions", "whisper-1",
+                        "音频转写 multipart 调试入口，使用 fileRefs 选择已上传文件。",
+                        json.objectNode().put("model", "whisper-1"),
+                        java.util.List.of("model", "language"), java.util.List.of("file"), java.util.List.of("requestId", "canonicalResponse", "error")),
+                template("file", "upload", "resource_execute", "openai", "POST", "/v1/files", "gpt-4o-mini",
+                        "文件上传调试入口，验证 multipart、purpose、文件绑定和上游资源映射。",
+                        json.objectNode().put("purpose", "assistants"),
+                        java.util.List.of("purpose"), java.util.List.of("file"), java.util.List.of("gatewayResourceKey", "canonicalResponse")),
+                template("batch", "create", "resource_execute", "openai", "POST", "/v1/batches", "gpt-4o-mini",
+                        "Batch 创建调试入口，用于验证 async resource、operation 和 lineage。",
+                        json.objectNode().put("input_file_id", "file_xxx").put("endpoint", "/v1/chat/completions").put("completion_window", "24h"),
+                        java.util.List.of(), java.util.List.of(), java.util.List.of("gatewayResourceKey", "canonicalResponse", "lineage")),
+                template("tuning", "create", "resource_execute", "openai", "POST", "/v1/fine_tuning/jobs", "gpt-4o-mini",
+                        "Fine tuning 调试入口，用于验证 tuning 生命周期和 tuned model import。",
+                        json.objectNode().put("model", "gpt-4o-mini").put("training_file", "file_xxx"),
+                        java.util.List.of(), java.util.List.of(), java.util.List.of("gatewayResourceKey", "operation", "modelAlias")),
+                template("cache", "import", "resource_execute", "public_resource", "POST", "/api/v1/caches/import", "gpt-4o-mini",
+                        "Gateway Cache 导入调试入口，用于验证 cache 生命周期、命中与 lineage。",
+                        json.objectNode().put("providerType", "OPENAI_COMPATIBLE").put("externalCacheRef", "cached_content_xxx").put("model", "gpt-4o-mini"),
+                        java.util.List.of(), java.util.List.of(), java.util.List.of("cacheName", "lineage", "usage"))
+        );
+    }
+
+    private AdminResourceTemplateResponse template(
+            String resourceType,
+            String operation,
+            String executionSurface,
+            String protocol,
+            String method,
+            String requestPath,
+            String modelHint,
+            String description,
+            JsonNode bodyTemplate,
+            java.util.List<String> formFields,
+            java.util.List<String> fileFields,
+            java.util.List<String> resultSignals) {
+        return new AdminResourceTemplateResponse(
+                resourceType,
+                operation,
+                executionSurface,
+                protocol,
+                method,
+                requestPath,
+                modelHint,
+                description,
+                bodyTemplate,
+                formFields,
+                fileFields,
+                resultSignals
         );
     }
 
