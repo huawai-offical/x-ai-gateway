@@ -3,6 +3,7 @@ package com.prodigalgal.xaigateway.admin.application;
 import com.prodigalgal.xaigateway.admin.api.*;
 import com.prodigalgal.xaigateway.infra.persistence.entity.DashboardExternalAppEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DashboardExternalAppRepository;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
@@ -81,6 +82,57 @@ public class DashboardExternalAppService {
         ensureActive(entity);
         String normalizedOrigin = resolveOrigin(origin, entity);
         ensureOrigin(entity, normalizedOrigin);
+        return buildSignedContext(entity, normalizedOrigin, actor, ttlSeconds);
+    }
+
+    @Transactional(readOnly = true)
+    public ExternalAppRuntimeResponse runtime(String slug, String origin, String actor, long ttlSeconds) {
+        DashboardExternalAppEntity entity = repository.findBySlug(normalizeSlug(slug))
+                .orElseThrow(() -> new IllegalArgumentException("未找到指定扩展应用。"));
+        DashboardExternalAppResponse app = toResponse(entity);
+        String actualOrigin = extractOrigin(entity.getIframeUrl());
+        if (!entity.isEnabled()) {
+            return runtimeBlocked(app, "APP_DISABLED", "应用已停用，不能挂载 iframe。", actualOrigin);
+        }
+        if (!entity.isNavEnabled()) {
+            return runtimeBlocked(app, "NAV_DISABLED", "应用未启用导航展示，运行页暂不开放。", actualOrigin);
+        }
+        if (actualOrigin == null) {
+            return runtimeBlocked(app, "INVALID_IFRAME_URL", "iframe URL 无法解析为有效来源。", null);
+        }
+        if (!entity.getAllowedOrigin().equals(actualOrigin)) {
+            return runtimeBlocked(
+                    app,
+                    "ORIGIN_MISMATCH",
+                    "iframe URL 来源 " + actualOrigin + " 与允许来源 " + entity.getAllowedOrigin() + " 不匹配。",
+                    actualOrigin
+            );
+        }
+        String normalizedOrigin = resolveOrigin(origin, entity);
+        ensureOrigin(entity, normalizedOrigin);
+        return new ExternalAppRuntimeResponse(
+                app,
+                buildSignedContext(entity, normalizedOrigin, actor, ttlSeconds),
+                true,
+                "READY",
+                "扩展应用可以安全挂载。",
+                actualOrigin
+        );
+    }
+
+    private ExternalAppRuntimeResponse runtimeBlocked(
+            DashboardExternalAppResponse app,
+            String status,
+            String message,
+            String actualOrigin) {
+        return new ExternalAppRuntimeResponse(app, null, false, status, message, actualOrigin);
+    }
+
+    private ExternalAppSignedContextResponse buildSignedContext(
+            DashboardExternalAppEntity entity,
+            String normalizedOrigin,
+            String actor,
+            long ttlSeconds) {
         Instant expiresAt = Instant.now().plusSeconds(Math.max(60, ttlSeconds <= 0 ? 300 : ttlSeconds));
         String payload = writeJson(Map.of(
                 "slug", entity.getSlug(),
@@ -158,6 +210,18 @@ public class DashboardExternalAppService {
     private void ensureOrigin(DashboardExternalAppEntity entity, String origin) {
         if (!entity.getAllowedOrigin().equals(normalizeOrigin(origin))) {
             throw new IllegalArgumentException("ORIGIN_MISMATCH");
+        }
+    }
+
+    private String extractOrigin(String iframeUrl) {
+        try {
+            URI uri = URI.create(required(iframeUrl, "iframe URL 不能为空。"));
+            if (!StringUtils.hasText(uri.getScheme()) || !StringUtils.hasText(uri.getAuthority())) {
+                return null;
+            }
+            return normalizeOrigin(uri.getScheme() + "://" + uri.getAuthority());
+        } catch (Exception exception) {
+            return null;
         }
     }
 
