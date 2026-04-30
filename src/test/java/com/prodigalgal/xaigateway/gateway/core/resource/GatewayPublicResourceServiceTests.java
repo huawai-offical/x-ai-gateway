@@ -3,6 +3,7 @@ package com.prodigalgal.xaigateway.gateway.core.resource;
 import com.prodigalgal.xaigateway.gateway.core.catalog.FineTunedModelRegistrationService;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayAsyncResourceEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCacheReferenceEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayAsyncResourceRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayFileBindingRepository;
@@ -58,8 +59,33 @@ class GatewayPublicResourceServiceTests {
 
         assertEquals("resource.lineage", response.path("object").asText());
         assertEquals("gateway:ftjob_1", response.path("root").asText());
-        assertTrue(response.path("nodes").size() >= 3);
-        assertTrue(response.path("edges").size() >= 2);
+        assertTrue(response.path("nodes").size() >= 7);
+        assertTrue(response.path("edges").size() >= 6);
+        assertEquals("tuning", response.path("summary").path("resource_type").asText());
+        assertEquals(response.path("nodes").size(), response.path("summary").path("node_count").asInt());
+    }
+
+    @Test
+    void shouldBuildLineageGraphFromCacheReference() {
+        Fixture fixture = new Fixture();
+        UpstreamCacheReferenceEntity cache = new UpstreamCacheReferenceEntity();
+        ReflectionTestUtils.setField(cache, "id", 42L);
+        cache.setDistributedKeyId(1L);
+        cache.setProviderType(ProviderType.GEMINI_DIRECT);
+        cache.setCredentialId(11L);
+        cache.setModelGroup("gemini-2.5-pro");
+        cache.setPrefixHash("prefix-1");
+        cache.setExternalCacheRef("cachedContents/demo");
+        cache.setStatus("ACTIVE");
+
+        Mockito.when(fixture.cacheService.resolve(1L, "cache_42")).thenReturn(cache);
+
+        ObjectNode response = fixture.service.lineage(1L, "cache", "cache_42");
+
+        assertEquals("resource.lineage", response.path("object").asText());
+        assertEquals("cache", response.path("summary").path("resource_type").asText());
+        assertTrue(response.path("nodes").size() >= 6);
+        assertTrue(response.path("edges").size() >= 5);
     }
 
     @Test
@@ -92,6 +118,51 @@ class GatewayPublicResourceServiceTests {
         Mockito.verify(fixture.asyncRepository).save(captor.capture());
         assertTrue(captor.getValue().getMetadataJson().contains("registered_model_key"));
         assertTrue(captor.getValue().getMetadataJson().contains("friendly-demo"));
+    }
+
+    @Test
+    void shouldMarkOperationDeleted() {
+        Fixture fixture = new Fixture();
+        GatewayAsyncResourceEntity entity = asyncEntity("ftjob_1", GatewayAsyncResourceType.TUNING, "running");
+        Mockito.when(fixture.asyncRepository.findByResourceKeyAndDistributedKeyIdAndDeletedFalse("ftjob_1", 1L))
+                .thenReturn(Optional.of(entity));
+        Mockito.when(fixture.asyncRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ObjectNode response = fixture.service.deleteOperation(1L, "ftjob_1");
+
+        assertTrue(response.path("deleted").asBoolean());
+        assertTrue(entity.isDeleted());
+        assertTrue(entity.getMetadataJson().contains("operation_deleted"));
+    }
+
+    @Test
+    void shouldWaitOperationImmediately() {
+        Fixture fixture = new Fixture();
+        GatewayAsyncResourceEntity entity = asyncEntity("ftjob_1", GatewayAsyncResourceType.TUNING, "running");
+        Mockito.when(fixture.asyncRepository.findByResourceKeyAndDistributedKeyIdAndDeletedFalse("ftjob_1", 1L))
+                .thenReturn(Optional.of(entity));
+
+        ObjectNode response = fixture.service.waitOperation(1L, "operations/ftjob_1");
+
+        assertTrue(response.path("waited").asBoolean());
+        assertEquals("immediate", response.path("wait_mode").asText());
+    }
+
+    @Test
+    void shouldListOperationsWithStringResourceType() {
+        Fixture fixture = new Fixture();
+        GatewayAsyncResourceEntity entity = asyncEntity("ftjob_1", GatewayAsyncResourceType.TUNING, "running");
+        Mockito.when(fixture.asyncRepository.search(
+                        Mockito.eq(1L),
+                        Mockito.eq(GatewayAsyncResourceType.TUNING),
+                        Mockito.eq("running"),
+                        any()))
+                .thenReturn(List.of(entity));
+
+        ObjectNode response = fixture.service.listOperations(1L, "tunings", "RUNNING");
+
+        assertEquals("list", response.path("object").asText());
+        assertEquals("operations/ftjob_1", response.path("data").path(0).path("name").asText());
     }
 
     private GatewayAsyncResourceEntity asyncEntity(String resourceKey, GatewayAsyncResourceType type, String status) {

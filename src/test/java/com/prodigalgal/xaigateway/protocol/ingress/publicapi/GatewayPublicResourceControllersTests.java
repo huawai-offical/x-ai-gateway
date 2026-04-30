@@ -2,7 +2,6 @@ package com.prodigalgal.xaigateway.protocol.ingress.publicapi;
 
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayTokenAuthenticationResolver;
-import com.prodigalgal.xaigateway.gateway.core.resource.GatewayAsyncResourceType;
 import com.prodigalgal.xaigateway.gateway.core.resource.GatewayCacheResourceService;
 import com.prodigalgal.xaigateway.gateway.core.resource.GatewayPublicResourceService;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
@@ -147,11 +146,11 @@ class GatewayPublicResourceControllersTests {
                 .put("name", "operations/ftjob_1")
                 .put("done", false);
 
-        Mockito.when(gatewayPublicResourceService.listOperations(1L, GatewayAsyncResourceType.TUNING, "running"))
+        Mockito.when(gatewayPublicResourceService.listOperations(1L, "tunings", "running"))
                 .thenReturn(response);
 
         webTestClient.get()
-                .uri("/api/v1/operations?resourceType=TUNING&status=running")
+                .uri("/api/v1/operations?resourceType=tunings&status=running")
                 .header(HttpHeaders.AUTHORIZATION, AUTHORIZATION)
                 .exchange()
                 .expectStatus().isOk()
@@ -176,6 +175,80 @@ class GatewayPublicResourceControllersTests {
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.done").isEqualTo(true);
+    }
+
+    @Test
+    void shouldWaitOperation() {
+        ObjectNode response = objectMapper.createObjectNode();
+        response.put("object", "operation");
+        response.put("name", "operations/ftjob_1");
+        response.put("waited", true);
+
+        Mockito.when(gatewayPublicResourceService.waitOperation(1L, "ftjob_1"))
+                .thenReturn(response);
+
+        webTestClient.post()
+                .uri("/api/v1/operations/ftjob_1:wait")
+                .header(HttpHeaders.AUTHORIZATION, AUTHORIZATION)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{}")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.waited").isEqualTo(true);
+    }
+
+    @Test
+    void shouldDeleteOperation() {
+        ObjectNode response = objectMapper.createObjectNode();
+        response.put("object", "operation");
+        response.put("name", "operations/ftjob_1");
+        response.put("deleted", true);
+
+        Mockito.when(gatewayPublicResourceService.deleteOperation(1L, "ftjob_1"))
+                .thenReturn(response);
+
+        webTestClient.delete()
+                .uri("/api/v1/operations/ftjob_1")
+                .header(HttpHeaders.AUTHORIZATION, AUTHORIZATION)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.deleted").isEqualTo(true);
+    }
+
+    @Test
+    void shouldInvalidateGatewayCache() {
+        ObjectNode response = cacheNode("cache_8");
+        response.put("invalidated", true);
+
+        Mockito.when(gatewayCacheResourceService.invalidate(1L, "cache_8"))
+                .thenReturn(response);
+
+        webTestClient.post()
+                .uri("/api/v1/caches/cache_8:invalidate")
+                .header(HttpHeaders.AUTHORIZATION, AUTHORIZATION)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.invalidated").isEqualTo(true);
+    }
+
+    @Test
+    void shouldTouchGatewayCache() {
+        ObjectNode response = cacheNode("cache_8");
+        response.put("active", true);
+
+        Mockito.when(gatewayCacheResourceService.touch(1L, "cache_8"))
+                .thenReturn(response);
+
+        webTestClient.post()
+                .uri("/api/v1/caches/cache_8:touch")
+                .header(HttpHeaders.AUTHORIZATION, AUTHORIZATION)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.active").isEqualTo(true);
     }
 
     @Test

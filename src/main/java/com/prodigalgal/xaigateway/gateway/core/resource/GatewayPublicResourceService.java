@@ -54,6 +54,19 @@ public class GatewayPublicResourceService {
 
     @Transactional(readOnly = true)
     public ObjectNode listOperations(Long distributedKeyId, GatewayAsyncResourceType resourceType, String status) {
+        return listOperations(distributedKeyId, resourceType, status, 100);
+    }
+
+    @Transactional(readOnly = true)
+    public ObjectNode listOperations(Long distributedKeyId, String resourceType, String status) {
+        return listOperations(distributedKeyId, toAsyncResourceType(normalizeResourceType(resourceType)), status, 100);
+    }
+
+    private ObjectNode listOperations(
+            Long distributedKeyId,
+            GatewayAsyncResourceType resourceType,
+            String status,
+            int limit) {
         ObjectNode response = objectMapper.createObjectNode();
         response.put("object", "list");
         ArrayNode data = response.putArray("data");
@@ -61,7 +74,7 @@ public class GatewayPublicResourceService {
                         distributedKeyId,
                         resourceType,
                         normalizeStatus(status),
-                        PageRequest.of(0, 100))
+                        PageRequest.of(0, limit))
                 .forEach(entity -> data.add(toOperationResponse(entity)));
         response.put("has_more", false);
         return response;
@@ -81,6 +94,26 @@ public class GatewayPublicResourceService {
             default -> throw new IllegalArgumentException("当前 operation 类型不支持 cancel。");
         };
         return toOperationResponse(resolveAsyncResource(distributedKeyId, payload.path("id").asText(entity.getResourceKey()), null));
+    }
+
+    public ObjectNode waitOperation(Long distributedKeyId, String operationName) {
+        ObjectNode response = getOperation(distributedKeyId, operationName);
+        response.put("waited", true);
+        response.put("wait_mode", "immediate");
+        return response;
+    }
+
+    public ObjectNode deleteOperation(Long distributedKeyId, String operationName) {
+        GatewayAsyncResourceEntity entity = resolveAsyncResource(distributedKeyId, operationName, null);
+        entity.setDeleted(true);
+        ObjectNode metadata = readObject(entity.getMetadataJson());
+        metadata.put("deleted_at", Instant.now().getEpochSecond());
+        appendEvent(metadata, "operation_deleted", entity.getStatus());
+        entity.setMetadataJson(writeJson(metadata));
+        gatewayAsyncResourceRepository.save(entity);
+        ObjectNode response = toOperationResponse(entity);
+        response.put("deleted", true);
+        return response;
     }
 
     public JsonNode createTuning(Long distributedKeyId, JsonNode requestBody) {
@@ -189,6 +222,16 @@ public class GatewayPublicResourceService {
                 "status", lifecycle.normalizedStatus() == null ? "" : lifecycle.normalizedStatus(),
                 "objectMode", lineage.objectMode() == null ? "" : lineage.objectMode()
         )));
+        nodes.add(node("distributed_key:" + entity.getDistributedKeyId(), "distributed_key", String.valueOf(entity.getDistributedKeyId()), Map.of()));
+        edges.add(edge("gateway:" + entity.getResourceKey(), "distributed_key:" + entity.getDistributedKeyId(), "scoped_to_key"));
+        if (lineage.requestModel() != null && !lineage.requestModel().isBlank()) {
+            nodes.add(node("model:" + lineage.requestModel(), "model", lineage.requestModel(), Map.of()));
+            edges.add(edge("gateway:" + entity.getResourceKey(), "model:" + lineage.requestModel(), "requested_model"));
+        }
+        nodes.add(payloadNode("request:" + entity.getResourceKey(), "request_payload", readObject(entity.getRequestPayloadJson())));
+        edges.add(edge("gateway:" + entity.getResourceKey(), "request:" + entity.getResourceKey(), "created_from_request"));
+        nodes.add(payloadNode("response:" + entity.getResourceKey(), "response_payload", readObject(entity.getResponsePayloadJson())));
+        edges.add(edge("gateway:" + entity.getResourceKey(), "response:" + entity.getResourceKey(), "has_response"));
         if (lineage.upstreamObjectId() != null && !lineage.upstreamObjectId().isBlank()) {
             nodes.add(node("upstream:" + lineage.upstreamObjectId(), "upstream_object", lineage.upstreamObjectId(), Map.of()));
             edges.add(edge("gateway:" + entity.getResourceKey(), "upstream:" + lineage.upstreamObjectId(), "backed_by_upstream_object"));
@@ -211,6 +254,7 @@ public class GatewayPublicResourceService {
             edges.add(edge("gateway:" + entity.getResourceKey(), nodeId, "references_artifact"));
         }
         response.set("lifecycle", objectMapper.valueToTree(lifecycle));
+        response.set("summary", summary(entity.getResourceType().name().toLowerCase(Locale.ROOT), entity.getResourceKey(), lifecycle.normalizedStatus(), nodes, edges));
         return response;
     }
 
@@ -228,8 +272,19 @@ public class GatewayPublicResourceService {
                 "modelGroup", entity.getModelGroup(),
                 "prefixHash", entity.getPrefixHash()
         )));
+        nodes.add(node("distributed_key:" + entity.getDistributedKeyId(), "distributed_key", String.valueOf(entity.getDistributedKeyId()), Map.of()));
+        edges.add(edge("cache:" + entity.getId(), "distributed_key:" + entity.getDistributedKeyId(), "scoped_to_key"));
+        nodes.add(node("provider:" + entity.getProviderType().name(), "provider", entity.getProviderType().name(), Map.of()));
+        edges.add(edge("cache:" + entity.getId(), "provider:" + entity.getProviderType().name(), "provided_by"));
+        nodes.add(node("model:" + entity.getModelGroup(), "model", entity.getModelGroup(), Map.of()));
+        edges.add(edge("cache:" + entity.getId(), "model:" + entity.getModelGroup(), "for_model"));
+        nodes.add(node("prefix:" + entity.getPrefixHash(), "cache_prefix", entity.getPrefixHash(), Map.of()));
+        edges.add(edge("cache:" + entity.getId(), "prefix:" + entity.getPrefixHash(), "indexes_prefix"));
+        nodes.add(node("external_cache:" + entity.getExternalCacheRef(), "external_cache_ref", entity.getExternalCacheRef(), Map.of()));
+        edges.add(edge("cache:" + entity.getId(), "external_cache:" + entity.getExternalCacheRef(), "maps_to_external_ref"));
         nodes.add(node("credential:" + entity.getCredentialId(), "credential", String.valueOf(entity.getCredentialId()), Map.of()));
         edges.add(edge("cache:" + entity.getId(), "credential:" + entity.getCredentialId(), "uses_credential"));
+        response.set("summary", summary("cache", "cache_" + entity.getId(), entity.getStatus(), nodes, edges));
         return response;
     }
 
@@ -248,6 +303,30 @@ public class GatewayPublicResourceService {
         }
         response.set("response", gatewayAsyncResourceCanonicalizer.readPayload(entity.getResponsePayloadJson()));
         return response;
+    }
+
+    private ObjectNode payloadNode(String id, String type, ObjectNode payload) {
+        ObjectNode node = node(id, type, type, Map.of(
+                "fieldCount", payload.size(),
+                "hasError", payload.has("error")
+        ));
+        ArrayNode fields = node.withArray("sampleFields");
+        payload.properties().forEach(entry -> {
+            if (fields.size() < 8) {
+                fields.add(entry.getKey());
+            }
+        });
+        return node;
+    }
+
+    private ObjectNode summary(String resourceType, String resourceId, String status, ArrayNode nodes, ArrayNode edges) {
+        ObjectNode summary = objectMapper.createObjectNode();
+        summary.put("resource_type", resourceType);
+        summary.put("resource_id", resourceId);
+        summary.put("status", status == null ? "" : status);
+        summary.put("node_count", nodes.size());
+        summary.put("edge_count", edges.size());
+        return summary;
     }
 
     private GatewayAsyncResourceEntity resolveAsyncResource(
@@ -277,6 +356,10 @@ public class GatewayPublicResourceService {
             case "operation", "operations", "" -> null;
             default -> throw new IllegalArgumentException("不支持的 resourceType：" + resourceType);
         };
+    }
+
+    private String normalizeResourceType(String resourceType) {
+        return resourceType == null ? "" : resourceType.trim().toLowerCase(Locale.ROOT);
     }
 
     private String normalizeStatus(String status) {

@@ -4,6 +4,7 @@ import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCacheReferenceEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCacheReferenceRepository;
 import java.time.Instant;
+import java.util.Locale;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,7 +53,7 @@ public class GatewayCacheResourceService {
         if (requestBody == null || !requestBody.isObject()) {
             throw new IllegalArgumentException("cache import 请求体必须是 JSON object。");
         }
-        ProviderType providerType = ProviderType.valueOf(requiredText(requestBody, "providerType").toUpperCase(java.util.Locale.ROOT));
+        ProviderType providerType = providerType(requiredText(requestBody, "providerType", "provider", "provider_type"));
         String modelGroup = firstText(requestBody, "modelGroup", "model");
         String prefixHash = firstText(requestBody, "prefixHash", "gatewayCacheId", "cacheKey");
         String externalCacheRef = firstText(requestBody, "externalCacheRef", "cachedContent", "cached_content", "name");
@@ -81,21 +82,33 @@ public class GatewayCacheResourceService {
         entity.setModelGroup(modelGroup.trim());
         entity.setPrefixHash(prefixHash.trim());
         entity.setExternalCacheRef(externalCacheRef.trim());
-        entity.setStatus(normalizeStatus(firstText(requestBody, "status")) == null ? "ACTIVE" : normalizeStatus(firstText(requestBody, "status")));
+        entity.setStatus(defaultStatus(firstText(requestBody, "status", "state")));
         entity.setExpireAt(instantValue(requestBody, "expireAt", "expiresAt"));
-        entity.setLastUsedAt(instantValue(requestBody, "lastUsedAt"));
+        entity.setLastUsedAt(instantValue(requestBody, "lastUsedAt", "last_used_at"));
         return toResponse(upstreamCacheReferenceRepository.save(entity));
     }
 
     public ObjectNode delete(Long distributedKeyId, String cacheName) {
+        ObjectNode response = invalidate(distributedKeyId, cacheName);
+        response.put("object", "gateway.cache.deleted");
+        response.put("deleted", true);
+        return response;
+    }
+
+    public ObjectNode invalidate(Long distributedKeyId, String cacheName) {
         UpstreamCacheReferenceEntity entity = resolve(distributedKeyId, cacheName);
         entity.setStatus("INVALIDATED");
         entity.setLastUsedAt(Instant.now());
         UpstreamCacheReferenceEntity saved = upstreamCacheReferenceRepository.save(entity);
         ObjectNode response = toResponse(saved);
-        response.put("deleted", true);
-        response.put("object", "gateway.cache.deleted");
+        response.put("invalidated", true);
         return response;
+    }
+
+    public ObjectNode touch(Long distributedKeyId, String cacheName) {
+        UpstreamCacheReferenceEntity entity = resolve(distributedKeyId, cacheName);
+        entity.setLastUsedAt(Instant.now());
+        return toResponse(upstreamCacheReferenceRepository.save(entity));
     }
 
     @Transactional(readOnly = true)
@@ -113,7 +126,11 @@ public class GatewayCacheResourceService {
 
     public ObjectNode toResponse(UpstreamCacheReferenceEntity entity) {
         ObjectNode response = objectMapper.createObjectNode();
-        response.put("id", "cache_" + entity.getId());
+        String cacheId = "cache_" + entity.getId();
+        boolean expired = isExpired(entity);
+        boolean active = "ACTIVE".equalsIgnoreCase(entity.getStatus()) && !expired;
+        response.put("id", cacheId);
+        response.put("name", "caches/" + cacheId);
         response.put("object", "gateway.cache");
         response.put("distributed_key_id", entity.getDistributedKeyId());
         response.put("provider_type", entity.getProviderType().name());
@@ -122,15 +139,42 @@ public class GatewayCacheResourceService {
         response.put("prefix_hash", entity.getPrefixHash());
         response.put("external_cache_ref", entity.getExternalCacheRef());
         response.put("status", entity.getStatus());
+        response.put("effective_status", expired ? "EXPIRED" : entity.getStatus());
+        response.put("expired", expired);
+        response.put("active", active);
         putInstant(response, "expire_at", entity.getExpireAt());
         putInstant(response, "last_used_at", entity.getLastUsedAt());
         putInstant(response, "created_at", entity.getCreatedAt());
         putInstant(response, "updated_at", entity.getUpdatedAt());
+        ObjectNode lifecycle = response.putObject("lifecycle");
+        lifecycle.put("status", entity.getStatus());
+        lifecycle.put("effective_status", expired ? "EXPIRED" : entity.getStatus());
+        lifecycle.put("expired", expired);
+        lifecycle.put("active", active);
+        putInstant(lifecycle, "expire_at", entity.getExpireAt());
+        putInstant(lifecycle, "last_used_at", entity.getLastUsedAt());
         return response;
     }
 
     private String normalizeStatus(String status) {
-        return status == null || status.isBlank() ? null : status.trim().toUpperCase(java.util.Locale.ROOT);
+        return status == null || status.isBlank() ? null : status.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private String defaultStatus(String status) {
+        String normalized = normalizeStatus(status);
+        return normalized == null ? "ACTIVE" : normalized;
+    }
+
+    private ProviderType providerType(String value) {
+        try {
+            return ProviderType.valueOf(value.trim().toUpperCase(Locale.ROOT));
+        } catch (RuntimeException exception) {
+            throw new IllegalArgumentException("providerType 不支持：" + value);
+        }
+    }
+
+    private boolean isExpired(UpstreamCacheReferenceEntity entity) {
+        return entity.getExpireAt() != null && entity.getExpireAt().isBefore(Instant.now());
     }
 
     private String normalizeName(String cacheName) {
@@ -149,10 +193,10 @@ public class GatewayCacheResourceService {
         }
     }
 
-    private String requiredText(JsonNode node, String fieldName) {
-        String value = firstText(node, fieldName);
+    private String requiredText(JsonNode node, String... fieldNames) {
+        String value = firstText(node, fieldNames);
         if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(fieldName + " 不能为空。");
+            throw new IllegalArgumentException(fieldNames[0] + " 不能为空。");
         }
         return value.trim();
     }

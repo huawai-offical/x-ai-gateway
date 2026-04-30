@@ -64,6 +64,22 @@ public class GatewayCachesController {
         return gatewayCacheResourceService.delete(distributedKey.id(), cacheName);
     }
 
+    @PostMapping("/{cacheName}:invalidate")
+    public ObjectNode invalidate(
+            @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
+            @PathVariable String cacheName) {
+        AuthenticatedDistributedKey distributedKey = authenticate(authorization);
+        return gatewayCacheResourceService.invalidate(distributedKey.id(), cacheName);
+    }
+
+    @PostMapping("/{cacheName}:touch")
+    public ObjectNode touch(
+            @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
+            @PathVariable String cacheName) {
+        AuthenticatedDistributedKey distributedKey = authenticate(authorization);
+        return gatewayCacheResourceService.touch(distributedKey.id(), cacheName);
+    }
+
     private AuthenticatedDistributedKey authenticate(String authorization) {
         return gatewayTokenAuthenticationResolver.authenticate(authorization, null, null, null);
     }
