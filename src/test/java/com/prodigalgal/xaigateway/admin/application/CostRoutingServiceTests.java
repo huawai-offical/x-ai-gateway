@@ -65,6 +65,10 @@ class CostRoutingServiceTests {
         Mockito.when(repository.findFirstByProviderTypeAndModelNameAndActiveTrueOrderByUpdatedAtDesc("OPENAI", "gpt-4o-mini"))
                 .thenReturn(Optional.of(entity));
         Mockito.when(repository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(entity));
+        GatewayUserBalanceLedgerEntity settledLedger = new GatewayUserBalanceLedgerEntity();
+        settledLedger.setDeltaTokenCredits(-12_000L);
+        settledLedger.setReferenceType("REQUEST_USAGE");
+        Mockito.when(ledgerRepository.findAll()).thenReturn(List.of(settledLedger));
 
         var estimate = service.estimate(new CostEstimateRequest("openai", "gpt-4o-mini", 1_000L, 2_000L, 500L, null, null, null, null));
         assertEquals(710_000L, estimate.estimatedMicros());
@@ -73,6 +77,8 @@ class CostRoutingServiceTests {
         var summary = service.summary();
         assertEquals(1L, summary.activeModels());
         assertTrue(summary.sampleMonthlyMicros() > 0);
+        assertEquals(1L, summary.settledRequestCount());
+        assertEquals(12_000L, summary.settledMicros());
     }
 
     @Test

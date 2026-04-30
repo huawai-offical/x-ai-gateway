@@ -60,7 +60,9 @@ public class AsyncLifecycleGatewayResourceExecutor implements GatewayResourceExe
             case "/v1/messages/batches" -> gatewayAsyncResourceService.createAnthropicMessageBatch(context.distributedKeyId(), requestBody, preferredCredentialId);
             case "/v1/messages/batches/{messageBatchId}" -> gatewayAsyncResourceService.getAnthropicMessageBatch(requirePathParam(context, "messageBatchId"), context.distributedKeyId());
             case "/v1/messages/batches/{messageBatchId}/cancel" -> gatewayAsyncResourceService.cancelAnthropicMessageBatch(requirePathParam(context, "messageBatchId"), context.distributedKeyId());
-            case "/v1/fine_tuning/jobs" -> gatewayAsyncResourceService.createTuning(context.distributedKeyId(), requestBody, preferredCredentialId);
+            case "/v1/fine_tuning/jobs" -> "GET".equals(context.httpMethod())
+                    ? gatewayAsyncResourceService.listTunings(context.distributedKeyId())
+                    : gatewayAsyncResourceService.createTuning(context.distributedKeyId(), requestBody, preferredCredentialId);
             case "/v1/fine_tuning/jobs/{jobId}" -> gatewayAsyncResourceService.getTuning(requirePathParam(context, "jobId"), context.distributedKeyId());
             case "/v1/fine_tuning/jobs/{jobId}/cancel" -> gatewayAsyncResourceService.cancelTuning(requirePathParam(context, "jobId"), context.distributedKeyId());
             case "/v1/realtime/client_secrets" -> gatewayAsyncResourceService.createRealtimeClientSecret(context.distributedKeyId(), requestBody, preferredCredentialId);

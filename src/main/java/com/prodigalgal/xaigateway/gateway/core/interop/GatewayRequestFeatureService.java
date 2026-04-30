@@ -265,6 +265,9 @@ public class GatewayRequestFeatureService {
         if ("POST".equals(method) && "/v1/fine_tuning/jobs".equals(normalizedPath)) {
             return semantics("fine_tuning", normalizedPath, TranslationResourceType.TUNING, TranslationOperation.TUNING_CREATE, List.of(InteropFeature.TUNING_CREATE, InteropFeature.FILE_OBJECT), RouteSelectionMode.CATALOG_SELECTION);
         }
+        if ("GET".equals(method) && "/v1/fine_tuning/jobs".equals(normalizedPath)) {
+            return semantics("fine_tuning", normalizedPath, TranslationResourceType.TUNING, TranslationOperation.TUNING_LIST, List.of(InteropFeature.TUNING_CREATE), RouteSelectionMode.LOCAL_CATALOG);
+        }
         if ("GET".equals(method) && "/v1/fine_tuning/jobs/{jobId}".equals(normalizedPath)) {
             return semantics("fine_tuning", normalizedPath, TranslationResourceType.TUNING, TranslationOperation.TUNING_GET, List.of(InteropFeature.TUNING_CREATE), RouteSelectionMode.STORED_LINEAGE);
         }
@@ -281,6 +284,7 @@ public class GatewayRequestFeatureService {
         if (requestPath == null || requestPath.isBlank()) {
             return requestPath;
         }
+        requestPath = normalizeGoogleNativeNamespace(requestPath);
         if (requestPath.matches("^/v1beta/models/[^/:]+:(generateContent|streamGenerateContent)$")) {
             return "/v1beta/models/{model}:generateContent";
         }
@@ -347,6 +351,7 @@ public class GatewayRequestFeatureService {
         if (requestPath == null || requestPath.isBlank()) {
             return java.util.Map.of();
         }
+        requestPath = normalizeGoogleNativeNamespace(requestPath);
         java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("^/v1beta/models/([^/:]+):(generateContent|streamGenerateContent)$").matcher(requestPath);
         if (matcher.matches()) {
             return java.util.Map.of("model", matcher.group(1));
@@ -396,6 +401,16 @@ public class GatewayRequestFeatureService {
             return java.util.Map.of("jobId", matcher.group(1));
         }
         return java.util.Map.of();
+    }
+
+    private String normalizeGoogleNativeNamespace(String requestPath) {
+        if (requestPath.startsWith("/google/upload/v1beta")) {
+            return requestPath.substring("/google".length());
+        }
+        if (requestPath.startsWith("/google/v1beta")) {
+            return requestPath.substring("/google".length());
+        }
+        return requestPath;
     }
 
     private String normalizeMethod(String httpMethod) {

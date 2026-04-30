@@ -94,6 +94,7 @@ public class DefaultCanonicalResourceMapper implements CanonicalResourceMapper {
             case UPLOAD_CREATE, UPLOAD_GET, UPLOAD_PART_ADD, UPLOAD_COMPLETE, UPLOAD_CANCEL -> "upload";
             case BATCH_CREATE, BATCH_GET, BATCH_CANCEL -> "batch";
             case ANTHROPIC_MESSAGE_BATCH_CREATE, ANTHROPIC_MESSAGE_BATCH_GET, ANTHROPIC_MESSAGE_BATCH_CANCEL -> "message_batch";
+            case TUNING_LIST -> "list";
             case TUNING_CREATE, TUNING_GET, TUNING_CANCEL -> "fine_tuning.job";
             case REALTIME_CLIENT_SECRET_CREATE -> "realtime.client_secret";
             case UNKNOWN, CHAT_COMPLETION, RESPONSE_CREATE, AUDIO_SPEECH -> "unknown";
@@ -138,6 +139,7 @@ public class DefaultCanonicalResourceMapper implements CanonicalResourceMapper {
                     TUNING_GET, TUNING_CANCEL -> "in_progress";
             case AUDIO_TRANSCRIPTION, AUDIO_TRANSLATION, EMBEDDING_CREATE, IMAGE_GENERATION, IMAGE_EDIT, IMAGE_VARIATION, MODERATION_CREATE,
                     FILE_CREATE, FILE_LIST, FILE_GET, FILE_DELETE, FILE_CONTENT_GET, REALTIME_CLIENT_SECRET_CREATE -> "completed";
+            case TUNING_LIST -> "completed";
             default -> rawBody == null || rawBody.isMissingNode() || rawBody.isNull() ? null : "completed";
         };
     }

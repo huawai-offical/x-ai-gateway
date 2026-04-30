@@ -26,8 +26,8 @@
   "id" : "openai-unexposed-list-events-checkpoints",
   "scope" : "not_exposed",
   "summary" : "未公开的 OpenAI list / events / checkpoints endpoint 继续作为 accepted exceptions。",
-  "blockerReason" : "当前仓库未暴露 GET /v1/batches、GET /v1/fine_tuning/jobs、fine-tuning events / checkpoints，因此继续作为 accepted exceptions 记录。",
-  "appliesTo" : [ "/v1/batches [GET]", "/v1/fine_tuning/jobs [GET]", "/v1/fine_tuning/jobs/{jobId}/events", "/v1/fine_tuning/jobs/{jobId}/checkpoints" ]
+  "blockerReason" : "当前仓库未暴露 GET /v1/batches、fine-tuning events / checkpoints，因此继续作为 accepted exceptions 记录。",
+  "appliesTo" : [ "/v1/batches [GET]", "/v1/fine_tuning/jobs/{jobId}/events", "/v1/fine_tuning/jobs/{jobId}/checkpoints" ]
 }, {
   "id" : "notion-mcp-auth-required",
   "scope" : "workflow",

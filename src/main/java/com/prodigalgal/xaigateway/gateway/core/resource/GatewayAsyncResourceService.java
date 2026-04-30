@@ -75,6 +75,7 @@ import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.buffer.DataBufferUtils;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -324,6 +325,7 @@ public class GatewayAsyncResourceService {
 
     public Mono<JsonNode> addUploadPart(String uploadId, Long distributedKeyId, FilePart dataPart) {
         GatewayAsyncResourceEntity entity = getRequired(uploadId, GatewayAsyncResourceType.UPLOAD, distributedKeyId);
+        assertUploadWritable(entity, "追加 part");
         ObjectNode metadata = readObject(entity.getMetadataJson());
         String upstreamId = metadata.path("upstream_object_id").asText(null);
         if (upstreamId == null || upstreamId.isBlank()) {
@@ -344,6 +346,7 @@ public class GatewayAsyncResourceService {
 
     public Mono<JsonNode> addUploadPartFromGatewayFile(String uploadId, Long distributedKeyId, String fileKey) {
         GatewayAsyncResourceEntity entity = getRequired(uploadId, GatewayAsyncResourceType.UPLOAD, distributedKeyId);
+        assertUploadWritable(entity, "追加 part");
         GatewayFileContent fileContent = getGatewayFileContent(fileKey, distributedKeyId);
         ObjectNode metadata = readObject(entity.getMetadataJson());
         String upstreamId = metadata.path("upstream_object_id").asText(null);
@@ -485,6 +488,21 @@ public class GatewayAsyncResourceService {
         return readOrSyncResource(tuningId, distributedKeyId, GatewayAsyncResourceType.TUNING, "fine_tuning.job");
     }
 
+    @Transactional(readOnly = true)
+    public JsonNode listTunings(Long distributedKeyId) {
+        ObjectNode response = objectMapper.createObjectNode();
+        response.put("object", "list");
+        var data = response.putArray("data");
+        gatewayAsyncResourceRepository.search(
+                        distributedKeyId,
+                        GatewayAsyncResourceType.TUNING,
+                        null,
+                        PageRequest.of(0, 100))
+                .forEach(entity -> data.add(readObject(entity.getResponsePayloadJson())));
+        response.put("has_more", false);
+        return response;
+    }
+
     public JsonNode cancelTuning(String tuningId, Long distributedKeyId) {
         return completeRemoteStatus(tuningId, distributedKeyId, GatewayAsyncResourceType.TUNING, InteropFeature.TUNING_CREATE, "/cancel");
     }
@@ -564,6 +582,12 @@ public class GatewayAsyncResourceService {
                         : completeLocalUpload(entity, distributedKeyId);
             }
             return updateLocalStatus(resourceKey, distributedKeyId, resourceType, suffix.contains("cancel") ? "cancelled" : "completed");
+        }
+        if (resourceType == GatewayAsyncResourceType.UPLOAD) {
+            Optional<JsonNode> terminalResponse = terminalUploadResponse(entity, suffix);
+            if (terminalResponse.isPresent()) {
+                return terminalResponse.get();
+            }
         }
         if (isAnthropicNativeBatch(metadata, resourceType)) {
             UpstreamTarget target = resolveAnthropicMessageBatchTargetForEntity(entity, metadata);
@@ -1570,6 +1594,24 @@ public class GatewayAsyncResourceService {
         if ("completed".equalsIgnoreCase(entity.getStatus())) {
             throw new IllegalArgumentException("已完成的 Upload 不允许继续" + action + "。");
         }
+    }
+
+    private Optional<JsonNode> terminalUploadResponse(GatewayAsyncResourceEntity entity, String suffix) {
+        boolean cancelAction = suffix != null && suffix.contains("cancel");
+        boolean completeAction = suffix != null && suffix.contains("complete");
+        if (cancelAction && "cancelled".equalsIgnoreCase(entity.getStatus())) {
+            return Optional.of(readJson(entity.getResponsePayloadJson()));
+        }
+        if (completeAction && "completed".equalsIgnoreCase(entity.getStatus())) {
+            return Optional.of(readJson(entity.getResponsePayloadJson()));
+        }
+        if (cancelAction && "completed".equalsIgnoreCase(entity.getStatus())) {
+            throw new IllegalArgumentException("已完成的 Upload 不允许取消。");
+        }
+        if (completeAction && "cancelled".equalsIgnoreCase(entity.getStatus())) {
+            throw new IllegalArgumentException("已取消的 Upload 不允许继续完成 Upload。");
+        }
+        return Optional.empty();
     }
 
     private Path persistLocalUploadPartFile(String uploadKey, String partId, String filename, byte[] bytes) {

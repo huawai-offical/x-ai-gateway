@@ -89,7 +89,7 @@ public record GatewayRequestSemantics(
             case UPLOAD_CREATE, UPLOAD_GET, UPLOAD_PART_ADD, UPLOAD_COMPLETE, UPLOAD_CANCEL -> "uploads";
             case BATCH_CREATE, BATCH_GET, BATCH_CANCEL -> "batches";
             case ANTHROPIC_MESSAGE_BATCH_CREATE, ANTHROPIC_MESSAGE_BATCH_GET, ANTHROPIC_MESSAGE_BATCH_CANCEL -> "messages.batches";
-            case TUNING_CREATE, TUNING_GET, TUNING_CANCEL -> "fine_tuning";
+            case TUNING_LIST, TUNING_CREATE, TUNING_GET, TUNING_CANCEL -> "fine_tuning";
             case REALTIME_CLIENT_SECRET_CREATE -> "realtime";
             case UNKNOWN -> resourceType == null ? "unknown" : resourceType.wireName();
         };
@@ -121,7 +121,7 @@ public record GatewayRequestSemantics(
             case ANTHROPIC_MESSAGE_BATCH_CREATE -> "/v1/messages/batches";
             case ANTHROPIC_MESSAGE_BATCH_GET -> "/v1/messages/batches/{messageBatchId}";
             case ANTHROPIC_MESSAGE_BATCH_CANCEL -> "/v1/messages/batches/{messageBatchId}/cancel";
-            case TUNING_CREATE -> "/v1/fine_tuning/jobs";
+            case TUNING_LIST, TUNING_CREATE -> "/v1/fine_tuning/jobs";
             case TUNING_GET -> "/v1/fine_tuning/jobs/{jobId}";
             case TUNING_CANCEL -> "/v1/fine_tuning/jobs/{jobId}/cancel";
             case REALTIME_CLIENT_SECRET_CREATE -> "/v1/realtime/client_secrets";
@@ -149,6 +149,7 @@ public record GatewayRequestSemantics(
                     BATCH_GET, BATCH_CANCEL,
                     ANTHROPIC_MESSAGE_BATCH_GET, ANTHROPIC_MESSAGE_BATCH_CANCEL,
                     TUNING_GET, TUNING_CANCEL -> RouteSelectionMode.STORED_LINEAGE;
+            case TUNING_LIST -> RouteSelectionMode.LOCAL_CATALOG;
             case REALTIME_CLIENT_SECRET_CREATE -> RouteSelectionMode.DISTRIBUTED_TARGET;
             case UNKNOWN -> resourceType == TranslationResourceType.FILE
                     ? RouteSelectionMode.LOCAL_CATALOG

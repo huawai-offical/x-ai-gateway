@@ -118,12 +118,21 @@ public class CostRoutingService {
                 .toList();
         long totalMicros = distribution.stream().mapToLong(CostEstimateResponse::estimatedMicros).sum();
         String currency = distribution.isEmpty() ? "USD" : distribution.get(0).currency();
+        List<GatewayUserBalanceLedgerEntity> settledLedgers = balanceLedgerRepository.findAll().stream()
+                .filter(ledger -> REQUEST_USAGE_REFERENCE_TYPE.equals(ledger.getReferenceType()))
+                .toList();
+        long settledMicros = settledLedgers.stream()
+                .mapToLong(ledger -> Math.max(0L, -ledger.getDeltaTokenCredits()))
+                .sum();
         return new CostSummaryResponse(
                 models.size(),
                 models.stream().filter(CostModelEntity::isActive).count(),
                 currency,
                 totalMicros,
                 display(currency, totalMicros),
+                settledLedgers.size(),
+                settledMicros,
+                display(currency, settledMicros),
                 distribution
         );
     }

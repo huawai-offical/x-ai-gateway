@@ -8,6 +8,9 @@ public record CostSummaryResponse(
         String currency,
         long sampleMonthlyMicros,
         String sampleMonthlyDisplay,
+        long settledRequestCount,
+        long settledMicros,
+        String settledDisplay,
         List<CostEstimateResponse> modelDistribution
 ) {
 }

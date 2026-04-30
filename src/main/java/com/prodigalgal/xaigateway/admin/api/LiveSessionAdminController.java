@@ -25,6 +25,33 @@ public class LiveSessionAdminController {
         return liveSessionService.create(request);
     }
 
+    @PostMapping("/{sessionKey}/connect")
+    public LiveSessionResponse connect(@PathVariable String sessionKey) {
+        return liveSessionService.connect(sessionKey);
+    }
+
+    @PostMapping("/{sessionKey}/heartbeat")
+    public LiveSessionResponse heartbeat(@PathVariable String sessionKey) {
+        return liveSessionService.heartbeat(sessionKey);
+    }
+
+    @PostMapping("/{sessionKey}/runtime-events")
+    public LiveSessionResponse sendRuntimeEvent(
+            @PathVariable String sessionKey,
+            @RequestBody LiveSessionRuntimeEventRequest request) {
+        return liveSessionService.sendRuntimeEvent(sessionKey, request);
+    }
+
+    @PostMapping("/{sessionKey}/close")
+    public LiveSessionResponse close(@PathVariable String sessionKey) {
+        return liveSessionService.close(sessionKey);
+    }
+
+    @PostMapping("/resume/{resumeToken}")
+    public LiveSessionResponse resume(@PathVariable String resumeToken) {
+        return liveSessionService.resume(resumeToken);
+    }
+
     @GetMapping("/{sessionKey}")
     public LiveSessionResponse get(@PathVariable String sessionKey) {
         return liveSessionService.get(sessionKey);

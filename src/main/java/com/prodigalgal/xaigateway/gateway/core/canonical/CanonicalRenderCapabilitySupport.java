@@ -16,23 +16,24 @@ public final class CanonicalRenderCapabilitySupport {
             String requestPath,
             GatewayRequestSemantics semantics) {
         String normalizedProtocol = protocol == null ? "openai" : protocol.trim().toLowerCase(Locale.ROOT);
+        String normalizedRequestPath = normalizeGoogleNativeNamespace(requestPath);
         TranslationResourceType resourceType = semantics == null ? TranslationResourceType.UNKNOWN : semantics.resourceType();
         TranslationOperation operation = semantics == null ? TranslationOperation.UNKNOWN : semantics.operation();
 
         return switch (normalizedProtocol) {
-            case "openai" -> renderOpenAiLevel(requestPath, resourceType);
+            case "openai" -> renderOpenAiLevel(normalizedRequestPath, resourceType);
             case "responses" -> resourceType == TranslationResourceType.RESPONSE
                     || operation == TranslationOperation.RESPONSE_CREATE
                     ? InteropCapabilityLevel.EMULATED
                     : InteropCapabilityLevel.UNSUPPORTED;
-            case "anthropic_native" -> isAnthropicNativePath(requestPath, resourceType)
+            case "anthropic_native" -> isAnthropicNativePath(normalizedRequestPath, resourceType)
                     ? InteropCapabilityLevel.NATIVE
                     : InteropCapabilityLevel.UNSUPPORTED;
-            case "google_native" -> isGeminiContentPath(requestPath)
-                    || isGeminiEmbeddingsPath(requestPath)
-                    || isGeminiFilesPath(requestPath)
-                    || isGeminiBatchesPath(requestPath)
-                    || isGeminiResourceMode(requestPath, resourceType)
+            case "google_native" -> isGeminiContentPath(normalizedRequestPath)
+                    || isGeminiEmbeddingsPath(normalizedRequestPath)
+                    || isGeminiFilesPath(normalizedRequestPath)
+                    || isGeminiBatchesPath(normalizedRequestPath)
+                    || isGeminiResourceMode(normalizedRequestPath, resourceType)
                     || resourceType == TranslationResourceType.CHAT
                     ? InteropCapabilityLevel.NATIVE
                     : InteropCapabilityLevel.UNSUPPORTED;
@@ -112,5 +113,18 @@ public final class CanonicalRenderCapabilitySupport {
         }
         return "/v1/messages/batches".equals(requestPath)
                 || requestPath.startsWith("/v1/messages/batches/");
+    }
+
+    private static String normalizeGoogleNativeNamespace(String requestPath) {
+        if (requestPath == null) {
+            return null;
+        }
+        if (requestPath.startsWith("/google/upload/v1beta")) {
+            return requestPath.substring("/google".length());
+        }
+        if (requestPath.startsWith("/google/v1beta")) {
+            return requestPath.substring("/google".length());
+        }
+        return requestPath;
     }
 }

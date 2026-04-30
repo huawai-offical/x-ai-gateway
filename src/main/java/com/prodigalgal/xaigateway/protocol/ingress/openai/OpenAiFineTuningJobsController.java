@@ -42,6 +42,20 @@ public class OpenAiFineTuningJobsController {
         );
     }
 
+    @GetMapping
+    public JsonNode listTunings(
+            @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
+        AuthenticatedDistributedKey distributedKey = gatewayTokenAuthenticationResolver.authenticate(authorization, null, null, null);
+        return gatewayResourceExecutionService.executeLifecycleJson(
+                distributedKey.id(),
+                distributedKey.keyPrefix(),
+                "GET",
+                "/v1/fine_tuning/jobs",
+                "resource-orchestration",
+                null
+        );
+    }
+
     @GetMapping("/{jobId}")
     public JsonNode getTuning(
             @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,

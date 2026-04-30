@@ -14,7 +14,6 @@ import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -26,6 +25,7 @@ public class AccountAdminService {
     private final UpstreamAccountPoolRepository upstreamAccountPoolRepository;
     private final CredentialCryptoService credentialCryptoService;
     private final SupportedModelCatalogService supportedModelCatalogService;
+    private final OAuthSessionRefreshService oauthSessionRefreshService;
     private final ObjectMapper objectMapper;
 
     public AccountAdminService(
@@ -33,11 +33,13 @@ public class AccountAdminService {
             UpstreamAccountPoolRepository upstreamAccountPoolRepository,
             CredentialCryptoService credentialCryptoService,
             SupportedModelCatalogService supportedModelCatalogService,
+            OAuthSessionRefreshService oauthSessionRefreshService,
             ObjectMapper objectMapper) {
         this.upstreamAccountRepository = upstreamAccountRepository;
         this.upstreamAccountPoolRepository = upstreamAccountPoolRepository;
         this.credentialCryptoService = credentialCryptoService;
         this.supportedModelCatalogService = supportedModelCatalogService;
+        this.oauthSessionRefreshService = oauthSessionRefreshService;
         this.objectMapper = objectMapper;
     }
 
@@ -66,18 +68,8 @@ public class AccountAdminService {
     }
 
     public UpstreamAccountResponse refresh(Long id) {
-        UpstreamAccountEntity entity = getRequired(id);
-        Instant refreshedAt = Instant.now();
-        entity.setLastRefreshAt(refreshedAt);
-        entity.setHealthy(true);
-        entity.setLastErrorMessage(null);
-        entity.setRefreshStatus("REFRESHED");
-        entity.setRefreshFailureCount(0);
-        entity.setLastRefreshResultJson(writeJson(Map.of(
-                "status", "manual_refresh_marked",
-                "refreshedAt", refreshedAt.toString()
-        )));
-        return toResponse(upstreamAccountRepository.save(entity));
+        oauthSessionRefreshService.refreshAccount(id);
+        return toResponse(getRequired(id));
     }
 
     public UpstreamAccountResponse updateNetwork(Long id, Long proxyId, Long tlsFingerprintProfileId) {
@@ -370,11 +362,4 @@ public class AccountAdminService {
         return null;
     }
 
-    private String writeJson(Map<String, String> value) {
-        try {
-            return objectMapper.writeValueAsString(value);
-        } catch (Exception ignored) {
-            return "{}";
-        }
-    }
 }

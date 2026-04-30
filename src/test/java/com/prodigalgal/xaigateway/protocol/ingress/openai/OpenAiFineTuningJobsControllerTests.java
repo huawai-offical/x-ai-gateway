@@ -62,6 +62,27 @@ class OpenAiFineTuningJobsControllerTests {
     }
 
     @Test
+    void shouldListTuningJobs() {
+        ObjectNode response = objectMapper.createObjectNode();
+        response.put("object", "list");
+        response.putArray("data");
+
+        Mockito.when(gatewayTokenAuthenticationResolver.authenticate("Bearer sk-gw-test.secret", null, null, null))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayResourceExecutionService.executeLifecycleJson(1L, "sk-gw-test", "GET", "/v1/fine_tuning/jobs", "resource-orchestration", null))
+                .thenReturn(response);
+
+        webTestClient.get()
+                .uri("/v1/fine_tuning/jobs")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.object").isEqualTo("list")
+                .jsonPath("$.data").isArray();
+    }
+
+    @Test
     void shouldGetTuningJob() {
         ObjectNode response = objectMapper.createObjectNode();
         response.put("id", "ftjob_1");

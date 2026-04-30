@@ -1,0 +1,59 @@
+[     977ms] [LOG] %c __                                               _____          __          __           ______          v1.62990.0
+/\ \       __                                    /\  __`\       /\ \      __/\ \__       /\__  _\                       
+\ \ \     /\_\    ___      __     __     _ __    \ \ \/\ \  _ __\ \ \____/\_\ \ ,_\      \/_/\ \/     ___     ___       
+ \ \ \  __\/\ \ /' _ `\  /'__`\ /'__`\  /\`'__\   \ \ \ \ \/\`'__\ \ '__`\/\ \ \ \/         \ \ \   /' _ `\  /'___\     
+  \ \ \L\ \\ \ \/\ \/\ \/\  __//\ \L\.\_\ \ \/     \ \ \_\ \ \ \/ \ \ \L\ \ \ \ \ \_  __     \_\ \__/\ \/\ \/\ \__/  __ 
+   \ \____/ \ \_\ \_\ \_\ \____\ \__/.\_\\ \_\      \ \_____\ \_\  \ \_,__/\ \_\ \__\/\ \    /\_____\ \_\ \_\ \____\/\_\
+    \/___/   \/_/\/_/\/_/\/____/\/__/\/_/ \/_/       \/_____/\/_/   \/___/  \/_/\/__/\ \/    \/_____/\/_/\/_/\/____/\/_/
+                                                                                      \/
+
+The product development system for teams and agents
+
+WE'RE HIRING: https://linear.app/careers
+CHANGELOG:    https://linear.app/changelog
+ 
+  font-family: monospace;
+  color: #282A30;
+   @ https://static.linear.app/client/assets/vendor-sentry.DUIRvFmS.js:5
+[    1829ms] [ERROR] Failed to launch 'linear://x-ai/issue/X-255/%E6%B7%B1%E5%8C%96-realtime-live-sessionprovider-live-websocket%E9%9F%B3%E9%A2%91%E5%8F%8C%E5%B7%A5%E4%B8%8E%E8%BF%90%E8%A1%8C%E6%97%B6%E6%8C%87%E6%A0%87%E6%8E%A5%E5%85%A5' because the scheme does not have a registered handler. @ https://linear.app/x-ai/issue/X-255/%E6%B7%B1%E5%8C%96-realtime-live-sessionprovider-live-websocket%E9%9F%B3%E9%A2%91%E5%8F%8C%E5%B7%A5%E4%B8%8E%E8%BF%90%E8%A1%8C%E6%97%B6%E6%8C%87%E6%A0%87%E6%8E%A5%E5%85%A5:0
+[    3841ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:44450/linear/check-url:0
+[   17556ms] [VERBOSE] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o @ https://accounts.google.com/v3/signin/identifier?opparams=%253F&dsh=S1428975215%3A1777555796272367&access_type=offline&client_id=463717515632-5f96ed9uaue5p206umg9toffdbfmsfbm.apps.googleusercontent.com&o2v=2&prompt=consent&redirect_uri=https%3A%2F%2Flinear.app%2Fauth%2Fgoogle%2Fcallback&response_type=code&scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.profile&service=lso&state=%7B%22key%22%3A%22FlNmsbEjh4CD8u07oDsAEuXgpwEP7UjK%22%2C%22isMobileAppLogin%22%3Afalse%7D&flowName=GeneralOAuthFlow&continue=https%3A%2F%2Faccounts.google.com%2Fsignin%2Foauth%2Fconsent%3Fauthuser%3Dunknown%26part%3DAJi8hANw81nVaDFttk_iuBPhMYP1U9CzcNxcDeHwE0H9YpvZtLhgb57aElg2KA0KSJ_FIDrTuniSH1moXdAZw6ipZMX0tSbOgIrKHbKdGnziaCnqFGhQVwHNiCmU490jGACLVPiWeXIxYICuB7HOx202BPRhEJta8w9ndeVpI4L_R9bY0HVTzIs9JR7LTmtw1jIIo9Bu1gH890K54U8oWLjWug5px42gnIUd7s0-R5zJf_L89l3okAm2y7iDzJkUSFlJCYMmWetK0MrMsxplpdZvHno-ydraT5XW7VwjCX8G-QAq-6eln9MEUDVx8bI6nx0YpEcBbLEG3TBUfu5UmRdRueUOFNnIyAN2fyLz46OtzIG9uIPqqE3nxLWvr45ewyISDJ_kkSjVyqtnQQInLwSitFVTJd6dOt6XuUewmaS5Juxd4qaVs0G0cEh0B82Y1wUJZ07-JC0zzx0pBQSdxFJCrB-UzzY3gg%26flowName%3DGeneralOAuthFlow%26as%3DS1428975215%253A1777555796272367%26client_id%3D463717515632-5f96ed9uaue5p206umg9toffdbfmsfbm.apps.googleusercontent.com%26requestPath%3D%252Fsignin%252Foauth%252Fconsent%23&app_domain=https%3A%2F%2Flinear.app&rart=ANgoxceVMbE03ifwvx4WekLdBR5H00OO1hCazCUBrZZCvxftUEevgB81OXViGIVRHxeiaqM0llPmHl4jQOOknzIZrwjVLJ10zC-SmkYMTuETxy0X9Pipkeo:0
+[   17561ms] [LOG] %c%s color: red; background: yellow; font-size: 24px; 警告！ @ https://www.gstatic.com/_/mss/boq-identity/_/js/k=boq-identity.AccountsSignInUi.zh_CN.MVb1Gr1Xgdk.es5.O/am=Kd8AAAChCIQMAMb__w8AEABB1MDrWQCaQGQAAAAAAAAAAMACAAA0Ag/d=1/excm=_b,_tp,identifierview/ed=1/dg=0/wt=2/ujg=1/rs=AOaEmlF88vv6XW3cD9axAGcGi5inMhTbjQ/dti=1/m=_b,_tp:541
+[   17561ms] [LOG] %c%s font-size: 18px; 使用此控制台可能会导致攻击程序利用 Self-XSS 攻击冒充您并窃取您的信息。
+请勿输入或粘贴您不明白的代码。 @ https://www.gstatic.com/_/mss/boq-identity/_/js/k=boq-identity.AccountsSignInUi.zh_CN.MVb1Gr1Xgdk.es5.O/am=Kd8AAAChCIQMAMb__w8AEABB1MDrWQCaQGQAAAAAAAAAAMACAAA0Ag/d=1/excm=_b,_tp,identifierview/ed=1/dg=0/wt=2/ujg=1/rs=AOaEmlF88vv6XW3cD9axAGcGi5inMhTbjQ/dti=1/m=_b,_tp:541
+[   17556ms] [VERBOSE] [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o @ https://accounts.google.com/v3/signin/identifier?opparams=%253F&dsh=S1428975215%3A1777555796272367&access_type=offline&client_id=463717515632-5f96ed9uaue5p206umg9toffdbfmsfbm.apps.googleusercontent.com&o2v=2&prompt=consent&redirect_uri=https%3A%2F%2Flinear.app%2Fauth%2Fgoogle%2Fcallback&response_type=code&scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.profile&service=lso&state=%7B%22key%22%3A%22FlNmsbEjh4CD8u07oDsAEuXgpwEP7UjK%22%2C%22isMobileAppLogin%22%3Afalse%7D&flowName=GeneralOAuthFlow&continue=https%3A%2F%2Faccounts.google.com%2Fsignin%2Foauth%2Fconsent%3Fauthuser%3Dunknown%26part%3DAJi8hANw81nVaDFttk_iuBPhMYP1U9CzcNxcDeHwE0H9YpvZtLhgb57aElg2KA0KSJ_FIDrTuniSH1moXdAZw6ipZMX0tSbOgIrKHbKdGnziaCnqFGhQVwHNiCmU490jGACLVPiWeXIxYICuB7HOx202BPRhEJta8w9ndeVpI4L_R9bY0HVTzIs9JR7LTmtw1jIIo9Bu1gH890K54U8oWLjWug5px42gnIUd7s0-R5zJf_L89l3okAm2y7iDzJkUSFlJCYMmWetK0MrMsxplpdZvHno-ydraT5XW7VwjCX8G-QAq-6eln9MEUDVx8bI6nx0YpEcBbLEG3TBUfu5UmRdRueUOFNnIyAN2fyLz46OtzIG9uIPqqE3nxLWvr45ewyISDJ_kkSjVyqtnQQInLwSitFVTJd6dOt6XuUewmaS5Juxd4qaVs0G0cEh0B82Y1wUJZ07-JC0zzx0pBQSdxFJCrB-UzzY3gg%26flowName%3DGeneralOAuthFlow%26as%3DS1428975215%253A1777555796272367%26client_id%3D463717515632-5f96ed9uaue5p206umg9toffdbfmsfbm.apps.googleusercontent.com%26requestPath%3D%252Fsignin%252Foauth%252Fconsent%23&app_domain=https%3A%2F%2Flinear.app&rart=ANgoxceVMbE03ifwvx4WekLdBR5H00OO1hCazCUBrZZCvxftUEevgB81OXViGIVRHxeiaqM0llPmHl4jQOOknzIZrwjVLJ10zC-SmkYMTuETxy0X9Pipkeo:0
+[   30710ms] [LOG] %c%s color: red; background: yellow; font-size: 24px; 警告！ @ https://www.gstatic.com/_/mss/boq-identity/_/js/k=boq-identity.OAuthUi.zh_CN.HUzS3H9sXzI.es5.O/am=nh8AAABQBAADAPz__wGCqMH1DECBAAAAAAAAAAAwAABE/d=1/excm=_b,_tp,attributesview/ed=1/dg=0/wt=2/ujg=1/rs=AOaEmlFYdsZpXZSBTF9kH9b6z9a9eQNMqQ/dti=1/m=_b,_tp:504
+[   30710ms] [LOG] %c%s font-size: 18px; 使用此控制台可能会导致攻击程序利用 Self-XSS 攻击冒充您并窃取您的信息。
+请勿输入或粘贴您不明白的代码。 @ https://www.gstatic.com/_/mss/boq-identity/_/js/k=boq-identity.OAuthUi.zh_CN.HUzS3H9sXzI.es5.O/am=nh8AAABQBAADAPz__wGCqMH1DECBAAAAAAAAAAAwAABE/d=1/excm=_b,_tp,attributesview/ed=1/dg=0/wt=2/ujg=1/rs=AOaEmlFYdsZpXZSBTF9kH9b6z9a9eQNMqQ/dti=1/m=_b,_tp:504
+[   32474ms] [LOG] %c __                                               _____          __          __           ______          v1.62990.0
+/\ \       __                                    /\  __`\       /\ \      __/\ \__       /\__  _\                       
+\ \ \     /\_\    ___      __     __     _ __    \ \ \/\ \  _ __\ \ \____/\_\ \ ,_\      \/_/\ \/     ___     ___       
+ \ \ \  __\/\ \ /' _ `\  /'__`\ /'__`\  /\`'__\   \ \ \ \ \/\`'__\ \ '__`\/\ \ \ \/         \ \ \   /' _ `\  /'___\     
+  \ \ \L\ \\ \ \/\ \/\ \/\  __//\ \L\.\_\ \ \/     \ \ \_\ \ \ \/ \ \ \L\ \ \ \ \ \_  __     \_\ \__/\ \/\ \/\ \__/  __ 
+   \ \____/ \ \_\ \_\ \_\ \____\ \__/.\_\\ \_\      \ \_____\ \_\  \ \_,__/\ \_\ \__\/\ \    /\_____\ \_\ \_\ \____\/\_\
+    \/___/   \/_/\/_/\/_/\/____/\/__/\/_/ \/_/       \/_____/\/_/   \/___/  \/_/\/__/\ \/    \/_____/\/_/\/_/\/____/\/_/
+                                                                                      \/
+
+The product development system for teams and agents
+
+WE'RE HIRING: https://linear.app/careers
+CHANGELOG:    https://linear.app/changelog
+ 
+  font-family: monospace;
+  color: #282A30;
+   @ https://static.linear.app/client/assets/vendor-sentry.DUIRvFmS.js:5
+[   45395ms] [ERROR] Access to fetch at 'https://client-api.linear.app/sync/bootstrap?type=partial&noSyncPackets=true&useCFCaching=true&noCache=true&clientDatabaseId=58777cec-6bad-490b-a248-2a85e46ad8f0&firstSyncId=617941343&syncGroups=a7f3e2d1-aaaa-4c8b-9a7f-3e2d1c8b9a7f&onlyModels=TeamKey&modelsHash=811a091660e0f782ab027e6eaa6b38a3' from origin 'https://linear.app' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ https://linear.app/x-ai/issue/X-255/%E6%B7%B1%E5%8C%96-realtime-live-sessionprovider-live-websocket%E9%9F%B3%E9%A2%91%E5%8F%8C%E5%B7%A5%E4%B8%8E%E8%BF%90%E8%A1%8C%E6%97%B6%E6%8C%87%E6%A0%87%E6%8E%A5%E5%85%A5:0
+[   45396ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://client-api.linear.app/sync/bootstrap?type=partial&noSyncPackets=true&useCFCaching=true&noCache=true&clientDatabaseId=58777cec-6bad-490b-a248-2a85e46ad8f0&firstSyncId=617941343&syncGroups=a7f3e2d1-aaaa-4c8b-9a7f-3e2d1c8b9a7f&onlyModels=TeamKey&modelsHash=811a091660e0f782ab027e6eaa6b38a3:0
+[   45410ms] [ERROR] Partial load models query error ClientError: Network error: Failed to fetch (client-api.linear.app)
+    at https://static.linear.app/client/assets/SyncWebSocket.Xw43MhO_.js:5:21510
+    at async e.restModelsStreamGen (https://static.linear.app/client/assets/SyncWebSocket.Xw43MhO_.js:5:21071)
+    at async e.restModelsStream (https://static.linear.app/client/assets/SyncWebSocket.Xw43MhO_.js:5:20009)
+    at async e.restModelsStream (https://static.linear.app/client/assets/SyncWebSocket.Xw43MhO_.js:6:8446)
+    at async https://static.linear.app/client/assets/store.BlW-s0xf.js:246:60606
+    at async Promise.all (index 57)
+    at async e.partialBootstrap (https://static.linear.app/client/assets/store.BlW-s0xf.js:246:60289)
+    at async e.loadPartialModels (https://static.linear.app/client/assets/store.BlW-s0xf.js:246:103462)
+    at async e.loadFullModels (https://static.linear.app/client/assets/store.BlW-s0xf.js:259:17576)
+    at async Promise.all (index 0)
+    at async e.handleBatch (https://static.linear.app/client/assets/store.BlW-s0xf.js:259:13822)
+    at async V1.handleResolve (https://static.linear.app/client/assets/store.BlW-s0xf.js:246:71552) {modelNames: Array(61)} @ https://static.linear.app/client/assets/vendor-sentry.DUIRvFmS.js:5

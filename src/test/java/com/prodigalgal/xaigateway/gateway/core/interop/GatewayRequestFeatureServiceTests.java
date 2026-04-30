@@ -169,16 +169,23 @@ class GatewayRequestFeatureServiceTests {
     @Test
     void shouldDescribeGoogleNativeEmbeddingsFilesAndBatchesWithSelectionModes() {
         GatewayRequestSemantics embedSemantics = service.describe("POST", "/v1beta/models/text-embedding-004:embedContent", null);
+        GatewayRequestSemantics googleNamespaceEmbedSemantics = service.describe("POST", "/google/v1beta/models/text-embedding-004:embedContent", null);
         GatewayRequestSemantics batchEmbedSemantics = service.describe("POST", "/v1beta/models/text-embedding-004:batchEmbedContents", null);
+        GatewayRequestSemantics googleUploadSemantics = service.describe("POST", "/google/upload/v1beta/files", null);
         GatewayRequestSemantics fileListSemantics = service.describe("GET", "/v1beta/files", null);
         GatewayRequestSemantics fileGetSemantics = service.describe("GET", "/v1beta/files/file_abc123", null);
         GatewayRequestSemantics batchCreateSemantics = service.describe("POST", "/v1beta/models/gemini-2.5-pro:batchGenerateContent", null);
         GatewayRequestSemantics batchGetSemantics = service.describe("GET", "/v1beta/batches/batch_abc123", null);
+        GatewayRequestSemantics tuningListSemantics = service.describe("GET", "/v1/fine_tuning/jobs", null);
 
         assertEquals(TranslationOperation.EMBEDDING_CREATE, embedSemantics.operation());
         assertEquals(RouteSelectionMode.CATALOG_SELECTION, embedSemantics.routeSelectionMode());
+        assertEquals(TranslationOperation.EMBEDDING_CREATE, googleNamespaceEmbedSemantics.operation());
+        assertEquals("/v1beta/models/{model}:embedContent", googleNamespaceEmbedSemantics.normalizedPath());
         assertEquals(TranslationOperation.EMBEDDING_CREATE, batchEmbedSemantics.operation());
         assertEquals(RouteSelectionMode.CATALOG_SELECTION, batchEmbedSemantics.routeSelectionMode());
+        assertEquals(TranslationOperation.FILE_CREATE, googleUploadSemantics.operation());
+        assertEquals("/upload/v1beta/files", googleUploadSemantics.normalizedPath());
         assertEquals(TranslationOperation.FILE_LIST, fileListSemantics.operation());
         assertEquals(RouteSelectionMode.LOCAL_CATALOG, fileListSemantics.routeSelectionMode());
         assertEquals(TranslationOperation.FILE_GET, fileGetSemantics.operation());
@@ -187,6 +194,8 @@ class GatewayRequestFeatureServiceTests {
         assertEquals(RouteSelectionMode.CATALOG_SELECTION, batchCreateSemantics.routeSelectionMode());
         assertEquals(TranslationOperation.BATCH_GET, batchGetSemantics.operation());
         assertEquals(RouteSelectionMode.STORED_LINEAGE, batchGetSemantics.routeSelectionMode());
+        assertEquals(TranslationOperation.TUNING_LIST, tuningListSemantics.operation());
+        assertEquals(RouteSelectionMode.LOCAL_CATALOG, tuningListSemantics.routeSelectionMode());
     }
 
     @Test
@@ -201,6 +210,8 @@ class GatewayRequestFeatureServiceTests {
         );
         assertEquals("/v1beta/models/{model}:embedContent", service.normalizePath("/v1beta/models/text-embedding-004:embedContent"));
         assertEquals("/v1beta/models/{model}:batchEmbedContents", service.normalizePath("/v1beta/models/text-embedding-004:batchEmbedContents"));
+        assertEquals("/v1beta/models/{model}:embedContent", service.normalizePath("/google/v1beta/models/text-embedding-004:embedContent"));
+        assertEquals("/upload/v1beta/files", service.normalizePath("/google/upload/v1beta/files"));
         assertEquals("/v1beta/files/{fileName}", service.normalizePath("/v1beta/files/file_abc123"));
         assertEquals("/v1beta/batches/{batchName}:cancel", service.normalizePath("/v1beta/batches/batch_abc123:cancel"));
 
@@ -215,6 +226,10 @@ class GatewayRequestFeatureServiceTests {
         assertEquals(
                 java.util.Map.of("model", "text-embedding-004"),
                 service.extractPathParams("/v1beta/models/text-embedding-004:embedContent")
+        );
+        assertEquals(
+                java.util.Map.of("model", "text-embedding-004"),
+                service.extractPathParams("/google/v1beta/models/text-embedding-004:embedContent")
         );
         assertEquals(
                 java.util.Map.of("fileName", "file_abc123"),

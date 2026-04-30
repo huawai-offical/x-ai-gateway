@@ -27,6 +27,7 @@ public enum TranslationOperation {
     ANTHROPIC_MESSAGE_BATCH_CREATE("anthropic_message_batch_create"),
     ANTHROPIC_MESSAGE_BATCH_GET("anthropic_message_batch_get"),
     ANTHROPIC_MESSAGE_BATCH_CANCEL("anthropic_message_batch_cancel"),
+    TUNING_LIST("tuning_list"),
     TUNING_CREATE("tuning_create"),
     TUNING_GET("tuning_get"),
     TUNING_CANCEL("tuning_cancel"),

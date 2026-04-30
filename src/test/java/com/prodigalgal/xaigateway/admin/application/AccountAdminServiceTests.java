@@ -25,11 +25,13 @@ class AccountAdminServiceTests {
         UpstreamAccountPoolRepository poolRepository = Mockito.mock(UpstreamAccountPoolRepository.class);
         CredentialCryptoService cryptoService = Mockito.mock(CredentialCryptoService.class);
         SupportedModelCatalogService modelCatalogService = Mockito.mock(SupportedModelCatalogService.class);
+        OAuthSessionRefreshService refreshService = Mockito.mock(OAuthSessionRefreshService.class);
         AccountAdminService service = new AccountAdminService(
                 accountRepository,
                 poolRepository,
                 cryptoService,
                 modelCatalogService,
+                refreshService,
                 new ObjectMapper()
         );
         Mockito.when(cryptoService.encrypt(Mockito.anyString())).thenAnswer(invocation -> "enc:" + invocation.getArgument(0));
@@ -93,11 +95,13 @@ class AccountAdminServiceTests {
         UpstreamAccountPoolRepository poolRepository = Mockito.mock(UpstreamAccountPoolRepository.class);
         CredentialCryptoService cryptoService = Mockito.mock(CredentialCryptoService.class);
         SupportedModelCatalogService modelCatalogService = Mockito.mock(SupportedModelCatalogService.class);
+        OAuthSessionRefreshService refreshService = Mockito.mock(OAuthSessionRefreshService.class);
         AccountAdminService service = new AccountAdminService(
                 accountRepository,
                 poolRepository,
                 cryptoService,
                 modelCatalogService,
+                refreshService,
                 new ObjectMapper()
         );
         UpstreamAccountEntity entity = new UpstreamAccountEntity();
@@ -109,15 +113,21 @@ class AccountAdminServiceTests {
         entity.setRefreshTokenCiphertext("enc:refresh");
         ReflectionTestUtils.setField(entity, "id", 7L);
         Mockito.when(accountRepository.findById(7L)).thenReturn(Optional.of(entity));
-        Mockito.when(accountRepository.save(Mockito.any())).thenAnswer(invocation -> invocation.getArgument(0));
+        Mockito.when(refreshService.refreshAccount(7L)).thenAnswer(invocation -> {
+            entity.setRefreshStatus("REFRESHED");
+            entity.setRefreshFailureCount(0);
+            entity.setLastRefreshResultJson("{\"status\":\"refreshed\",\"adapter\":\"openai-oauth-session\"}");
+            return new OAuthSessionRefreshOutcome(7L, "OPENAI_OAUTH", "REFRESHED", "openai-oauth-session", Instant.now(), null, null);
+        });
         Mockito.when(modelCatalogService.normalize(Mockito.anyList())).thenAnswer(invocation -> invocation.getArgument(0));
 
         UpstreamAccountResponse response = service.refresh(7L);
 
         assertEquals("REFRESHED", response.refreshStatus());
         assertEquals(0, response.refreshFailureCount());
-        assertTrue(response.lastRefreshResultJson().contains("manual_refresh_marked"));
+        assertTrue(response.lastRefreshResultJson().contains("openai-oauth-session"));
         assertEquals("enc:access", entity.getAccessTokenCiphertext());
         assertEquals("enc:refresh", entity.getRefreshTokenCiphertext());
+        Mockito.verify(refreshService).refreshAccount(7L);
     }
 }
