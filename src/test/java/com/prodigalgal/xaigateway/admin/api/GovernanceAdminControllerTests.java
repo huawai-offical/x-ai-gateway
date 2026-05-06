@@ -48,6 +48,10 @@ class GovernanceAdminControllerTests {
                         100,
                         true,
                         "sample",
+                        "{\"maxAttempts\":2}",
+                        "{\"order\":[\"same_site\"]}",
+                        "{\"failureThreshold\":3}",
+                        "{\"rpm\":60}",
                         Instant.parse("2026-04-17T08:00:00Z"),
                         Instant.parse("2026-04-17T08:05:00Z")
                 ));
@@ -71,7 +75,33 @@ class GovernanceAdminControllerTests {
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.policyName").isEqualTo("guard-openai")
-                .jsonPath("$.actionType").isEqualTo("QUARANTINE");
+                .jsonPath("$.actionType").isEqualTo("QUARANTINE")
+                .jsonPath("$.retryPolicy").isEqualTo("{\"maxAttempts\":2}");
+    }
+
+    @Test
+    void shouldReturnRoutingRuntimePlan() {
+        Mockito.when(governanceAdminService.routingRuntimePlan())
+                .thenReturn(new RoutingPolicyRuntimePlanResponse(
+                        2,
+                        true,
+                        List.of("score", "priority"),
+                        true,
+                        3,
+                        true,
+                        60,
+                        List.of(11L),
+                        List.of()
+                ));
+
+        webTestClient.get()
+                .uri("/admin/ops/policies/routing-runtime-plan")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.maxAttempts").isEqualTo(2)
+                .jsonPath("$.fallbackEnabled").isEqualTo(true)
+                .jsonPath("$.requestsPerMinute").isEqualTo(60);
     }
 
     @Test

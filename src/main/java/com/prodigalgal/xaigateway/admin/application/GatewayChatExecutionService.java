@@ -9,6 +9,10 @@ import com.prodigalgal.xaigateway.gateway.core.account.AccountSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyGovernanceService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyQueryService;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
+import com.prodigalgal.xaigateway.gateway.core.cli.CloudCliRequestFilterAction;
+import com.prodigalgal.xaigateway.gateway.core.cli.CloudCliRequestFilterResult;
+import com.prodigalgal.xaigateway.gateway.core.cli.CloudCliRequestFilterRule;
+import com.prodigalgal.xaigateway.gateway.core.cli.CloudCliRequestFilterService;
 import com.prodigalgal.xaigateway.gateway.core.credential.CredentialMaterialResolver;
 import com.prodigalgal.xaigateway.gateway.core.credential.ResolvedCredentialMaterial;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayChatRuntime;
@@ -43,6 +47,7 @@ import com.prodigalgal.xaigateway.gateway.core.routing.RouteExecutionAttempt;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionRequest;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionSource;
+import com.prodigalgal.xaigateway.gateway.core.routing.RoutingPolicyRuntimeEnforcementService;
 import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.usage.GatewayUsage;
@@ -60,6 +65,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -89,6 +95,9 @@ public class GatewayChatExecutionService {
     private final GeminiGenerateContentRequestMapper geminiGenerateContentRequestMapper;
     private final List<GatewayChatRuntime> gatewayChatRuntimes;
     private final GatewayProperties gatewayProperties;
+    private final RoutingPolicyRuntimeConfigService routingPolicyRuntimeConfigService;
+    private final RoutingPolicyRuntimeEnforcementService routingPolicyRuntimeEnforcementService;
+    private final CloudCliRequestFilterService cloudCliRequestFilterService;
 
     @Autowired
     public GatewayChatExecutionService(
@@ -108,7 +117,10 @@ public class GatewayChatExecutionService {
             AnthropicMessagesRequestMapper anthropicMessagesRequestMapper,
             GeminiGenerateContentRequestMapper geminiGenerateContentRequestMapper,
             List<GatewayChatRuntime> gatewayChatRuntimes,
-            GatewayProperties gatewayProperties) {
+            GatewayProperties gatewayProperties,
+            RoutingPolicyRuntimeConfigService routingPolicyRuntimeConfigService,
+            RoutingPolicyRuntimeEnforcementService routingPolicyRuntimeEnforcementService,
+            CloudCliRequestFilterService cloudCliRequestFilterService) {
         this.gatewayRouteSelectionService = gatewayRouteSelectionService;
         this.upstreamCredentialRepository = upstreamCredentialRepository;
         this.credentialCryptoService = credentialCryptoService;
@@ -126,6 +138,95 @@ public class GatewayChatExecutionService {
         this.geminiGenerateContentRequestMapper = geminiGenerateContentRequestMapper;
         this.gatewayChatRuntimes = gatewayChatRuntimes;
         this.gatewayProperties = gatewayProperties;
+        this.routingPolicyRuntimeConfigService = routingPolicyRuntimeConfigService;
+        this.routingPolicyRuntimeEnforcementService = routingPolicyRuntimeEnforcementService;
+        this.cloudCliRequestFilterService = cloudCliRequestFilterService;
+    }
+
+    public GatewayChatExecutionService(
+            GatewayRouteSelectionService gatewayRouteSelectionService,
+            UpstreamCredentialRepository upstreamCredentialRepository,
+            CredentialCryptoService credentialCryptoService,
+            GatewayObservabilityService gatewayObservabilityService,
+            GatewayRequestLifecycleService gatewayRequestLifecycleService,
+            DistributedKeyGovernanceService distributedKeyGovernanceService,
+            DistributedKeyQueryService distributedKeyQueryService,
+            AccountSelectionService accountSelectionService,
+            CredentialMaterialResolver credentialMaterialResolver,
+            GatewayRequestFeatureService gatewayRequestFeatureService,
+            TranslationExecutionPlanCompiler translationExecutionPlanCompiler,
+            OpenAiChatCompletionRequestMapper openAiChatCompletionRequestMapper,
+            OpenAiResponsesRequestMapper openAiResponsesRequestMapper,
+            AnthropicMessagesRequestMapper anthropicMessagesRequestMapper,
+            GeminiGenerateContentRequestMapper geminiGenerateContentRequestMapper,
+            List<GatewayChatRuntime> gatewayChatRuntimes,
+            GatewayProperties gatewayProperties,
+            RoutingPolicyRuntimeConfigService routingPolicyRuntimeConfigService,
+            RoutingPolicyRuntimeEnforcementService routingPolicyRuntimeEnforcementService) {
+        this(
+                gatewayRouteSelectionService,
+                upstreamCredentialRepository,
+                credentialCryptoService,
+                gatewayObservabilityService,
+                gatewayRequestLifecycleService,
+                distributedKeyGovernanceService,
+                distributedKeyQueryService,
+                accountSelectionService,
+                credentialMaterialResolver,
+                gatewayRequestFeatureService,
+                translationExecutionPlanCompiler,
+                openAiChatCompletionRequestMapper,
+                openAiResponsesRequestMapper,
+                anthropicMessagesRequestMapper,
+                geminiGenerateContentRequestMapper,
+                gatewayChatRuntimes,
+                gatewayProperties,
+                routingPolicyRuntimeConfigService,
+                routingPolicyRuntimeEnforcementService,
+                new CloudCliRequestFilterService()
+        );
+    }
+
+    public GatewayChatExecutionService(
+            GatewayRouteSelectionService gatewayRouteSelectionService,
+            UpstreamCredentialRepository upstreamCredentialRepository,
+            CredentialCryptoService credentialCryptoService,
+            GatewayObservabilityService gatewayObservabilityService,
+            GatewayRequestLifecycleService gatewayRequestLifecycleService,
+            DistributedKeyGovernanceService distributedKeyGovernanceService,
+            DistributedKeyQueryService distributedKeyQueryService,
+            AccountSelectionService accountSelectionService,
+            CredentialMaterialResolver credentialMaterialResolver,
+            GatewayRequestFeatureService gatewayRequestFeatureService,
+            TranslationExecutionPlanCompiler translationExecutionPlanCompiler,
+            OpenAiChatCompletionRequestMapper openAiChatCompletionRequestMapper,
+            OpenAiResponsesRequestMapper openAiResponsesRequestMapper,
+            AnthropicMessagesRequestMapper anthropicMessagesRequestMapper,
+            GeminiGenerateContentRequestMapper geminiGenerateContentRequestMapper,
+            List<GatewayChatRuntime> gatewayChatRuntimes,
+            GatewayProperties gatewayProperties) {
+        this(
+                gatewayRouteSelectionService,
+                upstreamCredentialRepository,
+                credentialCryptoService,
+                gatewayObservabilityService,
+                gatewayRequestLifecycleService,
+                distributedKeyGovernanceService,
+                distributedKeyQueryService,
+                accountSelectionService,
+                credentialMaterialResolver,
+                gatewayRequestFeatureService,
+                translationExecutionPlanCompiler,
+                openAiChatCompletionRequestMapper,
+                openAiResponsesRequestMapper,
+                anthropicMessagesRequestMapper,
+                geminiGenerateContentRequestMapper,
+                gatewayChatRuntimes,
+                gatewayProperties,
+                null,
+                null,
+                new CloudCliRequestFilterService()
+        );
     }
 
     public AdminChatExecuteResponse execute(AdminChatExecuteRequest request) {
@@ -142,24 +243,32 @@ public class GatewayChatExecutionService {
     }
 
     public CanonicalExecutionResult executeGatewayResponse(CanonicalRequest request) {
+        return executeGatewayResponse(request, GatewayClientFamily.GENERIC_OPENAI);
+    }
+
+    public CanonicalExecutionResult executeGatewayResponse(CanonicalRequest request, GatewayClientFamily clientFamily) {
+        GatewayClientFamily effectiveClientFamily = clientFamily == null ? GatewayClientFamily.GENERIC_OPENAI : clientFamily;
+        CloudCliRequestFilterResult filterResult = applyCloudCliRequestFilters(request, effectiveClientFamily);
+        CanonicalRequest filteredRequest = filterResult.request();
         String requestId = gatewayObservabilityService.nextRequestId();
         Instant startedAt = Instant.now();
-        JsonNode routeBody = buildRouteBody(request);
+        JsonNode routeBody = buildRouteBody(filteredRequest);
+        annotateFilterHits(routeBody, filterResult);
         RouteSelectionResult selectionResult = gatewayRouteSelectionService.select(new RouteSelectionRequest(
-                request.distributedKeyPrefix(),
-                request.ingressProtocol().name().toLowerCase(),
-                request.requestPath(),
-                request.requestedModel(),
+                filteredRequest.distributedKeyPrefix(),
+                filteredRequest.ingressProtocol().name().toLowerCase(),
+                filteredRequest.requestPath(),
+                filteredRequest.requestedModel(),
                 routeBody,
-                GatewayClientFamily.GENERIC_OPENAI,
+                effectiveClientFamily,
                 true
         ));
-        GatewayRequestSemantics semantics = gatewayRequestFeatureService.describe(request.requestPath(), routeBody);
-        gatewayRequestLifecycleService.startRequest(requestId, selectionResult, request, false, startedAt);
+        GatewayRequestSemantics semantics = gatewayRequestFeatureService.describe(filteredRequest.requestPath(), routeBody);
+        gatewayRequestLifecycleService.startRequest(requestId, selectionResult, filteredRequest, false, startedAt);
 
         try {
             List<RouteExecutionAttempt> attempts = new ArrayList<>();
-            int maxAttempts = Math.min(selectionResult.candidates().size(), gatewayProperties.getRouting().getMaxFallbackAttempts());
+            int maxAttempts = maxFallbackAttempts(selectionResult);
             RuntimeException lastException = null;
 
             for (int index = 0; index < maxAttempts; index++) {
@@ -167,7 +276,7 @@ public class GatewayChatExecutionService {
                 RouteSelectionResult candidateSelection = selectionForCandidate(selectionResult, candidate, attempts);
                 CanonicalExecutionPlanCompilation executionPlanCompilation = translationExecutionPlanCompiler.compileSelected(
                         candidateSelection,
-                        request,
+                        filteredRequest,
                         semantics,
                         routeBody
                 );
@@ -179,7 +288,7 @@ public class GatewayChatExecutionService {
                             candidateSelection,
                             credential,
                             credentialMaterial,
-                            request,
+                            filteredRequest,
                             executionPlanCompilation.canonicalPlan()
                     ));
                     if (isEmptyCanonicalResult(result)) {
@@ -195,6 +304,7 @@ public class GatewayChatExecutionService {
                     ));
                     RouteSelectionResult finalSelection = candidateSelection.withAttempts(List.copyOf(attempts));
                     gatewayRouteSelectionService.recordSuccessfulSelection(finalSelection);
+                    recordRoutingPolicySuccess(candidate, credential);
                     gatewayObservabilityService.recordRouteDecision(requestId, finalSelection);
 
                     CanonicalResponse enriched = enrichResponse(requestId, finalSelection, result);
@@ -215,7 +325,7 @@ public class GatewayChatExecutionService {
                     gatewayRequestLifecycleService.completeRequest(
                             requestId,
                             finalSelection,
-                            request,
+                            filteredRequest,
                             false,
                             usageView,
                             startedAt,
@@ -233,6 +343,7 @@ public class GatewayChatExecutionService {
                     ));
                     gatewayRouteSelectionService.invalidateSelection(candidateSelection);
                     gatewayRouteSelectionService.markCredentialCooldown(candidate.candidate().credentialId(), fallbackDetail(exception));
+                    recordRoutingPolicyFailure(candidate, credential, fallbackDetail(exception));
                     lastException = exception;
                     if (!shouldFallback(exception) || index == maxAttempts - 1) {
                         RouteSelectionResult failedSelection = candidateSelection.withAttempts(List.copyOf(attempts));
@@ -240,7 +351,7 @@ public class GatewayChatExecutionService {
                         gatewayRequestLifecycleService.failRequest(
                                 requestId,
                                 failedSelection,
-                                request,
+                                filteredRequest,
                                 false,
                                 exception,
                                 GatewayUsageView.empty(),
@@ -264,20 +375,28 @@ public class GatewayChatExecutionService {
     }
 
     public CanonicalExecutionStreamResult executeGatewayStream(CanonicalRequest request) {
+        return executeGatewayStream(request, GatewayClientFamily.GENERIC_OPENAI);
+    }
+
+    public CanonicalExecutionStreamResult executeGatewayStream(CanonicalRequest request, GatewayClientFamily clientFamily) {
+        GatewayClientFamily effectiveClientFamily = clientFamily == null ? GatewayClientFamily.GENERIC_OPENAI : clientFamily;
+        CloudCliRequestFilterResult filterResult = applyCloudCliRequestFilters(request, effectiveClientFamily);
+        CanonicalRequest filteredRequest = filterResult.request();
         String requestId = gatewayObservabilityService.nextRequestId();
         Instant startedAt = Instant.now();
-        JsonNode routeBody = buildRouteBody(request);
+        JsonNode routeBody = buildRouteBody(filteredRequest);
+        annotateFilterHits(routeBody, filterResult);
         RouteSelectionResult selectionResult = gatewayRouteSelectionService.select(new RouteSelectionRequest(
-                request.distributedKeyPrefix(),
-                request.ingressProtocol().name().toLowerCase(),
-                request.requestPath(),
-                request.requestedModel(),
+                filteredRequest.distributedKeyPrefix(),
+                filteredRequest.ingressProtocol().name().toLowerCase(),
+                filteredRequest.requestPath(),
+                filteredRequest.requestedModel(),
                 routeBody,
-                GatewayClientFamily.GENERIC_OPENAI,
+                effectiveClientFamily,
                 true
         ));
-        GatewayRequestSemantics semantics = gatewayRequestFeatureService.describe(request.requestPath(), routeBody);
-        gatewayRequestLifecycleService.startRequest(requestId, selectionResult, request, true, startedAt);
+        GatewayRequestSemantics semantics = gatewayRequestFeatureService.describe(filteredRequest.requestPath(), routeBody);
+        gatewayRequestLifecycleService.startRequest(requestId, selectionResult, filteredRequest, true, startedAt);
         AtomicReference<CanonicalUsage> lastVisibleUsage = new AtomicReference<>(CanonicalUsage.empty());
         AtomicBoolean terminalRecorded = new AtomicBoolean(false);
         AtomicReference<RouteSelectionResult> finalSelectionRef = new AtomicReference<>(selectionResult);
@@ -285,11 +404,11 @@ public class GatewayChatExecutionService {
         AtomicReference<Long> selectedAccountIdRef = new AtomicReference<>(null);
         AtomicReference<Long> firstTokenLatencyMsRef = new AtomicReference<>(null);
         List<RouteExecutionAttempt> attempts = new java.util.concurrent.CopyOnWriteArrayList<>();
-        int maxAttempts = Math.min(selectionResult.candidates().size(), gatewayProperties.getRouting().getMaxFallbackAttempts());
+        int maxAttempts = maxFallbackAttempts(selectionResult);
         Flux<CanonicalStreamEvent> chunks = streamAttempt(
                         requestId,
                         selectionResult,
-                        request,
+                        filteredRequest,
                         routeBody,
                         semantics,
                         0,
@@ -312,7 +431,7 @@ public class GatewayChatExecutionService {
                         recordTerminalUsage(
                                 requestId,
                                 finalSelection,
-                                request,
+                                filteredRequest,
                                 startedAt,
                                 usageView,
                                 event.usage(),
@@ -331,7 +450,7 @@ public class GatewayChatExecutionService {
                         recordTerminalUsage(
                                 requestId,
                                 finalSelection,
-                                request,
+                                filteredRequest,
                                 startedAt,
                                 usageView,
                                 null,
@@ -348,7 +467,7 @@ public class GatewayChatExecutionService {
                     gatewayRequestLifecycleService.failRequest(
                             requestId,
                             finalSelection,
-                            request,
+                            filteredRequest,
                             true,
                             error,
                             terminalUsageView(null, lastVisibleUsage.get()),
@@ -364,7 +483,7 @@ public class GatewayChatExecutionService {
                     gatewayRequestLifecycleService.cancelRequest(
                             requestId,
                             finalSelection,
-                            request,
+                            filteredRequest,
                             true,
                             terminalUsageView(null, lastVisibleUsage.get()),
                             startedAt,
@@ -432,6 +551,7 @@ public class GatewayChatExecutionService {
                         RouteSelectionResult finalSelection = candidateSelection.withAttempts(List.copyOf(attempts));
                         finalSelectionRef.set(finalSelection);
                         gatewayRouteSelectionService.recordSuccessfulSelection(finalSelection);
+                        recordRoutingPolicySuccess(candidate, credential);
                     }
                 })
                 .doOnComplete(() -> {
@@ -446,6 +566,7 @@ public class GatewayChatExecutionService {
                         RouteSelectionResult finalSelection = candidateSelection.withAttempts(List.copyOf(attempts));
                         finalSelectionRef.set(finalSelection);
                         gatewayRouteSelectionService.recordSuccessfulSelection(finalSelection);
+                        recordRoutingPolicySuccess(candidate, credential);
                     }
                 })
                 .onErrorResume(error -> {
@@ -461,6 +582,7 @@ public class GatewayChatExecutionService {
                     finalSelectionRef.set(failedSelection);
                     gatewayRouteSelectionService.invalidateSelection(candidateSelection);
                     gatewayRouteSelectionService.markCredentialCooldown(candidate.candidate().credentialId(), fallbackDetail(error));
+                    recordRoutingPolicyFailure(candidate, credential, fallbackDetail(error));
                     if (!firstOutputCommitted.get()
                             && shouldFallback(error)
                             && candidateIndex + 1 < maxAttempts
@@ -654,6 +776,54 @@ public class GatewayChatExecutionService {
         return "none";
     }
 
+    private CloudCliRequestFilterResult applyCloudCliRequestFilters(
+            CanonicalRequest request,
+            GatewayClientFamily clientFamily) {
+        GatewayProperties.Cli.RequestFilter filter = gatewayProperties.getCli().getRequestFilter();
+        if (filter == null || !filter.isEnabled() || filter.getRules() == null || filter.getRules().isEmpty()) {
+            return new CloudCliRequestFilterResult(request, List.of(), List.of());
+        }
+        List<CloudCliRequestFilterRule> rules = filter.getRules().stream()
+                .map(this::toCloudCliRequestFilterRule)
+                .toList();
+        return cloudCliRequestFilterService.apply(request, clientFamily, rules);
+    }
+
+    private CloudCliRequestFilterRule toCloudCliRequestFilterRule(GatewayProperties.Cli.Rule rule) {
+        CloudCliRequestFilterAction action = null;
+        if (rule.getAction() != null && !rule.getAction().isBlank()) {
+            try {
+                action = CloudCliRequestFilterAction.valueOf(
+                        rule.getAction().trim().toUpperCase(Locale.ROOT).replace('-', '_')
+                );
+            } catch (IllegalArgumentException ignored) {
+                action = null;
+            }
+        }
+        return new CloudCliRequestFilterRule(
+                rule.getId(),
+                action,
+                rule.getClientFamilies(),
+                rule.getRole(),
+                rule.getContains(),
+                rule.getReplacement()
+        );
+    }
+
+    private void annotateFilterHits(JsonNode routeBody, CloudCliRequestFilterResult filterResult) {
+        if (!(routeBody instanceof ObjectNode root) || filterResult == null) {
+            return;
+        }
+        if (filterResult.appliedRuleIds().isEmpty() && filterResult.skippedRuleIds().isEmpty()) {
+            return;
+        }
+        ObjectNode metadata = root.putObject("x_ai_gateway_filter");
+        var applied = metadata.putArray("applied_rule_ids");
+        filterResult.appliedRuleIds().forEach(applied::add);
+        var skipped = metadata.putArray("skipped_rule_ids");
+        filterResult.skippedRuleIds().forEach(skipped::add);
+    }
+
     private RouteSelectionResult selectionForCandidate(
             RouteSelectionResult selectionResult,
             RouteCandidateView candidate,
@@ -696,6 +866,27 @@ public class GatewayChatExecutionService {
         boolean hasReasoning = result.reasoning() != null && !result.reasoning().isBlank();
         boolean hasToolCalls = result.toolCalls() != null && !result.toolCalls().isEmpty();
         return !hasText && !hasReasoning && !hasToolCalls;
+    }
+
+    private int maxFallbackAttempts(RouteSelectionResult selectionResult) {
+        int candidates = selectionResult.candidates().size();
+        int defaultMaxAttempts = gatewayProperties.getRouting().getMaxFallbackAttempts();
+        if (routingPolicyRuntimeConfigService == null) {
+            return Math.min(candidates, defaultMaxAttempts);
+        }
+        return routingPolicyRuntimeConfigService.maxAttempts(defaultMaxAttempts, candidates);
+    }
+
+    private void recordRoutingPolicySuccess(RouteCandidateView candidate, UpstreamCredentialEntity credential) {
+        if (routingPolicyRuntimeEnforcementService != null) {
+            routingPolicyRuntimeEnforcementService.recordSuccess(candidate, credential);
+        }
+    }
+
+    private void recordRoutingPolicyFailure(RouteCandidateView candidate, UpstreamCredentialEntity credential, String reason) {
+        if (routingPolicyRuntimeEnforcementService != null) {
+            routingPolicyRuntimeEnforcementService.recordFailure(candidate, credential, reason);
+        }
     }
 
     private boolean isVisibleStreamEvent(CanonicalStreamEvent event) {

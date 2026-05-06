@@ -1,0 +1,25 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0045-payment-production-closure
+      author: codex
+      changes:
+        - addColumn:
+            tableName: payment_order
+            columns:
+              - column: { name: provider_instance_code, type: VARCHAR(96) }
+              - column: { name: checkout_url, type: VARCHAR(1024) }
+              - column: { name: checkout_method, type: VARCHAR(64) }
+              - column: { name: provider_payload_json, type: TEXT }
+              - column: { name: checkout_expires_at, type: TIMESTAMP WITH TIME ZONE }
+              - column: { name: refund_amount_minor, type: BIGINT, defaultValueNumeric: 0, constraints: { nullable: false } }
+              - column: { name: refunded_at, type: TIMESTAMP WITH TIME ZONE }
+              - column: { name: disputed_at, type: TIMESTAMP WITH TIME ZONE }
+              - column: { name: reconciled_at, type: TIMESTAMP WITH TIME ZONE }
+              - column: { name: reconcile_status, type: VARCHAR(64) }
+        - createIndex:
+            tableName: payment_order
+            indexName: idx_payment_order_provider_status_created
+            columns:
+              - column: { name: provider }
+              - column: { name: status }
+              - column: { name: created_at }

@@ -1,0 +1,38 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "x-ai-gateway Public API",
+    "version": "2026.05.06",
+    "description": "公开接入面的最小 OpenAPI 事实源，运行时也可通过 /public/docs/openapi.json 读取。"
+  },
+  "servers": [
+    {
+      "url": "https://gateway.example.com",
+      "description": "生产网关地址示例"
+    }
+  ],
+  "paths": {
+    "/public/docs/compatibility": { "get": { "summary": "读取公开兼容文档 bundle" } },
+    "/public/docs/openapi.json": { "get": { "summary": "读取公开 OpenAPI JSON" } },
+    "/v1/chat/completions": { "post": { "summary": "OpenAI-compatible Chat Completions" } },
+    "/v1/responses": { "post": { "summary": "OpenAI-compatible Responses" } },
+    "/v1/messages": { "post": { "summary": "Claude Messages compatible endpoint" } },
+    "/v1beta/models/{model}:generateContent": { "post": { "summary": "Gemini generateContent compatible endpoint" } },
+    "/api/v1/videos/generations": { "post": { "summary": "创建 Video async task" } },
+    "/api/v1/videos/{videoId}": { "get": { "summary": "读取 Video async task" } },
+    "/api/v1/videos/{videoId}/cancel": { "post": { "summary": "取消 Video async task" } },
+    "/api/v1/music/generations": { "post": { "summary": "创建 Music async task" } },
+    "/api/v1/music/{musicId}": { "get": { "summary": "读取 Music async task" } },
+    "/api/v1/music/{musicId}/cancel": { "post": { "summary": "取消 Music async task" } },
+    "/api/v1/media/provider-matrix": { "get": { "summary": "读取 Video/Music provider support matrix" } }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "Distributed Key"
+      }
+    }
+  }
+}

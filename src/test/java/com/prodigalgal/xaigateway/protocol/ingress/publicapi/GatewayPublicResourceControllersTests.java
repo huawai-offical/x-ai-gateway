@@ -5,6 +5,7 @@ import com.prodigalgal.xaigateway.gateway.core.auth.GatewayTokenAuthenticationRe
 import com.prodigalgal.xaigateway.gateway.core.resource.GatewayCacheResourceService;
 import com.prodigalgal.xaigateway.gateway.core.resource.GatewayPublicResourceService;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
+import com.prodigalgal.xaigateway.provider.adapter.gemini.GeminiCachedContentCreateExecutor;
 import com.prodigalgal.xaigateway.testsupport.PermitAllSecurityTestConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,7 +25,8 @@ import tools.jackson.databind.node.ObjectNode;
         GatewayCachesController.class,
         GatewayResourceLineageController.class,
         GatewayOperationsController.class,
-        GatewayTuningsController.class
+        GatewayTuningsController.class,
+        GatewayMediaTasksController.class
 })
 @Import(PermitAllSecurityTestConfig.class)
 class GatewayPublicResourceControllersTests {
@@ -45,6 +47,9 @@ class GatewayPublicResourceControllersTests {
 
     @MockitoBean
     private GatewayPublicResourceService gatewayPublicResourceService;
+
+    @MockitoBean
+    private GeminiCachedContentCreateExecutor geminiCachedContentCreateExecutor;
 
     @BeforeEach
     void setUp() {
@@ -184,7 +189,7 @@ class GatewayPublicResourceControllersTests {
         response.put("name", "operations/ftjob_1");
         response.put("waited", true);
 
-        Mockito.when(gatewayPublicResourceService.waitOperation(1L, "ftjob_1"))
+        Mockito.when(gatewayPublicResourceService.waitOperation(Mockito.eq(1L), Mockito.eq("ftjob_1"), Mockito.any(JsonNode.class)))
                 .thenReturn(response);
 
         webTestClient.post()
@@ -196,6 +201,34 @@ class GatewayPublicResourceControllersTests {
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.waited").isEqualTo(true);
+    }
+
+    @Test
+    void shouldCreateGeminiCachedContent() {
+        ObjectNode response = objectMapper.createObjectNode();
+        response.put("object", "gateway.cache.create_result");
+        response.put("external_cache_ref", "cachedContents/abc");
+
+        Mockito.when(geminiCachedContentCreateExecutor.create(Mockito.eq(1L), Mockito.any(JsonNode.class)))
+                .thenReturn(response);
+
+        webTestClient.post()
+                .uri("/api/v1/caches/gemini")
+                .header(HttpHeaders.AUTHORIZATION, AUTHORIZATION)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "credentialId": 11,
+                          "model": "gemini-2.5-pro",
+                          "prefixHash": "prefix-1",
+                          "contents": [{"role": "user", "parts": [{"text": "hello"}]}]
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.object").isEqualTo("gateway.cache.create_result")
+                .jsonPath("$.external_cache_ref").isEqualTo("cachedContents/abc");
     }
 
     @Test
@@ -215,6 +248,42 @@ class GatewayPublicResourceControllersTests {
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.deleted").isEqualTo(true);
+    }
+
+    @Test
+    void shouldCreateAndCancelVideoTask() {
+        ObjectNode created = objectMapper.createObjectNode();
+        created.put("id", "video_1");
+        created.put("object", "video.generation");
+        created.put("status", "queued");
+        ObjectNode cancelled = objectMapper.createObjectNode();
+        cancelled.put("id", "video_1");
+        cancelled.put("object", "video.generation");
+        cancelled.put("status", "cancelled");
+
+        Mockito.when(gatewayPublicResourceService.createVideo(Mockito.eq(1L), Mockito.any(JsonNode.class)))
+                .thenReturn(created);
+        Mockito.when(gatewayPublicResourceService.cancelVideo(1L, "video_1"))
+                .thenReturn(cancelled);
+
+        webTestClient.post()
+                .uri("/api/v1/videos/generations")
+                .header(HttpHeaders.AUTHORIZATION, AUTHORIZATION)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"model\":\"veo-3\",\"prompt\":\"demo\"}")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.object").isEqualTo("video.generation")
+                .jsonPath("$.status").isEqualTo("queued");
+
+        webTestClient.post()
+                .uri("/api/v1/videos/video_1/cancel")
+                .header(HttpHeaders.AUTHORIZATION, AUTHORIZATION)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.status").isEqualTo("cancelled");
     }
 
     @Test

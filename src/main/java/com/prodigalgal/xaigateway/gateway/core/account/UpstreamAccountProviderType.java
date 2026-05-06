@@ -5,7 +5,11 @@ import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 public enum UpstreamAccountProviderType {
     OPENAI_OAUTH(ProviderType.OPENAI_DIRECT),
     GEMINI_OAUTH(ProviderType.GEMINI_DIRECT),
-    CLAUDE_ACCOUNT(ProviderType.ANTHROPIC_DIRECT);
+    CLAUDE_ACCOUNT(ProviderType.ANTHROPIC_DIRECT),
+    CODEX_OAUTH(ProviderType.OPENAI_DIRECT),
+    ANTIGRAVITY_OAUTH(ProviderType.GEMINI_DIRECT),
+    COPILOT_OAUTH(ProviderType.OPENAI_DIRECT),
+    CLAUDE_PLAN(ProviderType.ANTHROPIC_DIRECT);
 
     private final ProviderType routeProviderType;
 

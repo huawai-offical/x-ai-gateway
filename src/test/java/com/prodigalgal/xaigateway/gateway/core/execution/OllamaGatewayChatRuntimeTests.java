@@ -26,20 +26,32 @@ import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.shared.ReasoningTransport;
 import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
+import java.net.URI;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.codec.HttpMessageWriter;
+import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.mock.http.client.reactive.MockClientHttpRequest;
 import org.springframework.web.reactive.function.client.ClientResponse;
+import org.springframework.web.reactive.function.BodyInserter;
+import org.springframework.web.reactive.function.client.ClientRequest;
 import org.springframework.web.reactive.function.client.ExchangeFunction;
+import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class OllamaGatewayChatRuntimeTests {
 
@@ -142,8 +154,73 @@ class OllamaGatewayChatRuntimeTests {
     }
 
     @Test
-    void shouldRejectDocumentInputForOllama() {
-        OllamaGatewayChatRuntime runtime = new OllamaGatewayChatRuntime(WebClient.builder(), objectMapper, Mockito.mock(GatewayFileService.class));
+    void shouldInjectTextDocumentInputForOllama() {
+        GatewayFileService gatewayFileService = Mockito.mock(GatewayFileService.class);
+        Mockito.when(gatewayFileService.getFileContent("doc-1", 1L))
+                .thenReturn(new GatewayFileContent(
+                        GatewayFileResponse.from("doc-1", "notes.md", null, 28, Instant.now(), "processed"),
+                        "第一行文档\nsecond line".getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                        "text/markdown"
+                ));
+        AtomicReference<String> capturedBody = new AtomicReference<>();
+        ExchangeFunction exchangeFunction = request -> {
+            capturedBody.set(extractBody(request));
+            return Mono.just(ClientResponse.create(HttpStatus.OK)
+                    .header("Content-Type", MediaType.APPLICATION_JSON_VALUE)
+                    .body("""
+                            {
+                              "message": {"content": "done"},
+                              "prompt_eval_count": 4,
+                              "eval_count": 1
+                            }
+                            """)
+                    .build());
+        };
+        OllamaGatewayChatRuntime runtime = new OllamaGatewayChatRuntime(
+                WebClient.builder().exchangeFunction(exchangeFunction),
+                objectMapper,
+                gatewayFileService
+        );
+        CanonicalRequest request = new CanonicalRequest(
+                "sk-gw-test",
+                CanonicalIngressProtocol.RESPONSES,
+                "/v1/responses",
+                "llama3",
+                List.of(new CanonicalMessage(
+                        CanonicalMessageRole.USER,
+                        List.of(
+                                CanonicalContentPart.text("请总结文档"),
+                                CanonicalContentPart.file("text/markdown", "gateway://doc-1", "notes.md")
+                        )
+                )),
+                List.of(),
+                null,
+                null,
+                null,
+                null,
+                null
+        );
+
+        CanonicalResponse result = runtime.execute(context(request));
+
+        assertEquals("done", result.outputText());
+        assertNotNull(capturedBody.get());
+        assertTrue(capturedBody.get().contains("请总结文档"));
+        assertTrue(capturedBody.get().contains("Ollama 文本文件: notes.md; mimeType=text/markdown"));
+        assertTrue(capturedBody.get().contains("第一行文档"));
+        Mockito.verify(gatewayFileService).getFileContent("doc-1", 1L);
+    }
+
+    @Test
+    void shouldRejectBinaryDocumentInputForOllama() {
+        GatewayFileService gatewayFileService = Mockito.mock(GatewayFileService.class);
+        Mockito.when(gatewayFileService.getFileContent("file-1", 1L))
+                .thenReturn(new GatewayFileContent(
+                        GatewayFileResponse.from("file-1", "demo.pdf", null, 4, Instant.now(), "processed"),
+                        "%PDF".getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                        "application/pdf"
+                ));
+        OllamaGatewayChatRuntime runtime = new OllamaGatewayChatRuntime(WebClient.builder(), objectMapper, gatewayFileService);
         CanonicalRequest request = new CanonicalRequest(
                 "sk-gw-test",
                 CanonicalIngressProtocol.RESPONSES,
@@ -164,7 +241,8 @@ class OllamaGatewayChatRuntimeTests {
                 null
         );
 
-        assertThrows(IllegalArgumentException.class, () -> runtime.execute(context(request)));
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> runtime.execute(context(request)));
+        assertTrue(exception.getMessage().contains("OLLAMA_UNSUPPORTED_FILE_TYPE"));
     }
 
     @Test
@@ -269,5 +347,27 @@ class OllamaGatewayChatRuntimeTests {
                 request,
                 null
         );
+    }
+
+    private String extractBody(ClientRequest request) {
+        MockClientHttpRequest mockRequest = new MockClientHttpRequest(request.method(), URI.create("https://example.com"));
+        request.headers().forEach((key, values) -> mockRequest.getHeaders().put(key, new ArrayList<>(values)));
+        request.body().insert(mockRequest, new BodyInserter.Context() {
+            @Override
+            public List<HttpMessageWriter<?>> messageWriters() {
+                return ExchangeStrategies.withDefaults().messageWriters();
+            }
+
+            @Override
+            public Optional<ServerHttpRequest> serverRequest() {
+                return Optional.empty();
+            }
+
+            @Override
+            public java.util.Map<String, Object> hints() {
+                return Collections.emptyMap();
+            }
+        }).block();
+        return mockRequest.getBodyAsString().block();
     }
 }

@@ -7,6 +7,9 @@ import com.prodigalgal.xaigateway.admin.api.GovernanceHealthScoreResponse;
 import com.prodigalgal.xaigateway.admin.api.QuarantineRecordResponse;
 import com.prodigalgal.xaigateway.admin.api.RouteGuardPolicyRequest;
 import com.prodigalgal.xaigateway.admin.api.RouteGuardPolicyResponse;
+import com.prodigalgal.xaigateway.admin.api.RoutingPolicyRuntimePlanResponse;
+import com.prodigalgal.xaigateway.admin.api.RoutingPolicyRuntimeStateResponse;
+import com.prodigalgal.xaigateway.admin.api.RoutingPolicySummaryResponse;
 import com.prodigalgal.xaigateway.admin.api.SiteHealthScoreResponse;
 import com.prodigalgal.xaigateway.admin.application.integrations.PlatformEventPublisher;
 import com.prodigalgal.xaigateway.admin.application.integrations.PlatformEventType;
@@ -20,6 +23,7 @@ import com.prodigalgal.xaigateway.gateway.core.governance.GovernanceTargetType;
 import com.prodigalgal.xaigateway.gateway.core.governance.QuarantineStatus;
 import com.prodigalgal.xaigateway.gateway.core.routing.CredentialHealthState;
 import com.prodigalgal.xaigateway.gateway.core.routing.HealthStateStore;
+import com.prodigalgal.xaigateway.gateway.core.routing.RoutingPolicyRuntimeEnforcementService;
 import com.prodigalgal.xaigateway.infra.persistence.entity.AutoActionRuleEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.QuarantineRecordEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.RouteGuardPolicyEntity;
@@ -39,6 +43,7 @@ import java.util.Objects;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
@@ -56,6 +61,36 @@ public class GovernanceAdminService {
     private final OpsAuditService opsAuditService;
     private final ObjectMapper objectMapper;
     private final PlatformEventPublisher platformEventPublisher;
+    private final RoutingPolicyRuntimeConfigService routingPolicyRuntimeConfigService;
+    private final RoutingPolicyRuntimeEnforcementService routingPolicyRuntimeEnforcementService;
+
+    @Autowired
+    public GovernanceAdminService(
+            RouteGuardPolicyRepository routeGuardPolicyRepository,
+            AutoActionRuleRepository autoActionRuleRepository,
+            QuarantineRecordRepository quarantineRecordRepository,
+            UpstreamCredentialRepository upstreamCredentialRepository,
+            UpstreamSiteProfileRepository upstreamSiteProfileRepository,
+            HealthStateStore healthStateStore,
+            GovernancePolicyEngine governancePolicyEngine,
+            OpsAuditService opsAuditService,
+            ObjectMapper objectMapper,
+            PlatformEventPublisher platformEventPublisher,
+            RoutingPolicyRuntimeConfigService routingPolicyRuntimeConfigService,
+            RoutingPolicyRuntimeEnforcementService routingPolicyRuntimeEnforcementService) {
+        this.routeGuardPolicyRepository = routeGuardPolicyRepository;
+        this.autoActionRuleRepository = autoActionRuleRepository;
+        this.quarantineRecordRepository = quarantineRecordRepository;
+        this.upstreamCredentialRepository = upstreamCredentialRepository;
+        this.upstreamSiteProfileRepository = upstreamSiteProfileRepository;
+        this.healthStateStore = healthStateStore;
+        this.governancePolicyEngine = governancePolicyEngine;
+        this.opsAuditService = opsAuditService;
+        this.objectMapper = objectMapper;
+        this.platformEventPublisher = platformEventPublisher;
+        this.routingPolicyRuntimeConfigService = routingPolicyRuntimeConfigService;
+        this.routingPolicyRuntimeEnforcementService = routingPolicyRuntimeEnforcementService;
+    }
 
     public GovernanceAdminService(
             RouteGuardPolicyRepository routeGuardPolicyRepository,
@@ -68,16 +103,20 @@ public class GovernanceAdminService {
             OpsAuditService opsAuditService,
             ObjectMapper objectMapper,
             PlatformEventPublisher platformEventPublisher) {
-        this.routeGuardPolicyRepository = routeGuardPolicyRepository;
-        this.autoActionRuleRepository = autoActionRuleRepository;
-        this.quarantineRecordRepository = quarantineRecordRepository;
-        this.upstreamCredentialRepository = upstreamCredentialRepository;
-        this.upstreamSiteProfileRepository = upstreamSiteProfileRepository;
-        this.healthStateStore = healthStateStore;
-        this.governancePolicyEngine = governancePolicyEngine;
-        this.opsAuditService = opsAuditService;
-        this.objectMapper = objectMapper;
-        this.platformEventPublisher = platformEventPublisher;
+        this(
+                routeGuardPolicyRepository,
+                autoActionRuleRepository,
+                quarantineRecordRepository,
+                upstreamCredentialRepository,
+                upstreamSiteProfileRepository,
+                healthStateStore,
+                governancePolicyEngine,
+                opsAuditService,
+                objectMapper,
+                platformEventPublisher,
+                null,
+                null
+        );
     }
 
     @Transactional(readOnly = true)
@@ -85,6 +124,77 @@ public class GovernanceAdminService {
         return routeGuardPolicyRepository.findAllByOrderByPriorityAscCreatedAtAsc().stream()
                 .map(this::toRouteGuardResponse)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public RoutingPolicySummaryResponse routingPolicySummary() {
+        List<RouteGuardPolicyEntity> entities = routeGuardPolicyRepository.findAllByOrderByPriorityAscCreatedAtAsc();
+        List<RouteGuardPolicyResponse> policies = entities.stream()
+                .map(this::toRouteGuardResponse)
+                .toList();
+        return new RoutingPolicySummaryResponse(
+                policies.size(),
+                (int) entities.stream().filter(RouteGuardPolicyEntity::isEnabled).count(),
+                countConfigured(entities, RouteGuardPolicyEntity::getRetryPolicy),
+                countConfigured(entities, RouteGuardPolicyEntity::getFallbackPolicy),
+                countConfigured(entities, RouteGuardPolicyEntity::getCircuitBreakerPolicy),
+                countConfigured(entities, RouteGuardPolicyEntity::getRateLimitPolicy),
+                policies
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public RoutingPolicyRuntimePlanResponse routingRuntimePlan() {
+        if (routingPolicyRuntimeConfigService == null) {
+            return new RoutingPolicyRuntimePlanResponse(
+                    3,
+                    false,
+                    List.of(),
+                    false,
+                    null,
+                    false,
+                    null,
+                    List.of(),
+                    List.of("RoutingPolicyRuntimeConfigService 未启用，返回默认 fallback 尝试次数。")
+            );
+        }
+        return routingPolicyRuntimeConfigService.runtimePlan(3);
+    }
+
+    @Transactional(readOnly = true)
+    public List<RoutingPolicyRuntimeStateResponse> routingRuntimeStates() {
+        if (routingPolicyRuntimeEnforcementService == null) {
+            return List.of();
+        }
+        return routingPolicyRuntimeEnforcementService.states();
+    }
+
+    public void resetRoutingRuntimeStates() {
+        if (routingPolicyRuntimeEnforcementService != null) {
+            routingPolicyRuntimeEnforcementService.reset();
+        }
+    }
+
+    public void resetRoutingRuntimeStates(String runtimeKey, Long policyId, String targetRef) {
+        if (routingPolicyRuntimeEnforcementService == null) {
+            return;
+        }
+        String resolvedRuntimeKey = resolveRuntimeKey(runtimeKey, policyId, targetRef);
+        if (resolvedRuntimeKey == null) {
+            routingPolicyRuntimeEnforcementService.reset();
+            return;
+        }
+        routingPolicyRuntimeEnforcementService.reset(resolvedRuntimeKey);
+    }
+
+    private String resolveRuntimeKey(String runtimeKey, Long policyId, String targetRef) {
+        if (runtimeKey != null && !runtimeKey.isBlank()) {
+            return runtimeKey.trim();
+        }
+        if (policyId != null && targetRef != null && !targetRef.isBlank()) {
+            return "policy:" + policyId + ":" + targetRef.trim();
+        }
+        return null;
     }
 
     public RouteGuardPolicyResponse saveRouteGuard(Long id, RouteGuardPolicyRequest request) {
@@ -105,11 +215,19 @@ public class GovernanceAdminService {
         entity.setPriority(request.priority() == null ? 100 : request.priority());
         entity.setEnabled(request.enabled() == null || request.enabled());
         entity.setDescription(blankToNull(request.description()));
+        entity.setRetryPolicy(blankToNull(request.retryPolicy()));
+        entity.setFallbackPolicy(blankToNull(request.fallbackPolicy()));
+        entity.setCircuitBreakerPolicy(blankToNull(request.circuitBreakerPolicy()));
+        entity.setRateLimitPolicy(blankToNull(request.rateLimitPolicy()));
         RouteGuardPolicyEntity saved = routeGuardPolicyRepository.save(entity);
         opsAuditService.record("GOVERNANCE", id == null ? "ROUTE_GUARD_CREATED" : "ROUTE_GUARD_UPDATED", "ROUTE_GUARD", String.valueOf(saved.getId()), writeAuditDetail(Map.of(
                 "targetType", saved.getTargetType().name(),
                 "policyMode", saved.getPolicyMode().name(),
-                "actionType", saved.getActionType().name()
+                "actionType", saved.getActionType().name(),
+                "retryPolicyConfigured", saved.getRetryPolicy() != null,
+                "fallbackPolicyConfigured", saved.getFallbackPolicy() != null,
+                "circuitBreakerPolicyConfigured", saved.getCircuitBreakerPolicy() != null,
+                "rateLimitPolicyConfigured", saved.getRateLimitPolicy() != null
         )));
         return toRouteGuardResponse(saved);
     }
@@ -495,6 +613,10 @@ public class GovernanceAdminService {
                 entity.getPriority(),
                 entity.isEnabled(),
                 entity.getDescription(),
+                entity.getRetryPolicy(),
+                entity.getFallbackPolicy(),
+                entity.getCircuitBreakerPolicy(),
+                entity.getRateLimitPolicy(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
         );
@@ -550,6 +672,13 @@ public class GovernanceAdminService {
 
     private String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private int countConfigured(List<RouteGuardPolicyEntity> entities, java.util.function.Function<RouteGuardPolicyEntity, String> extractor) {
+        return (int) entities.stream()
+                .map(extractor)
+                .filter(value -> value != null && !value.isBlank())
+                .count();
     }
 
     private String normalizeUpper(String value) {

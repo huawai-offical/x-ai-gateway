@@ -2,6 +2,9 @@ package com.prodigalgal.xaigateway.admin.application;
 
 import com.prodigalgal.xaigateway.admin.api.DistributedKeyCreateResponse;
 import com.prodigalgal.xaigateway.admin.api.DistributedKeyClientConfigResponse;
+import com.prodigalgal.xaigateway.admin.api.DistributedKeyOnboardingDeepLinkResponse;
+import com.prodigalgal.xaigateway.admin.api.DistributedKeyOnboardingPackResponse;
+import com.prodigalgal.xaigateway.admin.api.DistributedKeyOnboardingSnippetResponse;
 import com.prodigalgal.xaigateway.admin.api.DistributedKeyRequest;
 import com.prodigalgal.xaigateway.admin.api.DistributedKeyResponse;
 import com.prodigalgal.xaigateway.admin.api.DistributedKeySecretExportGrantResponse;
@@ -19,6 +22,8 @@ import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyBin
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeySecretExportGrantRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayUserRepository;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -147,6 +152,82 @@ public class DistributedKeyAdminService {
         );
     }
 
+    public DistributedKeyOnboardingPackResponse exportOnboardingPack(Long id, String baseUrl) {
+        DistributedKeyEntity entity = getRequired(id);
+        String normalizedBaseUrl = normalizeBaseUrl(baseUrl);
+        String apiBaseUrl = normalizedBaseUrl + "/v1";
+        String maskedKey = maskedKey(entity);
+        String secretPlaceholder = "<仅创建或轮换时展示一次；当前为 " + maskedKey + ">";
+        List<DistributedKeyOnboardingSnippetResponse> clientConfigs = List.of(
+                snippet("Codex config.toml", GatewayClientFamily.CODEX, "config_toml", normalizedBaseUrl, secretPlaceholder),
+                snippet("Claude Code shell env", GatewayClientFamily.CLAUDE_CODE, "env", normalizedBaseUrl, secretPlaceholder),
+                snippet("Gemini CLI shell env", GatewayClientFamily.GEMINI_CLI, "env", normalizedBaseUrl, secretPlaceholder),
+                snippet("OpenCode config.toml", GatewayClientFamily.OPENCODE, "config_toml", normalizedBaseUrl, secretPlaceholder),
+                snippet("OpenClaw config.toml", GatewayClientFamily.OPENCLAW, "config_toml", normalizedBaseUrl, secretPlaceholder),
+                snippet("Cursor OpenAI-compatible env", GatewayClientFamily.CURSOR, "env", normalizedBaseUrl, secretPlaceholder),
+                snippet("Windsurf OpenAI-compatible env", GatewayClientFamily.WINDSURF, "env", normalizedBaseUrl, secretPlaceholder),
+                snippet("Kiro OpenAI-compatible env", GatewayClientFamily.KIRO, "env", normalizedBaseUrl, secretPlaceholder),
+                snippet("GitHub Copilot-compatible env", GatewayClientFamily.GITHUB_COPILOT, "env", normalizedBaseUrl, secretPlaceholder),
+                snippet("curl smoke", GatewayClientFamily.GENERIC_OPENAI, "curl", normalizedBaseUrl, secretPlaceholder)
+        );
+        List<DistributedKeyOnboardingDeepLinkResponse> deepLinks = List.of(
+                new DistributedKeyOnboardingDeepLinkResponse(
+                        "xag scheme import",
+                        "xag",
+                        "xag://import/client-config?keyName=" + encode(entity.getKeyName())
+                                + "&baseUrl=" + encode(apiBaseUrl)
+                                + "&secret=one-time-or-local-secret"
+                                + "&maskedKey=" + encode(maskedKey),
+                        "Deep Link 不携带完整 secret；用户只导入云端 endpoint 元数据，不需要本地 proxy。"
+                ),
+                new DistributedKeyOnboardingDeepLinkResponse(
+                        "HTTPS import",
+                        "https",
+                        normalizedBaseUrl + "/portal/client-import?keyName=" + encode(entity.getKeyName())
+                                + "&baseUrl=" + encode(apiBaseUrl),
+                        "HTTPS 导入入口只传递配置元数据，完整 secret 仍遵循一次性导出策略。"
+                )
+        );
+        recordClientConfigExport(entity, "onboarding_pack", "MULTI_CLI", normalizedBaseUrl, "masked_only");
+        return new DistributedKeyOnboardingPackResponse(
+                entity.getKeyName(),
+                maskedKey,
+                normalizedBaseUrl,
+                apiBaseUrl,
+                "完整 secret 仅在创建或轮换后通过一次性 token 消费；接入包默认只返回 masked key 占位。",
+                clientConfigs,
+                deepLinks,
+                buildMcpServerConfig(apiBaseUrl, secretPlaceholder),
+                List.of(
+                        "将当前 CLI/AI IDE 统一接入云端 x-ai-gateway endpoint，并优先使用公开模型别名。",
+                        "通过 X-AI-Gateway-Client-Family、X-AI-Gateway-Client-Instance、X-AI-Gateway-Workspace-Hint 标记客户端来源。",
+                        "当请求失败时，先读取 response error_code，再查看 /admin/observability/traces/{requestId}。",
+                        "需要图片、音频、视频或文件能力时，先确认 provider capability matrix 是否标记为 NATIVE。"
+                ),
+                List.of(
+                        "client-config-export：复制或下载当前客户端配置片段。",
+                        "cloud-cli-request-filter：在云端执行 replace/remove/mask 请求过滤，不读取用户本地 workspace。",
+                        "gateway-trace-reader：根据 requestId 拉取 trace、route decision、cache hit 和 usage。",
+                        "provider-smoke-runner：用 curl smoke 示例验证 baseUrl、secret 和模型别名。"
+                ),
+                List.of(
+                        "curl " + apiBaseUrl + "/chat/completions -H \"Authorization: Bearer " + secretPlaceholder
+                                + "\" -H \"Content-Type: application/json\" -d '{\"model\":\"gpt-4o-mini\",\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}]}'",
+                        "curl " + normalizedBaseUrl + "/actuator/health/readiness",
+                        "curl " + normalizedBaseUrl + "/admin/observability/summary"
+                ),
+                List.of(
+                        "401：检查 secret 是否为完整值，不要把 masked key 当成真实 key 使用。",
+                        "404：确认 baseUrl 是否带了重复 /v1；接入包中的 apiBaseUrl 已经包含 /v1。",
+                        "客户端命中错误账号池：检查 X-AI-Gateway-Client-Family 与 key/access group/account pool 的 allowedClientFamilies。",
+                        "request filter 未命中：检查 gateway.cli.request-filter.enabled、rule.action、clientFamilies、role 与 contains。",
+                        "模型不可用：查看 key 的 allowedModels、allowedProviderTypes 与 route policy runtime state。",
+                        "Claude/Gemini CLI 自定义 base URL 不兼容时，改用 OpenAI-compatible 客户端或 OpenCode/OpenClaw 配置。"
+                ),
+                Instant.now()
+        );
+    }
+
     public DistributedKeyClientConfigResponse consumeOneTimeClientConfig(
             Long id,
             String grantToken,
@@ -207,39 +288,8 @@ public class DistributedKeyAdminService {
             String apiKey,
             String warning) {
         String apiBaseUrl = normalizedBaseUrl + "/v1";
-        String config = switch (normalizedFormat) {
-            case "auth_json" -> """
-                    {
-                      "OPENAI_API_KEY": "%s",
-                      "OPENAI_BASE_URL": "%s",
-                      "X_AI_GATEWAY_API_KEY": "%s"
-                    }
-                    """.formatted(apiKey, apiBaseUrl, apiKey).trim();
-            case "env" -> """
-                    export OPENAI_API_KEY="%s"
-                    export OPENAI_BASE_URL="%s"
-                    export X_AI_GATEWAY_API_KEY="%s"
-                    """.formatted(apiKey, apiBaseUrl, apiKey).trim();
-            case "curl" -> """
-                    curl %s/chat/completions \\
-                      -H "Authorization: Bearer %s" \\
-                      -H "Content-Type: application/json" \\
-                      -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"ping"}]}'
-                    """.formatted(apiBaseUrl, apiKey).trim();
-            default -> """
-                    [model_providers.x-ai-gateway]
-                    name = "x-ai-gateway"
-                    base_url = "%s"
-                    env_key = "X_AI_GATEWAY_API_KEY"
-                    wire_api = "chat"
-
-                    # 将下方值写入安全的 secret manager；普通导出只会给出占位符。
-                    api_key = "%s"
-                    """.formatted(apiBaseUrl, apiKey).trim();
-        };
-        String maskedKey = entity.getMaskedKey() == null || entity.getMaskedKey().isBlank()
-                ? entity.getKeyPrefix() + "..."
-                : entity.getMaskedKey();
+        String config = renderClientConfig(normalizedFormat, normalizedClientFamily, normalizedBaseUrl, apiKey);
+        String maskedKey = maskedKey(entity);
         return new DistributedKeyClientConfigResponse(
                 entity.getKeyName(),
                 normalizedClientFamily,
@@ -248,6 +298,69 @@ public class DistributedKeyAdminService {
                 warning,
                 config
         );
+    }
+
+    private String renderClientConfig(
+            String normalizedFormat,
+            String normalizedClientFamily,
+            String normalizedBaseUrl,
+            String apiKey) {
+        String apiBaseUrl = normalizedBaseUrl + "/v1";
+        return switch (normalizedFormat) {
+            case "auth_json" -> """
+                    {
+                      "OPENAI_API_KEY": "%s",
+                      "OPENAI_BASE_URL": "%s",
+                      "X_AI_GATEWAY_API_KEY": "%s",
+                      "X_AI_GATEWAY_CLIENT_FAMILY": "%s",
+                      "X_AI_GATEWAY_CLIENT_INSTANCE": "default",
+                      "X_AI_GATEWAY_WORKSPACE_HINT": "default"
+                    }
+                    """.formatted(apiKey, apiBaseUrl, apiKey, normalizedClientFamily).trim();
+            case "env" -> """
+                    export OPENAI_API_KEY="%s"
+                    export OPENAI_BASE_URL="%s"
+                    export X_AI_GATEWAY_API_KEY="%s"
+                    export X_AI_GATEWAY_CLIENT_FAMILY="%s"
+                    export X_AI_GATEWAY_CLIENT_INSTANCE="default"
+                    export X_AI_GATEWAY_WORKSPACE_HINT="default"
+                    export ANTHROPIC_API_KEY="%s"
+                    export ANTHROPIC_BASE_URL="%s"
+                    export GEMINI_API_KEY="%s"
+                    export GEMINI_BASE_URL="%s"
+                    """.formatted(
+                            apiKey,
+                            apiBaseUrl,
+                            apiKey,
+                            normalizedClientFamily,
+                            apiKey,
+                            apiBaseUrl,
+                            apiKey,
+                            apiBaseUrl
+                    ).trim();
+            case "curl" -> """
+                    curl %s/chat/completions \\
+                      -H "Authorization: Bearer %s" \\
+                      -H "Content-Type: application/json" \\
+                      -H "X-AI-Gateway-Client-Family: %s" \\
+                      -H "X-AI-Gateway-Client-Instance: default" \\
+                      -H "X-AI-Gateway-Workspace-Hint: default" \\
+                      -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"ping"}]}'
+                    """.formatted(apiBaseUrl, apiKey, normalizedClientFamily).trim();
+            default -> """
+                    [model_providers.x-ai-gateway]
+                    name = "x-ai-gateway"
+                    base_url = "%s"
+                    env_key = "X_AI_GATEWAY_API_KEY"
+                    wire_api = "chat"
+                    client_family = "%s"
+                    client_instance = "default"
+                    workspace_hint = "default"
+
+                    # 将下方值写入安全的 secret manager；普通导出只会给出占位符。
+                    api_key = "%s"
+                    """.formatted(apiBaseUrl, normalizedClientFamily, apiKey).trim();
+        };
     }
 
     private DistributedKeyEntity getRequired(Long id) {
@@ -400,6 +513,51 @@ public class DistributedKeyAdminService {
             return value.substring(0, value.length() - 3);
         }
         return value;
+    }
+
+    private DistributedKeyOnboardingSnippetResponse snippet(
+            String name,
+            GatewayClientFamily clientFamily,
+            String format,
+            String normalizedBaseUrl,
+            String apiKey) {
+        String normalizedFormat = normalizeConfigFormat(format);
+        return new DistributedKeyOnboardingSnippetResponse(
+                name,
+                clientFamily.name(),
+                normalizedFormat,
+                renderClientConfig(normalizedFormat, clientFamily.name(), normalizedBaseUrl, apiKey)
+        );
+    }
+
+    private String buildMcpServerConfig(String apiBaseUrl, String apiKey) {
+        return """
+                {
+                  "mcpServers": {
+                    "x-ai-gateway": {
+                      "command": "npx",
+                      "args": ["-y", "@modelcontextprotocol/server-openapi", "%s/openapi.json"],
+                      "env": {
+                        "X_AI_GATEWAY_API_KEY": "%s",
+                        "OPENAI_BASE_URL": "%s"
+                      }
+                    }
+                  }
+                }
+                """.formatted(apiBaseUrl, apiKey, apiBaseUrl).trim();
+    }
+
+    private String maskedKey(DistributedKeyEntity entity) {
+        return entity.getMaskedKey() == null || entity.getMaskedKey().isBlank()
+                ? entity.getKeyPrefix() + "..."
+                : entity.getMaskedKey();
+    }
+
+    private String encode(String value) {
+        if (value == null) {
+            return "";
+        }
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 
     private void recordClientConfigExport(

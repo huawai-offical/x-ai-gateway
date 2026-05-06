@@ -68,6 +68,10 @@ gateway:
   routing:
     interop-plan-enabled: true
     route-decision-logging-enabled: true
+    runtime-store:
+      type: ${GATEWAY_ROUTING_RUNTIME_STORE_TYPE:memory}
+      key-prefix: ${GATEWAY_ROUTING_RUNTIME_STORE_KEY_PREFIX:}
+      fallback-to-memory: ${GATEWAY_ROUTING_RUNTIME_STORE_FALLBACK_TO_MEMORY:true}
   cache:
     enabled: true
     sticky-by-distributed-key: true
@@ -82,6 +86,20 @@ gateway:
     encryption-key: ${GATEWAY_ENCRYPTION_KEY:change-me-local-only}
   storage:
     file-root: ${GATEWAY_FILE_ROOT:.data/files}
+  oauth:
+    social-jwks-cache-ttl: ${GATEWAY_SOCIAL_JWKS_CACHE_TTL:PT30M}
+    google-social-client-id: ${GATEWAY_GOOGLE_SOCIAL_CLIENT_ID:}
+    google-social-client-secret: ${GATEWAY_GOOGLE_SOCIAL_CLIENT_SECRET:}
+    github-social-client-id: ${GATEWAY_GITHUB_SOCIAL_CLIENT_ID:}
+    github-social-client-secret: ${GATEWAY_GITHUB_SOCIAL_CLIENT_SECRET:}
+    qq-social-client-id: ${GATEWAY_QQ_SOCIAL_CLIENT_ID:}
+    qq-social-client-secret: ${GATEWAY_QQ_SOCIAL_CLIENT_SECRET:}
+    wechat-social-client-id: ${GATEWAY_WECHAT_SOCIAL_CLIENT_ID:}
+    wechat-social-client-secret: ${GATEWAY_WECHAT_SOCIAL_CLIENT_SECRET:}
+    meta-social-client-id: ${GATEWAY_META_SOCIAL_CLIENT_ID:}
+    meta-social-client-secret: ${GATEWAY_META_SOCIAL_CLIENT_SECRET:}
+    x-social-client-id: ${GATEWAY_X_SOCIAL_CLIENT_ID:}
+    x-social-client-secret: ${GATEWAY_X_SOCIAL_CLIENT_SECRET:}
   observability:
     async:
       enabled: ${GATEWAY_OBSERVABILITY_ASYNC_ENABLED:true}

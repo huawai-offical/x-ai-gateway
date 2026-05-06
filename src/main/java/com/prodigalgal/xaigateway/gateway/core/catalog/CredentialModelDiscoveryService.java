@@ -396,6 +396,9 @@ public class CredentialModelDiscoveryService {
         if (siteKind == UpstreamSiteKind.AZURE_OPENAI) {
             return "/openai/models?api-version=2024-10-21";
         }
+        if (siteKind == UpstreamSiteKind.VOLCENGINE) {
+            return "/api/v3/models";
+        }
         URI uri = URI.create(normalizeBaseUrl(baseUrl));
         return uri.getPath() != null && uri.getPath().endsWith("/v1") ? "/models" : "/v1/models";
     }

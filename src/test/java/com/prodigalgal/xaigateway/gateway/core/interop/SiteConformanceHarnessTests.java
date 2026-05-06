@@ -275,6 +275,11 @@ class SiteConformanceHarnessTests {
         if ("/v1/moderations".equals(fixture.requestPath())) {
             root.put("input", "hi");
         }
+        if ("/v1/rerank".equals(fixture.requestPath())) {
+            root.put("query", "hi");
+            root.putArray("documents").add("hello").add("world");
+            return root;
+        }
         if ("/v1/embeddings".equals(fixture.requestPath())) {
             root.put("input", "hi");
             return root;

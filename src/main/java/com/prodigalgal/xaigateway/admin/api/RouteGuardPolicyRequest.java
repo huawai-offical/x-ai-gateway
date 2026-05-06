@@ -20,6 +20,10 @@ public record RouteGuardPolicyRequest(
         Integer ttlSeconds,
         Integer priority,
         Boolean enabled,
-        String description
+        String description,
+        String retryPolicy,
+        String fallbackPolicy,
+        String circuitBreakerPolicy,
+        String rateLimitPolicy
 ) {
 }

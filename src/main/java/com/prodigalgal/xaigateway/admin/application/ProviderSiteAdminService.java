@@ -1,6 +1,8 @@
 package com.prodigalgal.xaigateway.admin.application;
 
 import com.prodigalgal.xaigateway.admin.api.CapabilityMatrixRowResponse;
+import com.prodigalgal.xaigateway.admin.api.ProviderSitePresetImportRequest;
+import com.prodigalgal.xaigateway.admin.api.ProviderSitePresetResponse;
 import com.prodigalgal.xaigateway.admin.api.ProviderSiteRequest;
 import com.prodigalgal.xaigateway.admin.api.ProviderSiteResponse;
 import com.prodigalgal.xaigateway.admin.api.SiteModelCapabilityResponse;
@@ -48,6 +50,7 @@ public class ProviderSiteAdminService {
     private final CredentialModelDiscoveryService credentialModelDiscoveryService;
     private final SiteCapabilityTruthService siteCapabilityTruthService;
     private final ExecutionBackendPolicyService executionBackendPolicyService;
+    private final SecurityPolicyService securityPolicyService;
 
     @Autowired
     public ProviderSiteAdminService(
@@ -58,7 +61,8 @@ public class ProviderSiteAdminService {
             ProviderSiteRegistryService providerSiteRegistryService,
             CredentialModelDiscoveryService credentialModelDiscoveryService,
             SiteCapabilityTruthService siteCapabilityTruthService,
-            ExecutionBackendPolicyService executionBackendPolicyService) {
+            ExecutionBackendPolicyService executionBackendPolicyService,
+            SecurityPolicyService securityPolicyService) {
         this.upstreamSiteProfileRepository = upstreamSiteProfileRepository;
         this.siteCapabilitySnapshotRepository = siteCapabilitySnapshotRepository;
         this.siteModelCapabilityRepository = siteModelCapabilityRepository;
@@ -67,6 +71,7 @@ public class ProviderSiteAdminService {
         this.credentialModelDiscoveryService = credentialModelDiscoveryService;
         this.siteCapabilityTruthService = siteCapabilityTruthService;
         this.executionBackendPolicyService = executionBackendPolicyService;
+        this.securityPolicyService = securityPolicyService;
     }
 
     public ProviderSiteAdminService(
@@ -85,7 +90,30 @@ public class ProviderSiteAdminService {
                 providerSiteRegistryService,
                 credentialModelDiscoveryService,
                 siteCapabilityTruthService,
-                new ExecutionBackendPolicyService()
+                new ExecutionBackendPolicyService(),
+                null
+        );
+    }
+
+    public ProviderSiteAdminService(
+            UpstreamSiteProfileRepository upstreamSiteProfileRepository,
+            SiteCapabilitySnapshotRepository siteCapabilitySnapshotRepository,
+            SiteModelCapabilityRepository siteModelCapabilityRepository,
+            UpstreamCredentialRepository upstreamCredentialRepository,
+            ProviderSiteRegistryService providerSiteRegistryService,
+            CredentialModelDiscoveryService credentialModelDiscoveryService,
+            SiteCapabilityTruthService siteCapabilityTruthService,
+            ExecutionBackendPolicyService executionBackendPolicyService) {
+        this(
+                upstreamSiteProfileRepository,
+                siteCapabilitySnapshotRepository,
+                siteModelCapabilityRepository,
+                upstreamCredentialRepository,
+                providerSiteRegistryService,
+                credentialModelDiscoveryService,
+                siteCapabilityTruthService,
+                executionBackendPolicyService,
+                null
         );
     }
 
@@ -106,6 +134,22 @@ public class ProviderSiteAdminService {
         UpstreamSiteProfileEntity entity = new UpstreamSiteProfileEntity();
         apply(entity, request);
         return toResponse(upstreamSiteProfileRepository.save(entity));
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProviderSitePresetResponse> listPresets() {
+        return providerSiteRegistryService.listPresets();
+    }
+
+    @Transactional(readOnly = true)
+    public ProviderSitePresetResponse getPreset(String code) {
+        return providerSiteRegistryService.getPreset(code);
+    }
+
+    public ProviderSiteResponse importPreset(String code, ProviderSitePresetImportRequest request) {
+        boolean active = request == null || request.active() == null || request.active();
+        boolean refreshCapabilities = request == null || request.refreshCapabilities() == null || request.refreshCapabilities();
+        return toResponse(providerSiteRegistryService.importPreset(code, active, refreshCapabilities));
     }
 
     public ProviderSiteResponse update(Long id, ProviderSiteRequest request) {
@@ -276,6 +320,8 @@ public class ProviderSiteAdminService {
         return switch (entity.getSiteKind()) {
             case ANTHROPIC_DIRECT -> "anthropic_native";
             case GEMINI_DIRECT, VERTEX_AI -> "google_native";
+            case DIFY -> "dify-compatible";
+            case COHERE, JINA -> "rerank";
             default -> "openai";
         };
     }
@@ -312,17 +358,30 @@ public class ProviderSiteAdminService {
             UpstreamSiteProfileEntity entity,
             SiteCapabilitySnapshotEntity snapshot) {
         return Map.ofEntries(
+                Map.entry(InteropFeature.CHAT_TEXT.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.CHAT_TEXT))),
+                Map.entry(InteropFeature.TOOLS.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.TOOLS))),
+                Map.entry(InteropFeature.IMAGE_INPUT.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.IMAGE_INPUT))),
+                Map.entry(InteropFeature.FILE_INPUT.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.FILE_INPUT))),
                 Map.entry(InteropFeature.RESPONSE_OBJECT.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.RESPONSE_OBJECT))),
                 Map.entry(InteropFeature.EMBEDDINGS.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.EMBEDDINGS))),
+                Map.entry(InteropFeature.REASONING.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.REASONING))),
                 Map.entry(InteropFeature.AUDIO_TRANSCRIPTION.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.AUDIO_TRANSCRIPTION))),
+                Map.entry(InteropFeature.AUDIO_TRANSLATION.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.AUDIO_TRANSLATION))),
+                Map.entry(InteropFeature.AUDIO_SPEECH.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.AUDIO_SPEECH))),
                 Map.entry(InteropFeature.IMAGE_GENERATION.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.IMAGE_GENERATION))),
+                Map.entry(InteropFeature.IMAGE_EDIT.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.IMAGE_EDIT))),
+                Map.entry(InteropFeature.IMAGE_VARIATION.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.IMAGE_VARIATION))),
                 Map.entry(InteropFeature.MODERATION.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.MODERATION))),
                 Map.entry(InteropFeature.FILE_OBJECT.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.FILE_OBJECT))),
                 Map.entry(InteropFeature.UPLOAD_CREATE.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.UPLOAD_CREATE))),
                 Map.entry(InteropFeature.BATCH_CREATE.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.BATCH_CREATE))),
                 Map.entry(InteropFeature.ANTHROPIC_MESSAGE_BATCH.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.ANTHROPIC_MESSAGE_BATCH))),
                 Map.entry(InteropFeature.TUNING_CREATE.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.TUNING_CREATE))),
-                Map.entry(InteropFeature.REALTIME_CLIENT_SECRET.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.REALTIME_CLIENT_SECRET)))
+                Map.entry(InteropFeature.REALTIME_CLIENT_SECRET.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.REALTIME_CLIENT_SECRET))),
+                Map.entry(InteropFeature.RERANK.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.RERANK))),
+                Map.entry(InteropFeature.VIDEO_GENERATION.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.VIDEO_GENERATION))),
+                Map.entry(InteropFeature.MUSIC_GENERATION.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.MUSIC_GENERATION))),
+                Map.entry(InteropFeature.WEB_SEARCH.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.WEB_SEARCH)))
         );
     }
 
@@ -437,6 +496,42 @@ public class ProviderSiteAdminService {
                         TranslationResourceType.REALTIME,
                         TranslationOperation.REALTIME_CLIENT_SECRET_CREATE,
                         List.of(InteropFeature.REALTIME_CLIENT_SECRET)
+                )),
+                Map.entry("rerank_create", toSurface(
+                        entity,
+                        snapshot,
+                        "openai",
+                        "/v1/rerank",
+                        TranslationResourceType.RERANK,
+                        TranslationOperation.RERANK_CREATE,
+                        List.of(InteropFeature.RERANK)
+                )),
+                Map.entry("video_generation_create", toSurface(
+                        entity,
+                        snapshot,
+                        "openai",
+                        "/v1/videos/generations",
+                        TranslationResourceType.VIDEO,
+                        TranslationOperation.VIDEO_GENERATION_CREATE,
+                        List.of(InteropFeature.VIDEO_GENERATION, InteropFeature.ASYNC_TASK)
+                )),
+                Map.entry("music_generation_create", toSurface(
+                        entity,
+                        snapshot,
+                        "openai",
+                        "/v1/music/generations",
+                        TranslationResourceType.MUSIC,
+                        TranslationOperation.MUSIC_GENERATION_CREATE,
+                        List.of(InteropFeature.MUSIC_GENERATION, InteropFeature.ASYNC_TASK)
+                )),
+                Map.entry("web_search_create", toSurface(
+                        entity,
+                        snapshot,
+                        "openai",
+                        "/v1/web_search",
+                        TranslationResourceType.WEB_SEARCH,
+                        TranslationOperation.WEB_SEARCH_CREATE,
+                        List.of(InteropFeature.WEB_SEARCH)
                 ))
         );
     }
@@ -599,6 +694,9 @@ public class ProviderSiteAdminService {
 
     private void apply(UpstreamSiteProfileEntity entity, ProviderSiteRequest request) {
         var policy = providerSiteRegistryService.policy(request.siteKind());
+        if (securityPolicyService != null) {
+            securityPolicyService.assertUrlAllowed(request.baseUrlPattern());
+        }
         entity.setProfileCode(request.profileCode().trim());
         entity.setDisplayName(request.displayName().trim());
         entity.setProviderFamily(policy.providerFamily());

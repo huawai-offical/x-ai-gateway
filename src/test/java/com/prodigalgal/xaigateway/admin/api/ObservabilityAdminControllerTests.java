@@ -1,6 +1,7 @@
 package com.prodigalgal.xaigateway.admin.api;
 
 import com.prodigalgal.xaigateway.admin.application.ObservabilityQueryService;
+import com.prodigalgal.xaigateway.admin.application.MonitoringBillingRollupService;
 import com.prodigalgal.xaigateway.gateway.core.resource.GatewayAsyncResourceType;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.testsupport.PermitAllSecurityTestConfig;
@@ -23,6 +24,9 @@ class ObservabilityAdminControllerTests {
 
     @MockitoBean
     private ObservabilityQueryService observabilityQueryService;
+
+    @MockitoBean
+    private MonitoringBillingRollupService monitoringBillingRollupService;
 
     @Test
     void shouldReturnRouteDecisionLogs() {

@@ -118,8 +118,8 @@ public class CredentialMaterialResolver {
             return CredentialAuthKind.defaultValue(fallback);
         }
         return switch (providerType) {
-            case GEMINI_OAUTH -> CredentialAuthKind.GOOGLE_ACCESS_TOKEN;
-            case OPENAI_OAUTH, CLAUDE_ACCOUNT -> CredentialAuthKind.ACCESS_TOKEN;
+            case GEMINI_OAUTH, ANTIGRAVITY_OAUTH -> CredentialAuthKind.GOOGLE_ACCESS_TOKEN;
+            case OPENAI_OAUTH, CLAUDE_ACCOUNT, CODEX_OAUTH, COPILOT_OAUTH, CLAUDE_PLAN -> CredentialAuthKind.ACCESS_TOKEN;
         };
     }
 

@@ -78,6 +78,12 @@ class SystemSettingsAdminControllerTests {
                         180000,
                         600000
                 ),
+                new SystemSettingsResponse.SecuritySettingsResponse(
+                        true,
+                        false,
+                        java.util.List.of("api.openai.com"),
+                        java.util.List.of("blocked")
+                ),
                 Instant.parse("2026-04-07T08:00:00Z")
         );
     }

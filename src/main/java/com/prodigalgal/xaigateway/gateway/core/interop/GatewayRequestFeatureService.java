@@ -238,6 +238,36 @@ public class GatewayRequestFeatureService {
         if ("POST".equals(method) && "/v1/moderations".equals(normalizedPath)) {
             return semantics("moderations", normalizedPath, TranslationResourceType.MODERATION, TranslationOperation.MODERATION_CREATE, List.of(InteropFeature.MODERATION), RouteSelectionMode.CATALOG_SELECTION);
         }
+        if ("POST".equals(method) && "/v1/rerank".equals(normalizedPath)) {
+            return semantics("rerank", normalizedPath, TranslationResourceType.RERANK, TranslationOperation.RERANK_CREATE, List.of(InteropFeature.RERANK), RouteSelectionMode.CATALOG_SELECTION);
+        }
+        if ("POST".equals(method) && "/v1/videos/generations".equals(normalizedPath)) {
+            return semantics("videos", normalizedPath, TranslationResourceType.VIDEO, TranslationOperation.VIDEO_GENERATION_CREATE, List.of(InteropFeature.VIDEO_GENERATION, InteropFeature.ASYNC_TASK), RouteSelectionMode.CATALOG_SELECTION);
+        }
+        if ("GET".equals(method) && "/v1/videos/{taskId}".equals(normalizedPath)) {
+            return semantics("videos", normalizedPath, TranslationResourceType.VIDEO, TranslationOperation.VIDEO_GENERATION_GET, List.of(InteropFeature.ASYNC_TASK), RouteSelectionMode.STORED_LINEAGE);
+        }
+        if ("POST".equals(method) && "/v1/videos/{taskId}/cancel".equals(normalizedPath)) {
+            return semantics("videos", normalizedPath, TranslationResourceType.VIDEO, TranslationOperation.VIDEO_GENERATION_CANCEL, List.of(InteropFeature.ASYNC_TASK), RouteSelectionMode.STORED_LINEAGE);
+        }
+        if ("POST".equals(method) && "/v1/music/generations".equals(normalizedPath)) {
+            return semantics("music", normalizedPath, TranslationResourceType.MUSIC, TranslationOperation.MUSIC_GENERATION_CREATE, List.of(InteropFeature.MUSIC_GENERATION, InteropFeature.ASYNC_TASK), RouteSelectionMode.CATALOG_SELECTION);
+        }
+        if ("GET".equals(method) && "/v1/music/{taskId}".equals(normalizedPath)) {
+            return semantics("music", normalizedPath, TranslationResourceType.MUSIC, TranslationOperation.MUSIC_GENERATION_GET, List.of(InteropFeature.ASYNC_TASK), RouteSelectionMode.STORED_LINEAGE);
+        }
+        if ("POST".equals(method) && "/v1/music/{taskId}/cancel".equals(normalizedPath)) {
+            return semantics("music", normalizedPath, TranslationResourceType.MUSIC, TranslationOperation.MUSIC_GENERATION_CANCEL, List.of(InteropFeature.ASYNC_TASK), RouteSelectionMode.STORED_LINEAGE);
+        }
+        if ("GET".equals(method) && "/v1/tasks/{taskId}".equals(normalizedPath)) {
+            return semantics("tasks", normalizedPath, TranslationResourceType.TASK, TranslationOperation.TASK_GET, List.of(InteropFeature.ASYNC_TASK), RouteSelectionMode.STORED_LINEAGE);
+        }
+        if ("POST".equals(method) && "/v1/tasks/{taskId}/cancel".equals(normalizedPath)) {
+            return semantics("tasks", normalizedPath, TranslationResourceType.TASK, TranslationOperation.TASK_CANCEL, List.of(InteropFeature.ASYNC_TASK), RouteSelectionMode.STORED_LINEAGE);
+        }
+        if ("POST".equals(method) && "/v1/web_search".equals(normalizedPath)) {
+            return semantics("web_search", normalizedPath, TranslationResourceType.WEB_SEARCH, TranslationOperation.WEB_SEARCH_CREATE, List.of(InteropFeature.WEB_SEARCH), RouteSelectionMode.CATALOG_SELECTION);
+        }
         if ("POST".equals(method) && "/v1/uploads".equals(normalizedPath)) {
             return semantics("uploads", normalizedPath, TranslationResourceType.UPLOAD, TranslationOperation.UPLOAD_CREATE, List.of(InteropFeature.UPLOAD_CREATE, InteropFeature.FILE_OBJECT), RouteSelectionMode.CATALOG_SELECTION);
         }
@@ -344,6 +374,30 @@ public class GatewayRequestFeatureService {
         if (requestPath.matches("^/v1/fine_tuning/jobs/[^/]+$")) {
             return "/v1/fine_tuning/jobs/{jobId}";
         }
+        if ("/v1/videos/generations".equals(requestPath)) {
+            return "/v1/videos/generations";
+        }
+        if (requestPath.matches("^/v1/videos/[^/]+/cancel$")) {
+            return "/v1/videos/{taskId}/cancel";
+        }
+        if (requestPath.matches("^/v1/videos/[^/]+$")) {
+            return "/v1/videos/{taskId}";
+        }
+        if ("/v1/music/generations".equals(requestPath)) {
+            return "/v1/music/generations";
+        }
+        if (requestPath.matches("^/v1/music/[^/]+/cancel$")) {
+            return "/v1/music/{taskId}/cancel";
+        }
+        if (requestPath.matches("^/v1/music/[^/]+$")) {
+            return "/v1/music/{taskId}";
+        }
+        if (requestPath.matches("^/v1/tasks/[^/]+/cancel$")) {
+            return "/v1/tasks/{taskId}/cancel";
+        }
+        if (requestPath.matches("^/v1/tasks/[^/]+$")) {
+            return "/v1/tasks/{taskId}";
+        }
         return requestPath;
     }
 
@@ -399,6 +453,18 @@ public class GatewayRequestFeatureService {
         matcher = java.util.regex.Pattern.compile("^/v1/fine_tuning/jobs/([^/]+)(?:/cancel)?$").matcher(requestPath);
         if (matcher.matches()) {
             return java.util.Map.of("jobId", matcher.group(1));
+        }
+        matcher = java.util.regex.Pattern.compile("^/v1/videos/([^/]+)(?:/cancel)?$").matcher(requestPath);
+        if (matcher.matches()) {
+            return java.util.Map.of("taskId", matcher.group(1));
+        }
+        matcher = java.util.regex.Pattern.compile("^/v1/music/([^/]+)(?:/cancel)?$").matcher(requestPath);
+        if (matcher.matches()) {
+            return java.util.Map.of("taskId", matcher.group(1));
+        }
+        matcher = java.util.regex.Pattern.compile("^/v1/tasks/([^/]+)(?:/cancel)?$").matcher(requestPath);
+        if (matcher.matches()) {
+            return java.util.Map.of("taskId", matcher.group(1));
         }
         return java.util.Map.of();
     }

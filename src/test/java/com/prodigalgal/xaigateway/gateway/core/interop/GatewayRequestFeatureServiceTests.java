@@ -252,4 +252,57 @@ class GatewayRequestFeatureServiceTests {
         assertEquals(RouteSelectionMode.DISTRIBUTED_TARGET, semantics.routeSelectionMode());
         assertEquals(List.of(InteropFeature.REALTIME_CLIENT_SECRET), semantics.requiredFeatures());
     }
+
+    @Test
+    void shouldDescribeExtendedNonChatResourceSemantics() {
+        GatewayRequestSemantics rerank = service.describe("POST", "/v1/rerank", null);
+        GatewayRequestSemantics videoCreate = service.describe("POST", "/v1/videos/generations", null);
+        GatewayRequestSemantics videoGet = service.describe("GET", "/v1/videos/task_123", null);
+        GatewayRequestSemantics musicCancel = service.describe("POST", "/v1/music/task_456/cancel", null);
+        GatewayRequestSemantics taskGet = service.describe("GET", "/v1/tasks/task_789", null);
+        GatewayRequestSemantics webSearch = service.describe("POST", "/v1/web_search", null);
+
+        assertEquals(TranslationResourceType.RERANK, rerank.resourceType());
+        assertEquals(TranslationOperation.RERANK_CREATE, rerank.operation());
+        assertEquals(List.of(InteropFeature.RERANK), rerank.requiredFeatures());
+        assertEquals(RouteSelectionMode.CATALOG_SELECTION, rerank.routeSelectionMode());
+
+        assertEquals(TranslationResourceType.VIDEO, videoCreate.resourceType());
+        assertEquals(TranslationOperation.VIDEO_GENERATION_CREATE, videoCreate.operation());
+        assertEquals(List.of(InteropFeature.VIDEO_GENERATION, InteropFeature.ASYNC_TASK), videoCreate.requiredFeatures());
+
+        assertEquals(TranslationOperation.VIDEO_GENERATION_GET, videoGet.operation());
+        assertEquals("/v1/videos/{taskId}", videoGet.normalizedPath());
+        assertEquals(RouteSelectionMode.STORED_LINEAGE, videoGet.routeSelectionMode());
+
+        assertEquals(TranslationResourceType.MUSIC, musicCancel.resourceType());
+        assertEquals(TranslationOperation.MUSIC_GENERATION_CANCEL, musicCancel.operation());
+        assertEquals("/v1/music/{taskId}/cancel", musicCancel.normalizedPath());
+        assertEquals(RouteSelectionMode.STORED_LINEAGE, musicCancel.routeSelectionMode());
+
+        assertEquals(TranslationResourceType.TASK, taskGet.resourceType());
+        assertEquals(TranslationOperation.TASK_GET, taskGet.operation());
+        assertEquals(RouteSelectionMode.STORED_LINEAGE, taskGet.routeSelectionMode());
+
+        assertEquals(TranslationResourceType.WEB_SEARCH, webSearch.resourceType());
+        assertEquals(TranslationOperation.WEB_SEARCH_CREATE, webSearch.operation());
+        assertEquals(List.of(InteropFeature.WEB_SEARCH), webSearch.requiredFeatures());
+    }
+
+    @Test
+    void shouldNormalizeExtendedResourcePathsAndExtractTaskParams() {
+        assertEquals("/v1/videos/generations", service.normalizePath("/v1/videos/generations"));
+        assertEquals("/v1/videos/{taskId}", service.normalizePath("/v1/videos/task_123"));
+        assertEquals("/v1/videos/{taskId}/cancel", service.normalizePath("/v1/videos/task_123/cancel"));
+        assertEquals("/v1/music/generations", service.normalizePath("/v1/music/generations"));
+        assertEquals("/v1/music/{taskId}", service.normalizePath("/v1/music/task_456"));
+        assertEquals("/v1/music/{taskId}/cancel", service.normalizePath("/v1/music/task_456/cancel"));
+        assertEquals("/v1/tasks/{taskId}", service.normalizePath("/v1/tasks/task_789"));
+        assertEquals("/v1/tasks/{taskId}/cancel", service.normalizePath("/v1/tasks/task_789/cancel"));
+
+        assertEquals(java.util.Map.of("taskId", "task_123"), service.extractPathParams("/v1/videos/task_123"));
+        assertEquals(java.util.Map.of("taskId", "task_123"), service.extractPathParams("/v1/videos/task_123/cancel"));
+        assertEquals(java.util.Map.of("taskId", "task_456"), service.extractPathParams("/v1/music/task_456"));
+        assertEquals(java.util.Map.of("taskId", "task_789"), service.extractPathParams("/v1/tasks/task_789"));
+    }
 }

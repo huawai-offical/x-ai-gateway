@@ -28,18 +28,22 @@ public class GoogleNativeNamespaceController {
     public ResponseEntity<?> generateContent(
             @PathVariable String model,
             @RequestHeader(value = "x-goog-api-key", required = false) String headerApiKey,
+            @RequestHeader(value = "X-AI-Gateway-Client-Family", required = false) String explicitClientFamily,
+            @RequestHeader(value = "User-Agent", required = false) String userAgent,
             @RequestParam(value = "key", required = false) String queryApiKey,
             @RequestBody GeminiGenerateContentRequest request) {
-        return generateContentController.generateContent(model, headerApiKey, queryApiKey, request);
+        return generateContentController.generateContent(model, headerApiKey, explicitClientFamily, userAgent, queryApiKey, request);
     }
 
     @PostMapping("/models/{model}:streamGenerateContent")
     public ResponseEntity<?> streamGenerateContent(
             @PathVariable String model,
             @RequestHeader(value = "x-goog-api-key", required = false) String headerApiKey,
+            @RequestHeader(value = "X-AI-Gateway-Client-Family", required = false) String explicitClientFamily,
+            @RequestHeader(value = "User-Agent", required = false) String userAgent,
             @RequestParam(value = "key", required = false) String queryApiKey,
             @RequestBody GeminiGenerateContentRequest request) {
-        return generateContentController.streamGenerateContent(model, headerApiKey, queryApiKey, request);
+        return generateContentController.streamGenerateContent(model, headerApiKey, explicitClientFamily, userAgent, queryApiKey, request);
     }
 
     @PostMapping("/models/{model}:embedContent")

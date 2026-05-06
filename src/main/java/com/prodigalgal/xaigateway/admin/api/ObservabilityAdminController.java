@@ -1,6 +1,7 @@
 package com.prodigalgal.xaigateway.admin.api;
 
 import com.prodigalgal.xaigateway.admin.application.ObservabilityQueryService;
+import com.prodigalgal.xaigateway.admin.application.MonitoringBillingRollupService;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import java.time.Instant;
 import java.util.List;
@@ -16,9 +17,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class ObservabilityAdminController {
 
     private final ObservabilityQueryService observabilityQueryService;
+    private final MonitoringBillingRollupService monitoringBillingRollupService;
 
-    public ObservabilityAdminController(ObservabilityQueryService observabilityQueryService) {
+    public ObservabilityAdminController(
+            ObservabilityQueryService observabilityQueryService,
+            MonitoringBillingRollupService monitoringBillingRollupService) {
         this.observabilityQueryService = observabilityQueryService;
+        this.monitoringBillingRollupService = monitoringBillingRollupService;
     }
 
     @GetMapping("/route-decisions")
@@ -115,5 +120,25 @@ public class ObservabilityAdminController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to) {
         return observabilityQueryService.summary(distributedKeyId, providerType, from, to);
+    }
+
+    @GetMapping("/billing-rollup")
+    public MonitoringBillingRollupResponse billingRollup(
+            @RequestParam(defaultValue = "day") String period,
+            @RequestParam(required = false) Long distributedKeyId,
+            @RequestParam(required = false) ProviderType providerType,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to) {
+        return monitoringBillingRollupService.rollup(period, distributedKeyId, providerType, from, to);
+    }
+
+    @GetMapping(value = "/billing-rollup.csv", produces = "text/csv")
+    public String billingRollupCsv(
+            @RequestParam(defaultValue = "day") String period,
+            @RequestParam(required = false) Long distributedKeyId,
+            @RequestParam(required = false) ProviderType providerType,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to) {
+        return monitoringBillingRollupService.exportCsv(period, distributedKeyId, providerType, from, to);
     }
 }

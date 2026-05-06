@@ -28,6 +28,29 @@ public class GovernanceAdminController {
         return governanceAdminService.listRouteGuards();
     }
 
+    @GetMapping("/policies/routing-summary")
+    public RoutingPolicySummaryResponse routingPolicySummary() {
+        return governanceAdminService.routingPolicySummary();
+    }
+
+    @GetMapping("/policies/routing-runtime-plan")
+    public RoutingPolicyRuntimePlanResponse routingRuntimePlan() {
+        return governanceAdminService.routingRuntimePlan();
+    }
+
+    @GetMapping("/policies/routing-runtime-states")
+    public List<RoutingPolicyRuntimeStateResponse> routingRuntimeStates() {
+        return governanceAdminService.routingRuntimeStates();
+    }
+
+    @PostMapping("/policies/routing-runtime-states/reset")
+    public void resetRoutingRuntimeStates(
+            @RequestParam(required = false) String runtimeKey,
+            @RequestParam(required = false) Long policyId,
+            @RequestParam(required = false) String targetRef) {
+        governanceAdminService.resetRoutingRuntimeStates(runtimeKey, policyId, targetRef);
+    }
+
     @PostMapping("/policies/route-guards")
     public RouteGuardPolicyResponse createRouteGuard(@Valid @RequestBody RouteGuardPolicyRequest request) {
         return governanceAdminService.saveRouteGuard(null, request);

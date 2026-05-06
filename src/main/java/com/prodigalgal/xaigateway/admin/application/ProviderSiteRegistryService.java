@@ -1,5 +1,6 @@
 package com.prodigalgal.xaigateway.admin.application;
 
+import com.prodigalgal.xaigateway.admin.api.ProviderSitePresetResponse;
 import com.prodigalgal.xaigateway.gateway.core.catalog.DiscoveredModelDefinition;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
@@ -16,7 +17,9 @@ import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,16 +31,20 @@ public class ProviderSiteRegistryService {
     private final SiteCapabilitySnapshotRepository siteCapabilitySnapshotRepository;
     private final SiteModelCapabilityRepository siteModelCapabilityRepository;
     private final UpstreamSitePolicyService upstreamSitePolicyService;
+    private final ProviderCatalogLoader providerCatalogLoader;
 
+    @Autowired
     public ProviderSiteRegistryService(
             UpstreamSiteProfileRepository upstreamSiteProfileRepository,
             SiteCapabilitySnapshotRepository siteCapabilitySnapshotRepository,
             SiteModelCapabilityRepository siteModelCapabilityRepository,
-            UpstreamSitePolicyService upstreamSitePolicyService) {
+            UpstreamSitePolicyService upstreamSitePolicyService,
+            ProviderCatalogLoader providerCatalogLoader) {
         this.upstreamSiteProfileRepository = upstreamSiteProfileRepository;
         this.siteCapabilitySnapshotRepository = siteCapabilitySnapshotRepository;
         this.siteModelCapabilityRepository = siteModelCapabilityRepository;
         this.upstreamSitePolicyService = upstreamSitePolicyService;
+        this.providerCatalogLoader = providerCatalogLoader;
     }
 
     public UpstreamSiteProfileEntity ensureSiteProfile(ProviderType providerType, String baseUrl, Long siteProfileId) {
@@ -54,6 +61,29 @@ public class ProviderSiteRegistryService {
 
     public UpstreamSitePolicyService.SitePolicy policy(UpstreamSiteKind siteKind) {
         return upstreamSitePolicyService.policy(siteKind);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProviderSitePresetResponse> listPresets() {
+        return providerCatalogLoader.load().presets().stream()
+                .map(this::toPresetResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public ProviderSitePresetResponse getPreset(String code) {
+        return toPresetResponse(findPreset(code));
+    }
+
+    public UpstreamSiteProfileEntity importPreset(String code, boolean active, boolean refreshCapabilities) {
+        ProviderPresetDefinition preset = findPreset(code);
+        String profileCode = preset.profileCode();
+        Optional<UpstreamSiteProfileEntity> existing = upstreamSiteProfileRepository.findByProfileCode(profileCode);
+        UpstreamSiteProfileEntity entity = existing.orElseGet(() -> upstreamSiteProfileRepository.save(createProfile(preset, active)));
+        if (refreshCapabilities) {
+            refreshCapabilities(entity, List.of());
+        }
+        return entity;
     }
 
     public SiteCapabilitySnapshotEntity refreshCapabilities(
@@ -112,6 +142,74 @@ public class ProviderSiteRegistryService {
         return entity;
     }
 
+    private UpstreamSiteProfileEntity createProfile(ProviderPresetDefinition preset, boolean active) {
+        UpstreamSitePolicyService.SitePolicy policy = upstreamSitePolicyService.policy(preset.siteKind());
+        UpstreamSiteProfileEntity entity = new UpstreamSiteProfileEntity();
+        entity.setProfileCode(preset.profileCode());
+        entity.setDisplayName(preset.displayName());
+        entity.setProviderFamily(policy.providerFamily());
+        entity.setSiteKind(preset.siteKind());
+        entity.setAuthStrategy(policy.authStrategy());
+        entity.setPathStrategy(policy.pathStrategy());
+        entity.setModelAddressingStrategy(policy.modelAddressingStrategy());
+        entity.setErrorSchemaStrategy(policy.errorSchemaStrategy());
+        entity.setBaseUrlPattern(preset.defaultBaseUrl());
+        entity.setDescription(preset.description());
+        entity.setProfileSource(SiteProfileSource.MANUAL);
+        entity.setActive(active);
+        return entity;
+    }
+
+    private ProviderPresetDefinition findPreset(String code) {
+        String normalizedCode = normalizePresetCode(code);
+        return providerCatalogLoader.load().presets().stream()
+                .filter(preset -> preset.code().equals(normalizedCode))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("未找到指定的供应商预设。"));
+    }
+
+    private ProviderSitePresetResponse toPresetResponse(ProviderPresetDefinition preset) {
+        UpstreamSitePolicyService.SitePolicy policy = upstreamSitePolicyService.policy(preset.siteKind());
+        Optional<UpstreamSiteProfileEntity> existing = upstreamSiteProfileRepository.findByProfileCode(preset.profileCode());
+        return new ProviderSitePresetResponse(
+                preset.code(),
+                preset.profileCode(),
+                preset.displayName(),
+                preset.siteKind(),
+                policy.providerFamily(),
+                policy.authStrategy(),
+                policy.pathStrategy(),
+                policy.modelAddressingStrategy(),
+                policy.errorSchemaStrategy(),
+                preset.defaultBaseUrl(),
+                preset.description(),
+                policy.supportedProtocols(),
+                policy.streamTransport(),
+                policy.fallbackStrategy(),
+                preset.capabilityTags(),
+                preset.costProfile(),
+                preset.errorMode(),
+                preset.catalogVersion(),
+                preset.catalogSource(),
+                preset.deprecated(),
+                preset.conformanceChecks(),
+                preset.compatibilitySurface(),
+                preset.supportStrategy(),
+                preset.modelFamilies(),
+                preset.pricingMetadata(),
+                preset.unsupportedFeatures(),
+                existing.isPresent(),
+                existing.map(UpstreamSiteProfileEntity::getId).orElse(null)
+        );
+    }
+
+    private String normalizePresetCode(String code) {
+        if (code == null || code.isBlank()) {
+            throw new IllegalArgumentException("供应商预设 code 不能为空。");
+        }
+        return code.trim().toLowerCase(Locale.ROOT);
+    }
+
     private SiteModelCapabilityEntity toSiteModelCapability(
             UpstreamSiteProfileEntity siteProfile,
             UpstreamSitePolicyService.SitePolicy policy,
@@ -143,4 +241,5 @@ public class ProviderSiteRegistryService {
         }
         return List.copyOf(values);
     }
+
 }

@@ -14,6 +14,24 @@ public class GatewayClientFamilyResolver {
         }
 
         String normalized = userAgent.toLowerCase();
+        if (normalized.contains("openclaw") || normalized.contains("open-claw")) {
+            return GatewayClientFamily.OPENCLAW;
+        }
+        if (normalized.contains("opencode") || normalized.contains("open-code")) {
+            return GatewayClientFamily.OPENCODE;
+        }
+        if (normalized.contains("cursor")) {
+            return GatewayClientFamily.CURSOR;
+        }
+        if (normalized.contains("windsurf")) {
+            return GatewayClientFamily.WINDSURF;
+        }
+        if (normalized.contains("kiro")) {
+            return GatewayClientFamily.KIRO;
+        }
+        if (normalized.contains("copilot")) {
+            return GatewayClientFamily.GITHUB_COPILOT;
+        }
         if (normalized.contains("codex")) {
             return GatewayClientFamily.CODEX;
         }

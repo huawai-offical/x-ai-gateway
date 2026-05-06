@@ -180,6 +180,12 @@ class GatewayRouteSelectionServiceTests {
         assertNotNull(result.prefixHash());
         assertNotNull(result.fingerprint());
         assertEquals("HEALTHY", result.candidateEvaluations().get(0).healthState());
+        assertTrue(result.candidateEvaluations().get(0).scoreBreakdown().contains("priority_score=100.0"));
+        assertTrue(result.candidateEvaluations().get(0).scoreBreakdown().contains("weight_score=100.0"));
+        assertTrue(result.candidateEvaluations().get(0).scoreBreakdown().contains("affinity_bonus=500.0"));
+        assertTrue(result.candidateEvaluations().get(0).scoreBreakdown().stream().anyMatch(item -> item.startsWith("total_score=")));
+        assertTrue(result.candidateEvaluations().get(0).scoreBreakdown().contains("retry_candidate=true"));
+        assertTrue(result.candidateEvaluations().get(0).scoreBreakdown().contains("fallback_order=priority:10,weight:100"));
     }
 
     @Test

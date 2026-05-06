@@ -9,6 +9,7 @@ import com.prodigalgal.xaigateway.infra.persistence.entity.SystemSettingEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.SystemSettingRepository;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,7 @@ public class SystemSettingsAdminService {
 
     private static final String UPSTREAM_CACHE_KEY = "gateway.upstream-cache";
     private static final String UPSTREAM_RUNTIME_KEY = "gateway.upstream-runtime";
+    private static final String SECURITY_KEY = "gateway.security";
 
     private final SystemSettingRepository systemSettingRepository;
     private final GatewayProperties gatewayProperties;
@@ -58,8 +60,17 @@ public class SystemSettingsAdminService {
                                 600_000
                         ));
 
+        SystemSettingsResponse.SecuritySettingsResponse security =
+                read(SECURITY_KEY, SystemSettingsResponse.SecuritySettingsResponse.class)
+                        .orElseGet(() -> new SystemSettingsResponse.SecuritySettingsResponse(
+                                true,
+                                false,
+                                List.of(),
+                                List.of()
+                        ));
+
         Instant updatedAt = latestUpdatedAt();
-        return new SystemSettingsResponse(upstreamCache, upstream, updatedAt);
+        return new SystemSettingsResponse(upstreamCache, upstream, security, updatedAt);
     }
 
     public SystemSettingsResponse save(SystemSettingsRequest request) {
@@ -86,15 +97,26 @@ public class SystemSettingsAdminService {
                         intOrDefault(request.upstream().httpStreamTimeoutMs(), current.upstream().httpStreamTimeoutMs())
                 );
 
+        SystemSettingsResponse.SecuritySettingsResponse security = request.security() == null
+                ? current.security()
+                : new SystemSettingsResponse.SecuritySettingsResponse(
+                        boolOrDefault(request.security().ssrfProtectionEnabled(), current.security().ssrfProtectionEnabled()),
+                        boolOrDefault(request.security().allowPrivateNetwork(), current.security().allowPrivateNetwork()),
+                        normalizeStringList(request.security().allowedHosts(), current.security().allowedHosts()),
+                        normalizeStringList(request.security().sensitiveWords(), current.security().sensitiveWords())
+                );
+
         write(UPSTREAM_CACHE_KEY, upstreamCache, "json", "上游缓存运行时设置。");
         write(UPSTREAM_RUNTIME_KEY, upstream, "json", "上游超时运行时设置。");
+        write(SECURITY_KEY, security, "json", "安全策略设置。");
 
-        return new SystemSettingsResponse(upstreamCache, upstream, latestUpdatedAt());
+        return new SystemSettingsResponse(upstreamCache, upstream, security, latestUpdatedAt());
     }
 
     public SystemSettingsResponse reset() {
         systemSettingRepository.findBySettingKey(UPSTREAM_CACHE_KEY).ifPresent(systemSettingRepository::delete);
         systemSettingRepository.findBySettingKey(UPSTREAM_RUNTIME_KEY).ifPresent(systemSettingRepository::delete);
+        systemSettingRepository.findBySettingKey(SECURITY_KEY).ifPresent(systemSettingRepository::delete);
         return get();
     }
 
@@ -115,6 +137,17 @@ public class SystemSettingsAdminService {
 
     private String blankOrDefault(String value, String defaultValue) {
         return value == null || value.isBlank() ? defaultValue : value.trim();
+    }
+
+    private List<String> normalizeStringList(List<String> values, List<String> defaultValue) {
+        if (values == null) {
+            return defaultValue == null ? List.of() : List.copyOf(defaultValue);
+        }
+        return values.stream()
+                .filter(value -> value != null && !value.isBlank())
+                .map(String::trim)
+                .distinct()
+                .toList();
     }
 
     private String normalizeDuration(String value) {

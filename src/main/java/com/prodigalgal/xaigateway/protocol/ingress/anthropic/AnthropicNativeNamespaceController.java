@@ -16,8 +16,10 @@ public class AnthropicNativeNamespaceController {
     @PostMapping("/messages")
     public ResponseEntity<?> messages(
             @RequestHeader("x-api-key") String apiKey,
+            @RequestHeader(value = "X-AI-Gateway-Client-Family", required = false) String explicitClientFamily,
+            @RequestHeader(value = "User-Agent", required = false) String userAgent,
             @RequestBody AnthropicMessagesRequest request) {
-        return messagesController.createMessage(apiKey, request);
+        return messagesController.createMessage(apiKey, explicitClientFamily, userAgent, request);
     }
 
     @RequestMapping("/**")

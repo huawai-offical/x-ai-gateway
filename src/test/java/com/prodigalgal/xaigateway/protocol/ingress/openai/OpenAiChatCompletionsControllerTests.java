@@ -3,6 +3,7 @@ package com.prodigalgal.xaigateway.protocol.ingress.openai;
 import com.prodigalgal.xaigateway.admin.application.GatewayChatExecutionService;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthenticationService;
+import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamilyResolver;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionResult;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionStreamResult;
@@ -41,7 +42,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Flux;
 
 @WebFluxTest(controllers = OpenAiChatCompletionsController.class)
-@Import({PermitAllSecurityTestConfig.class, OpenAiChatCompletionRequestMapper.class})
+@Import({PermitAllSecurityTestConfig.class, OpenAiChatCompletionRequestMapper.class, GatewayClientFamilyResolver.class})
 class OpenAiChatCompletionsControllerTests {
 
     @Autowired

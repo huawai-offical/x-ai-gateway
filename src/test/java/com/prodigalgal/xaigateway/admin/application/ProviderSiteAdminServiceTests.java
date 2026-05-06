@@ -1,6 +1,7 @@
 package com.prodigalgal.xaigateway.admin.application;
 
 import com.prodigalgal.xaigateway.gateway.core.catalog.CredentialModelDiscoveryService;
+import com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendPolicyService;
 import com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendDecision;
 import com.prodigalgal.xaigateway.gateway.core.interop.CapabilityResolution;
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics;
@@ -19,6 +20,7 @@ import com.prodigalgal.xaigateway.gateway.core.site.UpstreamSitePolicyService;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SiteCapabilitySnapshotEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamSiteProfileEntity;
+import com.prodigalgal.xaigateway.admin.api.ProviderSiteRequest;
 import com.prodigalgal.xaigateway.admin.api.ProviderSiteResponse;
 import com.prodigalgal.xaigateway.infra.persistence.repository.SiteCapabilitySnapshotRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.SiteModelCapabilityRepository;
@@ -37,6 +39,45 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ProviderSiteAdminServiceTests {
+
+    @Test
+    void shouldRejectUnsafeProviderSiteBaseUrl() {
+        UpstreamSiteProfileRepository profileRepository = Mockito.mock(UpstreamSiteProfileRepository.class);
+        SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        SiteModelCapabilityRepository modelCapabilityRepository = Mockito.mock(SiteModelCapabilityRepository.class);
+        UpstreamCredentialRepository credentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        ProviderSiteRegistryService providerSiteRegistryService = Mockito.mock(ProviderSiteRegistryService.class);
+        CredentialModelDiscoveryService credentialModelDiscoveryService = Mockito.mock(CredentialModelDiscoveryService.class);
+        SiteCapabilityTruthService truthService = Mockito.mock(SiteCapabilityTruthService.class);
+        SecurityPolicyService securityPolicyService = Mockito.mock(SecurityPolicyService.class);
+        Mockito.when(providerSiteRegistryService.policy(UpstreamSiteKind.OPENAI_DIRECT))
+                .thenReturn(new UpstreamSitePolicyService().policy(UpstreamSiteKind.OPENAI_DIRECT));
+        Mockito.doThrow(new IllegalArgumentException("SSRF 防护阻断私网或本机地址。"))
+                .when(securityPolicyService)
+                .assertUrlAllowed("http://127.0.0.1:8080");
+
+        ProviderSiteAdminService service = new ProviderSiteAdminService(
+                profileRepository,
+                snapshotRepository,
+                modelCapabilityRepository,
+                credentialRepository,
+                providerSiteRegistryService,
+                credentialModelDiscoveryService,
+                truthService,
+                new ExecutionBackendPolicyService(),
+                securityPolicyService
+        );
+
+        assertThrows(IllegalArgumentException.class, () -> service.create(new ProviderSiteRequest(
+                "unsafe",
+                "Unsafe",
+                UpstreamSiteKind.OPENAI_DIRECT,
+                "http://127.0.0.1:8080",
+                null,
+                true
+        )));
+        Mockito.verify(profileRepository, Mockito.never()).save(Mockito.any());
+    }
 
     @Test
     void shouldRejectDeletingSiteWithLinkedCredentials() {
@@ -397,6 +438,50 @@ class ProviderSiteAdminServiceTests {
                 .anyMatch(reason -> reason.contains("accepted exception")));
     }
 
+    @Test
+    void shouldExposeAllMatrixFeaturesAndAvoidJinaGeneralChatOverclaim() {
+        UpstreamSiteProfileRepository profileRepository = Mockito.mock(UpstreamSiteProfileRepository.class);
+        SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        SiteModelCapabilityRepository modelCapabilityRepository = Mockito.mock(SiteModelCapabilityRepository.class);
+        UpstreamCredentialRepository credentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        ProviderSiteRegistryService providerSiteRegistryService = Mockito.mock(ProviderSiteRegistryService.class);
+        CredentialModelDiscoveryService credentialModelDiscoveryService = Mockito.mock(CredentialModelDiscoveryService.class);
+        SiteCapabilityTruthService truthService = new SiteCapabilityTruthService(
+                new UpstreamSitePolicyService(),
+                snapshotRepository
+        );
+
+        ProviderSiteAdminService service = new ProviderSiteAdminService(
+                profileRepository,
+                snapshotRepository,
+                modelCapabilityRepository,
+                credentialRepository,
+                providerSiteRegistryService,
+                credentialModelDiscoveryService,
+                truthService
+        );
+
+        UpstreamSiteProfileEntity site = sampleJinaSite(6L);
+        SiteCapabilitySnapshotEntity snapshot = sampleSnapshot(site);
+        snapshot.setSupportsEmbeddings(true);
+
+        Mockito.when(profileRepository.findById(6L)).thenReturn(Optional.of(site));
+        Mockito.when(snapshotRepository.findBySiteProfile_Id(6L)).thenReturn(Optional.of(snapshot));
+        Mockito.when(modelCapabilityRepository.findAllBySiteProfile_IdOrderByModelKeyAsc(6L)).thenReturn(List.of());
+        Mockito.when(credentialRepository.findAllBySiteProfileIdAndDeletedFalseAndActiveTrueOrderByCreatedAtDesc(6L))
+                .thenReturn(List.of());
+
+        ProviderSiteResponse response = service.get(6L);
+
+        assertEquals("blocked", response.features().get("chat_text").supportStatus());
+        assertEquals("blocked", response.features().get("tools").supportStatus());
+        assertEquals("native", response.features().get("embeddings").supportStatus());
+        assertEquals("native", response.features().get("rerank").supportStatus());
+        assertTrue(response.features().containsKey("video_generation"));
+        assertTrue(response.features().containsKey("music_generation"));
+        assertTrue(response.features().containsKey("web_search"));
+    }
+
     private void mockAllFeatures(
             SiteCapabilityTruthService truthService,
             UpstreamSiteProfileEntity site,
@@ -411,16 +496,30 @@ class ProviderSiteAdminServiceTests {
                 List.of()
         );
         for (InteropFeature feature : List.of(
+                InteropFeature.CHAT_TEXT,
+                InteropFeature.TOOLS,
+                InteropFeature.IMAGE_INPUT,
+                InteropFeature.FILE_INPUT,
                 InteropFeature.RESPONSE_OBJECT,
                 InteropFeature.EMBEDDINGS,
+                InteropFeature.REASONING,
                 InteropFeature.AUDIO_TRANSCRIPTION,
+                InteropFeature.AUDIO_TRANSLATION,
+                InteropFeature.AUDIO_SPEECH,
                 InteropFeature.IMAGE_GENERATION,
+                InteropFeature.IMAGE_EDIT,
+                InteropFeature.IMAGE_VARIATION,
                 InteropFeature.MODERATION,
                 InteropFeature.FILE_OBJECT,
                 InteropFeature.UPLOAD_CREATE,
                 InteropFeature.BATCH_CREATE,
+                InteropFeature.ANTHROPIC_MESSAGE_BATCH,
                 InteropFeature.TUNING_CREATE,
-                InteropFeature.REALTIME_CLIENT_SECRET
+                InteropFeature.REALTIME_CLIENT_SECRET,
+                InteropFeature.RERANK,
+                InteropFeature.VIDEO_GENERATION,
+                InteropFeature.MUSIC_GENERATION,
+                InteropFeature.WEB_SEARCH
         )) {
             Mockito.when(truthService.resolve(site, snapshot, feature)).thenReturn(new CapabilityResolution(
                     feature,
@@ -508,6 +607,21 @@ class ProviderSiteAdminServiceTests {
         entity.setDisplayName("OPENAI_COMPATIBLE_GENERIC");
         entity.setProviderFamily(ProviderFamily.OPENAI);
         entity.setSiteKind(UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC);
+        entity.setAuthStrategy(AuthStrategy.BEARER);
+        entity.setPathStrategy(PathStrategy.OPENAI_V1);
+        entity.setModelAddressingStrategy(ModelAddressingStrategy.MODEL_NAME);
+        entity.setErrorSchemaStrategy(ErrorSchemaStrategy.OPENAI_ERROR);
+        entity.setActive(true);
+        ReflectionTestUtils.setField(entity, "id", id);
+        return entity;
+    }
+
+    private UpstreamSiteProfileEntity sampleJinaSite(Long id) {
+        UpstreamSiteProfileEntity entity = new UpstreamSiteProfileEntity();
+        entity.setProfileCode("site:jina");
+        entity.setDisplayName("JINA");
+        entity.setProviderFamily(ProviderFamily.OPENAI);
+        entity.setSiteKind(UpstreamSiteKind.JINA);
         entity.setAuthStrategy(AuthStrategy.BEARER);
         entity.setPathStrategy(PathStrategy.OPENAI_V1);
         entity.setModelAddressingStrategy(ModelAddressingStrategy.MODEL_NAME);

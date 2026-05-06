@@ -4,6 +4,7 @@ import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayTokenAuthenticationResolver;
 import com.prodigalgal.xaigateway.gateway.core.resource.GatewayCacheResourceService;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
+import com.prodigalgal.xaigateway.provider.adapter.gemini.GeminiCachedContentCreateExecutor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,12 +24,15 @@ public class GatewayCachesController {
 
     private final GatewayTokenAuthenticationResolver gatewayTokenAuthenticationResolver;
     private final GatewayCacheResourceService gatewayCacheResourceService;
+    private final GeminiCachedContentCreateExecutor geminiCachedContentCreateExecutor;
 
     public GatewayCachesController(
             GatewayTokenAuthenticationResolver gatewayTokenAuthenticationResolver,
-            GatewayCacheResourceService gatewayCacheResourceService) {
+            GatewayCacheResourceService gatewayCacheResourceService,
+            GeminiCachedContentCreateExecutor geminiCachedContentCreateExecutor) {
         this.gatewayTokenAuthenticationResolver = gatewayTokenAuthenticationResolver;
         this.gatewayCacheResourceService = gatewayCacheResourceService;
+        this.geminiCachedContentCreateExecutor = geminiCachedContentCreateExecutor;
     }
 
     @GetMapping
@@ -46,6 +50,14 @@ public class GatewayCachesController {
             @RequestBody JsonNode requestBody) {
         AuthenticatedDistributedKey distributedKey = authenticate(authorization);
         return gatewayCacheResourceService.importCache(distributedKey.id(), requestBody);
+    }
+
+    @PostMapping("/gemini")
+    public ObjectNode createGeminiCachedContent(
+            @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
+            @RequestBody JsonNode requestBody) {
+        AuthenticatedDistributedKey distributedKey = authenticate(authorization);
+        return geminiCachedContentCreateExecutor.create(distributedKey.id(), requestBody);
     }
 
     @GetMapping("/{cacheName}")

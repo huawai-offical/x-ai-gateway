@@ -65,6 +65,63 @@ class DistributedKeyAdminServiceTests {
     }
 
     @Test
+    void shouldExportMultiCliOnboardingPackWithoutFullSecret() {
+        DistributedKeyRepository keyRepository = Mockito.mock(DistributedKeyRepository.class);
+        DistributedKeyAdminService service = new DistributedKeyAdminService(
+                keyRepository,
+                Mockito.mock(DistributedKeySecretService.class),
+                Mockito.mock(DistributedKeyBindingRepository.class),
+                Mockito.mock(DistributedKeyAccountPoolBindingRepository.class),
+                Mockito.mock(DistributedKeyAccessGroupGrantRepository.class),
+                Mockito.mock(DistributedKeySecretExportGrantRepository.class),
+                Mockito.mock(GatewayUserRepository.class),
+                Mockito.mock(CredentialCryptoService.class),
+                Optional.empty()
+        );
+        DistributedKeyEntity entity = new DistributedKeyEntity();
+        entity.setKeyName("cli-key");
+        entity.setKeyPrefix("sk-gw-cli");
+        entity.setMaskedKey("sk-gw-cli...abcd");
+        ReflectionTestUtils.setField(entity, "id", 4L);
+        Mockito.when(keyRepository.findById(4L)).thenReturn(Optional.of(entity));
+
+        var response = service.exportOnboardingPack(4L, "https://gateway.example.com/v1/");
+
+        assertEquals("cli-key", response.keyName());
+        assertEquals("https://gateway.example.com/v1", response.apiBaseUrl());
+        assertTrue(response.clientConfigs().stream().anyMatch(item -> "CODEX".equals(item.clientFamily())));
+        assertTrue(response.clientConfigs().stream().anyMatch(item -> "CLAUDE_CODE".equals(item.clientFamily())));
+        assertTrue(response.clientConfigs().stream().anyMatch(item -> "GEMINI_CLI".equals(item.clientFamily())));
+        assertTrue(response.clientConfigs().stream().anyMatch(item -> "CURSOR".equals(item.clientFamily())));
+        assertTrue(response.clientConfigs().stream().anyMatch(item -> "WINDSURF".equals(item.clientFamily())));
+        assertTrue(response.clientConfigs().stream().anyMatch(item -> "KIRO".equals(item.clientFamily())));
+        assertTrue(response.clientConfigs().stream().anyMatch(item -> "GITHUB_COPILOT".equals(item.clientFamily())));
+        assertTrue(response.clientConfigs().stream().anyMatch(item -> item.content().contains("X_AI_GATEWAY_CLIENT_INSTANCE")));
+        assertTrue(response.deepLinks().stream().anyMatch(item -> item.url().startsWith("xag://import")));
+        assertTrue(response.deepLinks().stream().anyMatch(item -> item.warning().contains("不需要本地 proxy")));
+        assertTrue(response.mcpServerConfig().contains("mcpServers"));
+        assertTrue(response.troubleshooting().stream().anyMatch(item -> item.contains("401")));
+        assertTrue(response.troubleshooting().stream().anyMatch(item -> item.contains("request filter")));
+        assertTrue(response.clientConfigs().stream().noneMatch(item -> item.content().contains("full-secret")));
+    }
+
+    @Test
+    void shouldNormalizeOpenCodeAndOpenClawClientFamilies() {
+        assertEquals(
+                "OPENCODE",
+                com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily.from("opencode").name()
+        );
+        assertEquals(
+                "OPENCLAW",
+                com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily.from("open-claw").name()
+        );
+        assertEquals(
+                "GITHUB_COPILOT",
+                com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily.from("copilot").name()
+        );
+    }
+
+    @Test
     void shouldCreateOneTimeSecretExportGrantAndConsumeOnlyOnce() {
         DistributedKeyRepository keyRepository = Mockito.mock(DistributedKeyRepository.class);
         DistributedKeySecretExportGrantRepository grantRepository =

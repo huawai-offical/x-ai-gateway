@@ -3,6 +3,7 @@ package com.prodigalgal.xaigateway.protocol.ingress.google;
 import com.prodigalgal.xaigateway.admin.application.GatewayChatExecutionService;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthenticationService;
+import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamilyResolver;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.canonical.GoogleNativeNonChatCanonicalRenderer;
 import com.prodigalgal.xaigateway.gateway.core.canonical.NonChatCanonicalRenderService;
@@ -59,7 +60,8 @@ import reactor.core.publisher.Flux;
         GeminiFilesEncoder.class,
         GeminiBatchesEncoder.class,
         GoogleNativeNonChatCanonicalRenderer.class,
-        NonChatCanonicalRenderService.class
+        NonChatCanonicalRenderService.class,
+        GatewayClientFamilyResolver.class
 })
 class GeminiGenerateContentControllerTests {
 

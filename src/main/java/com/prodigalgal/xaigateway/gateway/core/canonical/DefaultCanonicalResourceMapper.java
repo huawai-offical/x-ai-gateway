@@ -97,6 +97,11 @@ public class DefaultCanonicalResourceMapper implements CanonicalResourceMapper {
             case TUNING_LIST -> "list";
             case TUNING_CREATE, TUNING_GET, TUNING_CANCEL -> "fine_tuning.job";
             case REALTIME_CLIENT_SECRET_CREATE -> "realtime.client_secret";
+            case RERANK_CREATE -> "rerank";
+            case VIDEO_GENERATION_CREATE, VIDEO_GENERATION_GET, VIDEO_GENERATION_CANCEL -> "video.generation";
+            case MUSIC_GENERATION_CREATE, MUSIC_GENERATION_GET, MUSIC_GENERATION_CANCEL -> "music.generation";
+            case TASK_GET, TASK_CANCEL -> "task";
+            case WEB_SEARCH_CREATE -> "web_search";
             case UNKNOWN, CHAT_COMPLETION, RESPONSE_CREATE, AUDIO_SPEECH -> "unknown";
         };
         if ("list".equals(responseKind)
@@ -131,14 +136,18 @@ public class DefaultCanonicalResourceMapper implements CanonicalResourceMapper {
             return "completed";
         }
         return switch (operation == null ? TranslationOperation.UNKNOWN : operation) {
-            case UPLOAD_CREATE, BATCH_CREATE, TUNING_CREATE -> "created";
+            case UPLOAD_CREATE, BATCH_CREATE, TUNING_CREATE, VIDEO_GENERATION_CREATE, MUSIC_GENERATION_CREATE -> "created";
             case ANTHROPIC_MESSAGE_BATCH_CREATE -> "created";
             case UPLOAD_GET, UPLOAD_PART_ADD, UPLOAD_COMPLETE, UPLOAD_CANCEL,
                     BATCH_GET, BATCH_CANCEL,
                     ANTHROPIC_MESSAGE_BATCH_GET, ANTHROPIC_MESSAGE_BATCH_CANCEL,
-                    TUNING_GET, TUNING_CANCEL -> "in_progress";
+                    TUNING_GET, TUNING_CANCEL,
+                    VIDEO_GENERATION_GET, VIDEO_GENERATION_CANCEL,
+                    MUSIC_GENERATION_GET, MUSIC_GENERATION_CANCEL,
+                    TASK_GET, TASK_CANCEL -> "in_progress";
             case AUDIO_TRANSCRIPTION, AUDIO_TRANSLATION, EMBEDDING_CREATE, IMAGE_GENERATION, IMAGE_EDIT, IMAGE_VARIATION, MODERATION_CREATE,
-                    FILE_CREATE, FILE_LIST, FILE_GET, FILE_DELETE, FILE_CONTENT_GET, REALTIME_CLIENT_SECRET_CREATE -> "completed";
+                    FILE_CREATE, FILE_LIST, FILE_GET, FILE_DELETE, FILE_CONTENT_GET, REALTIME_CLIENT_SECRET_CREATE,
+                    RERANK_CREATE, WEB_SEARCH_CREATE -> "completed";
             case TUNING_LIST -> "completed";
             default -> rawBody == null || rawBody.isMissingNode() || rawBody.isNull() ? null : "completed";
         };

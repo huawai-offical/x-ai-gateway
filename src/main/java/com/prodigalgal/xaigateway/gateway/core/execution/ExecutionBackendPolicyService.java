@@ -113,14 +113,19 @@ public class ExecutionBackendPolicyService {
         }
         if (semantics.resourceType() == TranslationResourceType.AUDIO
                 || semantics.resourceType() == TranslationResourceType.IMAGE
-                || semantics.resourceType() == TranslationResourceType.MODERATION) {
+                || semantics.resourceType() == TranslationResourceType.MODERATION
+                || semantics.resourceType() == TranslationResourceType.RERANK
+                || semantics.resourceType() == TranslationResourceType.WEB_SEARCH) {
             return List.of(ExecutionBackend.PASSTHROUGH);
         }
         if (semantics.resourceType() == TranslationResourceType.FILE
                 || semantics.resourceType() == TranslationResourceType.UPLOAD
                 || semantics.resourceType() == TranslationResourceType.BATCH
                 || semantics.resourceType() == TranslationResourceType.TUNING
-                || semantics.resourceType() == TranslationResourceType.REALTIME) {
+                || semantics.resourceType() == TranslationResourceType.REALTIME
+                || semantics.resourceType() == TranslationResourceType.VIDEO
+                || semantics.resourceType() == TranslationResourceType.MUSIC
+                || semantics.resourceType() == TranslationResourceType.TASK) {
             return List.of(ExecutionBackend.ORCHESTRATION);
         }
         return List.of();
@@ -132,8 +137,8 @@ public class ExecutionBackendPolicyService {
         }
         return switch (semantics.resourceType()) {
             case EMBEDDING -> List.of(ExecutionBackend.NATIVE);
-            case AUDIO, IMAGE, MODERATION -> List.of(ExecutionBackend.PASSTHROUGH);
-            case FILE, UPLOAD, BATCH, TUNING, REALTIME -> List.of(ExecutionBackend.ORCHESTRATION);
+            case AUDIO, IMAGE, MODERATION, RERANK, WEB_SEARCH -> List.of(ExecutionBackend.PASSTHROUGH);
+            case FILE, UPLOAD, BATCH, TUNING, REALTIME, VIDEO, MUSIC, TASK -> List.of(ExecutionBackend.ORCHESTRATION);
             case CHAT, RESPONSE, UNKNOWN -> List.of();
         };
     }

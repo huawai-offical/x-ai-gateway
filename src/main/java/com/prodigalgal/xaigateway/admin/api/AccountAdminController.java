@@ -51,6 +51,13 @@ public class AccountAdminController {
         return accountAdminService.exportConfig(id, clientFamily);
     }
 
+    @GetMapping("/{id}/programming-identity")
+    public ProgrammingAccountIdentityResponse programmingIdentity(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "CODEX") String clientFamily) {
+        return accountAdminService.programmingIdentity(id, clientFamily);
+    }
+
     @PostMapping("/import-auth-json")
     public UpstreamAccountResponse importAuthJson(@Valid @RequestBody AccountImportAuthJsonRequest request) {
         return accountAdminService.importAuthJson(request);

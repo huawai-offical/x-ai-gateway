@@ -76,6 +76,18 @@ public class ExecutionSupportMatrixService {
                     siteKind == UpstreamSiteKind.ANTHROPIC_DIRECT
                             ? InteropCapabilityLevel.NATIVE
                             : InteropCapabilityLevel.UNSUPPORTED;
+            case RERANK ->
+                    (siteKind == UpstreamSiteKind.COHERE || siteKind == UpstreamSiteKind.JINA)
+                            ? InteropCapabilityLevel.NATIVE
+                            : InteropCapabilityLevel.UNSUPPORTED;
+            case VIDEO_GENERATION, MUSIC_GENERATION, ASYNC_TASK ->
+                    (siteKind == UpstreamSiteKind.OPENAI_DIRECT || siteKind == UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC)
+                            ? InteropCapabilityLevel.NATIVE
+                            : InteropCapabilityLevel.UNSUPPORTED;
+            case WEB_SEARCH ->
+                    siteKind == UpstreamSiteKind.OPENAI_DIRECT
+                            ? InteropCapabilityLevel.NATIVE
+                            : InteropCapabilityLevel.UNSUPPORTED;
         };
     }
 
@@ -94,7 +106,8 @@ public class ExecutionSupportMatrixService {
 
     private boolean supportsOpenAiStyleSite(UpstreamSiteKind siteKind) {
         return switch (siteKind) {
-            case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, GROK, MISTRAL, COHERE, TOGETHER, FIREWORKS, OPENROUTER -> true;
+            case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE,
+                    MINIMAX, GROK, MISTRAL, COHERE, JINA, TOGETHER, FIREWORKS, OPENROUTER -> true;
             default -> false;
         };
     }

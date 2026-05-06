@@ -77,4 +77,9 @@ public class LiveSessionAdminController {
             @RequestParam(required = false) Long afterEventId) {
         return liveSessionService.replaySse(sessionKey, afterEventId);
     }
+
+    @GetMapping("/{sessionKey}/conformance")
+    public LiveSessionConformanceResponse conformance(@PathVariable String sessionKey) {
+        return liveSessionService.conformance(sessionKey);
+    }
 }

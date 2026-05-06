@@ -20,7 +20,12 @@ public enum InteropFeature {
     BATCH_CREATE,
     ANTHROPIC_MESSAGE_BATCH,
     TUNING_CREATE,
-    REALTIME_CLIENT_SECRET;
+    REALTIME_CLIENT_SECRET,
+    RERANK,
+    VIDEO_GENERATION,
+    MUSIC_GENERATION,
+    ASYNC_TASK,
+    WEB_SEARCH;
 
     public String wireName() {
         return name().toLowerCase();

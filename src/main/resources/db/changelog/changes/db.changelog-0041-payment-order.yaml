@@ -1,0 +1,64 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0041-payment-order
+      author: codex
+      changes:
+        - createTable:
+            tableName: payment_order
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: order_no, type: VARCHAR(96), constraints: { nullable: false } }
+              - column: { name: user_id, type: BIGINT, constraints: { nullable: false } }
+              - column: { name: provider, type: VARCHAR(64), constraints: { nullable: false } }
+              - column: { name: amount_minor, type: BIGINT, constraints: { nullable: false } }
+              - column: { name: currency, type: VARCHAR(16), constraints: { nullable: false } }
+              - column: { name: token_credits, type: BIGINT, constraints: { nullable: false } }
+              - column: { name: status, type: VARCHAR(32), constraints: { nullable: false } }
+              - column: { name: provider_trade_no, type: VARCHAR(128) }
+              - column: { name: metadata_json, type: TEXT }
+              - column: { name: paid_at, type: TIMESTAMP WITH TIME ZONE }
+              - column: { name: created_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+              - column: { name: updated_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+        - addUniqueConstraint:
+            tableName: payment_order
+            columnNames: order_no
+            constraintName: uk_payment_order_order_no
+        - addForeignKeyConstraint:
+            baseTableName: payment_order
+            baseColumnNames: user_id
+            referencedTableName: gateway_user
+            referencedColumnNames: id
+            constraintName: fk_payment_order_user
+        - createIndex:
+            tableName: payment_order
+            indexName: idx_payment_order_user_created
+            columns:
+              - column: { name: user_id }
+              - column: { name: created_at }
+        - createIndex:
+            tableName: payment_order
+            indexName: idx_payment_order_status_created
+            columns:
+              - column: { name: status }
+              - column: { name: created_at }
+        - createTable:
+            tableName: payment_audit_log
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: order_no, type: VARCHAR(96), constraints: { nullable: false } }
+              - column: { name: provider, type: VARCHAR(64), constraints: { nullable: false } }
+              - column: { name: event_type, type: VARCHAR(64), constraints: { nullable: false } }
+              - column: { name: idempotency_key, type: VARCHAR(128) }
+              - column: { name: payload_json, type: TEXT }
+              - column: { name: created_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+        - createIndex:
+            tableName: payment_audit_log
+            indexName: idx_payment_audit_order_created
+            columns:
+              - column: { name: order_no }
+              - column: { name: created_at }
+        - createIndex:
+            tableName: payment_audit_log
+            indexName: idx_payment_audit_idempotency
+            columns:
+              - column: { name: idempotency_key }

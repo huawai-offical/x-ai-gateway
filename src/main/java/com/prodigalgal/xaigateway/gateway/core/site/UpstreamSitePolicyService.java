@@ -26,6 +26,24 @@ public class UpstreamSitePolicyService {
                 if (normalized.contains("api.deepseek.com")) {
                     yield UpstreamSiteKind.DEEPSEEK;
                 }
+                if (normalized.contains("dashscope.aliyuncs.com")) {
+                    yield UpstreamSiteKind.QWEN;
+                }
+                if (normalized.contains("api.moonshot.cn")) {
+                    yield UpstreamSiteKind.MOONSHOT;
+                }
+                if (normalized.contains("api.siliconflow.cn")) {
+                    yield UpstreamSiteKind.SILICONFLOW;
+                }
+                if (normalized.contains("volces.com") || normalized.contains("ark.cn-")) {
+                    yield UpstreamSiteKind.VOLCENGINE;
+                }
+                if (normalized.contains("api.minimax.chat")) {
+                    yield UpstreamSiteKind.MINIMAX;
+                }
+                if (normalized.contains("api.dify.ai")) {
+                    yield UpstreamSiteKind.DIFY;
+                }
                 if (normalized.contains("api.x.ai")) {
                     yield UpstreamSiteKind.GROK;
                 }
@@ -34,6 +52,9 @@ public class UpstreamSitePolicyService {
                 }
                 if (normalized.contains("api.cohere.ai")) {
                     yield UpstreamSiteKind.COHERE;
+                }
+                if (normalized.contains("api.jina.ai")) {
+                    yield UpstreamSiteKind.JINA;
                 }
                 if (normalized.contains("api.together.xyz")) {
                     yield UpstreamSiteKind.TOGETHER;
@@ -98,7 +119,8 @@ public class UpstreamSitePolicyService {
                     "provider-native",
                     null
             );
-            case DEEPSEEK, GROK, TOGETHER, FIREWORKS, OPENROUTER, OPENAI_COMPATIBLE_GENERIC -> new SitePolicy(
+            case DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE, MINIMAX, GROK, TOGETHER, FIREWORKS, OPENROUTER,
+                    OPENAI_COMPATIBLE_GENERIC -> new SitePolicy(
                     ProviderFamily.OPENAI,
                     AuthStrategy.BEARER,
                     PathStrategy.OPENAI_V1,
@@ -117,6 +139,27 @@ public class UpstreamSitePolicyService {
                     false,
                     "sse",
                     "provider-specific-fallback",
+                    null
+            );
+            case DIFY -> new SitePolicy(
+                    ProviderFamily.OPENAI,
+                    AuthStrategy.BEARER,
+                    PathStrategy.OPENAI_V1,
+                    ModelAddressingStrategy.MODEL_NAME,
+                    ErrorSchemaStrategy.OPENAI_ERROR,
+                    List.of("openai"),
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    "sse",
+                    "workflow-openai-compatible",
                     null
             );
             case MISTRAL -> new SitePolicy(
@@ -224,6 +267,27 @@ public class UpstreamSitePolicyService {
                     "compatibility-api",
                     null
             );
+            case JINA -> new SitePolicy(
+                    ProviderFamily.OPENAI,
+                    AuthStrategy.BEARER,
+                    PathStrategy.OPENAI_V1,
+                    ModelAddressingStrategy.MODEL_NAME,
+                    ErrorSchemaStrategy.OPENAI_ERROR,
+                    List.of("openai"),
+                    false,
+                    true,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    "sse",
+                    "rerank-native",
+                    null
+            );
             case VERTEX_AI -> new SitePolicy(
                     ProviderFamily.GEMINI,
                     AuthStrategy.BEARER,
@@ -303,6 +367,13 @@ public class UpstreamSitePolicyService {
                     ? InteropCapabilityLevel.NATIVE
                     : InteropCapabilityLevel.UNSUPPORTED;
             case REALTIME_CLIENT_SECRET -> policy.supportsRealtime()
+                    ? InteropCapabilityLevel.NATIVE
+                    : InteropCapabilityLevel.UNSUPPORTED;
+            case RERANK -> siteKind == UpstreamSiteKind.COHERE || siteKind == UpstreamSiteKind.JINA
+                    ? InteropCapabilityLevel.NATIVE
+                    : InteropCapabilityLevel.UNSUPPORTED;
+            case VIDEO_GENERATION, MUSIC_GENERATION, ASYNC_TASK -> InteropCapabilityLevel.UNSUPPORTED;
+            case WEB_SEARCH -> siteKind == UpstreamSiteKind.OPENAI_DIRECT
                     ? InteropCapabilityLevel.NATIVE
                     : InteropCapabilityLevel.UNSUPPORTED;
         };

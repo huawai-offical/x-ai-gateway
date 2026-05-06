@@ -25,6 +25,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import java.util.Locale;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -33,6 +34,8 @@ import reactor.core.publisher.Flux;
 
 @Service
 public class OllamaGatewayChatRuntime implements GatewayChatRuntime {
+
+    private static final int MAX_TEXT_FILE_CHARS = 60_000;
 
     private final WebClient.Builder webClientBuilder;
     private final ObjectMapper objectMapper;
@@ -116,7 +119,13 @@ public class OllamaGatewayChatRuntime implements GatewayChatRuntime {
                     continue;
                 }
                 if (media.type() == CanonicalPartType.FILE) {
-                    throw new IllegalArgumentException("当前 Ollama 运行时暂不支持通用 file/document input。");
+                    if (media.uri() == null || media.uri().isBlank()) {
+                        throw new IllegalArgumentException("OLLAMA_UNSUPPORTED_FILE_INPUT: Ollama file/document input 缺少可用 URL。");
+                    }
+                    if (!media.uri().startsWith("gateway://") && !media.uri().startsWith("data:")) {
+                        throw new IllegalArgumentException("OLLAMA_UNSUPPORTED_FILE_INPUT: 当前 Ollama 运行时仅支持 gateway:// 或 data URL 文本 file/document input。");
+                    }
+                    continue;
                 }
                 if (media.type() != CanonicalPartType.IMAGE) {
                     throw new IllegalArgumentException("当前 Ollama 运行时仅支持图片输入。");
@@ -153,7 +162,7 @@ public class OllamaGatewayChatRuntime implements GatewayChatRuntime {
         }
         ArrayNode messages = body.putArray("messages");
         for (CanonicalMessage message : request.messages()) {
-            String text = joinText(message);
+            String text = joinText(message, context);
             List<CanonicalContentPart> mediaParts = mediaParts(message);
             CanonicalContentPart toolResult = toolResult(message);
             boolean hasText = text != null && !text.isBlank();
@@ -244,6 +253,78 @@ public class OllamaGatewayChatRuntime implements GatewayChatRuntime {
             return Base64.getEncoder().encodeToString(URLDecoder.decode(payload, StandardCharsets.UTF_8).getBytes(StandardCharsets.UTF_8));
         }
         throw new IllegalArgumentException("当前 Ollama 运行时不支持远程 URL 图片输入。");
+    }
+
+    private String encodeTextFile(CanonicalContentPart part, GatewayChatRuntimeContext context) {
+        TextFilePayload payload = resolveTextFilePayload(part, context);
+        String mimeType = firstNonBlank(payload.mimeType(), part.mimeType(), "application/octet-stream");
+        if (!isSupportedTextFileMimeType(mimeType, payload.filename())) {
+            throw new IllegalArgumentException("OLLAMA_UNSUPPORTED_FILE_TYPE: 当前 Ollama 运行时仅支持文本类 file/document input，收到 MIME 类型 " + mimeType + "。");
+        }
+        String text = new String(payload.bytes(), StandardCharsets.UTF_8);
+        if (text.length() > MAX_TEXT_FILE_CHARS) {
+            text = text.substring(0, MAX_TEXT_FILE_CHARS)
+                    + "\n[内容已截断：超过 " + MAX_TEXT_FILE_CHARS + " 个字符。]";
+        }
+        String filename = firstNonBlank(payload.filename(), part.name(), "document.txt");
+        return "[Ollama 文本文件: " + filename + "; mimeType=" + mimeType + "]\n"
+                + text
+                + "\n[文件结束: " + filename + "]";
+    }
+
+    private TextFilePayload resolveTextFilePayload(CanonicalContentPart part, GatewayChatRuntimeContext context) {
+        if (part.uri().startsWith("gateway://")) {
+            String fileKey = part.uri().substring("gateway://".length());
+            GatewayFileContent content = gatewayFileService.getFileContent(fileKey, context.selectionResult().distributedKeyId());
+            String filename = content.metadata() == null ? part.name() : content.metadata().filename();
+            return new TextFilePayload(content.bytes() == null ? new byte[0] : content.bytes(), content.mimeType(), filename);
+        }
+        if (part.uri().startsWith("data:")) {
+            int commaIndex = part.uri().indexOf(',');
+            if (commaIndex < 0) {
+                throw new IllegalArgumentException("OLLAMA_UNSUPPORTED_FILE_INPUT: 无法解析 data URL file/document input。");
+            }
+            String metadata = part.uri().substring(5, commaIndex);
+            String payload = part.uri().substring(commaIndex + 1);
+            byte[] bytes = metadata.contains(";base64")
+                    ? Base64.getDecoder().decode(payload)
+                    : URLDecoder.decode(payload, StandardCharsets.UTF_8).getBytes(StandardCharsets.UTF_8);
+            String mimeType = metadata.isBlank() ? part.mimeType() : metadata.split(";", 2)[0];
+            return new TextFilePayload(bytes, mimeType, part.name());
+        }
+        throw new IllegalArgumentException("OLLAMA_UNSUPPORTED_FILE_INPUT: 当前 Ollama 运行时仅支持 gateway:// 或 data URL 文本 file/document input。");
+    }
+
+    private boolean isSupportedTextFileMimeType(String mimeType, String filename) {
+        String normalized = mimeType == null ? "" : mimeType.toLowerCase(Locale.ROOT).trim();
+        if (normalized.startsWith("text/")) {
+            return true;
+        }
+        if (normalized.equals("application/json")
+                || normalized.equals("application/ld+json")
+                || normalized.endsWith("+json")
+                || normalized.equals("application/xml")
+                || normalized.endsWith("+xml")
+                || normalized.equals("application/yaml")
+                || normalized.equals("application/x-yaml")
+                || normalized.equals("application/javascript")
+                || normalized.equals("application/x-javascript")
+                || normalized.equals("application/x-ndjson")
+                || normalized.equals("application/csv")
+                || normalized.equals("application/markdown")) {
+            return true;
+        }
+        String lowerFilename = filename == null ? "" : filename.toLowerCase(Locale.ROOT);
+        return lowerFilename.endsWith(".txt")
+                || lowerFilename.endsWith(".md")
+                || lowerFilename.endsWith(".markdown")
+                || lowerFilename.endsWith(".json")
+                || lowerFilename.endsWith(".jsonl")
+                || lowerFilename.endsWith(".csv")
+                || lowerFilename.endsWith(".xml")
+                || lowerFilename.endsWith(".yaml")
+                || lowerFilename.endsWith(".yml")
+                || lowerFilename.endsWith(".log");
     }
 
     private Object resolveThinkingControl(CanonicalReasoningConfig reasoning) {
@@ -415,12 +496,19 @@ public class OllamaGatewayChatRuntime implements GatewayChatRuntime {
                 .orElse(null);
     }
 
-    private String joinText(CanonicalMessage message) {
-        return message.parts().stream()
-                .filter(part -> part.type() == CanonicalPartType.TEXT)
-                .map(CanonicalContentPart::text)
-                .filter(text -> text != null && !text.isBlank())
-                .reduce((left, right) -> left + "\n" + right)
-                .orElse("");
+    private String joinText(CanonicalMessage message, GatewayChatRuntimeContext context) {
+        List<String> textBlocks = new ArrayList<>();
+        for (CanonicalContentPart part : message.parts()) {
+            if (part.type() == CanonicalPartType.TEXT && part.text() != null && !part.text().isBlank()) {
+                textBlocks.add(part.text());
+            }
+            if (part.type() == CanonicalPartType.FILE) {
+                textBlocks.add(encodeTextFile(part, context));
+            }
+        }
+        return String.join("\n", textBlocks);
+    }
+
+    private record TextFilePayload(byte[] bytes, String mimeType, String filename) {
     }
 }

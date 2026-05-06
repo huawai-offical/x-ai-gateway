@@ -4,6 +4,10 @@ public interface LiveSessionRuntimeAdapter {
 
     String protocol();
 
+    default String transport() {
+        return "simulated";
+    }
+
     LiveSessionRuntimeConnectResult connect(LiveSessionRuntimeRequest request);
 
     LiveSessionRuntimeExchangeResult send(LiveSessionRuntimeRequest request, LiveSessionRuntimeMessage message);

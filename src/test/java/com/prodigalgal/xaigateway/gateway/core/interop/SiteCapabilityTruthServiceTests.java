@@ -209,6 +209,73 @@ class SiteCapabilityTruthServiceTests {
     }
 
     @Test
+    void shouldTreatJinaAsRerankNativeButNotGeneralChatByDefault() {
+        SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        Mockito.when(repository.findBySiteProfile_Id(14L)).thenReturn(Optional.of(snapshot(false, true, false, false, false, false, false, false, false, false)));
+        SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
+
+        CatalogCandidateView candidate = new CatalogCandidateView(
+                203L,
+                "jina",
+                ProviderType.OPENAI_COMPATIBLE,
+                14L,
+                ProviderFamily.OPENAI,
+                UpstreamSiteKind.JINA,
+                AuthStrategy.BEARER,
+                PathStrategy.OPENAI_V1,
+                ErrorSchemaStrategy.OPENAI_ERROR,
+                "https://api.jina.ai/v1",
+                "jina-reranker-v2-base-multilingual",
+                "jina-reranker-v2-base-multilingual",
+                List.of("openai"),
+                false,
+                false,
+                false,
+                true,
+                false,
+                false,
+                false,
+                false,
+                ReasoningTransport.NONE,
+                InteropCapabilityLevel.NATIVE
+        );
+
+        assertEquals(InteropCapabilityLevel.NATIVE, service.capabilityLevel(candidate, InteropFeature.RERANK));
+        assertEquals(InteropCapabilityLevel.UNSUPPORTED, service.capabilityLevel(candidate, InteropFeature.CHAT_TEXT));
+    }
+
+    @Test
+    void shouldTreatQwenAsOpenAiCompatibleAndKeepRealtimeBlocked() {
+        SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        Mockito.when(repository.findBySiteProfile_Id(15L)).thenReturn(Optional.of(snapshot(true, true, false, false, false, true, true, true, true, true)));
+        SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
+
+        CatalogCandidateView candidate = candidate(15L, ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.QWEN);
+        FeatureCompatibilityReport embeddings = service.evaluate(
+                candidate,
+                new GatewayRequestSemantics(
+                        TranslationResourceType.EMBEDDING,
+                        TranslationOperation.EMBEDDING_CREATE,
+                        List.of(InteropFeature.EMBEDDINGS),
+                        true
+                )
+        );
+        FeatureCompatibilityReport realtime = service.evaluate(
+                candidate,
+                new GatewayRequestSemantics(
+                        TranslationResourceType.REALTIME,
+                        TranslationOperation.REALTIME_CLIENT_SECRET_CREATE,
+                        List.of(InteropFeature.REALTIME_CLIENT_SECRET),
+                        true
+                )
+        );
+
+        assertEquals(SupportStatus.NATIVE, embeddings.supportStatus());
+        assertEquals(SupportStatus.BLOCKED, realtime.supportStatus());
+        assertTrue(realtime.blockedReasons().stream().anyMatch(item -> item.contains("realtime client secrets")));
+    }
+
+    @Test
     void shouldTreatVertexChatAndEmbeddingsAsNative() {
         SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
         Mockito.when(repository.findBySiteProfile_Id(8L)).thenReturn(Optional.of(snapshot(false, true, true, true, true, true, false, true, true, false)));
@@ -571,6 +638,51 @@ class SiteCapabilityTruthServiceTests {
         assertEquals(SupportStatus.BLOCKED, openAiCompatibleRealtimeFeature.supportStatus());
         assertTrue(openAiCompatibleRealtimeFeature.blockedReasons().stream()
                 .anyMatch(reason -> reason.contains("realtime client secrets")));
+    }
+
+    @Test
+    void shouldUseSiteKindSpecificDefaultsForDifyAndJinaSiteProfileMatrix() {
+        SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
+        SiteCapabilitySnapshotEntity fullSnapshot = snapshot(true, true, true, true, true, true, true, true, true, true);
+
+        assertEquals(
+                InteropCapabilityLevel.NATIVE,
+                service.resolve(siteProfile(UpstreamSiteKind.DIFY), fullSnapshot, InteropFeature.CHAT_TEXT).effectiveLevel()
+        );
+        assertEquals(
+                InteropCapabilityLevel.UNSUPPORTED,
+                service.resolve(siteProfile(UpstreamSiteKind.DIFY), fullSnapshot, InteropFeature.TOOLS).effectiveLevel()
+        );
+        assertEquals(
+                InteropCapabilityLevel.UNSUPPORTED,
+                service.resolve(siteProfile(UpstreamSiteKind.DIFY), fullSnapshot, InteropFeature.IMAGE_INPUT).effectiveLevel()
+        );
+        assertEquals(
+                InteropCapabilityLevel.UNSUPPORTED,
+                service.resolve(siteProfile(UpstreamSiteKind.DIFY), fullSnapshot, InteropFeature.REASONING).effectiveLevel()
+        );
+        assertEquals(
+                InteropCapabilityLevel.UNSUPPORTED,
+                service.resolve(siteProfile(UpstreamSiteKind.DIFY), fullSnapshot, InteropFeature.RERANK).effectiveLevel()
+        );
+
+        assertEquals(
+                InteropCapabilityLevel.UNSUPPORTED,
+                service.resolve(siteProfile(UpstreamSiteKind.JINA), fullSnapshot, InteropFeature.CHAT_TEXT).effectiveLevel()
+        );
+        assertEquals(
+                InteropCapabilityLevel.UNSUPPORTED,
+                service.resolve(siteProfile(UpstreamSiteKind.JINA), fullSnapshot, InteropFeature.TOOLS).effectiveLevel()
+        );
+        assertEquals(
+                InteropCapabilityLevel.NATIVE,
+                service.resolve(siteProfile(UpstreamSiteKind.JINA), fullSnapshot, InteropFeature.EMBEDDINGS).effectiveLevel()
+        );
+        assertEquals(
+                InteropCapabilityLevel.NATIVE,
+                service.resolve(siteProfile(UpstreamSiteKind.JINA), fullSnapshot, InteropFeature.RERANK).effectiveLevel()
+        );
     }
 
     private CatalogCandidateView geminiCandidate(Long siteProfileId, UpstreamSiteKind siteKind) {

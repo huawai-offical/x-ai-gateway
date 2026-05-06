@@ -67,6 +67,18 @@ public class RouteGuardPolicyEntity {
     @Column(name = "description", length = 512)
     private String description;
 
+    @Column(name = "retry_policy", columnDefinition = "text")
+    private String retryPolicy;
+
+    @Column(name = "fallback_policy", columnDefinition = "text")
+    private String fallbackPolicy;
+
+    @Column(name = "circuit_breaker_policy", columnDefinition = "text")
+    private String circuitBreakerPolicy;
+
+    @Column(name = "rate_limit_policy", columnDefinition = "text")
+    private String rateLimitPolicy;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false, columnDefinition = "timestamp with time zone")
     private Instant createdAt;
@@ -181,6 +193,38 @@ public class RouteGuardPolicyEntity {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public String getRetryPolicy() {
+        return retryPolicy;
+    }
+
+    public void setRetryPolicy(String retryPolicy) {
+        this.retryPolicy = retryPolicy;
+    }
+
+    public String getFallbackPolicy() {
+        return fallbackPolicy;
+    }
+
+    public void setFallbackPolicy(String fallbackPolicy) {
+        this.fallbackPolicy = fallbackPolicy;
+    }
+
+    public String getCircuitBreakerPolicy() {
+        return circuitBreakerPolicy;
+    }
+
+    public void setCircuitBreakerPolicy(String circuitBreakerPolicy) {
+        this.circuitBreakerPolicy = circuitBreakerPolicy;
+    }
+
+    public String getRateLimitPolicy() {
+        return rateLimitPolicy;
+    }
+
+    public void setRateLimitPolicy(String rateLimitPolicy) {
+        this.rateLimitPolicy = rateLimitPolicy;
     }
 
     public Instant getCreatedAt() {

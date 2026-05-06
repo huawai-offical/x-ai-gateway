@@ -4,6 +4,7 @@ import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.admin.application.GatewayChatExecutionService;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthenticationService;
+import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamilyResolver;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionResult;
@@ -45,7 +46,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Flux;
 
 @WebFluxTest(controllers = OpenAiResponsesController.class)
-@Import({PermitAllSecurityTestConfig.class, OpenAiResponsesRequestMapper.class})
+@Import({PermitAllSecurityTestConfig.class, OpenAiResponsesRequestMapper.class, GatewayClientFamilyResolver.class})
 class OpenAiResponsesControllerTests {
 
     @Autowired

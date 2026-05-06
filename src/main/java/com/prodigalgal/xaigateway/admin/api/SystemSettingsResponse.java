@@ -1,10 +1,12 @@
 package com.prodigalgal.xaigateway.admin.api;
 
 import java.time.Instant;
+import java.util.List;
 
 public record SystemSettingsResponse(
         UpstreamCacheSettingsResponse upstreamCache,
         UpstreamRuntimeSettingsResponse upstream,
+        SecuritySettingsResponse security,
         Instant updatedAt
 ) {
 
@@ -25,5 +27,17 @@ public record SystemSettingsResponse(
             int httpTimeoutMs,
             int httpStreamTimeoutMs
     ) {
+    }
+
+    public record SecuritySettingsResponse(
+            boolean ssrfProtectionEnabled,
+            boolean allowPrivateNetwork,
+            List<String> allowedHosts,
+            List<String> sensitiveWords
+    ) {
+        public SecuritySettingsResponse {
+            allowedHosts = allowedHosts == null ? List.of() : List.copyOf(allowedHosts);
+            sensitiveWords = sensitiveWords == null ? List.of() : List.copyOf(sensitiveWords);
+        }
     }
 }

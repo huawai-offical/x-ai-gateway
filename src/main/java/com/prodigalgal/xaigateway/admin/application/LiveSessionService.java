@@ -1,6 +1,7 @@
 package com.prodigalgal.xaigateway.admin.application;
 
 import com.prodigalgal.xaigateway.admin.api.LiveSessionCreateRequest;
+import com.prodigalgal.xaigateway.admin.api.LiveSessionConformanceResponse;
 import com.prodigalgal.xaigateway.admin.api.LiveSessionEventRequest;
 import com.prodigalgal.xaigateway.admin.api.LiveSessionEventResponse;
 import com.prodigalgal.xaigateway.admin.api.LiveSessionResponse;
@@ -11,6 +12,7 @@ import com.prodigalgal.xaigateway.infra.persistence.repository.LiveSessionEventR
 import com.prodigalgal.xaigateway.infra.persistence.repository.LiveSessionRepository;
 import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -32,17 +34,28 @@ public class LiveSessionService {
     private final LiveSessionEventRepository liveSessionEventRepository;
     private final ObjectMapper objectMapper;
     private final Map<String, LiveSessionRuntimeAdapter> runtimeAdapters;
+    private final LiveSessionConnectionPool connectionPool;
 
     public LiveSessionService(
             LiveSessionRepository liveSessionRepository,
             LiveSessionEventRepository liveSessionEventRepository,
             ObjectMapper objectMapper,
             List<LiveSessionRuntimeAdapter> runtimeAdapters) {
+        this(liveSessionRepository, liveSessionEventRepository, objectMapper, runtimeAdapters, new LiveSessionConnectionPool());
+    }
+
+    public LiveSessionService(
+            LiveSessionRepository liveSessionRepository,
+            LiveSessionEventRepository liveSessionEventRepository,
+            ObjectMapper objectMapper,
+            List<LiveSessionRuntimeAdapter> runtimeAdapters,
+            LiveSessionConnectionPool connectionPool) {
         this.liveSessionRepository = liveSessionRepository;
         this.liveSessionEventRepository = liveSessionEventRepository;
         this.objectMapper = objectMapper;
         this.runtimeAdapters = runtimeAdapters.stream()
                 .collect(Collectors.toMap(adapter -> adapter.protocol().toLowerCase(Locale.ROOT), Function.identity(), (left, right) -> left));
+        this.connectionPool = connectionPool == null ? new LiveSessionConnectionPool() : connectionPool;
     }
 
     @Transactional(readOnly = true)
@@ -81,14 +94,23 @@ public class LiveSessionService {
                 "runtimeState", "CONNECTING",
                 "connectingAt", now.toString()
         )));
-        LiveSessionRuntimeConnectResult result = adapter.connect(toRuntimeRequest(session, now));
+        LiveSessionConnectionPool.Lease lease = connectionPool.acquire(tenantKey(session), session.getSessionKey(), session.getProtocol());
+        LiveSessionRuntimeConnectResult result;
+        try {
+            result = adapter.connect(toRuntimeRequest(session, now));
+        } catch (RuntimeException exception) {
+            connectionPool.release(session.getSessionKey());
+            throw exception;
+        }
         session.setStatus("CONNECTED");
         session.setMetadataJson(mergeMetadata(session.getMetadataJson(), mergeRuntimeMetadata(result.runtimeMetadata(), Map.of(
                 "runtimeState", "CONNECTED",
                 "connectedAt", now.toString(),
                 "adapter", result.adapterName(),
+                "transport", adapter.transport(),
                 "upstreamResumeHandle", result.upstreamResumeHandle()
         ))));
+        session.setMetadataJson(mergeMetadata(session.getMetadataJson(), connectionPoolMetadata(lease)));
         liveSessionRepository.save(session);
         appendProviderEvents(session, result.providerEvents());
         return toResponse(session);
@@ -98,13 +120,17 @@ public class LiveSessionService {
         LiveSessionEntity session = getRequired(sessionKey);
         ensureNotClosed(session);
         Instant now = Instant.now();
-        LiveSessionRuntimeExchangeResult result = adapterFor(session).heartbeat(toRuntimeRequest(session, now));
+        LiveSessionRuntimeAdapter adapter = adapterFor(session);
+        LiveSessionRuntimeExchangeResult result = adapter.heartbeat(toRuntimeRequest(session, now));
+        LiveSessionConnectionPool.Lease lease = connectionPool.touch(session.getSessionKey());
         session.setStatus("CONNECTED");
         session.setMetadataJson(mergeMetadata(session.getMetadataJson(), mergeRuntimeMetadata(result.runtimeMetadata(), Map.of(
                 "runtimeState", "CONNECTED",
                 "lastHeartbeatAt", now.toString(),
-                "adapter", result.adapterName()
+                "adapter", result.adapterName(),
+                "transport", adapter.transport()
         ))));
+        session.setMetadataJson(mergeMetadata(session.getMetadataJson(), connectionPoolMetadata(lease)));
         liveSessionRepository.save(session);
         appendProviderEvents(session, result.providerEvents());
         return toResponse(session);
@@ -119,16 +145,24 @@ public class LiveSessionService {
         String payloadJson = defaultString(request.payloadJson(), "{}");
         appendEventEntity(session, eventType, "INPUT", payloadJson, audioBytes);
 
-        LiveSessionRuntimeExchangeResult result = adapterFor(session).send(
+        LiveSessionRuntimeAdapter adapter = adapterFor(session);
+        LiveSessionRuntimeExchangeResult result = adapter.send(
                 toRuntimeRequest(session, now),
                 new LiveSessionRuntimeMessage(eventType, payloadJson, audioBytes)
         );
+        LiveSessionConnectionPool.Lease lease = connectionPool.touch(session.getSessionKey());
         session.setStatus("STREAMING");
         session.setMetadataJson(mergeMetadata(session.getMetadataJson(), mergeRuntimeMetadata(result.runtimeMetadata(), Map.of(
                 "runtimeState", "STREAMING",
                 "lastRuntimeEventAt", now.toString(),
-                "adapter", result.adapterName()
+                "lastGatewayEventCategory", classifyRuntimeEvent(eventType),
+                "lastInputAudioBytes", String.valueOf(audioBytes),
+                "usageInputAudioBytes", String.valueOf(session.getInputAudioBytes()),
+                "binaryFrameObserved", String.valueOf(audioBytes > 0),
+                "adapter", result.adapterName(),
+                "transport", adapter.transport()
         ))));
+        session.setMetadataJson(mergeMetadata(session.getMetadataJson(), connectionPoolMetadata(lease)));
         liveSessionRepository.save(session);
         appendProviderEvents(session, result.providerEvents());
         return toResponse(session);
@@ -159,14 +193,27 @@ public class LiveSessionService {
             return toResponse(session);
         }
         Instant now = Instant.now();
-        LiveSessionRuntimeExchangeResult result = adapterFor(session).close(toRuntimeRequest(session, now));
+        LiveSessionRuntimeAdapter adapter = adapterFor(session);
+        LiveSessionRuntimeExchangeResult result;
+        try {
+            result = adapter.close(toRuntimeRequest(session, now));
+        } finally {
+            connectionPool.release(session.getSessionKey());
+        }
         session.setStatus("CLOSED");
         session.setClosedAt(now);
         session.setMetadataJson(mergeMetadata(session.getMetadataJson(), mergeRuntimeMetadata(result.runtimeMetadata(), Map.of(
                 "runtimeState", "CLOSED",
                 "closedAt", now.toString(),
-                "adapter", result.adapterName()
+                "closeReason", "client_closed",
+                "cancelSemantic", "gateway_close_as_client_cancel",
+                "adapter", result.adapterName(),
+                "transport", adapter.transport()
         ))));
+        session.setMetadataJson(mergeMetadata(session.getMetadataJson(), Map.of(
+                "connectionPoolState", "RELEASED",
+                "connectionPoolActive", String.valueOf(connectionPool.activeCount())
+        )));
         liveSessionRepository.save(session);
         appendProviderEvents(session, result.providerEvents());
         return toResponse(session);
@@ -201,6 +248,77 @@ public class LiveSessionService {
         return builder.toString();
     }
 
+    @Transactional(readOnly = true)
+    public LiveSessionConformanceResponse conformance(String sessionKey) {
+        LiveSessionEntity session = getRequired(sessionKey);
+        List<LiveSessionEventEntity> events = liveSessionEventRepository.findAllBySession_IdOrderByEventIdAsc(session.getId());
+        long inputEvents = events.stream().filter(event -> "INPUT".equalsIgnoreCase(event.getDirection())).count();
+        long outputEvents = events.stream().filter(event -> "OUTPUT".equalsIgnoreCase(event.getDirection())).count();
+        boolean connected = contains(session.getStatus(), "CONNECTED")
+                || contains(session.getStatus(), "STREAMING")
+                || contains(session.getStatus(), "CLOSED")
+                || contains(session.getMetadataJson(), "CONNECTED")
+                || events.stream().anyMatch(event -> "runtime.connected".equalsIgnoreCase(event.getEventType()));
+        boolean streaming = "STREAMING".equalsIgnoreCase(session.getStatus())
+                || inputEvents > 0 && outputEvents > 0
+                || events.stream().anyMatch(event -> event.getEventType() != null && event.getEventType().startsWith("provider."));
+        boolean closed = session.getClosedAt() != null || "CLOSED".equalsIgnoreCase(session.getStatus());
+        boolean sseReplayAvailable = !events.isEmpty() && replaySse(sessionKey, 0L).contains("data:");
+        String transport = readMetadataValue(session.getMetadataJson(), "transport");
+        boolean websocketTransport = "websocket".equalsIgnoreCase(transport);
+        boolean websocketFrames = events.stream().anyMatch(event -> event.getEventType() != null && event.getEventType().startsWith("websocket."));
+        boolean binaryAudioFrames = events.stream().anyMatch(event -> event.getEventType() != null
+                && event.getEventType().startsWith("websocket.frame.")
+                && event.getAudioBytes() > 0);
+        boolean normalizedProviderErrors = events.stream().anyMatch(event -> "websocket.error".equalsIgnoreCase(event.getEventType())
+                || contains(event.getPayloadJson(), "normalizedProviderErrorCode"))
+                || contains(session.getMetadataJson(), "normalizedProviderErrorCode");
+        boolean retryObserved = events.stream().anyMatch(event -> "websocket.retry".equalsIgnoreCase(event.getEventType()))
+                || contains(session.getMetadataJson(), "retryAfterMs");
+
+        List<String> checks = new ArrayList<>();
+        addCheck(checks, connected, "runtime connected");
+        addCheck(checks, streaming, "bidirectional event flow");
+        addCheck(checks, sseReplayAvailable, "sse replay available");
+        addCheck(checks, session.getInputAudioBytes() >= 0 && session.getOutputAudioBytes() >= 0, "audio byte counters available");
+        if (websocketTransport) {
+            addCheck(checks, websocketFrames, "websocket frames available");
+            addCheck(checks, binaryAudioFrames, "binary audio frames accounted");
+            addCheck(checks, normalizedProviderErrors, "provider errors normalized");
+            addCheck(checks, retryObserved, "retry semantics available");
+        }
+
+        List<String> warnings = new ArrayList<>();
+        if (!closed) {
+            warnings.add("session not closed");
+        }
+        if (outputEvents == 0) {
+            warnings.add("no provider output events");
+        }
+        String conformanceStatus = checks.size() >= 4 && warnings.isEmpty()
+                ? "PASS"
+                : checks.size() >= 3 ? "WARN" : "FAIL";
+
+        return new LiveSessionConformanceResponse(
+                session.getSessionKey(),
+                session.getProtocol(),
+                session.getStatus(),
+                connected,
+                streaming,
+                closed,
+                sseReplayAvailable,
+                inputEvents,
+                outputEvents,
+                events.size(),
+                session.getInputAudioBytes(),
+                session.getOutputAudioBytes(),
+                transport,
+                conformanceStatus,
+                List.copyOf(checks),
+                List.copyOf(warnings)
+        );
+    }
+
     private LiveSessionEntity getRequired(String sessionKey) {
         return liveSessionRepository.findBySessionKey(sessionKey)
                 .orElseThrow(() -> new IllegalArgumentException("未找到 Live Session。"));
@@ -223,6 +341,11 @@ public class LiveSessionService {
                 session.getMetadataJson(),
                 now
         );
+    }
+
+    private String tenantKey(LiveSessionEntity session) {
+        Long distributedKeyId = session.getDistributedKeyId();
+        return distributedKeyId == null ? "tenant:anonymous" : "distributed_key:" + distributedKeyId;
     }
 
     private void ensureNotClosed(LiveSessionEntity session) {
@@ -282,6 +405,46 @@ public class LiveSessionService {
         return value == null || value.isBlank() ? fallback : value.trim();
     }
 
+    private String classifyRuntimeEvent(String eventType) {
+        if (eventType == null || eventType.isBlank()) {
+            return "message";
+        }
+        String normalized = eventType.toLowerCase(Locale.ROOT);
+        if (normalized.startsWith("audio.")) {
+            return "audio";
+        }
+        if (normalized.contains("timeout")) {
+            return "timeout";
+        }
+        if (normalized.contains("retry")) {
+            return "retry";
+        }
+        if (normalized.startsWith("error")) {
+            return "error";
+        }
+        return "message";
+    }
+
+    private boolean contains(String value, String expected) {
+        return value != null && expected != null && value.toUpperCase(Locale.ROOT).contains(expected.toUpperCase(Locale.ROOT));
+    }
+
+    private void addCheck(List<String> checks, boolean passed, String name) {
+        if (passed) {
+            checks.add(name);
+        }
+    }
+
+    private String readMetadataValue(String metadataJson, String fieldName) {
+        try {
+            JsonNode root = objectMapper.readTree(defaultString(metadataJson, "{}"));
+            JsonNode value = root == null ? null : root.path(fieldName);
+            return value == null || value.isMissingNode() || value.isNull() ? null : value.asText(null);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
     private Map<String, String> mergeRuntimeMetadata(Map<String, String> primary, Map<String, String> fallback) {
         Map<String, String> merged = new LinkedHashMap<>();
         if (fallback != null) {
@@ -291,6 +454,19 @@ public class LiveSessionService {
             merged.putAll(primary);
         }
         return merged;
+    }
+
+    private Map<String, String> connectionPoolMetadata(LiveSessionConnectionPool.Lease lease) {
+        Map<String, String> metadata = new LinkedHashMap<>();
+        if (lease != null) {
+            metadata.put("connectionPoolLeaseId", lease.leaseId());
+            metadata.put("connectionPoolTenant", lease.tenantKey());
+            metadata.put("connectionPoolState", lease.state());
+            metadata.put("connectionPoolExpiresAt", lease.expiresAt().toString());
+        }
+        metadata.put("connectionPoolActive", String.valueOf(connectionPool.activeCount()));
+        metadata.put("connectionPoolMaxPerTenant", String.valueOf(connectionPool.maxConnectionsPerTenant()));
+        return metadata;
     }
 
     private String mergeMetadata(String metadataJson, Map<String, String> additions) {

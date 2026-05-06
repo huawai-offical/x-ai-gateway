@@ -77,3 +77,15 @@ databaseChangeLog:
       file: db/changelog/changes/db.changelog-0038-live-ops-cost.yaml
   - include:
       file: db/changelog/changes/db.changelog-0039-access-groups.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0040-route-policy-config.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0041-payment-order.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0042-portal-social-oauth.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0043-portal-security-mfa.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0044-passkey-portal-identity.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0045-payment-production-closure.yaml

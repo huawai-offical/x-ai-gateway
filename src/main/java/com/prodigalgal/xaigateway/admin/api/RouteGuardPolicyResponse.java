@@ -22,6 +22,10 @@ public record RouteGuardPolicyResponse(
         int priority,
         boolean enabled,
         String description,
+        String retryPolicy,
+        String fallbackPolicy,
+        String circuitBreakerPolicy,
+        String rateLimitPolicy,
         Instant createdAt,
         Instant updatedAt
 ) {

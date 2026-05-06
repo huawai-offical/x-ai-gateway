@@ -5,5 +5,7 @@ public enum GatewayAsyncResourceType {
     UPLOAD,
     BATCH,
     TUNING,
-    REALTIME_SESSION
+    REALTIME_SESSION,
+    VIDEO,
+    MUSIC
 }

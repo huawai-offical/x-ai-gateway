@@ -69,7 +69,17 @@ public class SiteCapabilityTruthService {
         if (siteProfile == null || feature == null) {
             return unsupportedResolution(feature, "未找到站点档案。");
         }
-        InteropCapabilityLevel declaredLevel = declaredLevel(siteProfile.getSiteKind(), snapshot, true, true, true, true, true, feature);
+        UpstreamSiteKind siteKind = siteProfile.getSiteKind();
+        InteropCapabilityLevel declaredLevel = declaredLevel(
+                siteKind,
+                snapshot,
+                siteSupportsChat(siteKind),
+                siteSupportsTools(siteKind),
+                siteSupportsImageInput(siteKind),
+                siteSupportsEmbeddings(siteKind),
+                siteSupportsThinking(siteKind),
+                feature
+        );
         InteropCapabilityLevel implementedLevel = siteLevelImplementedLevel(siteProfile.getSiteKind(), feature);
         InteropCapabilityLevel effectiveLevel = minimumLevel(declaredLevel, implementedLevel);
 
@@ -380,7 +390,8 @@ public class SiteCapabilityTruthService {
     private ProviderType providerTypeFor(UpstreamSiteKind siteKind) {
         return switch (siteKind) {
             case OPENAI_DIRECT, AZURE_OPENAI -> ProviderType.OPENAI_DIRECT;
-            case DEEPSEEK, GROK, MISTRAL, COHERE, TOGETHER, FIREWORKS, OPENROUTER, OPENAI_COMPATIBLE_GENERIC -> ProviderType.OPENAI_COMPATIBLE;
+            case DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE, MINIMAX, DIFY, GROK, MISTRAL, COHERE, JINA,
+                    TOGETHER, FIREWORKS, OPENROUTER, OPENAI_COMPATIBLE_GENERIC -> ProviderType.OPENAI_COMPATIBLE;
             case ANTHROPIC_DIRECT -> ProviderType.ANTHROPIC_DIRECT;
             case GEMINI_DIRECT, VERTEX_AI -> ProviderType.GEMINI_DIRECT;
             case OLLAMA_DIRECT -> ProviderType.OLLAMA_DIRECT;
@@ -403,18 +414,18 @@ public class SiteCapabilityTruthService {
 
         return switch (feature) {
             case CHAT_TEXT -> supportsChat ? InteropCapabilityLevel.NATIVE : InteropCapabilityLevel.UNSUPPORTED;
-            case TOOLS -> siteKind == UpstreamSiteKind.OLLAMA_DIRECT
-                    ? supportsTools ? InteropCapabilityLevel.NATIVE : InteropCapabilityLevel.UNSUPPORTED
-                    : supportsChat ? InteropCapabilityLevel.NATIVE : InteropCapabilityLevel.UNSUPPORTED;
+            case TOOLS -> supportsTools ? InteropCapabilityLevel.NATIVE : InteropCapabilityLevel.UNSUPPORTED;
             case IMAGE_INPUT -> switch (siteKind) {
                 case OLLAMA_DIRECT -> supportsImageInput ? InteropCapabilityLevel.NATIVE : InteropCapabilityLevel.UNSUPPORTED;
-                case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, GROK, MISTRAL, TOGETHER, FIREWORKS,
+                case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE,
+                        MINIMAX, GROK, MISTRAL, TOGETHER, FIREWORKS,
                         OPENROUTER, ANTHROPIC_DIRECT, GEMINI_DIRECT, VERTEX_AI -> InteropCapabilityLevel.NATIVE;
                 case AZURE_OPENAI -> InteropCapabilityLevel.LOSSY;
                 default -> InteropCapabilityLevel.UNSUPPORTED;
             };
             case FILE_INPUT -> switch (siteKind) {
-                case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, GROK, MISTRAL, TOGETHER, FIREWORKS,
+                case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE,
+                        MINIMAX, GROK, MISTRAL, TOGETHER, FIREWORKS,
                         OPENROUTER, GEMINI_DIRECT, VERTEX_AI -> InteropCapabilityLevel.NATIVE;
                 case ANTHROPIC_DIRECT -> InteropCapabilityLevel.EMULATED;
                 default -> InteropCapabilityLevel.UNSUPPORTED;
@@ -471,6 +482,15 @@ public class SiteCapabilityTruthService {
                     && supportsUpstreamRealtime(siteKind)
                     ? InteropCapabilityLevel.NATIVE
                     : InteropCapabilityLevel.UNSUPPORTED;
+            case RERANK -> supportsUpstreamRerank(siteKind)
+                    ? InteropCapabilityLevel.NATIVE
+                    : InteropCapabilityLevel.UNSUPPORTED;
+            case VIDEO_GENERATION, MUSIC_GENERATION, ASYNC_TASK -> supportsUpstreamMedia(siteKind)
+                    ? InteropCapabilityLevel.NATIVE
+                    : InteropCapabilityLevel.UNSUPPORTED;
+            case WEB_SEARCH -> supportsUpstreamWebSearch(siteKind)
+                    ? InteropCapabilityLevel.NATIVE
+                    : InteropCapabilityLevel.UNSUPPORTED;
         };
     }
 
@@ -482,8 +502,9 @@ public class SiteCapabilityTruthService {
 
     private boolean supportsUpstreamEmbeddings(UpstreamSiteKind siteKind) {
         return switch (siteKind) {
-            case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, GROK, MISTRAL, TOGETHER, FIREWORKS,
-                    OPENROUTER, COHERE, GEMINI_DIRECT, VERTEX_AI, AZURE_OPENAI -> true;
+            case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE,
+                    MINIMAX, GROK, MISTRAL, TOGETHER, FIREWORKS, OPENROUTER, COHERE, JINA,
+                    GEMINI_DIRECT, VERTEX_AI, AZURE_OPENAI -> true;
             default -> false;
         };
     }
@@ -506,15 +527,17 @@ public class SiteCapabilityTruthService {
 
     private boolean supportsOpenAiStyleResources(UpstreamSiteKind siteKind) {
         return switch (siteKind) {
-            case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, GROK, MISTRAL, COHERE, TOGETHER, FIREWORKS, OPENROUTER -> true;
+            case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE,
+                    MINIMAX, GROK, MISTRAL, COHERE, TOGETHER, FIREWORKS, OPENROUTER -> true;
             default -> false;
         };
     }
 
     private boolean supportsUpstreamFileObjects(UpstreamSiteKind siteKind) {
         return switch (siteKind) {
-            case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, OPENROUTER, TOGETHER, FIREWORKS, DEEPSEEK, GROK,
-                    MISTRAL, COHERE, ANTHROPIC_DIRECT, GEMINI_DIRECT, VERTEX_AI -> true;
+            case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, OPENROUTER, TOGETHER, FIREWORKS, DEEPSEEK, QWEN,
+                    MOONSHOT, SILICONFLOW, VOLCENGINE, MINIMAX, DIFY, GROK, MISTRAL, COHERE, JINA,
+                    ANTHROPIC_DIRECT, GEMINI_DIRECT, VERTEX_AI -> true;
             default -> false;
         };
     }
@@ -537,6 +560,50 @@ public class SiteCapabilityTruthService {
 
     private boolean supportsUpstreamRealtime(UpstreamSiteKind siteKind) {
         return siteKind == UpstreamSiteKind.OPENAI_DIRECT;
+    }
+
+    private boolean supportsUpstreamRerank(UpstreamSiteKind siteKind) {
+        return siteKind == UpstreamSiteKind.COHERE || siteKind == UpstreamSiteKind.JINA;
+    }
+
+    private boolean supportsUpstreamWebSearch(UpstreamSiteKind siteKind) {
+        return siteKind == UpstreamSiteKind.OPENAI_DIRECT;
+    }
+
+    private boolean supportsUpstreamMedia(UpstreamSiteKind siteKind) {
+        return siteKind == UpstreamSiteKind.OPENAI_DIRECT || siteKind == UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC;
+    }
+
+    private boolean siteSupportsChat(UpstreamSiteKind siteKind) {
+        return switch (siteKind) {
+            case JINA -> false;
+            default -> true;
+        };
+    }
+
+    private boolean siteSupportsTools(UpstreamSiteKind siteKind) {
+        return switch (siteKind) {
+            case DIFY, JINA -> false;
+            default -> siteSupportsChat(siteKind);
+        };
+    }
+
+    private boolean siteSupportsImageInput(UpstreamSiteKind siteKind) {
+        return switch (siteKind) {
+            case DIFY, JINA, COHERE, OLLAMA_DIRECT -> false;
+            default -> true;
+        };
+    }
+
+    private boolean siteSupportsEmbeddings(UpstreamSiteKind siteKind) {
+        return upstreamSitePolicyService.policy(siteKind).supportsEmbeddings();
+    }
+
+    private boolean siteSupportsThinking(UpstreamSiteKind siteKind) {
+        return switch (siteKind) {
+            case DIFY, JINA, COHERE, OLLAMA_DIRECT -> false;
+            default -> siteSupportsChat(siteKind);
+        };
     }
 
     private boolean supportsGoogleGenAiSite(UpstreamSiteKind siteKind) {
@@ -594,7 +661,23 @@ public class SiteCapabilityTruthService {
                         "Anthropic 当前没有与 OpenAI realtime client_secret 等价的稳定原生对象，因此当前不开放。";
                 default -> null;
             };
-            case OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, GROK, MISTRAL, COHERE, TOGETHER, FIREWORKS, OPENROUTER -> switch (feature) {
+            case DIFY -> switch (feature) {
+                case FILE_OBJECT ->
+                        "Dify 的 OpenAI-compatible surface 只视作 workflow/chat 入口，不把 file object lifecycle 视为稳定上游契约。";
+                case UPLOAD_CREATE ->
+                        "Dify 不暴露与 OpenAI /v1/uploads 等价的稳定对象生命周期，因此当前不开放。";
+                case BATCH_CREATE ->
+                        "Dify 不暴露与 OpenAI /v1/batches 等价的稳定对象生命周期，因此当前不开放。";
+                case TUNING_CREATE ->
+                        "Dify 不暴露与 OpenAI fine-tuning 等价的稳定对象生命周期，因此当前不开放。";
+                case REALTIME_CLIENT_SECRET ->
+                        "Dify 不暴露与 OpenAI realtime client_secret 等价的稳定对象生命周期，因此当前不开放。";
+                case RERANK ->
+                        "Dify 当前在本仓库仅作为 workflow/chat compatible preset，不把 rerank 标记为稳定 native 能力。";
+                default -> null;
+            };
+            case OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE, MINIMAX, GROK, MISTRAL,
+                    COHERE, TOGETHER, FIREWORKS, OPENROUTER -> switch (feature) {
                 case FILE_OBJECT ->
                         "OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；files 仍作为 accepted exception，不在当前实现面内。";
                 case UPLOAD_CREATE ->
@@ -607,6 +690,19 @@ public class SiteCapabilityTruthService {
                         "OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；realtime client secrets 仍作为 accepted exception，不在当前实现面内。";
                 default -> null;
             };
+            case JINA -> switch (feature) {
+                case FILE_OBJECT ->
+                        "Jina 当前仅在本仓库中冻结为 embeddings/rerank provider，不把 file object lifecycle 视作稳定契约。";
+                case UPLOAD_CREATE ->
+                        "Jina 当前仅在本仓库中冻结为 embeddings/rerank provider，不开放 uploads object lifecycle。";
+                case BATCH_CREATE ->
+                        "Jina 当前仅在本仓库中冻结为 embeddings/rerank provider，不开放 batches object lifecycle。";
+                case TUNING_CREATE ->
+                        "Jina 当前仅在本仓库中冻结为 embeddings/rerank provider，不开放 tuning lifecycle。";
+                case REALTIME_CLIENT_SECRET ->
+                        "Jina 当前不提供与 OpenAI realtime client_secret 等价的稳定能力。";
+                default -> null;
+            };
             default -> null;
         };
     }
@@ -616,8 +712,8 @@ public class SiteCapabilityTruthService {
             return "blocked";
         }
         return switch (resourceType) {
-            case FILE, UPLOAD, BATCH, TUNING, REALTIME, RESPONSE -> "upstream_object_with_local_lineage";
-            case CHAT, EMBEDDING, AUDIO, IMAGE, MODERATION -> executionKind == ExecutionKind.NATIVE
+            case FILE, UPLOAD, BATCH, TUNING, REALTIME, RESPONSE, VIDEO, MUSIC, TASK -> "upstream_object_with_local_lineage";
+            case CHAT, EMBEDDING, AUDIO, IMAGE, MODERATION, RERANK, WEB_SEARCH -> executionKind == ExecutionKind.NATIVE
                     ? "direct_upstream_execution"
                     : "translated_execution";
             default -> "direct_upstream_execution";

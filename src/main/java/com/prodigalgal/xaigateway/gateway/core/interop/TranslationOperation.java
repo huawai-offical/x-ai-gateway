@@ -32,6 +32,16 @@ public enum TranslationOperation {
     TUNING_GET("tuning_get"),
     TUNING_CANCEL("tuning_cancel"),
     REALTIME_CLIENT_SECRET_CREATE("realtime_client_secret_create"),
+    RERANK_CREATE("rerank_create"),
+    VIDEO_GENERATION_CREATE("video_generation_create"),
+    VIDEO_GENERATION_GET("video_generation_get"),
+    VIDEO_GENERATION_CANCEL("video_generation_cancel"),
+    MUSIC_GENERATION_CREATE("music_generation_create"),
+    MUSIC_GENERATION_GET("music_generation_get"),
+    MUSIC_GENERATION_CANCEL("music_generation_cancel"),
+    TASK_GET("task_get"),
+    TASK_CANCEL("task_cancel"),
+    WEB_SEARCH_CREATE("web_search_create"),
     UNKNOWN("unknown");
 
     private final String wireName;

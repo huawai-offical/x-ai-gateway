@@ -38,6 +38,23 @@ public class ProviderSiteAdminController {
         return providerSiteAdminService.create(request);
     }
 
+    @GetMapping("/presets")
+    public List<ProviderSitePresetResponse> listPresets() {
+        return providerSiteAdminService.listPresets();
+    }
+
+    @GetMapping("/presets/{code}")
+    public ProviderSitePresetResponse getPreset(@PathVariable String code) {
+        return providerSiteAdminService.getPreset(code);
+    }
+
+    @PostMapping("/presets/{code}/import")
+    public ProviderSiteResponse importPreset(
+            @PathVariable String code,
+            @RequestBody(required = false) ProviderSitePresetImportRequest request) {
+        return providerSiteAdminService.importPreset(code, request);
+    }
+
     @GetMapping("/{id}")
     public ProviderSiteResponse get(@PathVariable Long id) {
         return providerSiteAdminService.get(id);

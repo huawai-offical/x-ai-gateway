@@ -102,17 +102,17 @@ public class OAuthConnectionService {
 
     private String resolveAuthBaseUrl(UpstreamAccountProviderType providerType) {
         return switch (providerType) {
-            case OPENAI_OAUTH -> gatewayProperties.getOauth().getOpenaiAuthBaseUrl();
-            case GEMINI_OAUTH -> gatewayProperties.getOauth().getGeminiAuthBaseUrl();
-            case CLAUDE_ACCOUNT -> gatewayProperties.getOauth().getClaudeAuthBaseUrl();
+            case OPENAI_OAUTH, CODEX_OAUTH, COPILOT_OAUTH -> gatewayProperties.getOauth().getOpenaiAuthBaseUrl();
+            case GEMINI_OAUTH, ANTIGRAVITY_OAUTH -> gatewayProperties.getOauth().getGeminiAuthBaseUrl();
+            case CLAUDE_ACCOUNT, CLAUDE_PLAN -> gatewayProperties.getOauth().getClaudeAuthBaseUrl();
         };
     }
 
     private String resolveClientId(UpstreamAccountProviderType providerType) {
         return switch (providerType) {
-            case OPENAI_OAUTH -> gatewayProperties.getOauth().getOpenaiClientId();
-            case GEMINI_OAUTH -> gatewayProperties.getOauth().getGeminiClientId();
-            case CLAUDE_ACCOUNT -> gatewayProperties.getOauth().getClaudeClientId();
+            case OPENAI_OAUTH, CODEX_OAUTH, COPILOT_OAUTH -> gatewayProperties.getOauth().getOpenaiClientId();
+            case GEMINI_OAUTH, ANTIGRAVITY_OAUTH -> gatewayProperties.getOauth().getGeminiClientId();
+            case CLAUDE_ACCOUNT, CLAUDE_PLAN -> gatewayProperties.getOauth().getClaudeClientId();
         };
     }
 

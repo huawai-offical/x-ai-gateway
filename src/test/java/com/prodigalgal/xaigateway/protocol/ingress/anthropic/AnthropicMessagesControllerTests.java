@@ -3,6 +3,7 @@ package com.prodigalgal.xaigateway.protocol.ingress.anthropic;
 import com.prodigalgal.xaigateway.admin.application.GatewayChatExecutionService;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthenticationService;
+import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamilyResolver;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionResult;
@@ -40,7 +41,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Flux;
 
 @WebFluxTest(controllers = AnthropicMessagesController.class)
-@Import({PermitAllSecurityTestConfig.class, AnthropicMessagesRequestMapper.class})
+@Import({PermitAllSecurityTestConfig.class, AnthropicMessagesRequestMapper.class, GatewayClientFamilyResolver.class})
 class AnthropicMessagesControllerTests {
 
     @Autowired

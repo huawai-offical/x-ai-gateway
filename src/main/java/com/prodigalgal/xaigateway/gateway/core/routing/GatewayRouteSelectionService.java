@@ -67,6 +67,7 @@ public class GatewayRouteSelectionService {
     private final RouteCacheStore routeCacheStore;
     private final HealthStateStore healthStateStore;
     private final CostRoutingService costRoutingService;
+    private final RoutingPolicyRuntimeEnforcementService routingPolicyRuntimeEnforcementService;
 
     @Autowired
     public GatewayRouteSelectionService(
@@ -84,7 +85,8 @@ public class GatewayRouteSelectionService {
             GovernancePolicyEngine governancePolicyEngine,
             RouteCacheStore routeCacheStore,
             HealthStateStore healthStateStore,
-            CostRoutingService costRoutingService) {
+            CostRoutingService costRoutingService,
+            RoutingPolicyRuntimeEnforcementService routingPolicyRuntimeEnforcementService) {
         this.distributedKeyQueryService = distributedKeyQueryService;
         this.modelCatalogQueryService = modelCatalogQueryService;
         this.promptFingerprintService = promptFingerprintService;
@@ -100,6 +102,7 @@ public class GatewayRouteSelectionService {
         this.routeCacheStore = routeCacheStore;
         this.healthStateStore = healthStateStore;
         this.costRoutingService = costRoutingService;
+        this.routingPolicyRuntimeEnforcementService = routingPolicyRuntimeEnforcementService;
     }
 
     public GatewayRouteSelectionService(
@@ -154,6 +157,7 @@ public class GatewayRouteSelectionService {
                     public void clear(Long credentialId) {
                     }
                 },
+                null,
                 null
         );
     }
@@ -186,6 +190,7 @@ public class GatewayRouteSelectionService {
                 GovernancePolicyEngine.allowAll(),
                 routeCacheStore,
                 healthStateStore,
+                null,
                 null
         );
     }
@@ -220,6 +225,43 @@ public class GatewayRouteSelectionService {
                 governancePolicyEngine,
                 routeCacheStore,
                 healthStateStore,
+                null,
+                null
+        );
+    }
+
+    public GatewayRouteSelectionService(
+            DistributedKeyQueryService distributedKeyQueryService,
+            ModelCatalogQueryService modelCatalogQueryService,
+            PromptFingerprintService promptFingerprintService,
+            AffinityCacheService affinityCacheService,
+            DistributedKeyGovernanceService distributedKeyGovernanceService,
+            UpstreamCredentialRepository upstreamCredentialRepository,
+            NetworkProxyRepository networkProxyRepository,
+            AccountSelectionService accountSelectionService,
+            GatewayRequestFeatureService gatewayRequestFeatureService,
+            SiteCapabilityTruthService siteCapabilityTruthService,
+            NonChatRoutePolicyService nonChatRoutePolicyService,
+            GovernancePolicyEngine governancePolicyEngine,
+            RouteCacheStore routeCacheStore,
+            HealthStateStore healthStateStore,
+            CostRoutingService costRoutingService) {
+        this(
+                distributedKeyQueryService,
+                modelCatalogQueryService,
+                promptFingerprintService,
+                affinityCacheService,
+                distributedKeyGovernanceService,
+                upstreamCredentialRepository,
+                networkProxyRepository,
+                accountSelectionService,
+                gatewayRequestFeatureService,
+                siteCapabilityTruthService,
+                nonChatRoutePolicyService,
+                governancePolicyEngine,
+                routeCacheStore,
+                healthStateStore,
+                costRoutingService,
                 null
         );
     }
@@ -558,6 +600,15 @@ public class GatewayRouteSelectionService {
                 cooldownUntil = policyDecision.effectiveUntil();
             }
 
+            if (exclusionReasons.isEmpty() && routingPolicyRuntimeEnforcementService != null) {
+                RoutePolicyRuntimeDecision runtimeDecision = routingPolicyRuntimeEnforcementService.evaluateCandidate(staticEvaluation.candidate(), credential);
+                if (!runtimeDecision.allowed()) {
+                    exclusionReasons.add(runtimeDecision.reasonCode());
+                    healthState = runtimeDecision.healthState();
+                    cooldownUntil = runtimeDecision.retryAfter();
+                }
+            }
+
             if (exclusionReasons.isEmpty() && !isNetworkHealthy(credential)) {
                 exclusionReasons.add("network_blocked");
                 healthState = "NETWORK_BLOCKED";
@@ -587,9 +638,10 @@ public class GatewayRouteSelectionService {
             healthState = "FILTERED";
         }
 
-        List<String> scoreBreakdown = buildScoreBreakdown(staticEvaluation.candidate(), selectionSource, healthState, costEstimate);
+        ScoreComponents scoreComponents = scoreComponents(staticEvaluation.candidate(), selectionSource, fingerprint, costEstimate);
+        List<String> scoreBreakdown = buildScoreBreakdown(staticEvaluation.candidate(), selectionSource, healthState, costEstimate, scoreComponents);
         double totalScore = exclusionReasons.isEmpty()
-                ? totalScore(staticEvaluation.candidate(), selectionSource, fingerprint, costEstimate)
+                ? scoreComponents.totalScore()
                 : Double.NEGATIVE_INFINITY;
 
         return new RouteCandidateEvaluation(
@@ -609,7 +661,8 @@ public class GatewayRouteSelectionService {
             RouteCandidateView candidate,
             RouteSelectionSource selectionSource,
             String healthState,
-            CostEstimateResponse costEstimate) {
+            CostEstimateResponse costEstimate,
+            ScoreComponents scoreComponents) {
         List<String> breakdown = new ArrayList<>();
         breakdown.add("capability_rank=" + candidate.capabilityRank());
         breakdown.add("binding_priority=" + candidate.bindingPriority());
@@ -617,6 +670,15 @@ public class GatewayRouteSelectionService {
         breakdown.add("render_capability=" + (candidate.capabilityLevel() == null ? "unsupported" : candidate.capabilityLevel().toLowerCase()));
         breakdown.add("health_state=" + healthState);
         breakdown.add("selection_source=" + selectionSource.name());
+        breakdown.add("capability_score=" + scoreComponents.capabilityScore());
+        breakdown.add("priority_score=" + scoreComponents.priorityScore());
+        breakdown.add("weight_score=" + scoreComponents.weightScore());
+        breakdown.add("affinity_bonus=" + scoreComponents.affinityBonus());
+        breakdown.add("cost_penalty=" + scoreComponents.costPenalty());
+        breakdown.add("weighted_hash_jitter=" + scoreComponents.weightedHashJitter());
+        breakdown.add("total_score=" + scoreComponents.totalScore());
+        breakdown.add("retry_candidate=" + "HEALTHY".equalsIgnoreCase(healthState));
+        breakdown.add("fallback_order=priority:" + candidate.bindingPriority() + ",weight:" + candidate.bindingWeight());
         if (costEstimate != null) {
             breakdown.add("estimated_cost=" + costEstimate.estimatedDisplay());
             breakdown.add("estimated_input_tokens=" + costEstimate.inputTokens());
@@ -628,7 +690,7 @@ public class GatewayRouteSelectionService {
         return List.copyOf(breakdown);
     }
 
-    private double totalScore(
+    private ScoreComponents scoreComponents(
             RouteCandidateView candidate,
             RouteSelectionSource selectionSource,
             String seed,
@@ -642,12 +704,31 @@ public class GatewayRouteSelectionService {
             case MODEL_AFFINITY -> 150d;
             case WEIGHTED_HASH -> 0d;
         };
-        return capabilityScore
+        double costPenalty = costPenalty(costEstimate);
+        double weightedHashJitter = stablePositiveHash(seed + ":" + candidate.candidate().credentialId()) / (double) Long.MAX_VALUE;
+        double totalScore = capabilityScore
                 + priorityScore
                 + weightScore
                 + affinityBonus
-                - costPenalty(costEstimate)
-                + stablePositiveHash(seed + ":" + candidate.candidate().credentialId()) / (double) Long.MAX_VALUE;
+                - costPenalty
+                + weightedHashJitter;
+        return new ScoreComponents(
+                capabilityScore,
+                priorityScore,
+                weightScore,
+                affinityBonus,
+                costPenalty,
+                weightedHashJitter,
+                totalScore
+        );
+    }
+
+    private double totalScore(
+            RouteCandidateView candidate,
+            RouteSelectionSource selectionSource,
+            String seed,
+            CostEstimateResponse costEstimate) {
+        return scoreComponents(candidate, selectionSource, seed, costEstimate).totalScore();
     }
 
     private CostEstimateResponse evaluateCost(
@@ -851,5 +932,16 @@ public class GatewayRouteSelectionService {
         int capabilityRank() {
             return candidate.capabilityRank();
         }
+    }
+
+    private record ScoreComponents(
+            double capabilityScore,
+            double priorityScore,
+            double weightScore,
+            double affinityBonus,
+            double costPenalty,
+            double weightedHashJitter,
+            double totalScore
+    ) {
     }
 }

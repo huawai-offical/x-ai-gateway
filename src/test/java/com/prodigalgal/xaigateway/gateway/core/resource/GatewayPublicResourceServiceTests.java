@@ -149,6 +149,25 @@ class GatewayPublicResourceServiceTests {
     }
 
     @Test
+    void shouldPollOperationUntilDoneWhenWaitTimeoutProvided() {
+        Fixture fixture = new Fixture();
+        GatewayAsyncResourceEntity running = asyncEntity("ftjob_1", GatewayAsyncResourceType.TUNING, "running");
+        GatewayAsyncResourceEntity succeeded = asyncEntity("ftjob_1", GatewayAsyncResourceType.TUNING, "succeeded");
+        Mockito.when(fixture.asyncRepository.findByResourceKeyAndDistributedKeyIdAndDeletedFalse("ftjob_1", 1L))
+                .thenReturn(Optional.of(running))
+                .thenReturn(Optional.of(succeeded));
+        ObjectNode request = fixture.objectMapper.createObjectNode();
+        request.put("timeoutMs", 150);
+
+        ObjectNode response = fixture.service.waitOperation(1L, "operations/ftjob_1", request);
+
+        assertTrue(response.path("waited").asBoolean());
+        assertTrue(response.path("done").asBoolean());
+        assertEquals("polling", response.path("wait_mode").asText());
+        assertEquals(false, response.path("timeout").asBoolean());
+    }
+
+    @Test
     void shouldListOperationsWithStringResourceType() {
         Fixture fixture = new Fixture();
         GatewayAsyncResourceEntity entity = asyncEntity("ftjob_1", GatewayAsyncResourceType.TUNING, "running");
@@ -163,6 +182,36 @@ class GatewayPublicResourceServiceTests {
 
         assertEquals("list", response.path("object").asText());
         assertEquals("operations/ftjob_1", response.path("data").path(0).path("name").asText());
+    }
+
+    @Test
+    void shouldListAndCancelVideoOperations() {
+        Fixture fixture = new Fixture();
+        GatewayAsyncResourceEntity entity = asyncEntity("video_1", GatewayAsyncResourceType.VIDEO, "queued");
+        Mockito.when(fixture.asyncRepository.search(
+                        Mockito.eq(1L),
+                        Mockito.eq(GatewayAsyncResourceType.VIDEO),
+                        Mockito.eq("queued"),
+                        any()))
+                .thenReturn(List.of(entity));
+        Mockito.when(fixture.asyncRepository.findByResourceKeyAndDistributedKeyIdAndDeletedFalse("video_1", 1L))
+                .thenReturn(Optional.of(entity));
+        Mockito.when(fixture.asyncService.cancelVideoTask("video_1", 1L))
+                .thenAnswer(invocation -> {
+                    entity.setStatus("cancelled");
+                    entity.setResponsePayloadJson("{\"id\":\"video_1\",\"object\":\"video.generation\",\"status\":\"cancelled\"}");
+                    ObjectNode response = fixture.objectMapper.createObjectNode();
+                    response.put("id", "video_1");
+                    response.put("status", "cancelled");
+                    return response;
+                });
+
+        ObjectNode listResponse = fixture.service.listOperations(1L, "videos", "QUEUED");
+        ObjectNode cancelResponse = fixture.service.cancelOperation(1L, "operations/video_1");
+
+        assertEquals("operations/video_1", listResponse.path("data").path(0).path("name").asText());
+        assertEquals("VIDEO", cancelResponse.path("metadata").path("resource_type").asText());
+        assertEquals("cancelled", cancelResponse.path("metadata").path("status").asText());
     }
 
     private GatewayAsyncResourceEntity asyncEntity(String resourceKey, GatewayAsyncResourceType type, String status) {

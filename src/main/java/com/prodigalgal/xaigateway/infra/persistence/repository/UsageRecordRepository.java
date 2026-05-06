@@ -15,6 +15,8 @@ public interface UsageRecordRepository extends JpaRepository<UsageRecordEntity, 
     Optional<UsageRecordEntity> findByRequestId(String requestId);
     List<UsageRecordEntity> findAllByRequestIdIn(Iterable<String> requestIds);
 
+    List<UsageRecordEntity> findTop100ByDistributedKeyIdInOrderByCreatedAtDesc(Iterable<Long> distributedKeyIds);
+
     @Query("""
             select entity
             from UsageRecordEntity entity

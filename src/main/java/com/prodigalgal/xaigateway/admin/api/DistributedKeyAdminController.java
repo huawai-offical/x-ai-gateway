@@ -68,6 +68,13 @@ public class DistributedKeyAdminController {
         return distributedKeyAdminService.exportClientConfig(id, format, clientFamily, baseUrl);
     }
 
+    @GetMapping("/{id}/onboarding-pack")
+    public DistributedKeyOnboardingPackResponse exportOnboardingPack(
+            @PathVariable Long id,
+            @RequestParam(required = false) String baseUrl) {
+        return distributedKeyAdminService.exportOnboardingPack(id, baseUrl);
+    }
+
     @PostMapping("/{id}/client-config/downloads/{grantToken}")
     public DistributedKeyClientConfigResponse consumeOneTimeClientConfig(
             @PathVariable Long id,

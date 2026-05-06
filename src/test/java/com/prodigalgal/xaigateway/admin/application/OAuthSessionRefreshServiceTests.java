@@ -132,6 +132,27 @@ class OAuthSessionRefreshServiceTests {
         Mockito.verify(repository, Mockito.never()).save(Mockito.any());
     }
 
+    @Test
+    void shouldRefreshCodexProgrammingAccountWithDefaultAdapter() {
+        UpstreamAccountRepository repository = Mockito.mock(UpstreamAccountRepository.class);
+        CredentialCryptoService cryptoService = Mockito.mock(CredentialCryptoService.class);
+        UpstreamAccountEntity entity = account(14L, UpstreamAccountProviderType.CODEX_OAUTH);
+        entity.setTokenExpiresAt(Instant.now().minusSeconds(30));
+        Mockito.when(repository.findAll()).thenReturn(List.of(entity));
+        Mockito.when(repository.save(Mockito.any())).thenAnswer(invocation -> invocation.getArgument(0));
+        Mockito.when(cryptoService.decrypt("enc:access-old")).thenReturn("access-old");
+        Mockito.when(cryptoService.decrypt("enc:refresh-old")).thenReturn("refresh-old");
+        Mockito.when(cryptoService.encrypt(Mockito.anyString())).thenAnswer(invocation -> "enc:" + invocation.getArgument(0));
+        OAuthSessionRefreshService service = service(repository, cryptoService, new CodexOAuthSessionRefreshAdapter());
+
+        OAuthSessionRefreshOutcome outcome = service.refreshDueAccounts(10).getFirst();
+
+        assertEquals("REFRESHED", outcome.status());
+        assertEquals("codex-oauth-session", outcome.reason());
+        assertEquals("REFRESHED", entity.getRefreshStatus());
+        assertTrue(entity.getHeaderSnapshotJson().contains("x-codex-account"));
+    }
+
     private OAuthSessionRefreshService service(
             UpstreamAccountRepository repository,
             CredentialCryptoService cryptoService,

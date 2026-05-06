@@ -13,9 +13,13 @@ import com.prodigalgal.xaigateway.infra.persistence.entity.AnnouncementEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.AnnouncementReadStateEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayUserBalanceLedgerEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayUserEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.PaymentOrderEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.PromoCampaignEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.RedeemCodeEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.RedeemCodeUsageEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.SiteCapabilitySnapshotEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamSiteProfileEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UsageRecordEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountPoolEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UserSubscriptionEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.AnnouncementReadStateRepository;
@@ -24,27 +28,41 @@ import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAcc
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayUserBalanceLedgerRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayUserRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.PaymentOrderRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.RedeemCodeRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.RedeemCodeUsageRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.SiteCapabilitySnapshotRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountPoolRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamSiteProfileRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UsageRecordRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UserSubscriptionRepository;
 import com.prodigalgal.xaigateway.portal.api.PortalAnnouncementResponse;
 import com.prodigalgal.xaigateway.portal.api.PortalBalanceLedgerResponse;
+import com.prodigalgal.xaigateway.portal.api.PortalChannelStatusResponse;
 import com.prodigalgal.xaigateway.portal.api.PortalKeyCreateRequest;
 import com.prodigalgal.xaigateway.portal.api.PortalKeyCreateResponse;
 import com.prodigalgal.xaigateway.portal.api.PortalKeyResponse;
 import com.prodigalgal.xaigateway.portal.api.PortalLoginRequest;
+import com.prodigalgal.xaigateway.portal.api.PortalPaymentOrderResponse;
+import com.prodigalgal.xaigateway.portal.api.PortalProfileResponse;
 import com.prodigalgal.xaigateway.portal.api.PortalRedeemStatusResponse;
 import com.prodigalgal.xaigateway.portal.api.PortalRedeemResponse;
 import com.prodigalgal.xaigateway.portal.api.PortalRegisterRequest;
+import com.prodigalgal.xaigateway.portal.api.PortalSelfServiceSummaryResponse;
 import com.prodigalgal.xaigateway.portal.api.PortalSessionResponse;
 import com.prodigalgal.xaigateway.portal.api.PortalSubscriptionResponse;
+import com.prodigalgal.xaigateway.portal.api.PortalUsageItemResponse;
+import com.prodigalgal.xaigateway.portal.api.PortalUsageSummaryResponse;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -69,11 +87,56 @@ public class PortalAuthService {
     private final RedeemCodeRepository redeemCodeRepository;
     private final RedeemCodeUsageRepository redeemCodeUsageRepository;
     private final GatewayUserBalanceLedgerRepository balanceLedgerRepository;
+    private final PaymentOrderRepository paymentOrderRepository;
+    private final UsageRecordRepository usageRecordRepository;
+    private final UpstreamSiteProfileRepository upstreamSiteProfileRepository;
+    private final SiteCapabilitySnapshotRepository siteCapabilitySnapshotRepository;
     private final UpstreamAccountPoolRepository accountPoolRepository;
     private final DistributedKeyAccountPoolBindingRepository keyPoolBindingRepository;
     private final DistributedKeySecretService distributedKeySecretService;
     private final PasswordEncoder passwordEncoder;
     private final AccessGroupEntitlementService accessGroupEntitlementService;
+    private final ObjectProvider<PortalSecurityService> portalSecurityServiceProvider;
+
+    @Autowired
+    public PortalAuthService(
+            GatewayUserRepository gatewayUserRepository,
+            UserSubscriptionRepository userSubscriptionRepository,
+            DistributedKeyRepository distributedKeyRepository,
+            AnnouncementRepository announcementRepository,
+            AnnouncementReadStateRepository announcementReadStateRepository,
+            RedeemCodeRepository redeemCodeRepository,
+            RedeemCodeUsageRepository redeemCodeUsageRepository,
+            GatewayUserBalanceLedgerRepository balanceLedgerRepository,
+            PaymentOrderRepository paymentOrderRepository,
+            UsageRecordRepository usageRecordRepository,
+            UpstreamSiteProfileRepository upstreamSiteProfileRepository,
+            SiteCapabilitySnapshotRepository siteCapabilitySnapshotRepository,
+            UpstreamAccountPoolRepository accountPoolRepository,
+            DistributedKeyAccountPoolBindingRepository keyPoolBindingRepository,
+            DistributedKeySecretService distributedKeySecretService,
+            PasswordEncoder passwordEncoder,
+            AccessGroupEntitlementService accessGroupEntitlementService,
+            ObjectProvider<PortalSecurityService> portalSecurityServiceProvider) {
+        this.gatewayUserRepository = gatewayUserRepository;
+        this.userSubscriptionRepository = userSubscriptionRepository;
+        this.distributedKeyRepository = distributedKeyRepository;
+        this.announcementRepository = announcementRepository;
+        this.announcementReadStateRepository = announcementReadStateRepository;
+        this.redeemCodeRepository = redeemCodeRepository;
+        this.redeemCodeUsageRepository = redeemCodeUsageRepository;
+        this.balanceLedgerRepository = balanceLedgerRepository;
+        this.paymentOrderRepository = paymentOrderRepository;
+        this.usageRecordRepository = usageRecordRepository;
+        this.upstreamSiteProfileRepository = upstreamSiteProfileRepository;
+        this.siteCapabilitySnapshotRepository = siteCapabilitySnapshotRepository;
+        this.accountPoolRepository = accountPoolRepository;
+        this.keyPoolBindingRepository = keyPoolBindingRepository;
+        this.distributedKeySecretService = distributedKeySecretService;
+        this.passwordEncoder = passwordEncoder;
+        this.accessGroupEntitlementService = accessGroupEntitlementService;
+        this.portalSecurityServiceProvider = portalSecurityServiceProvider;
+    }
 
     public PortalAuthService(
             GatewayUserRepository gatewayUserRepository,
@@ -89,19 +152,63 @@ public class PortalAuthService {
             DistributedKeySecretService distributedKeySecretService,
             PasswordEncoder passwordEncoder,
             AccessGroupEntitlementService accessGroupEntitlementService) {
-        this.gatewayUserRepository = gatewayUserRepository;
-        this.userSubscriptionRepository = userSubscriptionRepository;
-        this.distributedKeyRepository = distributedKeyRepository;
-        this.announcementRepository = announcementRepository;
-        this.announcementReadStateRepository = announcementReadStateRepository;
-        this.redeemCodeRepository = redeemCodeRepository;
-        this.redeemCodeUsageRepository = redeemCodeUsageRepository;
-        this.balanceLedgerRepository = balanceLedgerRepository;
-        this.accountPoolRepository = accountPoolRepository;
-        this.keyPoolBindingRepository = keyPoolBindingRepository;
-        this.distributedKeySecretService = distributedKeySecretService;
-        this.passwordEncoder = passwordEncoder;
-        this.accessGroupEntitlementService = accessGroupEntitlementService;
+        this(
+                gatewayUserRepository,
+                userSubscriptionRepository,
+                distributedKeyRepository,
+                announcementRepository,
+                announcementReadStateRepository,
+                redeemCodeRepository,
+                redeemCodeUsageRepository,
+                balanceLedgerRepository,
+                null,
+                null,
+                null,
+                null,
+                accountPoolRepository,
+                keyPoolBindingRepository,
+                distributedKeySecretService,
+                passwordEncoder,
+                accessGroupEntitlementService,
+                null
+        );
+    }
+
+    public PortalAuthService(
+            GatewayUserRepository gatewayUserRepository,
+            UserSubscriptionRepository userSubscriptionRepository,
+            DistributedKeyRepository distributedKeyRepository,
+            AnnouncementRepository announcementRepository,
+            AnnouncementReadStateRepository announcementReadStateRepository,
+            RedeemCodeRepository redeemCodeRepository,
+            RedeemCodeUsageRepository redeemCodeUsageRepository,
+            GatewayUserBalanceLedgerRepository balanceLedgerRepository,
+            UpstreamAccountPoolRepository accountPoolRepository,
+            DistributedKeyAccountPoolBindingRepository keyPoolBindingRepository,
+            DistributedKeySecretService distributedKeySecretService,
+            PasswordEncoder passwordEncoder,
+            AccessGroupEntitlementService accessGroupEntitlementService,
+            ObjectProvider<PortalSecurityService> portalSecurityServiceProvider) {
+        this(
+                gatewayUserRepository,
+                userSubscriptionRepository,
+                distributedKeyRepository,
+                announcementRepository,
+                announcementReadStateRepository,
+                redeemCodeRepository,
+                redeemCodeUsageRepository,
+                balanceLedgerRepository,
+                null,
+                null,
+                null,
+                null,
+                accountPoolRepository,
+                keyPoolBindingRepository,
+                distributedKeySecretService,
+                passwordEncoder,
+                accessGroupEntitlementService,
+                portalSecurityServiceProvider
+        );
     }
 
     @Transactional(readOnly = true)
@@ -119,7 +226,9 @@ public class PortalAuthService {
     }
 
     public Mono<PortalSessionResponse> register(PortalRegisterRequest request, ServerWebExchange exchange) {
+        portalSecurityService().ifPresent(service -> service.verifyCaptcha(request.captchaChallengeId(), request.captchaAnswer()));
         String email = normalizeEmail(request.email());
+        portalSecurityService().ifPresent(service -> service.verifyRegistrationPolicy(email, request.inviteCode()));
         if (gatewayUserRepository.existsByEmailIgnoreCase(email)) {
             throw new IllegalArgumentException("该邮箱已经注册。");
         }
@@ -144,10 +253,20 @@ public class PortalAuthService {
         if (user.getPasswordHash() == null || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             throw new GatewayUnauthorizedException("邮箱或密码错误。");
         }
+        portalSecurityService().ifPresent(service -> service.verifyLoginTotpIfRequired(user, request.totpCode()));
 
         user.setLastLoginAt(Instant.now());
         gatewayUserRepository.save(user);
         return exchange.getSession().map(session -> authenticateSession(user, session));
+    }
+
+    public Mono<PortalSessionResponse> authenticateExternalUser(GatewayUserEntity user, ServerWebExchange exchange) {
+        if (!user.isActive()) {
+            throw new GatewayUnauthorizedException("该用户已停用。");
+        }
+        user.setLastLoginAt(Instant.now());
+        GatewayUserEntity saved = gatewayUserRepository.save(user);
+        return exchange.getSession().map(session -> authenticateSession(saved, session));
     }
 
     public Mono<Void> logout(ServerWebExchange exchange) {
@@ -176,6 +295,7 @@ public class PortalAuthService {
 
     public PortalKeyCreateResponse createKey(WebSession session, PortalKeyCreateRequest request) {
         GatewayUserEntity user = requireCurrentUser(session);
+        portalSecurityService().ifPresent(service -> service.assertKeyCreationAllowed(user));
         UpstreamAccountPoolEntity defaultPool = ensureDefaultPool();
         DistributedKeySecrets secrets = distributedKeySecretService.generate();
 
@@ -311,6 +431,71 @@ public class PortalAuthService {
         return balanceLedgerRepository.findAllByUser_IdOrderByCreatedAtDesc(user.getId()).stream()
                 .map(this::toBalanceLedgerResponse)
                 .toList();
+    }
+
+    public PortalProfileResponse profile(WebSession session) {
+        GatewayUserEntity user = requireCurrentUser(session);
+        return toProfileResponse(user);
+    }
+
+    public List<PortalPaymentOrderResponse> listPaymentOrders(WebSession session) {
+        GatewayUserEntity user = requireCurrentUser(session);
+        if (paymentOrderRepository == null) {
+            return List.of();
+        }
+        return paymentOrderRepository.findAllByUser_IdOrderByCreatedAtDesc(user.getId()).stream()
+                .map(this::toPaymentOrderResponse)
+                .toList();
+    }
+
+    public PortalUsageSummaryResponse usageSummary(WebSession session) {
+        GatewayUserEntity user = requireCurrentUser(session);
+        List<Long> keyIds = distributedKeyRepository.findAllByOwnerUser_IdOrderByCreatedAtDesc(user.getId()).stream()
+                .map(DistributedKeyEntity::getId)
+                .filter(id -> id != null)
+                .toList();
+        if (usageRecordRepository == null || keyIds.isEmpty()) {
+            return new PortalUsageSummaryResponse(0, 0, 0, 0, 0, List.of());
+        }
+        List<UsageRecordEntity> records = usageRecordRepository.findTop100ByDistributedKeyIdInOrderByCreatedAtDesc(keyIds);
+        long promptTokens = records.stream().mapToLong(UsageRecordEntity::getPromptTokens).sum();
+        long completionTokens = records.stream().mapToLong(UsageRecordEntity::getCompletionTokens).sum();
+        long totalTokens = records.stream().mapToLong(UsageRecordEntity::getTotalTokens).sum();
+        long cacheHitTokens = records.stream().mapToLong(UsageRecordEntity::getCacheHitTokens).sum();
+        List<PortalUsageItemResponse> recent = records.stream()
+                .sorted(Comparator.comparing(UsageRecordEntity::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .limit(20)
+                .map(this::toUsageItemResponse)
+                .toList();
+        return new PortalUsageSummaryResponse(records.size(), totalTokens, promptTokens, completionTokens, cacheHitTokens, recent);
+    }
+
+    public List<PortalChannelStatusResponse> channelStatuses(WebSession session) {
+        requireCurrentUser(session);
+        if (upstreamSiteProfileRepository == null || siteCapabilitySnapshotRepository == null) {
+            return List.of();
+        }
+        return upstreamSiteProfileRepository.findAllByActiveTrueOrderByDisplayNameAsc().stream()
+                .map(profile -> toChannelStatusResponse(profile, siteCapabilitySnapshotRepository.findBySiteProfile_Id(profile.getId()).orElse(null)))
+                .toList();
+    }
+
+    public PortalSelfServiceSummaryResponse selfServiceSummary(WebSession session) {
+        GatewayUserEntity user = requireCurrentUser(session);
+        return new PortalSelfServiceSummaryResponse(
+                toProfileResponse(user),
+                currentBalance(user.getId()),
+                listKeys(session),
+                listSubscriptions(session),
+                usageSummary(session),
+                listPaymentOrders(session),
+                channelStatuses(session)
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public GatewayUserEntity requireCurrentPortalUser(WebSession session) {
+        return requireCurrentUser(session);
     }
 
     private PortalSessionResponse authenticateSession(GatewayUserEntity user, WebSession session) {
@@ -533,6 +718,78 @@ public class PortalAuthService {
         );
     }
 
+    private PortalProfileResponse toProfileResponse(GatewayUserEntity user) {
+        int passkeyCount = portalSecurityService()
+                .map(service -> service.passkeyCountForUser(user.getId()))
+                .orElse(0);
+        return new PortalProfileResponse(
+                user.getId(),
+                user.getEmail(),
+                user.getDisplayName(),
+                user.isActive(),
+                user.getEmailVerifiedAt() != null,
+                user.isTotpEnabled(),
+                passkeyCount,
+                user.getLastLoginAt(),
+                user.getCreatedAt()
+        );
+    }
+
+    private PortalPaymentOrderResponse toPaymentOrderResponse(PaymentOrderEntity entity) {
+        return new PortalPaymentOrderResponse(
+                entity.getId(),
+                entity.getOrderNo(),
+                entity.getProvider(),
+                entity.getAmountMinor(),
+                entity.getCurrency(),
+                entity.getTokenCredits(),
+                entity.getStatus(),
+                entity.getProviderTradeNo(),
+                entity.getProviderInstanceCode(),
+                entity.getCheckoutUrl(),
+                entity.getCheckoutMethod(),
+                entity.getCheckoutExpiresAt(),
+                entity.getRefundAmountMinor(),
+                entity.getRefundedAt(),
+                entity.getDisputedAt(),
+                entity.getReconciledAt(),
+                entity.getReconcileStatus(),
+                entity.getPaidAt(),
+                entity.getCreatedAt()
+        );
+    }
+
+    private PortalUsageItemResponse toUsageItemResponse(UsageRecordEntity entity) {
+        return new PortalUsageItemResponse(
+                entity.getRequestId(),
+                entity.getDistributedKeyId(),
+                entity.getProtocol(),
+                entity.getModelGroup(),
+                entity.getProviderType() == null ? null : entity.getProviderType().name(),
+                entity.getPromptTokens(),
+                entity.getCompletionTokens(),
+                entity.getTotalTokens(),
+                entity.getCompleteness() == null ? null : entity.getCompleteness().name(),
+                entity.getCreatedAt()
+        );
+    }
+
+    private PortalChannelStatusResponse toChannelStatusResponse(
+            UpstreamSiteProfileEntity profile,
+            SiteCapabilitySnapshotEntity snapshot) {
+        return new PortalChannelStatusResponse(
+                profile.getId(),
+                profile.getProfileCode(),
+                profile.getDisplayName(),
+                profile.getSiteKind() == null ? null : profile.getSiteKind().name(),
+                profile.isActive(),
+                snapshot == null ? "UNKNOWN" : snapshot.getHealthState(),
+                snapshot == null ? null : snapshot.getBlockedReason(),
+                snapshot == null ? List.of() : snapshot.getSupportedProtocols(),
+                snapshot == null ? null : snapshot.getRefreshedAt()
+        );
+    }
+
     private String normalizeRedeemCode(String rawCode) {
         String value = rawCode == null ? "" : rawCode.trim().toUpperCase(Locale.ROOT);
         if (value.isBlank()) {
@@ -616,5 +873,9 @@ public class PortalAuthService {
                 .map(String::trim)
                 .distinct()
                 .toList();
+    }
+
+    private Optional<PortalSecurityService> portalSecurityService() {
+        return portalSecurityServiceProvider == null ? Optional.empty() : Optional.ofNullable(portalSecurityServiceProvider.getIfAvailable());
     }
 }

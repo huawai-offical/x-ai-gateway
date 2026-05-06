@@ -1,12 +1,15 @@
 package com.prodigalgal.xaigateway.admin.api;
 
 import jakarta.validation.Valid;
+import java.util.List;
 
 public record SystemSettingsRequest(
         @Valid
         UpstreamCacheSettingsRequest upstreamCache,
         @Valid
-        UpstreamRuntimeSettingsRequest upstream
+        UpstreamRuntimeSettingsRequest upstream,
+        @Valid
+        SecuritySettingsRequest security
 ) {
 
     public record UpstreamCacheSettingsRequest(
@@ -25,6 +28,14 @@ public record SystemSettingsRequest(
             Integer sdkStreamTimeoutMs,
             Integer httpTimeoutMs,
             Integer httpStreamTimeoutMs
+    ) {
+    }
+
+    public record SecuritySettingsRequest(
+            Boolean ssrfProtectionEnabled,
+            Boolean allowPrivateNetwork,
+            List<String> allowedHosts,
+            List<String> sensitiveWords
     ) {
     }
 }

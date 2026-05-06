@@ -12,6 +12,11 @@ public enum TranslationResourceType {
     BATCH("batch"),
     TUNING("tuning"),
     REALTIME("realtime"),
+    RERANK("rerank"),
+    VIDEO("video"),
+    MUSIC("music"),
+    TASK("task"),
+    WEB_SEARCH("web_search"),
     UNKNOWN("unknown");
 
     private final String wireName;

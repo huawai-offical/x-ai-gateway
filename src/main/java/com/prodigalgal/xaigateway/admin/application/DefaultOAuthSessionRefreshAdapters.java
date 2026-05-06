@@ -78,3 +78,31 @@ class ClaudeOAuthSessionRefreshAdapter extends DefaultOAuthSessionRefreshAdapter
         super(UpstreamAccountProviderType.CLAUDE_ACCOUNT, "claude-session", "x-claude-account", 1800);
     }
 }
+
+@Component
+class CodexOAuthSessionRefreshAdapter extends DefaultOAuthSessionRefreshAdapter {
+    CodexOAuthSessionRefreshAdapter() {
+        super(UpstreamAccountProviderType.CODEX_OAUTH, "codex-oauth-session", "x-codex-account", 3600);
+    }
+}
+
+@Component
+class AntigravityOAuthSessionRefreshAdapter extends DefaultOAuthSessionRefreshAdapter {
+    AntigravityOAuthSessionRefreshAdapter() {
+        super(UpstreamAccountProviderType.ANTIGRAVITY_OAUTH, "antigravity-oauth-session", "x-antigravity-account", 3600);
+    }
+}
+
+@Component
+class CopilotOAuthSessionRefreshAdapter extends DefaultOAuthSessionRefreshAdapter {
+    CopilotOAuthSessionRefreshAdapter() {
+        super(UpstreamAccountProviderType.COPILOT_OAUTH, "copilot-oauth-session", "x-copilot-account", 3600);
+    }
+}
+
+@Component
+class ClaudePlanSessionRefreshAdapter extends DefaultOAuthSessionRefreshAdapter {
+    ClaudePlanSessionRefreshAdapter() {
+        super(UpstreamAccountProviderType.CLAUDE_PLAN, "claude-plan-session", "x-claude-plan-account", 1800);
+    }
+}

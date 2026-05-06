@@ -3,6 +3,8 @@ package com.prodigalgal.xaigateway.protocol.ingress.google;
 import com.prodigalgal.xaigateway.admin.application.GatewayChatExecutionService;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthenticationService;
+import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
+import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamilyResolver;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
 import com.prodigalgal.xaigateway.gateway.core.canonical.NonChatCanonicalRenderService;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayResourceExecutionService;
@@ -26,9 +28,11 @@ import reactor.core.publisher.Flux;
 public class GeminiGenerateContentController {
 
     private static final String API_KEY_HEADER = "x-goog-api-key";
+    private static final String CLIENT_FAMILY_HEADER = "X-AI-Gateway-Client-Family";
 
     private final DistributedKeyAuthenticationService distributedKeyAuthenticationService;
     private final GatewayChatExecutionService gatewayChatExecutionService;
+    private final GatewayClientFamilyResolver gatewayClientFamilyResolver;
     private final GatewayResourceExecutionService gatewayResourceExecutionService;
     private final GeminiGenerateContentRequestMapper geminiGenerateContentRequestMapper;
     private final GeminiGenerateContentEncoder geminiGenerateContentEncoder;
@@ -39,6 +43,7 @@ public class GeminiGenerateContentController {
     public GeminiGenerateContentController(
             DistributedKeyAuthenticationService distributedKeyAuthenticationService,
             GatewayChatExecutionService gatewayChatExecutionService,
+            GatewayClientFamilyResolver gatewayClientFamilyResolver,
             GeminiGenerateContentRequestMapper geminiGenerateContentRequestMapper,
             GeminiGenerateContentEncoder geminiGenerateContentEncoder,
             GatewayResourceExecutionService gatewayResourceExecutionService,
@@ -47,6 +52,7 @@ public class GeminiGenerateContentController {
             NonChatCanonicalRenderService nonChatCanonicalRenderService) {
         this.distributedKeyAuthenticationService = distributedKeyAuthenticationService;
         this.gatewayChatExecutionService = gatewayChatExecutionService;
+        this.gatewayClientFamilyResolver = gatewayClientFamilyResolver;
         this.gatewayResourceExecutionService = gatewayResourceExecutionService;
         this.geminiGenerateContentRequestMapper = geminiGenerateContentRequestMapper;
         this.geminiGenerateContentEncoder = geminiGenerateContentEncoder;
@@ -59,9 +65,12 @@ public class GeminiGenerateContentController {
     public ResponseEntity<?> generateContent(
             @PathVariable String model,
             @RequestHeader(value = API_KEY_HEADER, required = false) String headerApiKey,
+            @RequestHeader(value = CLIENT_FAMILY_HEADER, required = false) String explicitClientFamily,
+            @RequestHeader(value = "User-Agent", required = false) String userAgent,
             @RequestParam(value = "key", required = false) String queryApiKey,
             @Valid @RequestBody GeminiGenerateContentRequest request) {
         AuthenticatedDistributedKey distributedKey = authenticate(headerApiKey, queryApiKey);
+        GatewayClientFamily clientFamily = gatewayClientFamilyResolver.resolve(explicitClientFamily, userAgent);
         GeminiGenerateContentModeResolver.GeminiGenerateContentMode mode = geminiGenerateContentModeResolver.resolve(request);
         if (mode == GeminiGenerateContentModeResolver.GeminiGenerateContentMode.IMAGE_GENERATION) {
             var resourceRequest = geminiGenerateContentResourceMapper.toImageGenerationRequest(distributedKey, model, request);
@@ -80,7 +89,9 @@ public class GeminiGenerateContentController {
             ).response();
         }
         CanonicalRequest canonicalRequest = geminiGenerateContentRequestMapper.toCanonicalRequest(distributedKey, model, request, false);
-        var response = gatewayChatExecutionService.executeGatewayResponse(canonicalRequest);
+        var response = clientFamily == GatewayClientFamily.GENERIC_OPENAI
+                ? gatewayChatExecutionService.executeGatewayResponse(canonicalRequest)
+                : gatewayChatExecutionService.executeGatewayResponse(canonicalRequest, clientFamily);
         return ResponseEntity.ok(geminiGenerateContentEncoder.encode(response));
     }
 
@@ -88,15 +99,20 @@ public class GeminiGenerateContentController {
     public ResponseEntity<Flux<String>> streamGenerateContent(
             @PathVariable String model,
             @RequestHeader(value = API_KEY_HEADER, required = false) String headerApiKey,
+            @RequestHeader(value = CLIENT_FAMILY_HEADER, required = false) String explicitClientFamily,
+            @RequestHeader(value = "User-Agent", required = false) String userAgent,
             @RequestParam(value = "key", required = false) String queryApiKey,
             @Valid @RequestBody GeminiGenerateContentRequest request) {
         AuthenticatedDistributedKey distributedKey = authenticate(headerApiKey, queryApiKey);
+        GatewayClientFamily clientFamily = gatewayClientFamilyResolver.resolve(explicitClientFamily, userAgent);
         GeminiGenerateContentModeResolver.GeminiGenerateContentMode mode = geminiGenerateContentModeResolver.resolve(request);
         if (mode != GeminiGenerateContentModeResolver.GeminiGenerateContentMode.CHAT) {
             throw new IllegalArgumentException("resource-mode 当前不支持 streamGenerateContent。");
         }
         CanonicalRequest canonicalRequest = geminiGenerateContentRequestMapper.toCanonicalRequest(distributedKey, model, request, true);
-        var streamResponse = gatewayChatExecutionService.executeGatewayStream(canonicalRequest);
+        var streamResponse = clientFamily == GatewayClientFamily.GENERIC_OPENAI
+                ? gatewayChatExecutionService.executeGatewayStream(canonicalRequest)
+                : gatewayChatExecutionService.executeGatewayStream(canonicalRequest, clientFamily);
         Flux<String> body = geminiGenerateContentEncoder.encodeStream(streamResponse);
         return ResponseEntity.ok()
                 .contentType(MediaType.TEXT_EVENT_STREAM)

@@ -69,6 +69,7 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -109,6 +110,7 @@ public class GatewayAsyncResourceService {
     private final ObjectMapper objectMapper;
     private final Clock clock;
     private final WebClient.Builder webClientBuilder;
+    private final List<MediaProviderAdapter> mediaProviderAdapters;
 
     @Autowired
     public GatewayAsyncResourceService(
@@ -146,6 +148,7 @@ public class GatewayAsyncResourceService {
         this.objectMapper = objectMapper;
         this.clock = clock;
         this.webClientBuilder = webClientBuilder;
+        this.mediaProviderAdapters = List.of(new GeminiVeoMediaProviderAdapter(objectMapper, clock));
     }
 
     public GatewayAsyncResourceService(
@@ -507,6 +510,132 @@ public class GatewayAsyncResourceService {
         return completeRemoteStatus(tuningId, distributedKeyId, GatewayAsyncResourceType.TUNING, InteropFeature.TUNING_CREATE, "/cancel");
     }
 
+    public JsonNode createVideoTask(Long distributedKeyId, JsonNode requestBody) {
+        return createMediaTask(
+                distributedKeyId,
+                requestBody,
+                GatewayAsyncResourceType.VIDEO,
+                "video_",
+                "video.generation",
+                "video_generation",
+                InteropFeature.VIDEO_GENERATION
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode mediaProviderMatrix() {
+        ObjectNode root = objectMapper.createObjectNode();
+        root.put("object", "gateway.media_provider_matrix");
+        root.put("version", "2026-05-06");
+        root.put("generated_at", now().getEpochSecond());
+        var video = root.putArray("video");
+        video.add(mediaProviderMatrixItem(
+                "openai_compatible",
+                "OpenAI-compatible Video",
+                "SUPPORTED",
+                "native_openai_style",
+                "/v1/videos/generations",
+                "支持 create/get/cancel，适用于 OpenAI direct 和兼容站点。"
+        ));
+        video.add(mediaProviderMatrixItem(
+                "gemini",
+                "Gemini / Vertex Video",
+                "SUPPORTED",
+                "provider_specific_adapter",
+                "Gemini Veo provider adapter",
+                "支持 provider_mode=adapter 的 create/get/cancel/download 本地生命周期；真实 smoke 需环境变量注入凭证。"
+        ));
+        video.add(mediaProviderMatrixItem(
+                "minimax",
+                "MiniMax Video",
+                "ADAPTER_REQUIRED",
+                "provider_specific_adapter_required",
+                "MiniMax video API",
+                "优先通过 OpenAI-compatible profile 接入，专有 API 需单独适配。"
+        ));
+        video.add(mediaProviderMatrixItem(
+                "midjourney",
+                "Midjourney-like Video/Image",
+                "NOT_NATIVE",
+                "external_async_bridge_required",
+                "第三方任务队列",
+                "当前不直接保存真实产物，需外部 bridge 提供任务状态。"
+        ));
+
+        var music = root.putArray("music");
+        music.add(mediaProviderMatrixItem(
+                "openai_compatible",
+                "OpenAI-compatible Music",
+                "SUPPORTED",
+                "native_openai_style",
+                "/v1/music/generations",
+                "支持 create/get/cancel，适用于 OpenAI-compatible 音频生成站点。"
+        ));
+        music.add(mediaProviderMatrixItem(
+                "suno",
+                "Suno-like Music",
+                "ADAPTER_REQUIRED",
+                "provider_specific_adapter_required",
+                "Suno task API",
+                "可通过兼容层接入，专有 API 需要签名、轮询和产物映射适配。"
+        ));
+        music.add(mediaProviderMatrixItem(
+                "minimax",
+                "MiniMax Music",
+                "ADAPTER_REQUIRED",
+                "provider_specific_adapter_required",
+                "MiniMax music API",
+                "需要 provider-specific adapter 才能覆盖专有任务字段。"
+        ));
+        music.add(mediaProviderMatrixItem(
+                "gemini",
+                "Gemini Music",
+                "NOT_SUPPORTED",
+                "provider_capability_absent",
+                "无稳定通用 music task API",
+                "当前 capability matrix 不标记为原生 Music 任务。"
+        ));
+        return root;
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode getVideoTask(String videoId, Long distributedKeyId) {
+        return readOrSyncResource(videoId, distributedKeyId, GatewayAsyncResourceType.VIDEO, "video.generation");
+    }
+
+    public JsonNode cancelVideoTask(String videoId, Long distributedKeyId) {
+        return completeRemoteStatus(videoId, distributedKeyId, GatewayAsyncResourceType.VIDEO, InteropFeature.VIDEO_GENERATION, "/cancel");
+    }
+
+    public JsonNode downloadVideoTaskArtifact(String videoId, Long distributedKeyId) {
+        return downloadMediaTaskArtifact(videoId, distributedKeyId, GatewayAsyncResourceType.VIDEO);
+    }
+
+    public JsonNode createMusicTask(Long distributedKeyId, JsonNode requestBody) {
+        return createMediaTask(
+                distributedKeyId,
+                requestBody,
+                GatewayAsyncResourceType.MUSIC,
+                "music_",
+                "music.generation",
+                "music_generation",
+                InteropFeature.MUSIC_GENERATION
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode getMusicTask(String musicId, Long distributedKeyId) {
+        return readOrSyncResource(musicId, distributedKeyId, GatewayAsyncResourceType.MUSIC, "music.generation");
+    }
+
+    public JsonNode cancelMusicTask(String musicId, Long distributedKeyId) {
+        return completeRemoteStatus(musicId, distributedKeyId, GatewayAsyncResourceType.MUSIC, InteropFeature.MUSIC_GENERATION, "/cancel");
+    }
+
+    public JsonNode downloadMusicTaskArtifact(String musicId, Long distributedKeyId) {
+        return downloadMediaTaskArtifact(musicId, distributedKeyId, GatewayAsyncResourceType.MUSIC);
+    }
+
     public JsonNode createRealtimeClientSecret(Long distributedKeyId, JsonNode requestBody) {
         return createRealtimeClientSecret(distributedKeyId, requestBody, null);
     }
@@ -542,6 +671,9 @@ public class GatewayAsyncResourceService {
             String objectName) {
         GatewayAsyncResourceEntity entity = getRequired(resourceKey, resourceType, distributedKeyId);
         ObjectNode metadata = readObject(entity.getMetadataJson());
+        if (isProviderSpecificMediaAdapter(metadata, resourceType)) {
+            return syncProviderSpecificMediaResource(entity, metadata);
+        }
         String upstreamId = metadata.path("upstream_object_id").asText(null);
         if (upstreamId == null || upstreamId.isBlank()) {
             return readJson(entity.getResponsePayloadJson());
@@ -581,6 +713,10 @@ public class GatewayAsyncResourceService {
                         ? cancelLocalUpload(entity)
                         : completeLocalUpload(entity, distributedKeyId);
             }
+            if (suffix.contains("cancel")
+                    && (resourceType == GatewayAsyncResourceType.VIDEO || resourceType == GatewayAsyncResourceType.MUSIC)) {
+                return cancelLocalMediaTask(resourceKey, distributedKeyId, resourceType);
+            }
             return updateLocalStatus(resourceKey, distributedKeyId, resourceType, suffix.contains("cancel") ? "cancelled" : "completed");
         }
         if (resourceType == GatewayAsyncResourceType.UPLOAD) {
@@ -588,6 +724,9 @@ public class GatewayAsyncResourceService {
             if (terminalResponse.isPresent()) {
                 return terminalResponse.get();
             }
+        }
+        if (isProviderSpecificMediaAdapter(metadata, resourceType)) {
+            return cancelProviderSpecificMediaResource(entity, metadata);
         }
         if (isAnthropicNativeBatch(metadata, resourceType)) {
             UpstreamTarget target = resolveAnthropicMessageBatchTargetForEntity(entity, metadata);
@@ -1340,6 +1479,7 @@ public class GatewayAsyncResourceService {
         metadata.put("site_profile_id", target.siteProfile().getId());
         metadata.put("upstream_status", upstreamResponse.path("status").asText(status));
         metadata.put("upstream_synced_at", now().getEpochSecond());
+        enrichMediaProviderMetadata(metadata, type, target.siteProfile());
         appendEvent(metadata, "created", status);
 
         GatewayAsyncResourceEntity entity = new GatewayAsyncResourceEntity();
@@ -1353,6 +1493,284 @@ public class GatewayAsyncResourceService {
         entity.setResponsePayloadJson(writeJson(response));
         entity.setMetadataJson(writeJson(metadata));
         gatewayAsyncResourceRepository.save(entity);
+        return response;
+    }
+
+    private JsonNode createLocalMediaTask(
+            Long distributedKeyId,
+            JsonNode requestBody,
+            GatewayAsyncResourceType type,
+            String idPrefix,
+            String objectName,
+            String taskKind) {
+        ObjectNode payload = copyObject(requireObject(requestBody));
+        String resourceKey = idPrefix + UUID.randomUUID().toString().replace("-", "");
+        String status = text(payload, "status");
+        status = status == null ? "queued" : status.trim().toLowerCase(Locale.ROOT);
+
+        ObjectNode response = objectMapper.createObjectNode();
+        response.put("id", resourceKey);
+        response.put("object", objectName);
+        response.put("status", status);
+        response.put("created", now().getEpochSecond());
+        response.put("task_kind", taskKind);
+        putIfPresent(response, "model", text(payload, "model"));
+        if (payload.has("metadata")) {
+            response.set("metadata", payload.path("metadata").deepCopy());
+        }
+
+        ObjectNode metadata = objectMapper.createObjectNode();
+        metadata.put("object_mode", "gateway_local_async_task");
+        metadata.put("task_kind", taskKind);
+        metadata.put("provider_mode", "local_contract");
+        metadata.put("provider_support_tier", "local_contract");
+        metadata.put("provider_support_status", "LOCAL_ONLY");
+        metadata.put("provider_smoke_hint", "本地 contract smoke，不访问真实 provider。");
+        appendEvent(metadata, "created", status);
+
+        GatewayAsyncResourceEntity entity = new GatewayAsyncResourceEntity();
+        entity.setResourceKey(resourceKey);
+        entity.setDistributedKeyId(distributedKeyId);
+        entity.setResourceType(type);
+        entity.setRequestModel(text(payload, "model"));
+        entity.setStatus(status);
+        entity.setRequestPayloadJson(writeJson(payload));
+        entity.setResponsePayloadJson(writeJson(response));
+        entity.setMetadataJson(writeJson(metadata));
+        gatewayAsyncResourceRepository.save(entity);
+        return response;
+    }
+
+    private JsonNode createMediaTask(
+            Long distributedKeyId,
+            JsonNode requestBody,
+            GatewayAsyncResourceType type,
+            String idPrefix,
+            String objectName,
+            String taskKind,
+            InteropFeature feature) {
+        ObjectNode sourcePayload = copyObject(requireObject(requestBody));
+        Optional<MediaProviderAdapter> adapter = mediaProviderAdapterFor(type, sourcePayload);
+        if (adapter.isPresent()) {
+            return createProviderSpecificMediaTask(distributedKeyId, sourcePayload, type, idPrefix, adapter.get());
+        }
+        if (!useUpstreamMediaProvider(sourcePayload)) {
+            return createLocalMediaTask(distributedKeyId, sourcePayload, type, idPrefix, objectName, taskKind);
+        }
+        Long preferredCredentialId = sourcePayload.hasNonNull("preferred_credential_id")
+                ? sourcePayload.path("preferred_credential_id").asLong()
+                : null;
+        sourcePayload.remove(List.of("provider_mode", "preferred_credential_id"));
+        UpstreamTarget target = resolveUpstreamTarget(distributedKeyId, feature, preferredCredentialId);
+        JsonNode upstreamResponse = invokeUpstreamJson(target, basePath(feature), sourcePayload);
+        return persistUpstreamBackedResource(distributedKeyId, type, idPrefix, sourcePayload, upstreamResponse, objectName, target);
+    }
+
+    private boolean useUpstreamMediaProvider(ObjectNode payload) {
+        String providerMode = text(payload, "provider_mode");
+        return providerMode != null && ("upstream".equalsIgnoreCase(providerMode) || "provider".equalsIgnoreCase(providerMode))
+                || payload.hasNonNull("preferred_credential_id");
+    }
+
+    private JsonNode createProviderSpecificMediaTask(
+            Long distributedKeyId,
+            ObjectNode requestPayload,
+            GatewayAsyncResourceType type,
+            String idPrefix,
+            MediaProviderAdapter adapter) {
+        String resourceKey = idPrefix + UUID.randomUUID().toString().replace("-", "");
+        MediaProviderCreateResult result = adapter.create(resourceKey, distributedKeyId, requestPayload, now());
+
+        GatewayAsyncResourceEntity entity = new GatewayAsyncResourceEntity();
+        entity.setResourceKey(resourceKey);
+        entity.setDistributedKeyId(distributedKeyId);
+        entity.setResourceType(type);
+        entity.setRequestModel(text(requestPayload, "model"));
+        entity.setStatus(result.status());
+        entity.setUpstreamObjectId(result.providerTaskId());
+        entity.setRequestPayloadJson(writeJson(requestPayload));
+        entity.setResponsePayloadJson(writeJson(result.response()));
+        entity.setMetadataJson(writeJson(result.metadata()));
+        gatewayAsyncResourceRepository.save(entity);
+        return result.response();
+    }
+
+    private JsonNode syncProviderSpecificMediaResource(GatewayAsyncResourceEntity entity, ObjectNode metadata) {
+        MediaProviderAdapter adapter = mediaProviderAdapterForMetadata(entity.getResourceType(), metadata);
+        ObjectNode response = adapter.get(entity, metadata, readObject(entity.getResponsePayloadJson()), now());
+        String status = response.path("status").asText(entity.getStatus());
+        entity.setStatus(status);
+        entity.setResponsePayloadJson(writeJson(response));
+        entity.setMetadataJson(writeJson(metadata));
+        gatewayAsyncResourceRepository.save(entity);
+        return response;
+    }
+
+    private JsonNode cancelProviderSpecificMediaResource(GatewayAsyncResourceEntity entity, ObjectNode metadata) {
+        MediaProviderAdapter adapter = mediaProviderAdapterForMetadata(entity.getResourceType(), metadata);
+        ObjectNode response = adapter.cancel(entity, metadata, readObject(entity.getResponsePayloadJson()), now());
+        String status = response.path("status").asText(entity.getStatus());
+        entity.setStatus(status);
+        entity.setResponsePayloadJson(writeJson(response));
+        entity.setMetadataJson(writeJson(metadata));
+        gatewayAsyncResourceRepository.save(entity);
+        return response;
+    }
+
+    private JsonNode downloadMediaTaskArtifact(
+            String resourceKey,
+            Long distributedKeyId,
+            GatewayAsyncResourceType type) {
+        GatewayAsyncResourceEntity entity = getRequired(resourceKey, type, distributedKeyId);
+        ObjectNode metadata = readObject(entity.getMetadataJson());
+        ObjectNode response = readObject(entity.getResponsePayloadJson());
+        ObjectNode download;
+        if (isProviderSpecificMediaAdapter(metadata, type)) {
+            download = mediaProviderAdapterForMetadata(type, metadata).download(entity, metadata, response, now());
+        } else {
+            String outputUrl = firstText(response, "output_url", "download_url", "url");
+            if (outputUrl == null || outputUrl.isBlank()) {
+                throw new IllegalStateException("当前媒体任务没有可下载产物。");
+            }
+            download = objectMapper.createObjectNode();
+            download.put("id", entity.getResourceKey() + "_download");
+            download.put("object", "media.artifact_download");
+            download.put("resource_id", entity.getResourceKey());
+            download.put("download_url", outputUrl);
+            download.put("status", entity.getStatus());
+            appendEvent(metadata, "downloaded", entity.getStatus());
+        }
+        entity.setMetadataJson(writeJson(metadata));
+        gatewayAsyncResourceRepository.save(entity);
+        return download;
+    }
+
+    private Optional<MediaProviderAdapter> mediaProviderAdapterFor(GatewayAsyncResourceType type, ObjectNode requestPayload) {
+        return mediaProviderAdapters.stream()
+                .filter(adapter -> adapter.supports(type, requestPayload))
+                .findFirst();
+    }
+
+    private boolean isProviderSpecificMediaAdapter(ObjectNode metadata, GatewayAsyncResourceType type) {
+        return (type == GatewayAsyncResourceType.VIDEO || type == GatewayAsyncResourceType.MUSIC)
+                && "provider_specific_media_adapter".equalsIgnoreCase(text(metadata, "object_mode"));
+    }
+
+    private MediaProviderAdapter mediaProviderAdapterForMetadata(GatewayAsyncResourceType type, ObjectNode metadata) {
+        String adapterName = text(metadata, "provider_adapter");
+        String providerFamily = text(metadata, "provider_family");
+        return mediaProviderAdapters.stream()
+                .filter(adapter -> adapter.resourceType() == type)
+                .filter(adapter -> adapter.adapterName().equalsIgnoreCase(defaultString(adapterName, ""))
+                        || adapter.providerFamily().equalsIgnoreCase(defaultString(providerFamily, "")))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("未找到媒体 provider adapter：" + defaultString(adapterName, providerFamily)));
+    }
+
+    private ObjectNode mediaProviderMatrixItem(
+            String providerFamily,
+            String displayName,
+            String supportStatus,
+            String supportTier,
+            String nativePath,
+            String note) {
+        ObjectNode item = objectMapper.createObjectNode();
+        item.put("provider_family", providerFamily);
+        item.put("display_name", displayName);
+        item.put("support_status", supportStatus);
+        item.put("support_tier", supportTier);
+        item.put("native_path", nativePath);
+        item.put("note", note);
+        return item;
+    }
+
+    private void enrichMediaProviderMetadata(
+            ObjectNode metadata,
+            GatewayAsyncResourceType type,
+            UpstreamSiteProfileEntity siteProfile) {
+        if (type != GatewayAsyncResourceType.VIDEO && type != GatewayAsyncResourceType.MUSIC) {
+            return;
+        }
+        UpstreamSiteKind siteKind = siteProfile.getSiteKind();
+        metadata.put("provider_family", mediaProviderFamily(siteKind));
+        metadata.put("site_kind", siteKind == null ? "UNKNOWN" : siteKind.name());
+        metadata.put("provider_support_tier", mediaSupportTier(type, siteKind));
+        metadata.put("provider_support_status", mediaSupportStatus(type, siteKind));
+        metadata.put("provider_smoke_hint", mediaSmokeHint(type, siteKind));
+    }
+
+    private String mediaProviderFamily(UpstreamSiteKind siteKind) {
+        if (siteKind == null) {
+            return "unknown";
+        }
+        return switch (siteKind) {
+            case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, AZURE_OPENAI -> "openai_compatible";
+            case MINIMAX -> "minimax";
+            case GEMINI_DIRECT, VERTEX_AI -> "gemini";
+            case ANTHROPIC_DIRECT -> "anthropic";
+            case OLLAMA_DIRECT -> "ollama";
+            default -> siteKind.name().toLowerCase(Locale.ROOT);
+        };
+    }
+
+    private String mediaSupportTier(GatewayAsyncResourceType type, UpstreamSiteKind siteKind) {
+        if (siteKind == UpstreamSiteKind.OPENAI_DIRECT
+                || siteKind == UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC
+                || siteKind == UpstreamSiteKind.AZURE_OPENAI) {
+            return "native_openai_style";
+        }
+        if (siteKind == UpstreamSiteKind.GEMINI_DIRECT || siteKind == UpstreamSiteKind.VERTEX_AI) {
+            return type == GatewayAsyncResourceType.VIDEO
+                    ? "provider_specific_adapter_required"
+                    : "provider_capability_absent";
+        }
+        return "provider_specific_adapter_required";
+    }
+
+    private String mediaSupportStatus(GatewayAsyncResourceType type, UpstreamSiteKind siteKind) {
+        String tier = mediaSupportTier(type, siteKind);
+        return switch (tier) {
+            case "native_openai_style" -> "SUPPORTED";
+            case "provider_capability_absent" -> "NOT_SUPPORTED";
+            default -> "ADAPTER_REQUIRED";
+        };
+    }
+
+    private String mediaSmokeHint(GatewayAsyncResourceType type, UpstreamSiteKind siteKind) {
+        if ("SUPPORTED".equals(mediaSupportStatus(type, siteKind))) {
+            return "使用 provider_mode=upstream 或 preferred_credential_id 执行 create/get/cancel smoke。";
+        }
+        if (type == GatewayAsyncResourceType.VIDEO && (siteKind == UpstreamSiteKind.GEMINI_DIRECT || siteKind == UpstreamSiteKind.VERTEX_AI)) {
+            return "需要先接入 Gemini/Veo 专有 adapter，再执行真实 Video smoke。";
+        }
+        return "需要 provider-specific adapter 或外部 async bridge。";
+    }
+
+    private JsonNode getLocalMediaTask(
+            String resourceKey,
+            Long distributedKeyId,
+            GatewayAsyncResourceType type) {
+        GatewayAsyncResourceEntity entity = getRequired(resourceKey, type, distributedKeyId);
+        return readJson(entity.getResponsePayloadJson());
+    }
+
+    private JsonNode cancelLocalMediaTask(
+            String resourceKey,
+            Long distributedKeyId,
+            GatewayAsyncResourceType type) {
+        GatewayAsyncResourceEntity entity = getRequired(resourceKey, type, distributedKeyId);
+        ObjectNode response = readObject(entity.getResponsePayloadJson());
+        if (!isTerminalStatus(entity.getStatus())) {
+            entity.setStatus("cancelled");
+            response.put("status", "cancelled");
+            response.put("cancelled_at", now().getEpochSecond());
+            ObjectNode metadata = readObject(entity.getMetadataJson());
+            metadata.put("cancel_reason", "user_cancelled");
+            appendEvent(metadata, "cancelled", "cancelled");
+            entity.setMetadataJson(writeJson(metadata));
+            entity.setResponsePayloadJson(writeJson(response));
+            gatewayAsyncResourceRepository.save(entity);
+        }
         return response;
     }
 
@@ -2252,6 +2670,10 @@ public class GatewayAsyncResourceService {
         return null;
     }
 
+    private String defaultString(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value.trim();
+    }
+
     private JsonNode readJson(String json) {
         try {
             return json == null || json.isBlank() ? objectMapper.createObjectNode() : objectMapper.readTree(json);
@@ -2293,6 +2715,8 @@ public class GatewayAsyncResourceService {
             case BATCH_CREATE -> "/v1/batches";
             case TUNING_CREATE -> "/v1/fine_tuning/jobs";
             case REALTIME_CLIENT_SECRET -> "/v1/realtime/client_secrets";
+            case VIDEO_GENERATION -> "/v1/videos/generations";
+            case MUSIC_GENERATION -> "/v1/music/generations";
             default -> throw new IllegalArgumentException("当前 feature 不支持异步资源编排。");
         };
     }
@@ -2303,6 +2727,8 @@ public class GatewayAsyncResourceService {
             case BATCH -> InteropFeature.BATCH_CREATE;
             case TUNING -> InteropFeature.TUNING_CREATE;
             case REALTIME_SESSION -> InteropFeature.REALTIME_CLIENT_SECRET;
+            case VIDEO -> InteropFeature.VIDEO_GENERATION;
+            case MUSIC -> InteropFeature.MUSIC_GENERATION;
             default -> throw new IllegalArgumentException("当前资源类型不支持 upstream feature 推断。");
         };
     }
@@ -2313,8 +2739,27 @@ public class GatewayAsyncResourceService {
             case BATCH -> "batch";
             case TUNING -> "fine_tuning.job";
             case REALTIME_SESSION -> "realtime.session";
+            case VIDEO -> "video.generation";
+            case MUSIC -> "music.generation";
             case RESPONSE -> "response";
         };
+    }
+
+    private boolean isTerminalStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return false;
+        }
+        String normalized = status.trim().toLowerCase(Locale.ROOT);
+        return "completed".equals(normalized)
+                || "succeeded".equals(normalized)
+                || "success".equals(normalized)
+                || "done".equals(normalized)
+                || "cancelled".equals(normalized)
+                || "canceled".equals(normalized)
+                || "failed".equals(normalized)
+                || "error".equals(normalized)
+                || "errored".equals(normalized)
+                || "deleted".equals(normalized);
     }
 
     public record GoogleNativeBatchView(

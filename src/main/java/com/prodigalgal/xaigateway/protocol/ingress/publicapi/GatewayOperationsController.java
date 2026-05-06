@@ -61,7 +61,7 @@ public class GatewayOperationsController {
             @PathVariable String operationName,
             @RequestBody(required = false) JsonNode requestBody) {
         AuthenticatedDistributedKey distributedKey = gatewayTokenAuthenticationResolver.authenticate(authorization, null, null, null);
-        return gatewayPublicResourceService.waitOperation(distributedKey.id(), operationName);
+        return gatewayPublicResourceService.waitOperation(distributedKey.id(), operationName, requestBody);
     }
 
     @DeleteMapping("/{operationName}")

@@ -59,6 +59,12 @@ class AdminAuthControllerTests {
                         180000,
                         600000
                 ),
+                new SystemSettingsResponse.SecuritySettingsResponse(
+                        true,
+                        false,
+                        java.util.List.of(),
+                        java.util.List.of()
+                ),
                 Instant.parse("2026-04-20T08:00:00Z")
         ));
         when(adminConsoleCredentialService.matches("console-admin", "secret-123")).thenReturn(true);

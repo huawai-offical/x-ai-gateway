@@ -36,6 +36,10 @@ $env:SPRING_DATA_REDIS_DATABASE="0"
 
 Spring 配置里的安全写法应为 `host: ${REDIS_HOST:192.168.154.143}`，不要写成 `host: ${192.168.154.143}`，后者会被解析成名为 `192.168.154.143` 的占位符变量。
 
+## 可选 Smoke Harness
+
+Redis runtime store、OAuth mock contract、Ops maintenance dry-run 的可选 smoke 入口见 [testing-smoke-harness](testing-smoke-harness.md)。默认不设置 `XAG_SMOKE_*` 环境变量时，这些 smoke 测试会被 JUnit 自动跳过，不影响默认 CI。
+
 ## 默认资源基线
 
 首次启动会通过 `DefaultResourceBootstrapService` 幂等创建系统默认资源：

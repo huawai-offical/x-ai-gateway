@@ -2,7 +2,9 @@ package com.prodigalgal.xaigateway.admin.application;
 
 import com.prodigalgal.xaigateway.admin.api.AccountImportAuthJsonRequest;
 import com.prodigalgal.xaigateway.admin.api.UpstreamAccountResponse;
+import com.prodigalgal.xaigateway.gateway.core.account.UpstreamAccountProviderType;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountPoolEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountPoolRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountRepository;
 import java.time.Instant;
@@ -129,5 +131,57 @@ class AccountAdminServiceTests {
         assertEquals("enc:access", entity.getAccessTokenCiphertext());
         assertEquals("enc:refresh", entity.getRefreshTokenCiphertext());
         Mockito.verify(refreshService).refreshAccount(7L);
+    }
+
+    @Test
+    void shouldExposeProgrammingAccountIdentityAndRouteEligibility() {
+        UpstreamAccountRepository accountRepository = Mockito.mock(UpstreamAccountRepository.class);
+        UpstreamAccountPoolRepository poolRepository = Mockito.mock(UpstreamAccountPoolRepository.class);
+        CredentialCryptoService cryptoService = Mockito.mock(CredentialCryptoService.class);
+        SupportedModelCatalogService modelCatalogService = Mockito.mock(SupportedModelCatalogService.class);
+        OAuthSessionRefreshService refreshService = Mockito.mock(OAuthSessionRefreshService.class);
+        AccountAdminService service = new AccountAdminService(
+                accountRepository,
+                poolRepository,
+                cryptoService,
+                modelCatalogService,
+                refreshService,
+                new ObjectMapper()
+        );
+        UpstreamAccountPoolEntity pool = new UpstreamAccountPoolEntity();
+        ReflectionTestUtils.setField(pool, "id", 99L);
+        pool.setPoolName("codex-pool");
+        pool.setProviderType(UpstreamAccountProviderType.CODEX_OAUTH);
+        pool.setAllowedClientFamilies(List.of("CODEX"));
+        UpstreamAccountEntity entity = new UpstreamAccountEntity();
+        ReflectionTestUtils.setField(entity, "id", 88L);
+        entity.setPool(pool);
+        entity.setAccountName("codex-user");
+        entity.setProviderType(UpstreamAccountProviderType.CODEX_OAUTH);
+        entity.setExternalAccountId("codex:user-1");
+        entity.setActive(true);
+        entity.setFrozen(false);
+        entity.setHealthy(true);
+        entity.setRefreshStatus("READY");
+        entity.setQuotaRemainingTokens(10_000L);
+        entity.setQuotaRemainingRequests(30L);
+        entity.setQuotaWindowSeconds(3600);
+        entity.setMetadataJson("""
+                {
+                  "identity_subject": "codex:user-1",
+                  "identity_email": "coder@example.com",
+                  "adoption_decision": "adopted",
+                  "client_family": "CODEX"
+                }
+                """);
+        Mockito.when(accountRepository.findById(88L)).thenReturn(Optional.of(entity));
+
+        var identity = service.programmingIdentity(88L, "CODEX");
+
+        assertEquals(UpstreamAccountProviderType.CODEX_OAUTH, identity.providerType());
+        assertEquals("codex:user-1", identity.identitySubject());
+        assertEquals("coder@example.com", identity.identityEmail());
+        assertTrue(identity.routeEligible());
+        assertEquals(10_000L, identity.quotaRemainingTokens());
     }
 }

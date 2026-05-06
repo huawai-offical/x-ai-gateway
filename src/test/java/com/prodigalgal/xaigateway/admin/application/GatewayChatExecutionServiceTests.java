@@ -4,6 +4,7 @@ import com.prodigalgal.xaigateway.gateway.core.account.AccountSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyGovernanceService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyQueryService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyView;
+import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalContentPart;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlanCompilation;
@@ -34,6 +35,7 @@ import com.prodigalgal.xaigateway.gateway.core.observability.GatewayRequestLifec
 import com.prodigalgal.xaigateway.gateway.core.routing.GatewayRouteSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateEvaluation;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateView;
+import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionRequest;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionSource;
 import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend;
@@ -51,6 +53,7 @@ import com.prodigalgal.xaigateway.protocol.ingress.openai.OpenAiResponsesRequest
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.core.io.ByteArrayResource;
@@ -58,6 +61,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import tools.jackson.databind.ObjectMapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GatewayChatExecutionServiceTests {
@@ -199,6 +203,93 @@ class GatewayChatExecutionServiceTests {
     }
 
     @Test
+    void shouldCapChatFallbackAttemptsFromRuntimePolicy() {
+        GatewayRouteSelectionService routeSelectionService = Mockito.mock(GatewayRouteSelectionService.class);
+        UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        CredentialCryptoService credentialCryptoService = Mockito.mock(CredentialCryptoService.class);
+        GatewayObservabilityService gatewayObservabilityService = Mockito.mock(GatewayObservabilityService.class);
+        GatewayRequestLifecycleService gatewayRequestLifecycleService = Mockito.mock(GatewayRequestLifecycleService.class);
+        DistributedKeyGovernanceService distributedKeyGovernanceService = Mockito.mock(DistributedKeyGovernanceService.class);
+        DistributedKeyQueryService distributedKeyQueryService = Mockito.mock(DistributedKeyQueryService.class);
+        AccountSelectionService accountSelectionService = Mockito.mock(AccountSelectionService.class);
+        CredentialMaterialResolver credentialMaterialResolver = Mockito.mock(CredentialMaterialResolver.class);
+        GatewayRequestFeatureService gatewayRequestFeatureService = Mockito.mock(GatewayRequestFeatureService.class);
+        TranslationExecutionPlanCompiler translationExecutionPlanCompiler = Mockito.mock(TranslationExecutionPlanCompiler.class);
+        RoutingPolicyRuntimeConfigService routingPolicyRuntimeConfigService = Mockito.mock(RoutingPolicyRuntimeConfigService.class);
+        GatewayProperties gatewayProperties = new GatewayProperties();
+
+        GatewayChatRuntime runtime = new GatewayChatRuntime() {
+            @Override
+            public ExecutionBackend backend() {
+                return ExecutionBackend.NATIVE;
+            }
+
+            @Override
+            public boolean supports(com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView candidate) {
+                return true;
+            }
+
+            @Override
+            public CanonicalResponse execute(GatewayChatRuntimeContext context) {
+                throw new IllegalStateException("upstream 503");
+            }
+
+            @Override
+            public reactor.core.publisher.Flux<CanonicalStreamEvent> executeStream(GatewayChatRuntimeContext context) {
+                return reactor.core.publisher.Flux.empty();
+            }
+        };
+
+        GatewayChatExecutionService service = service(
+                routeSelectionService,
+                upstreamCredentialRepository,
+                credentialCryptoService,
+                gatewayObservabilityService,
+                gatewayRequestLifecycleService,
+                distributedKeyGovernanceService,
+                distributedKeyQueryService,
+                accountSelectionService,
+                credentialMaterialResolver,
+                gatewayRequestFeatureService,
+                translationExecutionPlanCompiler,
+                List.of(runtime),
+                gatewayProperties,
+                routingPolicyRuntimeConfigService
+        );
+
+        Mockito.when(gatewayObservabilityService.nextRequestId()).thenReturn("req-chat-policy-1");
+        Mockito.when(routeSelectionService.select(Mockito.any())).thenReturn(selectionResultWithFallbackCandidates());
+        Mockito.when(routingPolicyRuntimeConfigService.maxAttempts(3, 2)).thenReturn(1);
+        Mockito.when(translationExecutionPlanCompiler.compileSelected(Mockito.any(), Mockito.any(CanonicalRequest.class), Mockito.any(), Mockito.any()))
+                .thenReturn(canonicalCompilation("openai", "/v1/chat/completions", "gpt-4o"));
+        Mockito.when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.any()))
+                .thenReturn(new GatewayRequestSemantics(
+                        TranslationResourceType.CHAT,
+                        TranslationOperation.CHAT_COMPLETION,
+                        List.of(InteropFeature.CHAT_TEXT),
+                        true
+                ));
+        Mockito.when(upstreamCredentialRepository.findById(101L)).thenReturn(Optional.of(credential(101L)));
+        Mockito.when(credentialMaterialResolver.resolve(Mockito.any(), Mockito.any())).thenAnswer(invocation ->
+                new com.prodigalgal.xaigateway.gateway.core.credential.ResolvedCredentialMaterial(
+                        ((UpstreamCredentialEntity) invocation.getArgument(1)).getId(),
+                        null,
+                        CredentialAuthKind.API_KEY,
+                        "api-key",
+                        null,
+                        java.util.Map.of(),
+                        null,
+                        "test"
+                )
+        );
+
+        assertThrows(IllegalStateException.class, () -> service.executeGatewayResponse(canonicalRequest()));
+
+        Mockito.verify(routeSelectionService).markCredentialCooldown(101L, "upstream 503");
+        Mockito.verify(upstreamCredentialRepository, Mockito.never()).findById(202L);
+    }
+
+    @Test
     void shouldFallbackToSecondStreamCandidateBeforeFirstChunk() {
         GatewayRouteSelectionService routeSelectionService = Mockito.mock(GatewayRouteSelectionService.class);
         UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
@@ -293,6 +384,114 @@ class GatewayChatExecutionServiceTests {
         Mockito.verify(routeSelectionService).markCredentialCooldown(101L, "stream upstream 503");
     }
 
+    @Test
+    void shouldApplyCloudCliFilterAndRouteWithClientFamily() {
+        GatewayRouteSelectionService routeSelectionService = Mockito.mock(GatewayRouteSelectionService.class);
+        UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        CredentialCryptoService credentialCryptoService = Mockito.mock(CredentialCryptoService.class);
+        GatewayObservabilityService gatewayObservabilityService = Mockito.mock(GatewayObservabilityService.class);
+        GatewayRequestLifecycleService gatewayRequestLifecycleService = Mockito.mock(GatewayRequestLifecycleService.class);
+        DistributedKeyGovernanceService distributedKeyGovernanceService = Mockito.mock(DistributedKeyGovernanceService.class);
+        DistributedKeyQueryService distributedKeyQueryService = Mockito.mock(DistributedKeyQueryService.class);
+        AccountSelectionService accountSelectionService = Mockito.mock(AccountSelectionService.class);
+        CredentialMaterialResolver credentialMaterialResolver = Mockito.mock(CredentialMaterialResolver.class);
+        GatewayRequestFeatureService gatewayRequestFeatureService = Mockito.mock(GatewayRequestFeatureService.class);
+        TranslationExecutionPlanCompiler translationExecutionPlanCompiler = Mockito.mock(TranslationExecutionPlanCompiler.class);
+        GatewayProperties gatewayProperties = new GatewayProperties();
+        gatewayProperties.getCli().getRequestFilter().setEnabled(true);
+        GatewayProperties.Cli.Rule rule = new GatewayProperties.Cli.Rule();
+        rule.setId("mask-secret");
+        rule.setAction("mask");
+        rule.setClientFamilies(List.of("CURSOR"));
+        rule.setRole("user");
+        rule.setContains("secret");
+        gatewayProperties.getCli().getRequestFilter().setRules(List.of(rule));
+        AtomicReference<RouteSelectionRequest> capturedRouteRequest = new AtomicReference<>();
+
+        GatewayChatRuntime runtime = new GatewayChatRuntime() {
+            @Override
+            public ExecutionBackend backend() {
+                return ExecutionBackend.NATIVE;
+            }
+
+            @Override
+            public boolean supports(com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView candidate) {
+                return true;
+            }
+
+            @Override
+            public CanonicalResponse execute(GatewayChatRuntimeContext context) {
+                return new CanonicalResponse(
+                        null,
+                        context.selectionResult().publicModel(),
+                        "cursor ok",
+                        null,
+                        List.of(),
+                        CanonicalUsage.empty(),
+                        com.prodigalgal.xaigateway.gateway.core.response.GatewayFinishReason.STOP
+                );
+            }
+
+            @Override
+            public reactor.core.publisher.Flux<CanonicalStreamEvent> executeStream(GatewayChatRuntimeContext context) {
+                return reactor.core.publisher.Flux.empty();
+            }
+        };
+
+        GatewayChatExecutionService service = service(
+                routeSelectionService,
+                upstreamCredentialRepository,
+                credentialCryptoService,
+                gatewayObservabilityService,
+                gatewayRequestLifecycleService,
+                distributedKeyGovernanceService,
+                distributedKeyQueryService,
+                accountSelectionService,
+                credentialMaterialResolver,
+                gatewayRequestFeatureService,
+                translationExecutionPlanCompiler,
+                List.of(runtime),
+                gatewayProperties
+        );
+
+        Mockito.when(gatewayObservabilityService.nextRequestId()).thenReturn("req-cli-filter-1");
+        Mockito.when(routeSelectionService.select(Mockito.any())).thenAnswer(invocation -> {
+            RouteSelectionRequest request = invocation.getArgument(0);
+            capturedRouteRequest.set(request);
+            return selectionResultWithFallbackCandidates();
+        });
+        Mockito.when(translationExecutionPlanCompiler.compileSelected(Mockito.any(), Mockito.any(CanonicalRequest.class), Mockito.any(), Mockito.any()))
+                .thenReturn(canonicalCompilation("openai", "/v1/chat/completions", "gpt-4o"));
+        Mockito.when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.any()))
+                .thenReturn(new GatewayRequestSemantics(
+                        TranslationResourceType.CHAT,
+                        TranslationOperation.CHAT_COMPLETION,
+                        List.of(InteropFeature.CHAT_TEXT),
+                        true
+                ));
+        Mockito.when(upstreamCredentialRepository.findById(101L)).thenReturn(Optional.of(credential(101L)));
+        Mockito.when(credentialMaterialResolver.resolve(Mockito.any(), Mockito.any())).thenAnswer(invocation ->
+                new com.prodigalgal.xaigateway.gateway.core.credential.ResolvedCredentialMaterial(
+                        ((UpstreamCredentialEntity) invocation.getArgument(1)).getId(),
+                        null,
+                        CredentialAuthKind.API_KEY,
+                        "api-key",
+                        null,
+                        java.util.Map.of(),
+                        null,
+                        "test"
+                )
+        );
+
+        CanonicalRequest request = canonicalRequest("hello secret");
+        var response = service.executeGatewayResponse(request, GatewayClientFamily.CURSOR);
+
+        assertEquals("cursor ok", response.response().outputText());
+        assertEquals(GatewayClientFamily.CURSOR, capturedRouteRequest.get().clientFamily());
+        assertTrue(capturedRouteRequest.get().requestBody().toString().contains("[FILTERED]"));
+        assertTrue(capturedRouteRequest.get().requestBody().toString().contains("mask-secret"));
+    }
+
     private GatewayChatExecutionService service(
             GatewayRouteSelectionService routeSelectionService,
             UpstreamCredentialRepository upstreamCredentialRepository,
@@ -307,6 +506,39 @@ class GatewayChatExecutionServiceTests {
             TranslationExecutionPlanCompiler translationExecutionPlanCompiler,
             List<GatewayChatRuntime> gatewayChatRuntimes,
             GatewayProperties gatewayProperties) {
+        return service(
+                routeSelectionService,
+                upstreamCredentialRepository,
+                credentialCryptoService,
+                gatewayObservabilityService,
+                gatewayRequestLifecycleService,
+                distributedKeyGovernanceService,
+                distributedKeyQueryService,
+                accountSelectionService,
+                credentialMaterialResolver,
+                gatewayRequestFeatureService,
+                translationExecutionPlanCompiler,
+                gatewayChatRuntimes,
+                gatewayProperties,
+                null
+        );
+    }
+
+    private GatewayChatExecutionService service(
+            GatewayRouteSelectionService routeSelectionService,
+            UpstreamCredentialRepository upstreamCredentialRepository,
+            CredentialCryptoService credentialCryptoService,
+            GatewayObservabilityService gatewayObservabilityService,
+            GatewayRequestLifecycleService gatewayRequestLifecycleService,
+            DistributedKeyGovernanceService distributedKeyGovernanceService,
+            DistributedKeyQueryService distributedKeyQueryService,
+            AccountSelectionService accountSelectionService,
+            CredentialMaterialResolver credentialMaterialResolver,
+            GatewayRequestFeatureService gatewayRequestFeatureService,
+            TranslationExecutionPlanCompiler translationExecutionPlanCompiler,
+            List<GatewayChatRuntime> gatewayChatRuntimes,
+            GatewayProperties gatewayProperties,
+            RoutingPolicyRuntimeConfigService routingPolicyRuntimeConfigService) {
         return new GatewayChatExecutionService(
                 routeSelectionService,
                 upstreamCredentialRepository,
@@ -324,17 +556,23 @@ class GatewayChatExecutionServiceTests {
                 new AnthropicMessagesRequestMapper(objectMapper),
                 new GeminiGenerateContentRequestMapper(objectMapper),
                 gatewayChatRuntimes,
-                gatewayProperties
+                gatewayProperties,
+                routingPolicyRuntimeConfigService,
+                null
         );
     }
 
     private CanonicalRequest canonicalRequest() {
+        return canonicalRequest("hello");
+    }
+
+    private CanonicalRequest canonicalRequest(String content) {
         return new CanonicalRequest(
                 "sk-gw-test",
                 CanonicalIngressProtocol.OPENAI,
                 "/v1/chat/completions",
                 "gpt-4o",
-                List.of(new CanonicalMessage(CanonicalMessageRole.USER, List.of(CanonicalContentPart.text("hello")))),
+                List.of(new CanonicalMessage(CanonicalMessageRole.USER, List.of(CanonicalContentPart.text(content)))),
                 List.of(),
                 null,
                 null,

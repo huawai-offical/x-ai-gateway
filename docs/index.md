@@ -1,0 +1,76 @@
+# x-ai-gateway 本地文档索引
+
+## 需求
+
+- [REQ-20260501-001 本地化协作流程迁移](requirements/REQ-20260501-001-local-workflow-migration.md)
+- [REQ-20260501-002 最高优先级三个任务闭环设计](requirements/REQ-20260501-002-priority-task-closure-design.md)
+- [REQ-20260501-003 第二批最高优先级任务闭环设计](requirements/REQ-20260501-003-second-priority-task-closure-design.md)
+- [REQ-20260501-004 第三批最高优先级任务闭环设计](requirements/REQ-20260501-004-third-priority-task-closure-design.md)
+- [REQ-20260501-005 第四批最高优先级任务闭环设计](requirements/REQ-20260501-005-fourth-priority-task-closure-design.md)
+- [REQ-20260501-006 第五批最高优先级任务闭环设计](requirements/REQ-20260501-006-fifth-priority-task-closure-design.md)
+- [REQ-20260505-001 Notion/Linear 线上数据回迁到本地](requirements/REQ-20260505-001-notion-linear-back-migration.md)
+- [REQ-20260505-002 第六批最高优先级任务闭环设计](requirements/REQ-20260505-002-sixth-priority-task-closure-design.md)
+- [REQ-20260505-003 Redis/OAuth/Ops Smoke Harness 硬化](requirements/REQ-20260505-003-smoke-harness-hardening.md)
+- [REQ-20260506-001 第七批高优先级任务闭环设计](requirements/REQ-20260506-001-seventh-priority-task-closure-design.md)
+- [REQ-20260506-002 第八批高优先级任务闭环设计](requirements/REQ-20260506-002-eighth-priority-task-closure-design.md)
+- [REQ-20260506-003 第九批任务闭环设计](requirements/REQ-20260506-003-ninth-priority-task-closure-design.md)
+- [REQ-20260506-004 第十批任务闭环设计](requirements/REQ-20260506-004-tenth-priority-task-closure-design.md)
+- [REQ-20260506-005 剩余任务闭环设计](requirements/REQ-20260506-005-final-backlog-closure-design.md)
+- [REQ-20260506-006 剩余任务清零回归审计](requirements/REQ-20260506-006-backlog-zero-regression-audit.md)
+- [REQ-20260506-007 CLI 云端代理接入闭环设计](requirements/REQ-20260506-007-cli-cloud-access-closure-design.md)
+- [REQ-20260506-008 Provider 生态广度与 Conformance 完善](requirements/REQ-20260506-008-provider-ecosystem-conformance-closure.md)
+- [REQ-20260506-009 支付生产闭环完善](requirements/REQ-20260506-009-production-payment-closure.md)
+- [REQ-20260506-010 Realtime 与 Media 生产硬化](requirements/REQ-20260506-010-realtime-media-production-hardening.md)
+- [REQ-20260506-011 文档、i18n 与 OpenAPI 事实源修复](requirements/REQ-20260506-011-docs-i18n-openapi-truth-source.md)
+- [REQ-20260506-012 参考项目功能深度复核与任务再生成](requirements/REQ-20260506-012-reference-depth-recheck-task-generation.md)
+- [REQ-20260506-013 Provider 真实 Smoke 与价格同步闭环](requirements/REQ-20260506-013-provider-smoke-pricing-sync.md)
+- [REQ-20260506-014 支付定时对账、订阅发票与跨币种结算](requirements/REQ-20260506-014-payment-scheduled-reconcile-invoice-currency.md)
+- [REQ-20260506-015 Realtime 长连接池与专有 Media Adapter](requirements/REQ-20260506-015-realtime-pool-media-adapters.md)
+
+## 决策
+
+- [ADR-0001 使用仓库内 Markdown 替代线上 Notion/Linear](decisions/ADR-0001-local-docs-tasks-workflow.md)
+- [ADR-0002 最高优先级任务采用“骨架闭环优先”的交付范围](decisions/ADR-0002-priority-task-closure-scope.md)
+- [ADR-0003 第二批任务继续采用本地可验证闭环](decisions/ADR-0003-local-catalog-and-policy-config-scope.md)
+- [ADR-0004 第三批任务采用本地 Mock 可验证闭环](decisions/ADR-0004-third-batch-local-mockable-closure.md)
+- [ADR-0005 第四批任务采用“本地可验证适配层优先”闭环](decisions/ADR-0005-local-verifiable-adapter-closure.md)
+- [ADR-0006 第五批任务采用“真实适配接口 + 本地可验证执行器”闭环](decisions/ADR-0006-real-adapter-local-verification.md)
+- [ADR-0007 第六批任务采用“先校准差距，再补生产运行态与账号入口”闭环](decisions/ADR-0007-sixth-batch-runtime-and-oauth-scope.md)
+- [ADR-0008 云端代理优先的 CLI 接入架构](decisions/ADR-0008-cloud-cli-access-without-local-proxy.md)
+
+## 报告
+
+- [REP-20260501 对标 new-api / Sub2API / CC Switch 的差距分析与增强任务](reports/REP-20260501-open-source-gap-analysis.md)
+- [REP-20260505 Notion 文档回迁摘要](reports/REP-20260505-notion-back-migration-summary.md)
+- [REP-20260505 X-263 第二轮深度差距代码态审计](reports/REP-20260505-x263-code-state-audit.md)
+- [REP-20260506 三个参考项目功能完成度复核](reports/REP-20260506-reference-feature-completeness-review.md)
+- [REP-20260506 五个参考项目深度对标分析](reports/REP-20260506-five-reference-deep-analysis.md)
+- [REP-20260506 i18n 与 OpenAPI 事实源审计](reports/REP-20260506-i18n-openapi-truth-source-audit.md)
+- [REP-20260506 参考项目功能深度再复核](reports/REP-20260506-reference-feature-depth-recheck.md)
+
+## 迁移记录
+
+- [MIG-20260501 Notion/Linear 到本地文档任务迁移](migrations/MIG-20260501-notion-linear-to-local.md)
+- [MIG-20260505 Notion/Linear 回迁审计与本地落地](migrations/MIG-20260505-notion-linear-back-migration.md)
+- [LINEAR-20260505 x-ai-gateway issue 全量归档](migrations/LINEAR-20260505-x-ai-gateway-issue-archive.md)
+
+## 既有文档
+
+- [client-onboarding-pack](client-onboarding-pack.md)
+- [operations-drill-evidence](operations-drill-evidence.md)
+- [production-deployment-upgrade](production-deployment-upgrade.md)
+- [ollama-document-file-support](ollama-document-file-support.md)
+- [media-provider-executors](media-provider-executors.md)
+- [monitoring-billing-rollup](monitoring-billing-rollup.md)
+- [passkey-registration-policy-audit](passkey-registration-policy-audit.md)
+- [payment-provider-webhooks](payment-provider-webhooks.md)
+- [portal-self-service](portal-self-service.md)
+- [provider-smoke-pricing-sync](provider-smoke-pricing-sync.md)
+- [provider-catalog-marketplace](provider-catalog-marketplace.md)
+- [public-api-compatibility](public-api-compatibility.md)
+- [public-openapi-json](openapi/public-openapi.json)
+- [programming-account-identity](programming-account-identity.md)
+- [realtime-provider-websocket](realtime-provider-websocket.md)
+- [testing-baseline](testing-baseline.md)
+- [testing-social-oauth-smoke](testing-social-oauth-smoke.md)
+- [testing-smoke-harness](testing-smoke-harness.md)

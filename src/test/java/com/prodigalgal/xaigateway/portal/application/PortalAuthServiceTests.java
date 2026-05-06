@@ -4,16 +4,25 @@ import com.prodigalgal.xaigateway.gateway.core.auth.GatewayUnauthorizedException
 import com.prodigalgal.xaigateway.gateway.core.auth.AccessGroupEntitlementService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeySecretService;
 import com.prodigalgal.xaigateway.gateway.core.account.UpstreamAccountProviderType;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageCompleteness;
+import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageSource;
+import com.prodigalgal.xaigateway.gateway.core.shared.ProviderFamily;
+import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
+import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
 import com.prodigalgal.xaigateway.infra.persistence.entity.AccessGroupEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.AnnouncementEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyAccountPoolBindingEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayUserBalanceLedgerEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayUserEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.PaymentOrderEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.PromoCampaignEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.RedeemCodeEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.SiteCapabilitySnapshotEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SubscriptionPlanEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountPoolEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamSiteProfileEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UsageRecordEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UserSubscriptionEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.AnnouncementReadStateRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.AnnouncementRepository;
@@ -21,9 +30,13 @@ import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAcc
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayUserBalanceLedgerRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayUserRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.PaymentOrderRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.RedeemCodeRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.RedeemCodeUsageRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.SiteCapabilitySnapshotRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountPoolRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamSiteProfileRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UsageRecordRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UserSubscriptionRepository;
 import com.prodigalgal.xaigateway.portal.api.PortalKeyCreateRequest;
 import com.prodigalgal.xaigateway.portal.api.PortalLoginRequest;
@@ -35,6 +48,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
@@ -119,6 +133,49 @@ class PortalAuthServiceTests {
         assertTrue(session.authenticated());
         assertEquals("Pro", subscriptions.getFirst().planName());
         assertEquals("Portal Key", keys.getFirst().keyName());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void shouldDelegateCaptchaAndLoginTotpToPortalSecurityService() {
+        ObjectProvider<PortalSecurityService> securityProvider = Mockito.mock(ObjectProvider.class);
+        PortalSecurityService securityService = Mockito.mock(PortalSecurityService.class);
+        Mockito.when(securityProvider.getIfAvailable()).thenReturn(securityService);
+        PortalAuthService secureService = new PortalAuthService(
+                userRepository,
+                subscriptionRepository,
+                keyRepository,
+                announcementRepository,
+                announcementReadStateRepository,
+                redeemCodeRepository,
+                redeemCodeUsageRepository,
+                balanceLedgerRepository,
+                accountPoolRepository,
+                keyPoolBindingRepository,
+                distributedKeySecretService,
+                passwordEncoder,
+                accessGroupEntitlementService,
+                securityProvider
+        );
+        GatewayUserEntity user = user(55L, "mfa@example.com", "password-123");
+        Mockito.when(userRepository.existsByEmailIgnoreCase("mfa@example.com")).thenReturn(false);
+        Mockito.when(userRepository.findByEmailIgnoreCase("mfa@example.com")).thenReturn(Optional.of(user));
+        Mockito.when(userRepository.save(Mockito.any())).thenAnswer(invocation -> {
+            GatewayUserEntity entity = invocation.getArgument(0);
+            if (entity.getId() == null) {
+                ReflectionTestUtils.setField(entity, "id", 55L);
+            }
+            return entity;
+        });
+
+        secureService.register(
+                new PortalRegisterRequest("mfa@example.com", "Mfa", "password-123", "cap-1", "7"),
+                exchange()
+        ).block();
+        secureService.login(new PortalLoginRequest("mfa@example.com", "password-123", "123456"), exchange()).block();
+
+        Mockito.verify(securityService).verifyCaptcha("cap-1", "7");
+        Mockito.verify(securityService).verifyLoginTotpIfRequired(user, "123456");
     }
 
     @Test
@@ -221,6 +278,66 @@ class PortalAuthServiceTests {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void shouldReturnPortalSelfServiceSummaryWithUsageOrdersAndChannels() {
+        PaymentOrderRepository paymentOrderRepository = Mockito.mock(PaymentOrderRepository.class);
+        UsageRecordRepository usageRecordRepository = Mockito.mock(UsageRecordRepository.class);
+        UpstreamSiteProfileRepository siteProfileRepository = Mockito.mock(UpstreamSiteProfileRepository.class);
+        SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        ObjectProvider<PortalSecurityService> securityProvider = Mockito.mock(ObjectProvider.class);
+        PortalSecurityService securityService = Mockito.mock(PortalSecurityService.class);
+        Mockito.when(securityProvider.getIfAvailable()).thenReturn(securityService);
+        Mockito.when(securityService.passkeyCountForUser(8L)).thenReturn(2);
+        PortalAuthService richService = new PortalAuthService(
+                userRepository,
+                subscriptionRepository,
+                keyRepository,
+                announcementRepository,
+                announcementReadStateRepository,
+                redeemCodeRepository,
+                redeemCodeUsageRepository,
+                balanceLedgerRepository,
+                paymentOrderRepository,
+                usageRecordRepository,
+                siteProfileRepository,
+                snapshotRepository,
+                accountPoolRepository,
+                keyPoolBindingRepository,
+                distributedKeySecretService,
+                passwordEncoder,
+                accessGroupEntitlementService,
+                securityProvider
+        );
+        GatewayUserEntity user = user(8L, "beta@example.com", "password-123");
+        DistributedKeyEntity key = distributedKey(41L);
+        key.setOwnerUser(user);
+        Mockito.when(userRepository.findByEmailIgnoreCase("beta@example.com")).thenReturn(Optional.of(user));
+        Mockito.when(userRepository.findById(8L)).thenReturn(Optional.of(user));
+        Mockito.when(userRepository.save(Mockito.any())).thenAnswer(invocation -> invocation.getArgument(0));
+        Mockito.when(keyRepository.findAllByOwnerUser_IdOrderByCreatedAtDesc(8L)).thenReturn(List.of(key));
+        Mockito.when(subscriptionRepository.findAllByUser_IdOrderByCreatedAtDesc(8L)).thenReturn(List.of(subscription(31L)));
+        Mockito.when(balanceLedgerRepository.findTopByUser_IdOrderByCreatedAtDescIdDesc(8L))
+                .thenReturn(Optional.of(ledger(user, 1_500L)));
+        Mockito.when(paymentOrderRepository.findAllByUser_IdOrderByCreatedAtDesc(8L)).thenReturn(List.of(paymentOrder(user)));
+        Mockito.when(usageRecordRepository.findTop100ByDistributedKeyIdInOrderByCreatedAtDesc(List.of(41L))).thenReturn(List.of(usageRecord(41L)));
+        UpstreamSiteProfileEntity profile = siteProfile(71L);
+        SiteCapabilitySnapshotEntity snapshot = snapshot(profile);
+        Mockito.when(siteProfileRepository.findAllByActiveTrueOrderByDisplayNameAsc()).thenReturn(List.of(profile));
+        Mockito.when(snapshotRepository.findBySiteProfile_Id(71L)).thenReturn(Optional.of(snapshot));
+        MockServerWebExchange exchange = exchange();
+        richService.login(new PortalLoginRequest("beta@example.com", "password-123"), exchange).block();
+
+        var summary = richService.selfServiceSummary(exchange.getSession().block());
+
+        assertEquals("beta@example.com", summary.profile().email());
+        assertEquals(2, summary.profile().passkeyCount());
+        assertEquals(1_500L, summary.balanceAfterTokenCredits());
+        assertEquals(1, summary.recentOrders().size());
+        assertEquals(300, summary.usage().totalTokens());
+        assertEquals("READY", summary.channels().getFirst().healthState());
+    }
+
+    @Test
     void shouldRejectPortalKeyOperationForOtherUser() {
         GatewayUserEntity user = user(8L, "beta@example.com", "password-123");
         GatewayUserEntity otherUser = user(9L, "other@example.com", "password-123");
@@ -263,6 +380,67 @@ class PortalAuthServiceTests {
         user.setActive(true);
         user.setPasswordHash(passwordEncoder.encode(password));
         return user;
+    }
+
+    private GatewayUserBalanceLedgerEntity ledger(GatewayUserEntity user, long balanceAfter) {
+        GatewayUserBalanceLedgerEntity ledger = new GatewayUserBalanceLedgerEntity();
+        ledger.setUser(user);
+        ledger.setDeltaTokenCredits(balanceAfter);
+        ledger.setBalanceAfterTokenCredits(balanceAfter);
+        ledger.setReason("TEST");
+        ledger.setReferenceType("TEST");
+        ledger.setReferenceId("seed");
+        return ledger;
+    }
+
+    private PaymentOrderEntity paymentOrder(GatewayUserEntity user) {
+        PaymentOrderEntity order = new PaymentOrderEntity();
+        ReflectionTestUtils.setField(order, "id", 91L);
+        order.setUser(user);
+        order.setOrderNo("pay_1");
+        order.setProvider("stripe");
+        order.setAmountMinor(1990L);
+        order.setCurrency("CNY");
+        order.setTokenCredits(500L);
+        order.setStatus("PAID");
+        order.setProviderTradeNo("pi_1");
+        return order;
+    }
+
+    private UsageRecordEntity usageRecord(Long distributedKeyId) {
+        UsageRecordEntity usage = new UsageRecordEntity();
+        usage.setRequestId("req_1");
+        usage.setDistributedKeyId(distributedKeyId);
+        usage.setProtocol("openai");
+        usage.setRequestPath("/v1/chat/completions");
+        usage.setModelGroup("gpt-5-mini");
+        usage.setProviderType(ProviderType.OPENAI_DIRECT);
+        usage.setCredentialId(1L);
+        usage.setCompleteness(GatewayUsageCompleteness.FINAL);
+        usage.setUsageSource(GatewayUsageSource.DIRECT_RESPONSE);
+        usage.setPromptTokens(100);
+        usage.setCompletionTokens(200);
+        usage.setTotalTokens(300);
+        return usage;
+    }
+
+    private UpstreamSiteProfileEntity siteProfile(Long id) {
+        UpstreamSiteProfileEntity profile = new UpstreamSiteProfileEntity();
+        ReflectionTestUtils.setField(profile, "id", id);
+        profile.setProfileCode("openai-direct");
+        profile.setDisplayName("OpenAI Direct");
+        profile.setProviderFamily(ProviderFamily.OPENAI);
+        profile.setSiteKind(UpstreamSiteKind.OPENAI_DIRECT);
+        profile.setActive(true);
+        return profile;
+    }
+
+    private SiteCapabilitySnapshotEntity snapshot(UpstreamSiteProfileEntity profile) {
+        SiteCapabilitySnapshotEntity snapshot = new SiteCapabilitySnapshotEntity();
+        snapshot.setSiteProfile(profile);
+        snapshot.setHealthState("READY");
+        snapshot.setSupportedProtocols(List.of("openai", "responses"));
+        return snapshot;
     }
 
     private UserSubscriptionEntity subscription(Long id) {

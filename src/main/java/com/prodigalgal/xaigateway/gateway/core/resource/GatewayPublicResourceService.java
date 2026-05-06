@@ -10,6 +10,7 @@ import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEnt
 import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayAsyncResourceRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import java.time.Instant;
+import java.util.concurrent.TimeUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -91,15 +92,37 @@ public class GatewayPublicResourceService {
             case BATCH -> gatewayAsyncResourceService.cancelBatch(entity.getResourceKey(), distributedKeyId);
             case TUNING -> gatewayAsyncResourceService.cancelTuning(entity.getResourceKey(), distributedKeyId);
             case UPLOAD -> gatewayAsyncResourceService.cancelUpload(entity.getResourceKey(), distributedKeyId);
+            case VIDEO -> gatewayAsyncResourceService.cancelVideoTask(entity.getResourceKey(), distributedKeyId);
+            case MUSIC -> gatewayAsyncResourceService.cancelMusicTask(entity.getResourceKey(), distributedKeyId);
             default -> throw new IllegalArgumentException("当前 operation 类型不支持 cancel。");
         };
         return toOperationResponse(resolveAsyncResource(distributedKeyId, payload.path("id").asText(entity.getResourceKey()), null));
     }
 
     public ObjectNode waitOperation(Long distributedKeyId, String operationName) {
+        return waitOperation(distributedKeyId, operationName, null);
+    }
+
+    public ObjectNode waitOperation(Long distributedKeyId, String operationName, JsonNode requestBody) {
+        long waitMillis = boundedWaitMillis(requestBody);
+        if (waitMillis <= 0) {
+            ObjectNode response = getOperation(distributedKeyId, operationName);
+            response.put("waited", true);
+            response.put("wait_mode", "immediate");
+            response.put("timeout", false);
+            return response;
+        }
+
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(waitMillis);
         ObjectNode response = getOperation(distributedKeyId, operationName);
+        while (!response.path("done").asBoolean(false) && System.nanoTime() < deadline) {
+            sleepUntilNextPoll(deadline);
+            response = getOperation(distributedKeyId, operationName);
+        }
         response.put("waited", true);
-        response.put("wait_mode", "immediate");
+        response.put("wait_mode", "polling");
+        response.put("timeout", !response.path("done").asBoolean(false));
+        response.put("max_wait_ms", waitMillis);
         return response;
     }
 
@@ -131,6 +154,42 @@ public class GatewayPublicResourceService {
 
     public JsonNode cancelTuning(Long distributedKeyId, String tuningId) {
         return gatewayAsyncResourceService.cancelTuning(normalizeResourceName(tuningId), distributedKeyId);
+    }
+
+    public JsonNode createVideo(Long distributedKeyId, JsonNode requestBody) {
+        return gatewayAsyncResourceService.createVideoTask(distributedKeyId, requestBody);
+    }
+
+    public JsonNode mediaProviderMatrix() {
+        return gatewayAsyncResourceService.mediaProviderMatrix();
+    }
+
+    public JsonNode getVideo(Long distributedKeyId, String videoId) {
+        return gatewayAsyncResourceService.getVideoTask(normalizeResourceName(videoId), distributedKeyId);
+    }
+
+    public JsonNode cancelVideo(Long distributedKeyId, String videoId) {
+        return gatewayAsyncResourceService.cancelVideoTask(normalizeResourceName(videoId), distributedKeyId);
+    }
+
+    public JsonNode downloadVideo(Long distributedKeyId, String videoId) {
+        return gatewayAsyncResourceService.downloadVideoTaskArtifact(normalizeResourceName(videoId), distributedKeyId);
+    }
+
+    public JsonNode createMusic(Long distributedKeyId, JsonNode requestBody) {
+        return gatewayAsyncResourceService.createMusicTask(distributedKeyId, requestBody);
+    }
+
+    public JsonNode getMusic(Long distributedKeyId, String musicId) {
+        return gatewayAsyncResourceService.getMusicTask(normalizeResourceName(musicId), distributedKeyId);
+    }
+
+    public JsonNode cancelMusic(Long distributedKeyId, String musicId) {
+        return gatewayAsyncResourceService.cancelMusicTask(normalizeResourceName(musicId), distributedKeyId);
+    }
+
+    public JsonNode downloadMusic(Long distributedKeyId, String musicId) {
+        return gatewayAsyncResourceService.downloadMusicTaskArtifact(normalizeResourceName(musicId), distributedKeyId);
     }
 
     public ObjectNode deleteTuning(Long distributedKeyId, String tuningId) {
@@ -353,6 +412,8 @@ public class GatewayPublicResourceService {
             case "upload", "uploads" -> GatewayAsyncResourceType.UPLOAD;
             case "batch", "batches" -> GatewayAsyncResourceType.BATCH;
             case "tuning", "tunings", "fine_tuning", "fine_tuning.jobs" -> GatewayAsyncResourceType.TUNING;
+            case "video", "videos" -> GatewayAsyncResourceType.VIDEO;
+            case "music", "musics" -> GatewayAsyncResourceType.MUSIC;
             case "operation", "operations", "" -> null;
             default -> throw new IllegalArgumentException("不支持的 resourceType：" + resourceType);
         };
@@ -364,6 +425,44 @@ public class GatewayPublicResourceService {
 
     private String normalizeStatus(String status) {
         return status == null || status.isBlank() ? null : status.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private long boundedWaitMillis(JsonNode requestBody) {
+        if (requestBody == null || requestBody.isNull() || requestBody.isMissingNode()) {
+            return 0;
+        }
+        long value = optionalLong(requestBody, "timeoutMs");
+        if (value <= 0) {
+            value = optionalLong(requestBody, "maxWaitMs");
+        }
+        if (value <= 0) {
+            value = optionalLong(requestBody, "timeout_ms");
+        }
+        if (value <= 0) {
+            value = optionalLong(requestBody, "max_wait_ms");
+        }
+        if (value <= 0) {
+            long seconds = optionalLong(requestBody, "timeout");
+            value = seconds <= 0 ? 0 : seconds * 1000;
+        }
+        return Math.min(value, 2_000);
+    }
+
+    private long optionalLong(JsonNode node, String fieldName) {
+        Long value = longValue(node, fieldName);
+        return value == null ? 0 : value;
+    }
+
+    private void sleepUntilNextPoll(long deadline) {
+        long remainingMillis = TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime());
+        if (remainingMillis <= 0) {
+            return;
+        }
+        try {
+            Thread.sleep(Math.min(50, remainingMillis));
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private String normalizeResourceName(String value) {

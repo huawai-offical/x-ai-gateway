@@ -31,6 +31,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.node.JsonNodeFactory;
 
 @Service
 @Transactional(readOnly = true)
@@ -682,6 +684,16 @@ public class ObservabilityQueryService {
     }
 
     private UpstreamCacheReferenceResponse toUpstreamCacheReferenceResponse(UpstreamCacheReferenceEntity entity) {
+        boolean expired = entity.getExpireAt() != null && entity.getExpireAt().isBefore(Instant.now());
+        String effectiveStatus = expired ? "EXPIRED" : entity.getStatus();
+        boolean active = "ACTIVE".equalsIgnoreCase(entity.getStatus()) && !expired;
+        ObjectNode lifecycle = JsonNodeFactory.instance.objectNode();
+        lifecycle.put("status", entity.getStatus());
+        lifecycle.put("effective_status", effectiveStatus);
+        lifecycle.put("expired", expired);
+        lifecycle.put("active", active);
+        putInstant(lifecycle, "expire_at", entity.getExpireAt());
+        putInstant(lifecycle, "last_used_at", entity.getLastUsedAt());
         return new UpstreamCacheReferenceResponse(
                 entity.getId(),
                 entity.getDistributedKeyId(),
@@ -691,11 +703,23 @@ public class ObservabilityQueryService {
                 entity.getPrefixHash(),
                 entity.getExternalCacheRef(),
                 entity.getStatus(),
+                effectiveStatus,
+                expired,
+                active,
                 entity.getExpireAt(),
                 entity.getLastUsedAt(),
                 entity.getCreatedAt(),
-                entity.getUpdatedAt()
+                entity.getUpdatedAt(),
+                lifecycle
         );
+    }
+
+    private void putInstant(ObjectNode node, String fieldName, Instant value) {
+        if (value == null) {
+            node.putNull(fieldName);
+        } else {
+            node.put(fieldName, value.toString());
+        }
     }
 
     private record TimeWindow(Instant from, Instant to) {

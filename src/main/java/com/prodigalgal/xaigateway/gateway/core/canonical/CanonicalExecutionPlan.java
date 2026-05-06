@@ -303,6 +303,11 @@ public record CanonicalExecutionPlan(
             case ANTHROPIC_MESSAGE_BATCH_CREATE, ANTHROPIC_MESSAGE_BATCH_GET, ANTHROPIC_MESSAGE_BATCH_CANCEL -> "messages.batches";
             case TUNING_LIST, TUNING_CREATE, TUNING_GET, TUNING_CANCEL -> "fine_tuning";
             case REALTIME_CLIENT_SECRET_CREATE -> "realtime";
+            case RERANK_CREATE -> "rerank";
+            case VIDEO_GENERATION_CREATE, VIDEO_GENERATION_GET, VIDEO_GENERATION_CANCEL -> "videos";
+            case MUSIC_GENERATION_CREATE, MUSIC_GENERATION_GET, MUSIC_GENERATION_CANCEL -> "music";
+            case TASK_GET, TASK_CANCEL -> "tasks";
+            case WEB_SEARCH_CREATE -> "web_search";
             case UNKNOWN -> resourceType == null ? "unknown" : resourceType.wireName();
         };
     }
@@ -337,6 +342,16 @@ public record CanonicalExecutionPlan(
             case TUNING_GET -> "/v1/fine_tuning/jobs/{jobId}";
             case TUNING_CANCEL -> "/v1/fine_tuning/jobs/{jobId}/cancel";
             case REALTIME_CLIENT_SECRET_CREATE -> "/v1/realtime/client_secrets";
+            case RERANK_CREATE -> "/v1/rerank";
+            case VIDEO_GENERATION_CREATE -> "/v1/videos/generations";
+            case VIDEO_GENERATION_GET -> "/v1/videos/{taskId}";
+            case VIDEO_GENERATION_CANCEL -> "/v1/videos/{taskId}/cancel";
+            case MUSIC_GENERATION_CREATE -> "/v1/music/generations";
+            case MUSIC_GENERATION_GET -> "/v1/music/{taskId}";
+            case MUSIC_GENERATION_CANCEL -> "/v1/music/{taskId}/cancel";
+            case TASK_GET -> "/v1/tasks/{taskId}";
+            case TASK_CANCEL -> "/v1/tasks/{taskId}/cancel";
+            case WEB_SEARCH_CREATE -> "/v1/web_search";
             case UNKNOWN -> resourceType == null ? null : "/" + resourceType.wireName();
         };
     }

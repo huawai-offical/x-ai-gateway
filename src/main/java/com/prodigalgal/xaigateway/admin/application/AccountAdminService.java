@@ -2,6 +2,7 @@ package com.prodigalgal.xaigateway.admin.application;
 
 import com.prodigalgal.xaigateway.admin.api.ExportedClientConfigResponse;
 import com.prodigalgal.xaigateway.admin.api.AccountImportAuthJsonRequest;
+import com.prodigalgal.xaigateway.admin.api.ProgrammingAccountIdentityResponse;
 import com.prodigalgal.xaigateway.admin.api.UpstreamAccountResponse;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountPoolEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountEntity;
@@ -84,11 +85,61 @@ public class AccountAdminService {
         UpstreamAccountEntity entity = getRequired(id);
         String token = entity.getAccessTokenCiphertext() == null ? "" : credentialCryptoService.decrypt(entity.getAccessTokenCiphertext());
         String config = switch (entity.getProviderType()) {
-            case OPENAI_OAUTH -> "{\n  \"OPENAI_API_KEY\": \"" + token + "\"\n}";
-            case GEMINI_OAUTH -> "{\n  \"GEMINI_API_KEY\": \"" + token + "\"\n}";
-            case CLAUDE_ACCOUNT -> "{\n  \"ANTHROPIC_API_KEY\": \"" + token + "\"\n}";
+            case OPENAI_OAUTH, CODEX_OAUTH -> "{\n  \"OPENAI_API_KEY\": \"" + token + "\"\n}";
+            case GEMINI_OAUTH, ANTIGRAVITY_OAUTH -> "{\n  \"GEMINI_API_KEY\": \"" + token + "\"\n}";
+            case CLAUDE_ACCOUNT, CLAUDE_PLAN -> "{\n  \"ANTHROPIC_API_KEY\": \"" + token + "\"\n}";
+            case COPILOT_OAUTH -> "{\n  \"GITHUB_COPILOT_TOKEN\": \"" + token + "\"\n}";
         };
         return new ExportedClientConfigResponse(entity.getAccountName(), clientFamily, config);
+    }
+
+    @Transactional(readOnly = true)
+    public ProgrammingAccountIdentityResponse programmingIdentity(Long id, String clientFamily) {
+        UpstreamAccountEntity entity = getRequired(id);
+        JsonNode metadata = readMetadata(defaultString(entity.getMetadataJson(), "{}"));
+        String requestedClientFamily = defaultString(clientFamily, firstNonBlank(
+                parseText(metadata.findValue("client_family")),
+                parseText(metadata.findValue("clientFamily")),
+                "CODEX"
+        )).toUpperCase(Locale.ROOT);
+        String identitySubject = firstNonBlank(
+                parseText(metadata.findValue("identity_subject")),
+                parseText(metadata.findValue("identitySubject")),
+                parseText(metadata.findValue("subject")),
+                entity.getExternalAccountId()
+        );
+        String identityEmail = firstNonBlank(
+                parseText(metadata.findValue("identity_email")),
+                parseText(metadata.findValue("identityEmail")),
+                parseText(metadata.findValue("email"))
+        );
+        String adoptionDecision = firstNonBlank(
+                parseText(metadata.findValue("adoption_decision")),
+                parseText(metadata.findValue("adoptionDecision")),
+                parseText(metadata.findValue("identity_adoption")),
+                "ADOPTED"
+        ).toUpperCase(Locale.ROOT);
+        String authorizationStatus = firstNonBlank(entity.getRefreshStatus(), "UNKNOWN").toUpperCase(Locale.ROOT);
+        String routeBlockReason = routeBlockReason(entity, requestedClientFamily, adoptionDecision, authorizationStatus);
+
+        return new ProgrammingAccountIdentityResponse(
+                entity.getId(),
+                entity.getProviderType(),
+                entity.getAccountName(),
+                entity.getExternalAccountId(),
+                identitySubject,
+                identityEmail,
+                requestedClientFamily,
+                adoptionDecision,
+                authorizationStatus,
+                entity.getQuotaRemainingTokens(),
+                entity.getQuotaRemainingRequests(),
+                entity.getQuotaWindowSeconds(),
+                entity.getQuotaWindowStartedAt(),
+                routeBlockReason == null,
+                routeBlockReason,
+                entity.getLastRefreshResultJson()
+        );
     }
 
     public UpstreamAccountResponse importAuthJson(AccountImportAuthJsonRequest request) {
@@ -358,6 +409,57 @@ public class AccountAdminService {
         }
         if (value.isNumber() || value.isBoolean()) {
             return value.asText();
+        }
+        return null;
+    }
+
+    private String routeBlockReason(
+            UpstreamAccountEntity entity,
+            String clientFamily,
+            String adoptionDecision,
+            String authorizationStatus) {
+        if (!entity.isActive()) {
+            return "ACCOUNT_INACTIVE";
+        }
+        if (entity.isFrozen()) {
+            return "ACCOUNT_FROZEN";
+        }
+        if (!entity.isHealthy()) {
+            return "ACCOUNT_UNHEALTHY";
+        }
+        if ("REJECTED".equalsIgnoreCase(adoptionDecision)) {
+            return "IDENTITY_REJECTED";
+        }
+        if ("FAILED".equalsIgnoreCase(authorizationStatus)) {
+            return "AUTHORIZATION_FAILED";
+        }
+        if (entity.getQuotaRemainingTokens() != null && entity.getQuotaRemainingTokens() <= 0) {
+            return "QUOTA_TOKENS_EXHAUSTED";
+        }
+        if (entity.getQuotaRemainingRequests() != null && entity.getQuotaRemainingRequests() <= 0) {
+            return "QUOTA_REQUESTS_EXHAUSTED";
+        }
+        List<String> allowedFamilies = entity.getPool() == null || entity.getPool().getAllowedClientFamilies() == null
+                ? List.of()
+                : entity.getPool().getAllowedClientFamilies().stream()
+                        .filter(value -> value != null && !value.isBlank())
+                        .map(value -> value.trim().toUpperCase(Locale.ROOT))
+                        .toList();
+        if (!allowedFamilies.isEmpty() && !allowedFamilies.contains(clientFamily.toUpperCase(Locale.ROOT))) {
+            return "CLIENT_FAMILY_NOT_ALLOWED";
+        }
+        return null;
+    }
+
+    private String defaultString(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value.trim();
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
         }
         return null;
     }

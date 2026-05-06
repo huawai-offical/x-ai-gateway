@@ -15,7 +15,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @Service
@@ -194,6 +196,119 @@ public class PlatformOperationsService {
         return toRollbackResponse(rollbackJobRepository.save(saved));
     }
 
+    @Transactional(readOnly = true)
+    public DeploymentManifestResponse deploymentManifest(String profile) {
+        String normalizedProfile = normalizeProfile(profile);
+        List<DeploymentManifestItemResponse> files = deploymentFiles();
+        return new DeploymentManifestResponse(
+                normalizedProfile,
+                "x-ai-gateway:local",
+                "deploy/docker-compose.yml",
+                "deploy/.env.example",
+                "scripts/install.ps1",
+                "scripts/upgrade.ps1",
+                "scripts/rollback.ps1",
+                "http://localhost:8080/actuator/health/readiness",
+                files,
+                List.of(
+                        "DB_URL",
+                        "DB_USERNAME",
+                        "DB_PASSWORD",
+                        "REDIS_HOST",
+                        "REDIS_PORT",
+                        "REDIS_PASSWORD",
+                        "GATEWAY_ENCRYPTION_KEY",
+                        "GATEWAY_FILE_ROOT",
+                        "GATEWAY_ROUTING_RUNTIME_STORE_TYPE"
+                ),
+                List.of(
+                        "xag-postgres-data:/var/lib/postgresql/data",
+                        "xag-redis-data:/data",
+                        "./.data/files:/app/.data/files",
+                        "./output/logs:/app/logs"
+                ),
+                List.of(
+                        "Copy-Item deploy/.env.example .env",
+                        "docker compose --env-file .env -f deploy/docker-compose.yml up -d",
+                        ".\\scripts\\install.ps1 -EnvFile .env",
+                        ".\\scripts\\upgrade.ps1 -TargetVersion <version> -Confirm",
+                        ".\\scripts\\rollback.ps1 -BackupId <backup-id> -Confirm"
+                ),
+                List.of(
+                        "docs/production-deployment-upgrade.md",
+                        "docs/operations-drill-evidence.md",
+                        "docs/testing-smoke-harness.md"
+                ),
+                Instant.now()
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public DeploymentPreflightResponse deploymentPreflight(String targetVersion, String profile) {
+        String normalizedProfile = normalizeProfile(profile);
+        String normalizedTargetVersion = targetVersion == null || targetVersion.isBlank()
+                ? "未指定"
+                : targetVersion.trim();
+        List<DeploymentPreflightCheckResponse> checks = new ArrayList<>();
+        deploymentFiles().forEach(file -> checks.add(new DeploymentPreflightCheckResponse(
+                "file:" + file.path(),
+                file.present() ? "OK" : "FAIL",
+                file.required() && !file.present(),
+                file.present() ? "已找到 " + file.path() : "缺少 " + file.path(),
+                file.present() ? "无需处理。" : "按 docs/production-deployment-upgrade.md 补齐文件后再执行升级。"
+        )));
+        checks.add(new DeploymentPreflightCheckResponse(
+                "liquibase:master-changelog",
+                Files.exists(Path.of("src/main/resources/db/changelog/db.changelog-master.yaml")) ? "OK" : "FAIL",
+                !Files.exists(Path.of("src/main/resources/db/changelog/db.changelog-master.yaml")),
+                "数据库迁移入口检查。",
+                "确认 Liquibase master changelog 存在且纳入发布制品。"
+        ));
+        checks.add(new DeploymentPreflightCheckResponse(
+                "redis:runtime-store",
+                "redis".equalsIgnoreCase(gatewayProperties.getRouting().getRuntimeStore().getType()) ? "OK" : "WARN",
+                false,
+                "当前 routing runtime store 为 " + gatewayProperties.getRouting().getRuntimeStore().getType() + "。",
+                "生产多实例建议设置 GATEWAY_ROUTING_RUNTIME_STORE_TYPE=redis；本地单实例可继续使用 memory。"
+        ));
+        checks.add(new DeploymentPreflightCheckResponse(
+                "release:target-version",
+                "未指定".equals(normalizedTargetVersion) ? "WARN" : "OK",
+                false,
+                "目标版本：" + normalizedTargetVersion,
+                "执行升级前建议传入 targetVersion，并在 release artifact 中记录 artifactRef。"
+        ));
+        int blockingCount = (int) checks.stream().filter(DeploymentPreflightCheckResponse::blocking).count();
+        int warningCount = (int) checks.stream().filter(check -> "WARN".equals(check.status())).count();
+        String status = blockingCount > 0 ? "BLOCKED" : warningCount > 0 ? "WARN" : "PASS";
+        return new DeploymentPreflightResponse(
+                normalizedTargetVersion,
+                normalizedProfile,
+                status,
+                blockingCount,
+                warningCount,
+                checks,
+                List.of(
+                        "Copy-Item deploy/.env.example .env",
+                        ".\\scripts\\install.ps1 -EnvFile .env"
+                ),
+                List.of(
+                        ".\\gradlew.bat clean test",
+                        ".\\scripts\\upgrade.ps1 -TargetVersion " + normalizedTargetVersion + " -Confirm"
+                ),
+                List.of(
+                        ".\\scripts\\rollback.ps1 -BackupId <pre-upgrade-backup-id> -Confirm",
+                        "docker compose --env-file .env -f deploy/docker-compose.yml logs gateway"
+                ),
+                List.of(
+                        "docs/production-deployment-upgrade.md",
+                        "docs/operations-drill-evidence.md",
+                        "docs/testing-smoke-harness.md"
+                ),
+                Instant.now()
+        );
+    }
+
     private InstallationStateEntity getOrCreateInstallationState() {
         return installationStateRepository.findAll().stream().findFirst().orElseGet(() -> {
             InstallationStateEntity entity = new InstallationStateEntity();
@@ -245,6 +360,29 @@ public class PlatformOperationsService {
         } catch (JacksonException exception) {
             throw new IllegalStateException("序列化失败。", exception);
         }
+    }
+
+    private String normalizeProfile(String profile) {
+        if (profile == null || profile.isBlank()) {
+            return "compose";
+        }
+        return profile.trim().toLowerCase(Locale.ROOT).replace('-', '_');
+    }
+
+    private List<DeploymentManifestItemResponse> deploymentFiles() {
+        return List.of(
+                file("Dockerfile", "容器镜像构建入口", true),
+                file("deploy/docker-compose.yml", "Postgres、Redis 与 gateway 编排", true),
+                file("deploy/.env.example", "生产环境变量样例", true),
+                file("scripts/install.ps1", "首次部署脚本", true),
+                file("scripts/upgrade.ps1", "升级脚本", true),
+                file("scripts/rollback.ps1", "回滚脚本", true),
+                file("docs/production-deployment-upgrade.md", "部署、升级、回滚操作文档", true)
+        );
+    }
+
+    private DeploymentManifestItemResponse file(String path, String purpose, boolean required) {
+        return new DeploymentManifestItemResponse(path, purpose, required, Files.exists(Path.of(path)));
     }
 
     private InstallationStateResponse toInstallResponse(InstallationStateEntity entity) {

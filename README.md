@@ -4,6 +4,29 @@
 
 项目当前默认数据库名为 `x_ai_gateway`。
 
-项目文档已统一迁移到 Notion，仓库内不再维护本地 Markdown 文档导航：
+## 本地事实源
 
-- [文档入口](https://www.notion.so/33b79afa47908138aa54c1ae771ad264)
+本仓库默认使用本地优先协作流程，不再把线上 Notion 或线上 Linear 作为默认事实源。
+
+- 文档索引：[docs/index.md](docs/index.md)
+- 任务索引：[tasks/index.md](tasks/index.md)
+- 本地协作规则：[AGENTS.md](AGENTS.md)
+- 公开兼容文档：[docs/public-api-compatibility.md](docs/public-api-compatibility.md)
+
+## 公开文档 API
+
+运行服务后可读取结构化公开文档：
+
+```text
+GET /public/docs/compatibility?locale=zh-CN
+GET /public/docs/compatibility?locale=en-US
+GET /public/docs/openapi.json
+```
+
+公开 docs bundle 覆盖 quick start、provider preset、CLI 接入、SDK 示例、错误码、路由、计费和 conformance。OpenAPI JSON 维护公开接入面的最小事实源。
+
+## 开发约定
+
+- 新需求开始编码前，先在 `docs/requirements/` 和 `tasks/` 中建立本地记录。
+- 交付完成后，回写实现结果、验证情况、遗留问题和后续建议。
+- 默认不调用线上 Notion/Linear；只有用户明确要求时才使用线上连接器。

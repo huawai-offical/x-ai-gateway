@@ -46,6 +46,18 @@ public class GatewayUserEntity {
     @Column(name = "last_login_at", columnDefinition = "timestamp with time zone")
     private Instant lastLoginAt;
 
+    @Column(name = "email_verified_at", columnDefinition = "timestamp with time zone")
+    private Instant emailVerifiedAt;
+
+    @Column(name = "totp_secret_ciphertext", length = 512)
+    private String totpSecretCiphertext;
+
+    @Column(name = "totp_enabled", nullable = false)
+    private boolean totpEnabled = false;
+
+    @Column(name = "totp_verified_at", columnDefinition = "timestamp with time zone")
+    private Instant totpVerifiedAt;
+
     @Column(name = "notes", columnDefinition = "text")
     private String notes;
 
@@ -99,6 +111,38 @@ public class GatewayUserEntity {
 
     public void setLastLoginAt(Instant lastLoginAt) {
         this.lastLoginAt = lastLoginAt;
+    }
+
+    public Instant getEmailVerifiedAt() {
+        return emailVerifiedAt;
+    }
+
+    public void setEmailVerifiedAt(Instant emailVerifiedAt) {
+        this.emailVerifiedAt = emailVerifiedAt;
+    }
+
+    public String getTotpSecretCiphertext() {
+        return totpSecretCiphertext;
+    }
+
+    public void setTotpSecretCiphertext(String totpSecretCiphertext) {
+        this.totpSecretCiphertext = totpSecretCiphertext;
+    }
+
+    public boolean isTotpEnabled() {
+        return totpEnabled;
+    }
+
+    public void setTotpEnabled(boolean totpEnabled) {
+        this.totpEnabled = totpEnabled;
+    }
+
+    public Instant getTotpVerifiedAt() {
+        return totpVerifiedAt;
+    }
+
+    public void setTotpVerifiedAt(Instant totpVerifiedAt) {
+        this.totpVerifiedAt = totpVerifiedAt;
     }
 
     public String getNotes() {

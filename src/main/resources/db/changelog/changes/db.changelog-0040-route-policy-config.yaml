@@ -1,0 +1,12 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0040-route-policy-config
+      author: codex
+      changes:
+        - addColumn:
+            tableName: route_guard_policy
+            columns:
+              - column: { name: retry_policy, type: TEXT }
+              - column: { name: fallback_policy, type: TEXT }
+              - column: { name: circuit_breaker_policy, type: TEXT }
+              - column: { name: rate_limit_policy, type: TEXT }
