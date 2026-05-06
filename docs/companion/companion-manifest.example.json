@@ -1,0 +1,22 @@
+{
+  "manifestVersion": "1.0",
+  "clientInstance": {
+    "clientFamily": "CODEX",
+    "instanceId": "codex-main",
+    "workspaceHint": "repo-a",
+    "pluginName": "x-ai-gateway-vscode",
+    "pluginVersion": "0.1.0"
+  },
+  "capabilities": {
+    "mcpSummary": true,
+    "skillsSummary": true,
+    "sessionSummary": false,
+    "workspaceHint": true,
+    "deepLinkAuthorization": true
+  },
+  "privacy": {
+    "uploadsWorkspaceFiles": false,
+    "uploadsSecrets": false,
+    "uploadsSessionContent": false
+  }
+}

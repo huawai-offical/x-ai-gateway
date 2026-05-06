@@ -17,6 +17,8 @@ public interface UsageRecordRepository extends JpaRepository<UsageRecordEntity, 
 
     List<UsageRecordEntity> findTop100ByDistributedKeyIdInOrderByCreatedAtDesc(Iterable<Long> distributedKeyIds);
 
+    List<UsageRecordEntity> findTop100ByClientFamilyAndClientInstanceOrderByCreatedAtDesc(String clientFamily, String clientInstance);
+
     @Query("""
             select entity
             from UsageRecordEntity entity

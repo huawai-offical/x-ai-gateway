@@ -1,0 +1,28 @@
+{
+  "generatedAt": "2026-05-06",
+  "openapi": "../openapi/public-openapi.json",
+  "baseUrlEnv": "X_AI_GATEWAY_BASE_URL",
+  "apiKeyEnv": "X_AI_GATEWAY_API_KEY",
+  "targets": [
+    {
+      "language": "python",
+      "file": "python/chat_completions.py",
+      "entrypoint": "python chat_completions.py"
+    },
+    {
+      "language": "javascript",
+      "file": "javascript/chat-completions.mjs",
+      "entrypoint": "node chat-completions.mjs"
+    },
+    {
+      "language": "go",
+      "file": "go/chat_completions.go",
+      "entrypoint": "go run chat_completions.go"
+    },
+    {
+      "language": "java",
+      "file": "java/ChatCompletionsExample.java",
+      "entrypoint": "javac ChatCompletionsExample.java && java ChatCompletionsExample"
+    }
+  ]
+}

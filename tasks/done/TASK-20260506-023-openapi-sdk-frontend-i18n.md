@@ -1,9 +1,9 @@
 # TASK-20260506-023 OpenAPI 自动生成、SDK 示例与前端 i18n 抽取
 
-状态：Backlog  
+状态：Done  
 优先级：Medium  
 来源：[REP-20260506 参考项目功能深度再复核](../../docs/reports/REP-20260506-reference-feature-depth-recheck.md)  
-关联需求：[REQ-20260506-012 参考项目功能深度复核与任务再生成](../../docs/requirements/REQ-20260506-012-reference-depth-recheck-task-generation.md)
+关联需求：[REQ-20260506-019 OpenAPI 自动生成、SDK 示例与前端 i18n 抽取](../../docs/requirements/REQ-20260506-019-openapi-sdk-frontend-i18n.md)
 
 ## 背景
 
@@ -37,12 +37,19 @@
 
 ## 实现记录
 
-待处理。
+- 新增 `PublicOpenApiSnapshotTests`，公开 OpenAPI 缺少版本、info、关键 path、`bearerAuth` 或 SDK registry 时会失败。
+- 新增 `docs/sdk-examples/index.json` 与 Python、JavaScript、Go、Java 四类 chat completions 示例。
+- 新增 [public-sdk-examples](../../docs/public-sdk-examples.md)，把 SDK 示例入口、环境变量和使用边界沉淀到公开文档。
+- 新增 `web/src/i18n` 基础设施，包含 `zh-CN/en-US` 字典、fallback 和 key parity 测试。
+- 更新 [docs index](../../docs/index.md)，补齐公开 SDK 示例入口。
 
 ## 测试/验证
 
-待处理。
+- `.\gradlew.bat test --tests "com.prodigalgal.xaigateway.docs.PublicOpenApiSnapshotTests"`
+- `.\gradlew.bat test --tests "com.prodigalgal.xaigateway.docs.PublicOpenApiSnapshotTests" --tests "com.prodigalgal.xaigateway.docs.CompanionManifestSchemaTests"`
+- `bun run test -- src/i18n/messages.test.ts`
 
 ## 遗留问题
 
-待处理。
+- 未一次性抽取全部历史 Admin 页面文案；当前先覆盖 navigation/common/portal/public docs 的事实源和 parity 机制。
+- SDK 示例仍需要调用方配置真实 gateway key 与可用 provider 才能跑真实上游 smoke。

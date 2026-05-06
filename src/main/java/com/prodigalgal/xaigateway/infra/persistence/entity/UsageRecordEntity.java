@@ -27,7 +27,8 @@ import org.hibernate.annotations.UpdateTimestamp;
         indexes = {
                 @Index(name = "idx_usage_record_distributed_key_created", columnList = "distributed_key_id,created_at"),
                 @Index(name = "idx_usage_record_provider_created", columnList = "provider_type,created_at"),
-                @Index(name = "idx_usage_record_completeness_created", columnList = "completeness,created_at")
+                @Index(name = "idx_usage_record_completeness_created", columnList = "completeness,created_at"),
+                @Index(name = "idx_usage_record_client_instance_created", columnList = "client_family,client_instance,created_at")
         }
 )
 @Comment("归一化 usage 记录。")
@@ -43,6 +44,15 @@ public class UsageRecordEntity {
 
     @Column(name = "distributed_key_id", nullable = false)
     private Long distributedKeyId;
+
+    @Column(name = "client_family", length = 64)
+    private String clientFamily;
+
+    @Column(name = "client_instance", length = 128)
+    private String clientInstance;
+
+    @Column(name = "workspace_hint", length = 256)
+    private String workspaceHint;
 
     @Column(name = "protocol", nullable = false, length = 32)
     private String protocol;
@@ -133,6 +143,30 @@ public class UsageRecordEntity {
 
     public void setDistributedKeyId(Long distributedKeyId) {
         this.distributedKeyId = distributedKeyId;
+    }
+
+    public String getClientFamily() {
+        return clientFamily;
+    }
+
+    public void setClientFamily(String clientFamily) {
+        this.clientFamily = clientFamily;
+    }
+
+    public String getClientInstance() {
+        return clientInstance;
+    }
+
+    public void setClientInstance(String clientInstance) {
+        this.clientInstance = clientInstance;
+    }
+
+    public String getWorkspaceHint() {
+        return workspaceHint;
+    }
+
+    public void setWorkspaceHint(String workspaceHint) {
+        this.workspaceHint = workspaceHint;
     }
 
     public String getProtocol() {

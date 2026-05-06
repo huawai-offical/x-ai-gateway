@@ -1,9 +1,9 @@
 # TASK-20260506-024 Linux/systemd 部署、数据管理与迁移兼容
 
-状态：Backlog  
+状态：Done  
 优先级：Medium  
 来源：[REP-20260506 参考项目功能深度再复核](../../docs/reports/REP-20260506-reference-feature-depth-recheck.md)  
-关联需求：[REQ-20260506-012 参考项目功能深度复核与任务再生成](../../docs/requirements/REQ-20260506-012-reference-depth-recheck-task-generation.md)
+关联需求：[REQ-20260506-020 Linux/systemd 部署、数据管理与迁移兼容](../../docs/requirements/REQ-20260506-020-linux-systemd-data-migration.md)
 
 ## 背景
 
@@ -37,12 +37,22 @@
 
 ## 实现记录
 
-待处理。
+- 新增 `deploy/systemd/x-ai-gateway.service` 和 `scripts/linux/x-ai-gateway.env.example`。
+- 新增 `scripts/linux/install.sh`、`scripts/linux/upgrade.sh`、`scripts/linux/rollback.sh`，支持 dry-run、systemd 操作提示、健康检查和版本目录切换。
+- 新增 `scripts/data-management.mjs`，提供 One API/Sub2API 迁移 dry-run 和导出模板能力。
+- 新增 One API/Sub2API 样例导出文件，覆盖用户、key、provider/channel 和 usage 映射。
+- 新增 [linux-systemd-data-migration](../../docs/linux-systemd-data-migration.md)，记录部署、升级、回滚、迁移映射和验收命令。
 
 ## 测试/验证
 
-待处理。
+- `node scripts\data-management.mjs migrate --source one-api --input docs\migrations\samples\one-api-export.sample.json --dry-run`
+- `node scripts\data-management.mjs migrate --source sub2api --input docs\migrations\samples\sub2api-export.sample.json --dry-run`
+- `bash -n scripts/linux/install.sh`
+- `bash -n scripts/linux/upgrade.sh`
+- `bash -n scripts/linux/rollback.sh`
+- `node scripts\data-management.mjs export-template --help`
 
 ## 遗留问题
 
-待处理。
+- 未在真实 Linux 主机安装 systemd service；当前完成脚本、模板、文档和语法验证。
+- 未迁移真实生产数据；当前提供 dry-run 映射输出和失败报告基础。

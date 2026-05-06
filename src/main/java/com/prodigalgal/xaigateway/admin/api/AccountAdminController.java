@@ -1,6 +1,7 @@
 package com.prodigalgal.xaigateway.admin.api;
 
 import com.prodigalgal.xaigateway.admin.application.AccountAdminService;
+import com.prodigalgal.xaigateway.admin.application.OfficialAccountAdminService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
@@ -11,9 +12,13 @@ import java.util.List;
 public class AccountAdminController {
 
     private final AccountAdminService accountAdminService;
+    private final OfficialAccountAdminService officialAccountAdminService;
 
-    public AccountAdminController(AccountAdminService accountAdminService) {
+    public AccountAdminController(
+            AccountAdminService accountAdminService,
+            OfficialAccountAdminService officialAccountAdminService) {
         this.accountAdminService = accountAdminService;
+        this.officialAccountAdminService = officialAccountAdminService;
     }
 
     @GetMapping
@@ -61,5 +66,22 @@ public class AccountAdminController {
     @PostMapping("/import-auth-json")
     public UpstreamAccountResponse importAuthJson(@Valid @RequestBody AccountImportAuthJsonRequest request) {
         return accountAdminService.importAuthJson(request);
+    }
+
+    @PostMapping("/official/import")
+    public OfficialAccountQuotaResponse importOfficialAccount(@Valid @RequestBody OfficialAccountImportRequest request) {
+        return officialAccountAdminService.importOfficialAccount(request);
+    }
+
+    @PostMapping("/{id}/official/quota-refresh")
+    public OfficialAccountQuotaResponse refreshOfficialQuota(
+            @PathVariable Long id,
+            @RequestBody(required = false) OfficialAccountQuotaRefreshRequest request) {
+        return officialAccountAdminService.refreshQuota(id, request);
+    }
+
+    @GetMapping("/{id}/official/quota")
+    public OfficialAccountQuotaResponse officialQuota(@PathVariable Long id) {
+        return officialAccountAdminService.quota(id);
     }
 }

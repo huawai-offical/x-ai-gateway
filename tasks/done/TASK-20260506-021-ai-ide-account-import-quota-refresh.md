@@ -1,9 +1,9 @@
 # TASK-20260506-021 AI IDE/CLI 官方账号导入与配额刷新
 
-状态：Backlog  
+状态：Done  
 优先级：High  
 来源：[REP-20260506 参考项目功能深度再复核](../../docs/reports/REP-20260506-reference-feature-depth-recheck.md)  
-关联需求：[REQ-20260506-012 参考项目功能深度复核与任务再生成](../../docs/requirements/REQ-20260506-012-reference-depth-recheck-task-generation.md)
+关联需求：[REQ-20260506-017 AI IDE/CLI 官方账号导入与配额刷新](../../docs/requirements/REQ-20260506-017-official-account-import-quota-refresh.md)
 
 ## 背景
 
@@ -37,12 +37,19 @@
 
 ## 实现记录
 
-待处理。
+- 新增 `OfficialAccountType`、`OfficialAccountImportRequest`、`OfficialAccountQuotaRefreshRequest`、`OfficialAccountQuotaResponse`。
+- 新增 `OfficialAccountAdminService`，实现官方账号导入、quota refresh、quota summary 查询。
+- `AccountAdminController` 新增官方账号 Admin API：导入、刷新和查询。
+- 导入流程对 `accessToken`、`refreshToken` 加密保存，并对 metadata 中的敏感 key 递归脱敏。
+- quota 成功刷新会写入 plan/subscription tier、quota window、reset time、remaining、`nextRefreshAfter`、`lastRefreshResultJson`。
+- quota 失败刷新会写入 `QUOTA_FAILED`、`quota_error`、失败次数、冷却和下一次重试时间，并让调度摘要返回 `routeBlockReason`。
+- 新增 [official-account-quota-refresh](../../docs/official-account-quota-refresh.md) 文档。
 
 ## 测试/验证
 
-待处理。
+- `.\gradlew.bat test --tests "com.prodigalgal.xaigateway.admin.application.OfficialAccountAdminServiceTests"`
 
 ## 遗留问题
 
-待处理。
+- 本轮未扩展复杂 Admin 前端筛选/批量操作 UI；后端响应已包含 `quotaStatus`、`planTier`、`subscriptionTier`、`routeEligible` 和 `routeBlockReason`，可直接支撑 UI。
+- 本轮不绑定非公开远程接口；后续可按官方账号类型替换为真实 quota adapter。

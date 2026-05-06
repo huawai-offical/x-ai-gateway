@@ -250,6 +250,7 @@ public class GatewayChatExecutionService {
         GatewayClientFamily effectiveClientFamily = clientFamily == null ? GatewayClientFamily.GENERIC_OPENAI : clientFamily;
         CloudCliRequestFilterResult filterResult = applyCloudCliRequestFilters(request, effectiveClientFamily);
         CanonicalRequest filteredRequest = filterResult.request();
+        ensureRequestFilterAllowed(filterResult);
         String requestId = gatewayObservabilityService.nextRequestId();
         Instant startedAt = Instant.now();
         JsonNode routeBody = buildRouteBody(filteredRequest);
@@ -382,6 +383,7 @@ public class GatewayChatExecutionService {
         GatewayClientFamily effectiveClientFamily = clientFamily == null ? GatewayClientFamily.GENERIC_OPENAI : clientFamily;
         CloudCliRequestFilterResult filterResult = applyCloudCliRequestFilters(request, effectiveClientFamily);
         CanonicalRequest filteredRequest = filterResult.request();
+        ensureRequestFilterAllowed(filterResult);
         String requestId = gatewayObservabilityService.nextRequestId();
         Instant startedAt = Instant.now();
         JsonNode routeBody = buildRouteBody(filteredRequest);
@@ -806,8 +808,16 @@ public class GatewayChatExecutionService {
                 rule.getClientFamilies(),
                 rule.getRole(),
                 rule.getContains(),
-                rule.getReplacement()
+                rule.getReplacement(),
+                rule.getTarget(),
+                rule.getPath()
         );
+    }
+
+    private void ensureRequestFilterAllowed(CloudCliRequestFilterResult filterResult) {
+        if (filterResult != null && filterResult.denied()) {
+            throw new IllegalArgumentException("请求被云端 Request Filter 拒绝：" + filterResult.denyRuleId());
+        }
     }
 
     private void annotateFilterHits(JsonNode routeBody, CloudCliRequestFilterResult filterResult) {
@@ -822,6 +832,17 @@ public class GatewayChatExecutionService {
         filterResult.appliedRuleIds().forEach(applied::add);
         var skipped = metadata.putArray("skipped_rule_ids");
         filterResult.skippedRuleIds().forEach(skipped::add);
+        var hits = metadata.putArray("hits");
+        filterResult.hits().forEach(hit -> hits.addObject()
+                .put("rule_id", hit.ruleId())
+                .put("action", hit.action())
+                .put("target", hit.target())
+                .put("path", hit.path())
+                .put("summary", hit.summary()));
+        metadata.put("denied", filterResult.denied());
+        if (filterResult.denyRuleId() != null) {
+            metadata.put("deny_rule_id", filterResult.denyRuleId());
+        }
     }
 
     private RouteSelectionResult selectionForCandidate(

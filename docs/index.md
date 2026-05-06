@@ -26,6 +26,12 @@
 - [REQ-20260506-013 Provider 真实 Smoke 与价格同步闭环](requirements/REQ-20260506-013-provider-smoke-pricing-sync.md)
 - [REQ-20260506-014 支付定时对账、订阅发票与跨币种结算](requirements/REQ-20260506-014-payment-scheduled-reconcile-invoice-currency.md)
 - [REQ-20260506-015 Realtime 长连接池与专有 Media Adapter](requirements/REQ-20260506-015-realtime-pool-media-adapters.md)
+- [REQ-20260506-016 云端 Request Filter 高级规则、审计与 UI](requirements/REQ-20260506-016-cloud-request-filter-audit-ui.md)
+- [REQ-20260506-017 AI IDE/CLI 官方账号导入与配额刷新](requirements/REQ-20260506-017-official-account-import-quota-refresh.md)
+- [REQ-20260506-018 Client Instance 管理与插件/Deep Link 授权下发](requirements/REQ-20260506-018-client-instance-plugin-deeplink.md)
+- [REQ-20260506-019 OpenAPI 自动生成、SDK 示例与前端 i18n 抽取](requirements/REQ-20260506-019-openapi-sdk-frontend-i18n.md)
+- [REQ-20260506-020 Linux/systemd 部署、数据管理与迁移兼容](requirements/REQ-20260506-020-linux-systemd-data-migration.md)
+- [REQ-20260506-021 桌面 Companion、MCP/Skills/Session/Workspace 可行性评估](requirements/REQ-20260506-021-desktop-companion-mcp-workflow.md)
 
 ## 决策
 
@@ -37,6 +43,7 @@
 - [ADR-0006 第五批任务采用“真实适配接口 + 本地可验证执行器”闭环](decisions/ADR-0006-real-adapter-local-verification.md)
 - [ADR-0007 第六批任务采用“先校准差距，再补生产运行态与账号入口”闭环](decisions/ADR-0007-sixth-batch-runtime-and-oauth-scope.md)
 - [ADR-0008 云端代理优先的 CLI 接入架构](decisions/ADR-0008-cloud-cli-access-without-local-proxy.md)
+- [ADR-0009 Desktop Companion 不进入服务端主线](decisions/ADR-0009-desktop-companion-out-of-mainline.md)
 
 ## 报告
 
@@ -47,6 +54,7 @@
 - [REP-20260506 五个参考项目深度对标分析](reports/REP-20260506-five-reference-deep-analysis.md)
 - [REP-20260506 i18n 与 OpenAPI 事实源审计](reports/REP-20260506-i18n-openapi-truth-source-audit.md)
 - [REP-20260506 参考项目功能深度再复核](reports/REP-20260506-reference-feature-depth-recheck.md)
+- [REP-20260506 桌面 Companion、MCP/Skills/Session/Workspace 可行性评估](reports/REP-20260506-desktop-companion-mcp-workflow-evaluation.md)
 
 ## 迁移记录
 
@@ -57,16 +65,21 @@
 ## 既有文档
 
 - [client-onboarding-pack](client-onboarding-pack.md)
+- [client-instance-plugin-deeplink](client-instance-plugin-deeplink.md)
+- [cloud-cli-request-filter](cloud-cli-request-filter.md)
 - [operations-drill-evidence](operations-drill-evidence.md)
 - [production-deployment-upgrade](production-deployment-upgrade.md)
 - [ollama-document-file-support](ollama-document-file-support.md)
+- [official-account-quota-refresh](official-account-quota-refresh.md)
 - [media-provider-executors](media-provider-executors.md)
+- [linux-systemd-data-migration](linux-systemd-data-migration.md)
 - [monitoring-billing-rollup](monitoring-billing-rollup.md)
 - [passkey-registration-policy-audit](passkey-registration-policy-audit.md)
 - [payment-provider-webhooks](payment-provider-webhooks.md)
 - [portal-self-service](portal-self-service.md)
 - [provider-smoke-pricing-sync](provider-smoke-pricing-sync.md)
 - [provider-catalog-marketplace](provider-catalog-marketplace.md)
+- [public-sdk-examples](public-sdk-examples.md)
 - [public-api-compatibility](public-api-compatibility.md)
 - [public-openapi-json](openapi/public-openapi.json)
 - [programming-account-identity](programming-account-identity.md)

@@ -1,0 +1,14 @@
+{
+  "accounts": [
+    { "id": 2, "name": "bob", "email": "bob@example.com", "balance_micros": 900000 }
+  ],
+  "api_keys": [
+    { "id": 12, "account_id": 2, "name": "bob-dev", "secret": "sk-sub2api-secret-001", "models": ["gemini-2.5-flash"] }
+  ],
+  "providers": [
+    { "id": 22, "name": "gemini-main", "kind": "gemini", "endpoint": "https://generativelanguage.googleapis.com", "models": ["gemini-2.5-flash"] }
+  ],
+  "usage": [
+    { "id": 32, "key_id": 12, "request_id": "req_sub2api_1", "model": "gemini-2.5-flash", "prompt_tokens": 5, "completion_tokens": 11 }
+  ]
+}

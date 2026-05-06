@@ -1,0 +1,26 @@
+[Unit]
+Description=x-ai-gateway service
+Documentation=https://github.com/prodigalgal/x-ai-gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=x-ai-gateway
+Group=x-ai-gateway
+WorkingDirectory=/opt/x-ai-gateway/current
+EnvironmentFile=/etc/x-ai-gateway/x-ai-gateway.env
+ExecStart=/usr/bin/java $JAVA_OPTS -jar /opt/x-ai-gateway/current/x-ai-gateway.jar
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=5
+SuccessExitStatus=143
+LimitNOFILE=65535
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/lib/x-ai-gateway /var/log/x-ai-gateway /opt/x-ai-gateway
+
+[Install]
+WantedBy=multi-user.target

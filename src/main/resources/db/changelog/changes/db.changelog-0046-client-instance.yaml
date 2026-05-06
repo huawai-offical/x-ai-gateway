@@ -1,0 +1,127 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0046-client-instance
+      author: codex
+      changes:
+        - createTable:
+            tableName: client_instance
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: distributed_key_id, type: BIGINT, constraints: { nullable: false } }
+              - column: { name: instance_id, type: VARCHAR(128), constraints: { nullable: false } }
+              - column: { name: display_name, type: VARCHAR(128), constraints: { nullable: false } }
+              - column: { name: client_family, type: VARCHAR(64), constraints: { nullable: false } }
+              - column: { name: workspace_hint, type: VARCHAR(256) }
+              - column: { name: plugin_name, type: VARCHAR(128) }
+              - column: { name: plugin_version, type: VARCHAR(64) }
+              - column: { name: deep_link_scheme, type: VARCHAR(64) }
+              - column: { name: status, type: VARCHAR(32), defaultValue: ACTIVE, constraints: { nullable: false } }
+              - column: { name: last_authorized_at, type: TIMESTAMP WITH TIME ZONE }
+              - column: { name: last_seen_at, type: TIMESTAMP WITH TIME ZONE }
+              - column: { name: last_request_at, type: TIMESTAMP WITH TIME ZONE }
+              - column: { name: last_request_id, type: VARCHAR(64) }
+              - column: { name: disabled_at, type: TIMESTAMP WITH TIME ZONE }
+              - column: { name: revoked_at, type: TIMESTAMP WITH TIME ZONE }
+              - column: { name: metadata_json, type: TEXT }
+              - column: { name: created_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+              - column: { name: updated_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+        - addForeignKeyConstraint:
+            baseTableName: client_instance
+            baseColumnNames: distributed_key_id
+            referencedTableName: distributed_key
+            referencedColumnNames: id
+            constraintName: fk_client_instance_distributed_key
+            onDelete: CASCADE
+        - addUniqueConstraint:
+            tableName: client_instance
+            columnNames: distributed_key_id,instance_id
+            constraintName: uk_client_instance_key_instance
+        - createIndex:
+            tableName: client_instance
+            indexName: idx_client_instance_key_status
+            columns:
+              - column: { name: distributed_key_id }
+              - column: { name: status }
+        - createIndex:
+            tableName: client_instance
+            indexName: idx_client_instance_family
+            columns:
+              - column: { name: client_family }
+        - createIndex:
+            tableName: client_instance
+            indexName: idx_client_instance_last_seen
+            columns:
+              - column: { name: last_seen_at }
+        - createTable:
+            tableName: client_instance_grant
+            columns:
+              - column: { name: id, type: BIGINT, autoIncrement: true, constraints: { primaryKey: true, nullable: false } }
+              - column: { name: client_instance_id, type: BIGINT, constraints: { nullable: false } }
+              - column: { name: token_hash, type: VARCHAR(128), constraints: { nullable: false } }
+              - column: { name: full_key_ciphertext, type: TEXT, constraints: { nullable: false } }
+              - column: { name: source, type: VARCHAR(32), constraints: { nullable: false } }
+              - column: { name: config_format, type: VARCHAR(32), constraints: { nullable: false } }
+              - column: { name: base_url, type: VARCHAR(512), constraints: { nullable: false } }
+              - column: { name: expires_at, type: TIMESTAMP WITH TIME ZONE, constraints: { nullable: false } }
+              - column: { name: consumed_at, type: TIMESTAMP WITH TIME ZONE }
+              - column: { name: revoked_at, type: TIMESTAMP WITH TIME ZONE }
+              - column: { name: metadata_json, type: TEXT }
+              - column: { name: created_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+              - column: { name: updated_at, type: TIMESTAMP WITH TIME ZONE, defaultValueComputed: CURRENT_TIMESTAMP, constraints: { nullable: false } }
+        - addForeignKeyConstraint:
+            baseTableName: client_instance_grant
+            baseColumnNames: client_instance_id
+            referencedTableName: client_instance
+            referencedColumnNames: id
+            constraintName: fk_client_instance_grant_instance
+            onDelete: CASCADE
+        - addUniqueConstraint:
+            tableName: client_instance_grant
+            columnNames: token_hash
+            constraintName: uk_client_instance_grant_token_hash
+        - createIndex:
+            tableName: client_instance_grant
+            indexName: idx_client_instance_grant_instance
+            columns:
+              - column: { name: client_instance_id }
+        - createIndex:
+            tableName: client_instance_grant
+            indexName: idx_client_instance_grant_expires
+            columns:
+              - column: { name: expires_at }
+        - createIndex:
+            tableName: client_instance_grant
+            indexName: idx_client_instance_grant_consumed
+            columns:
+              - column: { name: consumed_at }
+        - createIndex:
+            tableName: client_instance_grant
+            indexName: idx_client_instance_grant_revoked
+            columns:
+              - column: { name: revoked_at }
+        - addColumn:
+            tableName: request_log
+            columns:
+              - column: { name: client_family, type: VARCHAR(64) }
+              - column: { name: client_instance, type: VARCHAR(128) }
+              - column: { name: workspace_hint, type: VARCHAR(256) }
+        - createIndex:
+            tableName: request_log
+            indexName: idx_request_log_client_instance_started
+            columns:
+              - column: { name: client_family }
+              - column: { name: client_instance }
+              - column: { name: started_at }
+        - addColumn:
+            tableName: usage_record
+            columns:
+              - column: { name: client_family, type: VARCHAR(64) }
+              - column: { name: client_instance, type: VARCHAR(128) }
+              - column: { name: workspace_hint, type: VARCHAR(256) }
+        - createIndex:
+            tableName: usage_record
+            indexName: idx_usage_record_client_instance_created
+            columns:
+              - column: { name: client_family }
+              - column: { name: client_instance }
+              - column: { name: created_at }

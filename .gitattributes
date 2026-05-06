@@ -1,6 +1,3 @@
 /gradlew text eol=lf
 *.bat text eol=crlf
 *.jar binary
-/.playwright-mcp
-/.gradle-user-home-installed
-/.gradle-user-home

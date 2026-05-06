@@ -26,7 +26,8 @@ import org.hibernate.annotations.UpdateTimestamp;
         indexes = {
                 @Index(name = "idx_request_log_distributed_key_started", columnList = "distributed_key_id,started_at"),
                 @Index(name = "idx_request_log_provider_started", columnList = "provider_type,started_at"),
-                @Index(name = "idx_request_log_status_started", columnList = "status,started_at")
+                @Index(name = "idx_request_log_status_started", columnList = "status,started_at"),
+                @Index(name = "idx_request_log_client_instance_started", columnList = "client_family,client_instance,started_at")
         }
 )
 @Comment("请求生命周期日志。")
@@ -45,6 +46,15 @@ public class RequestLogEntity {
 
     @Column(name = "distributed_key_prefix", nullable = false, length = 64)
     private String distributedKeyPrefix;
+
+    @Column(name = "client_family", length = 64)
+    private String clientFamily;
+
+    @Column(name = "client_instance", length = 128)
+    private String clientInstance;
+
+    @Column(name = "workspace_hint", length = 256)
+    private String workspaceHint;
 
     @Column(name = "protocol", nullable = false, length = 32)
     private String protocol;
@@ -172,6 +182,30 @@ public class RequestLogEntity {
 
     public void setDistributedKeyPrefix(String distributedKeyPrefix) {
         this.distributedKeyPrefix = distributedKeyPrefix;
+    }
+
+    public String getClientFamily() {
+        return clientFamily;
+    }
+
+    public void setClientFamily(String clientFamily) {
+        this.clientFamily = clientFamily;
+    }
+
+    public String getClientInstance() {
+        return clientInstance;
+    }
+
+    public void setClientInstance(String clientInstance) {
+        this.clientInstance = clientInstance;
+    }
+
+    public String getWorkspaceHint() {
+        return workspaceHint;
+    }
+
+    public void setWorkspaceHint(String workspaceHint) {
+        this.workspaceHint = workspaceHint;
     }
 
     public String getProtocol() {

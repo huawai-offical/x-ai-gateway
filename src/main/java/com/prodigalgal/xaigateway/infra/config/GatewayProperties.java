@@ -407,6 +407,8 @@ public class GatewayProperties {
             private String role = "all";
             private String contains;
             private String replacement;
+            private String target = "message_text";
+            private String path;
 
             public String getId() {
                 return id;
@@ -454,6 +456,22 @@ public class GatewayProperties {
 
             public void setReplacement(String replacement) {
                 this.replacement = replacement;
+            }
+
+            public String getTarget() {
+                return target;
+            }
+
+            public void setTarget(String target) {
+                this.target = target;
+            }
+
+            public String getPath() {
+                return path;
+            }
+
+            public void setPath(String path) {
+                this.path = path;
             }
         }
     }

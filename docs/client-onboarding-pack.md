@@ -10,6 +10,8 @@ POST /admin/distributed-keys/{id}/client-config/downloads/{grantToken}
 
 `onboarding-pack` 会一次性返回 Codex、Claude Code、Gemini CLI、OpenCode、OpenClaw、Cursor、Windsurf、Kiro、GitHub Copilot-compatible 与 curl smoke 片段，并附带 Deep Link、MCP server config、Prompts、Skills 和故障排查建议。
 
+实例级插件/Deep Link 授权下发见：[Client Instance 与插件/Deep Link 授权下发](client-instance-plugin-deeplink.md)。
+
 所有 CLI/AI IDE 都直接连接云端 `x-ai-gateway` endpoint，不要求用户在本机部署 proxy、agent、desktop companion。
 
 ## Secret 策略

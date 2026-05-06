@@ -1,9 +1,9 @@
 # TASK-20260506-020 云端 Request Filter 高级规则、审计与 UI
 
-状态：Backlog  
+状态：Done  
 优先级：High  
 来源：[REP-20260506 参考项目功能深度再复核](../../docs/reports/REP-20260506-reference-feature-depth-recheck.md)  
-关联需求：[REQ-20260506-012 参考项目功能深度复核与任务再生成](../../docs/requirements/REQ-20260506-012-reference-depth-recheck-task-generation.md)
+关联需求：[REQ-20260506-016 云端 Request Filter 高级规则、审计与 UI](../../docs/requirements/REQ-20260506-016-cloud-request-filter-audit-ui.md)
 
 ## 背景
 
@@ -38,12 +38,19 @@
 
 ## 实现记录
 
-待处理。
+- 扩展 `CloudCliRequestFilterRule`、`CloudCliRequestFilterAction`、`CloudCliRequestFilterResult`，新增结构化目标、路径、`REDACT`、`DENY` 与命中摘要。
+- 新增 `CloudCliRequestFilterHit`，为 trace、system event 和 Admin UI 提供脱敏命中事实源。
+- `CloudCliRequestFilterService` 支持 `message_text`、`provider_extensions`、`json_path`、`tool_schema`、`file_metadata` 五类目标。
+- `GatewayProperties.Cli.Rule` 支持 `target/path` 配置。
+- `GatewayChatExecutionService` 在 execute 和 stream 流程中统一拒绝 `DENY` 命中请求，并把命中摘要写入 `x_ai_gateway_filter`。
+- 新增 [cloud-cli-request-filter](../../docs/cloud-cli-request-filter.md) 使用文档。
 
 ## 测试/验证
 
-待处理。
+- `.\gradlew.bat test --tests "com.prodigalgal.xaigateway.gateway.core.cli.CloudCliRequestFilterServiceTests"`
+- `.\gradlew.bat test --tests "com.prodigalgal.xaigateway.admin.application.GatewayChatExecutionServiceTests" --tests "com.prodigalgal.xaigateway.gateway.core.cli.CloudCliRequestFilterServiceTests"`
 
 ## 遗留问题
 
-待处理。
+- 本轮未扩展复杂 Admin 可视化编辑器；后续 UI 可直接基于 `target/path/action/hits` 契约做创建、预览、启停和 trace 展示。
+- 结构化路径保持受控语义，未引入完整 JSONPath 表达式。

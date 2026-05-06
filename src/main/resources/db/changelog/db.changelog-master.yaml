@@ -89,3 +89,5 @@ databaseChangeLog:
       file: db/changelog/changes/db.changelog-0044-passkey-portal-identity.yaml
   - include:
       file: db/changelog/changes/db.changelog-0045-payment-production-closure.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0046-client-instance.yaml

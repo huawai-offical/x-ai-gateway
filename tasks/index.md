@@ -82,12 +82,12 @@
 | [TASK-20260506-017 Provider 真实凭证 Smoke 与价格同步自动化](done/TASK-20260506-017-provider-smoke-pricing-sync.md) | Done | High | REP-20260506 深度再复核 |
 | [TASK-20260506-018 支付定时对账、订阅发票与跨币种结算](done/TASK-20260506-018-payment-scheduled-reconcile-invoice-currency.md) | Done | High | REP-20260506 深度再复核 |
 | [TASK-20260506-019 Realtime 长连接池与专有 Media Adapter](done/TASK-20260506-019-realtime-pool-media-adapters.md) | Done | High | REP-20260506 深度再复核 |
-| [TASK-20260506-020 云端 Request Filter 高级规则、审计与 UI](backlog/TASK-20260506-020-cloud-request-filter-audit-ui.md) | Backlog | High | REP-20260506 深度再复核 |
-| [TASK-20260506-021 AI IDE/CLI 官方账号导入与配额刷新](backlog/TASK-20260506-021-ai-ide-account-import-quota-refresh.md) | Backlog | High | REP-20260506 深度再复核 |
-| [TASK-20260506-022 Client Instance 管理与插件/Deep Link 授权下发](backlog/TASK-20260506-022-client-instance-plugin-deeplink.md) | Backlog | Medium | REP-20260506 深度再复核 |
-| [TASK-20260506-023 OpenAPI 自动生成、SDK 示例与前端 i18n 抽取](backlog/TASK-20260506-023-openapi-sdk-frontend-i18n.md) | Backlog | Medium | REP-20260506 深度再复核 |
-| [TASK-20260506-024 Linux/systemd 部署、数据管理与迁移兼容](backlog/TASK-20260506-024-linux-systemd-data-migration.md) | Backlog | Medium | REP-20260506 深度再复核 |
-| [TASK-20260506-025 桌面 Companion、MCP/Skills/Session/Workspace 可行性评估](backlog/TASK-20260506-025-desktop-companion-local-workflow-evaluation.md) | Backlog | Low | REP-20260506 深度再复核 |
+| [TASK-20260506-020 云端 Request Filter 高级规则、审计与 UI](done/TASK-20260506-020-cloud-request-filter-audit-ui.md) | Done | High | REP-20260506 深度再复核 |
+| [TASK-20260506-021 AI IDE/CLI 官方账号导入与配额刷新](done/TASK-20260506-021-ai-ide-account-import-quota-refresh.md) | Done | High | REP-20260506 深度再复核 |
+| [TASK-20260506-022 Client Instance 管理与插件/Deep Link 授权下发](done/TASK-20260506-022-client-instance-plugin-deeplink.md) | Done | Medium | REP-20260506 深度再复核 |
+| [TASK-20260506-023 OpenAPI 自动生成、SDK 示例与前端 i18n 抽取](done/TASK-20260506-023-openapi-sdk-frontend-i18n.md) | Done | Medium | REP-20260506 深度再复核 |
+| [TASK-20260506-024 Linux/systemd 部署、数据管理与迁移兼容](done/TASK-20260506-024-linux-systemd-data-migration.md) | Done | Medium | REP-20260506 深度再复核 |
+| [TASK-20260506-025 桌面 Companion、MCP/Skills/Session/Workspace 可行性评估](done/TASK-20260506-025-desktop-companion-local-workflow-evaluation.md) | Done | Low | REP-20260506 深度再复核 |
 
 ## 本地化流程任务
 
