@@ -513,7 +513,8 @@ public class GatewayRequestFeatureService {
                 body == null ? null : body.path("systemInstruction"),
                 body == null ? null : body.path("generationConfig"),
                 body == null ? null : body.path("tools"),
-                body == null ? null : body.path("toolConfig")
+                body == null ? null : body.path("toolConfig"),
+                null
         ));
     }
 

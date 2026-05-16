@@ -283,6 +283,9 @@ class GatewayAsyncResourceServiceTests {
         assertTrue(matrix.path("video").toString().contains("Gemini"));
         assertTrue(matrix.path("video").toString().contains("provider_specific_adapter"));
         assertTrue(matrix.path("music").toString().contains("suno"));
+        assertTrue(matrix.path("music").toString().contains("music_generation"));
+        assertTrue(matrix.path("music").toString().contains("operator_configured_suno_music_pricing"));
+        assertTrue(matrix.path("music").toString().contains("XAG_SMOKE_SUNO"));
         assertTrue(matrix.path("music").toString().contains("NOT_SUPPORTED"));
     }
 
@@ -341,6 +344,78 @@ class GatewayAsyncResourceServiceTests {
         assertEquals("cancelled", cancelled.path("status").asText());
         assertTrue(entity.getMetadataJson().contains("\"object_mode\":\"provider_specific_media_adapter\""));
         assertTrue(entity.getMetadataJson().contains("\"provider_adapter\":\"gemini_veo\""));
+        assertTrue(entity.getMetadataJson().contains("\"downloaded\""));
+        assertTrue(cancellableEntity.getMetadataJson().contains("\"cancel_reason\":\"user_cancelled\""));
+    }
+
+    @Test
+    void shouldRunSunoMusicProviderAdapterLifecycle() throws Exception {
+        GatewayAsyncResourceRepository gatewayAsyncResourceRepository = Mockito.mock(GatewayAsyncResourceRepository.class);
+        SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        ObjectMapper objectMapper = new ObjectMapper();
+        GatewayAsyncResourceService service = new GatewayAsyncResourceService(
+                gatewayAsyncResourceRepository,
+                Mockito.mock(DistributedKeyQueryService.class),
+                Mockito.mock(UpstreamCredentialRepository.class),
+                Mockito.mock(UpstreamSiteProfileRepository.class),
+                snapshotRepository,
+                Mockito.mock(GatewayFileRepository.class),
+                Mockito.mock(GatewayFileBindingRepository.class),
+                Mockito.mock(CredentialCryptoService.class),
+                new SiteCapabilityTruthService(new UpstreamSitePolicyService(), snapshotRepository),
+                objectMapper,
+                Clock.fixed(Instant.parse("2026-04-12T04:00:00Z"), ZoneOffset.UTC),
+                WebClient.builder()
+        );
+        java.util.List<GatewayAsyncResourceEntity> savedEntities = new java.util.ArrayList<>();
+        Mockito.when(gatewayAsyncResourceRepository.save(any())).thenAnswer(invocation -> {
+            GatewayAsyncResourceEntity entity = invocation.getArgument(0);
+            savedEntities.add(entity);
+            return entity;
+        });
+
+        JsonNode created = service.createMusicTask(1L, objectMapper.readTree("""
+                {
+                  "model":"suno_music",
+                  "prompt":"a calm synth theme",
+                  "title":"Smoke Song",
+                  "tags":"ambient,synth",
+                  "provider_mode":"adapter",
+                  "provider_family":"suno"
+                }
+                """));
+        GatewayAsyncResourceEntity entity = savedEntities.get(savedEntities.size() - 1);
+        Mockito.when(gatewayAsyncResourceRepository.findByResourceKeyAndResourceTypeAndDeletedFalse(
+                        created.path("id").asText(),
+                        GatewayAsyncResourceType.MUSIC))
+                .thenReturn(Optional.of(entity));
+
+        JsonNode synced = service.getMusicTask(created.path("id").asText(), 1L);
+        JsonNode download = service.downloadMusicTaskArtifact(created.path("id").asText(), 1L);
+
+        JsonNode cancellable = service.createMusicTask(1L, objectMapper.readTree("""
+                {"model":"suno_music","prompt":"demo","provider_mode":"adapter","provider_family":"suno"}
+                """));
+        GatewayAsyncResourceEntity cancellableEntity = savedEntities.get(savedEntities.size() - 1);
+        Mockito.when(gatewayAsyncResourceRepository.findByResourceKeyAndResourceTypeAndDeletedFalse(
+                        cancellable.path("id").asText(),
+                        GatewayAsyncResourceType.MUSIC))
+                .thenReturn(Optional.of(cancellableEntity));
+        JsonNode cancelled = service.cancelMusicTask(cancellable.path("id").asText(), 1L);
+
+        assertEquals("queued", created.path("status").asText());
+        assertEquals("submitted", created.path("provider_status").asText());
+        assertEquals("completed", synced.path("status").asText());
+        assertEquals("success", synced.path("provider_status").asText());
+        assertEquals("media.artifact_download", download.path("object").asText());
+        assertEquals("audio/mpeg", download.path("content_type").asText());
+        assertTrue(download.path("download_url").asText().contains("/music/" + created.path("id").asText() + "/download"));
+        assertEquals("cancelled", cancelled.path("status").asText());
+        assertTrue(entity.getMetadataJson().contains("\"provider_adapter\":\"suno_music\""));
+        assertTrue(entity.getMetadataJson().contains("\"provider_capability\":\"music_generation\""));
+        assertTrue(entity.getMetadataJson().contains("\"provider_pricing_source\":\"operator_configured_suno_music_pricing\""));
+        assertTrue(entity.getMetadataJson().contains("\"AUTHENTICATION_FAILED\""));
+        assertTrue(entity.getMetadataJson().contains("\"PROVIDER_RATE_LIMITED\""));
         assertTrue(entity.getMetadataJson().contains("\"downloaded\""));
         assertTrue(cancellableEntity.getMetadataJson().contains("\"cancel_reason\":\"user_cancelled\""));
     }

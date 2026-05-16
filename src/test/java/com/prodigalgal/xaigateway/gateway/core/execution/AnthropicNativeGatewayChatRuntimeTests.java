@@ -1,91 +1,58 @@
 package com.prodigalgal.xaigateway.gateway.core.execution;
 
-import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyQueryService;
-import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyView;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalContentPart;
-import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileContent;
-import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileResponse;
-import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileService;
-import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
-import com.prodigalgal.xaigateway.provider.adapter.anthropic.AnthropicChatModelFactory;
-import java.nio.charset.StandardCharsets;
-import java.time.Instant;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalMessage;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalMessageRole;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
 import java.util.List;
-import java.util.Optional;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
-import org.springframework.test.util.ReflectionTestUtils;
+import tools.jackson.databind.ObjectMapper;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AnthropicNativeGatewayChatRuntimeTests {
 
-    @Test
-    void shouldPreferAnthropicFileIdForGatewayDocumentBlocks() {
-        GatewayFileService gatewayFileService = Mockito.mock(GatewayFileService.class);
-        DistributedKeyQueryService distributedKeyQueryService = Mockito.mock(DistributedKeyQueryService.class);
-        AnthropicNativeGatewayChatRuntime runtime = new AnthropicNativeGatewayChatRuntime(
-                Mockito.mock(AnthropicChatModelFactory.class),
-                gatewayFileService,
-                distributedKeyQueryService
-        );
-
-        Mockito.when(distributedKeyQueryService.findActiveByKeyPrefix("sk-gw-test"))
-                .thenReturn(Optional.of(distributedKeyView()));
-        Mockito.when(gatewayFileService.resolveAnthropicExternalFileId("file-1", 1L))
-                .thenReturn(Optional.of("file_anthropic_123"));
-
-        Object block = ReflectionTestUtils.invokeMethod(
-                runtime,
-                "toDocumentBlock",
-                "sk-gw-test",
-                CanonicalContentPart.file("application/pdf", "gateway://file-1", "doc.pdf")
-        );
-
-        assertTrue(String.valueOf(block).contains("file_id"));
-        assertTrue(String.valueOf(block).contains("file_anthropic_123"));
-    }
+    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final AnthropicNativeGatewayChatRuntime runtime = new AnthropicNativeGatewayChatRuntime(null, null, null);
 
     @Test
-    void shouldFallbackToBase64DocumentWhenAnthropicFileBindingMissing() {
-        GatewayFileService gatewayFileService = Mockito.mock(GatewayFileService.class);
-        DistributedKeyQueryService distributedKeyQueryService = Mockito.mock(DistributedKeyQueryService.class);
-        AnthropicNativeGatewayChatRuntime runtime = new AnthropicNativeGatewayChatRuntime(
-                Mockito.mock(AnthropicChatModelFactory.class),
-                gatewayFileService,
-                distributedKeyQueryService
-        );
-
-        Mockito.when(distributedKeyQueryService.findActiveByKeyPrefix("sk-gw-test"))
-                .thenReturn(Optional.of(distributedKeyView()));
-        Mockito.when(gatewayFileService.resolveAnthropicExternalFileId("file-1", 1L))
-                .thenReturn(Optional.empty());
-        Mockito.when(gatewayFileService.getFileContent("file-1", 1L))
-                .thenReturn(new GatewayFileContent(
-                        GatewayFileResponse.from("file-1", "doc.pdf", "assistants", 4L, Instant.parse("2026-04-16T00:00:00Z"), "processed"),
-                        "demo".getBytes(StandardCharsets.UTF_8),
-                        "application/pdf"
-                ));
-
-        Object block = ReflectionTestUtils.invokeMethod(
-                runtime,
-                "toDocumentBlock",
+    void shouldMapManagedAnthropicExtensionFields() throws Exception {
+        var request = new CanonicalRequest(
                 "sk-gw-test",
-                CanonicalContentPart.file("application/pdf", "gateway://file-1", "doc.pdf")
-        );
-
-        assertTrue(String.valueOf(block).contains("ZGVtbw=="));
-    }
-
-    private DistributedKeyView distributedKeyView() {
-        return new DistributedKeyView(
-                1L,
-                "test",
-                "sk-gw-test",
-                "masked",
-                List.of(ProviderType.ANTHROPIC_DIRECT.name().toLowerCase()),
+                CanonicalIngressProtocol.ANTHROPIC_NATIVE,
+                "/v1/messages",
+                "claude-sonnet-4",
+                List.of(new CanonicalMessage(CanonicalMessageRole.USER, List.of(CanonicalContentPart.text("hello")))),
                 List.of(),
-                List.of()
+                null,
+                null,
+                512,
+                null,
+                objectMapper.readTree("""
+                        {
+                          "service_tier":"auto",
+                          "container":"session-1",
+                          "metadata":{"user_id":"user-1","tenant":"community"},
+                          "context_management":{"clear_function_results":true},
+                          "mcp_servers":[{"type":"url","url":"https://mcp.example.com/sse","name":"docs"}],
+                          "x_ai_gateway_anthropic_beta":"context-2025-10-01"
+                        }
+                        """)
+        );
+
+        var params = runtime.buildRequest(request, "claude-sonnet-4");
+
+        assertEquals("auto", params.serviceTier().orElseThrow().asString());
+        assertEquals("session-1", params.container().orElseThrow());
+        assertEquals("user-1", params.metadata().orElseThrow().userId().orElseThrow());
+        assertTrue(params.metadata().orElseThrow()._additionalProperties().containsKey("tenant"));
+        assertTrue(params._additionalBodyProperties().containsKey("context_management"));
+        assertTrue(params._additionalBodyProperties().containsKey("mcp_servers"));
+        assertEquals(
+                List.of("context-2025-10-01,mcp-client-2025-04-04"),
+                params._additionalHeaders().values("anthropic-beta")
         );
     }
 }

@@ -2,7 +2,7 @@
 
 状态：Active  
 关联需求：[REQ-20260506-013](requirements/REQ-20260506-013-provider-smoke-pricing-sync.md)  
-关联任务：[TASK-20260506-017](../tasks/in-progress/TASK-20260506-017-provider-smoke-pricing-sync.md)
+关联任务：[TASK-20260506-017](../tasks/done/TASK-20260506-017-provider-smoke-pricing-sync.md)、[TASK-20260514-005](../tasks/done/TASK-20260514-005-provider-pricing-versioned-sync.md)
 
 ## 目标
 
@@ -58,11 +58,14 @@ build/reports/xag-smoke/gemini-ai-studio.md
 - 每个 provider preset 都有 `capabilityTags` 与 `conformanceChecks`。
 - Public docs bundle 能暴露非 deprecated preset。
 - Conformance fixture 覆盖 catalog 中的 site kind。
+- Provider Catalog pricing metadata 会派生为版本化 snapshot，包含 `snapshotVersion`、`checksum`、`approvalStatus`、`effectiveAt`、`supersededAt`、`driftStatus` 和 `productionEligible`。
+- 生产计费候选只能来自 `APPROVED` 且处于 effective window 的 snapshot；`provider-console`、`operator-configured` 和 `aggregator-pass-through` 默认需要人工批准。
 
 执行：
 
 ```powershell
 .\gradlew.bat test --tests "com.prodigalgal.xaigateway.admin.application.ProviderCatalogLoaderTests" --tests "com.prodigalgal.xaigateway.protocol.ingress.publicapi.PublicDocsBundleServiceTests"
+.\gradlew.bat test --tests "com.prodigalgal.xaigateway.admin.application.ProviderPricingSnapshotServiceTests" --tests "com.prodigalgal.xaigateway.admin.application.ProviderReferenceGapServiceTests" --tests "com.prodigalgal.xaigateway.admin.api.ProviderReferenceGapAdminControllerTests"
 ```
 
 ## 后续扩展
@@ -70,4 +73,4 @@ build/reports/xag-smoke/gemini-ai-studio.md
 - Qwen、Moonshot、SiliconFlow、Volcengine、MiniMax 可按 OpenAI-compatible smoke 模板扩展。
 - Jina/Cohere 可按 Rerank smoke 模板扩展。
 - Dify 可按 workflow-compatible smoke 模板扩展。
-- pricing metadata 后续可从静态快照升级为公开价格页抓取或人工批准的版本化 snapshot。
+- 版本化 pricing snapshot 已具备本地事实源；后续可新增受 allowlist、条款和人工批准保护的远端价格同步 job。

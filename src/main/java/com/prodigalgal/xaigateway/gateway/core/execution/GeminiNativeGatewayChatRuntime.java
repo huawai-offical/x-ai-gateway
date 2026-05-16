@@ -13,6 +13,7 @@ import com.google.genai.types.GenerateContentResponse;
 import com.google.genai.types.Part;
 import com.google.genai.types.Schema;
 import com.google.genai.types.Tool;
+import com.google.genai.types.ToolConfig;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyQueryService;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalContentPart;
@@ -36,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
+import tools.jackson.databind.JsonNode;
 
 @Service
 public class GeminiNativeGatewayChatRuntime implements GatewayChatRuntime {
@@ -135,7 +137,7 @@ public class GeminiNativeGatewayChatRuntime implements GatewayChatRuntime {
     }
 
     private GenerateContentConfig toConfig(CanonicalRequest request) {
-        GenerateContentConfig.Builder builder = GenerateContentConfig.builder();
+        GenerateContentConfig.Builder builder = baseConfig(request);
         if (request.temperature() != null) {
             builder.temperature(request.temperature().floatValue());
         }
@@ -146,11 +148,39 @@ public class GeminiNativeGatewayChatRuntime implements GatewayChatRuntime {
         if (systemInstruction != null) {
             builder.systemInstruction(systemInstruction);
         }
-        List<Tool> tools = toTools(request.tools());
+        List<Tool> tools = toTools(request);
         if (!tools.isEmpty()) {
             builder.tools(tools);
         }
+        JsonNode toolConfig = request.providerExtensions() == null ? null : request.providerExtensions().path("toolConfig");
+        if (toolConfig != null && toolConfig.isObject()) {
+            builder.toolConfig(parseToolConfig(toolConfig));
+        }
         return builder.build();
+    }
+
+    GenerateContentConfig buildConfigForTests(CanonicalRequest request) {
+        return toConfig(request);
+    }
+
+    private GenerateContentConfig.Builder baseConfig(CanonicalRequest request) {
+        JsonNode generationConfig = request.providerExtensions() == null ? null : request.providerExtensions().path("generationConfig");
+        if (generationConfig == null || !generationConfig.isObject()) {
+            return GenerateContentConfig.builder();
+        }
+        try {
+            return GenerateContentConfig.fromJson(generationConfig.toString()).toBuilder();
+        } catch (RuntimeException exception) {
+            throw new IllegalArgumentException("Gemini generationConfig 无法按官方 SDK 解析。", exception);
+        }
+    }
+
+    private ToolConfig parseToolConfig(JsonNode toolConfig) {
+        try {
+            return ToolConfig.fromJson(toolConfig.toString());
+        } catch (RuntimeException exception) {
+            throw new IllegalArgumentException("Gemini toolConfig 无法按官方 SDK 解析。", exception);
+        }
     }
 
     private Content toSystemInstruction(CanonicalRequest request) {
@@ -171,7 +201,16 @@ public class GeminiNativeGatewayChatRuntime implements GatewayChatRuntime {
         return Content.builder().role("user").parts(parts).build();
     }
 
-    private List<Tool> toTools(List<CanonicalToolDefinition> toolDefinitions) {
+    private List<Tool> toTools(CanonicalRequest request) {
+        JsonNode rawTools = request.providerExtensions() == null ? null : request.providerExtensions().path("tools");
+        if (rawTools != null && rawTools.isArray() && !rawTools.isEmpty()) {
+            List<Tool> tools = new ArrayList<>();
+            for (JsonNode rawTool : rawTools) {
+                tools.add(parseTool(rawTool));
+            }
+            return List.copyOf(tools);
+        }
+        List<CanonicalToolDefinition> toolDefinitions = request.tools();
         if (toolDefinitions == null || toolDefinitions.isEmpty()) {
             return List.of();
         }
@@ -185,6 +224,14 @@ public class GeminiNativeGatewayChatRuntime implements GatewayChatRuntime {
                         .build())
                 .toList();
         return List.of(Tool.builder().functionDeclarations(functionDeclarations).build());
+    }
+
+    private Tool parseTool(JsonNode rawTool) {
+        try {
+            return Tool.fromJson(rawTool.toString());
+        } catch (RuntimeException exception) {
+            throw new IllegalArgumentException("Gemini tools 无法按官方 SDK 解析。", exception);
+        }
     }
 
     private Part toMediaPart(String distributedKeyPrefix, CanonicalContentPart part) {

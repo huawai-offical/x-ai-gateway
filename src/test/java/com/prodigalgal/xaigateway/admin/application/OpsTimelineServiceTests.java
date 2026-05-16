@@ -54,8 +54,42 @@ class OpsTimelineServiceTests {
         event.setOccurredAt(Instant.now());
         Mockito.when(systemEventRepository.findTop500ByOrderByOccurredAtDesc()).thenReturn(List.of(event));
 
-        var filtered = service.listEvents("ERROR", "console", null, null);
+        var filtered = service.listEvents("ERROR", "console", null, null, null, null, null);
         assertEquals(1, filtered.size());
         assertTrue(filtered.get(0).title().contains("edge-probe"));
+    }
+
+    @Test
+    void shouldFilterSystemEventsByEventTypeAndEntityRef() {
+        OpsProbeRunRepository probeRunRepository = Mockito.mock(OpsProbeRunRepository.class);
+        OpsSystemEventRepository systemEventRepository = Mockito.mock(OpsSystemEventRepository.class);
+        OpsTimelineService service = new OpsTimelineService(probeRunRepository, systemEventRepository, new ObjectMapper());
+        OpsSystemEventEntity codexEvent = new OpsSystemEventEntity();
+        ReflectionTestUtils.setField(codexEvent, "id", 11L);
+        codexEvent.setEventType("CODEX_RUNTIME_BATCH_RECOVERY");
+        codexEvent.setSeverity("INFO");
+        codexEvent.setSource("account-pool-admin");
+        codexEvent.setEntityType("ACCOUNT_POOL");
+        codexEvent.setEntityRef("account-pool:5");
+        codexEvent.setTitle("Codex Runtime 批量恢复预检");
+        codexEvent.setDetailJson("{}");
+        codexEvent.setOccurredAt(Instant.parse("2026-05-08T01:00:00Z"));
+        OpsSystemEventEntity otherEvent = new OpsSystemEventEntity();
+        ReflectionTestUtils.setField(otherEvent, "id", 12L);
+        otherEvent.setEventType("OTHER_EVENT");
+        otherEvent.setSeverity("INFO");
+        otherEvent.setSource("account-pool-admin");
+        otherEvent.setEntityType("ACCOUNT_POOL");
+        otherEvent.setEntityRef("account-pool:6");
+        otherEvent.setTitle("Other");
+        otherEvent.setDetailJson("{}");
+        otherEvent.setOccurredAt(Instant.parse("2026-05-08T01:01:00Z"));
+        Mockito.when(systemEventRepository.findTop500ByOrderByOccurredAtDesc()).thenReturn(List.of(otherEvent, codexEvent));
+
+        var filtered = service.listEvents(null, null, "CODEX_RUNTIME_BATCH_RECOVERY", "ACCOUNT_POOL", "account-pool:5", null, null);
+
+        assertEquals(1, filtered.size());
+        assertEquals(11L, filtered.get(0).id());
+        assertEquals("account-pool:5", filtered.get(0).entityRef());
     }
 }

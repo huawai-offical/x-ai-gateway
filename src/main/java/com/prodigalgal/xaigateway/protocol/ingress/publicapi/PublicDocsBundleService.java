@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 @Service
@@ -41,7 +42,7 @@ public class PublicDocsBundleService {
 
     private PublicDocsBundleResponse chinese() {
         return new PublicDocsBundleResponse(
-                "2026.05.06",
+                "2026.05.15",
                 "zh-CN",
                 "x-ai-gateway 公开兼容文档",
                 "/public/docs/openapi.json",
@@ -52,7 +53,7 @@ public class PublicDocsBundleService {
                         "创建或获取 Distributed Key。",
                         "把 OpenAI-compatible client 的 base URL 设置为 https://gateway.example.com/v1。",
                         "将 Authorization Bearer 设置为完整 Distributed Key secret。",
-                        "先调用 /v1/chat/completions smoke，再按需启用 Claude、Gemini、Ollama 兼容路径。",
+                        "先调用 /v1/chat/completions smoke，再按需启用 Chat typed parameters、Claude、Gemini、Ollama 兼容路径。",
                         "失败时读取 error_code 和 requestId，再到管理端 trace 查询路由与账务记录。"
                 ),
                 compatibility(),
@@ -63,6 +64,13 @@ public class PublicDocsBundleService {
                 List.of(
                         "路由优先遵守 Distributed Key 的 allowedModels、allowedProviderTypes、clientFamily 与 Route Policy runtime state。",
                         "Retry/Fallback 触发后，trace 中会保留 route decision、provider、credential 与 degradation level。",
+                        "OpenAI Direct 可使用 response_format、tools/tool_choice、modalities/audio、web_search_options 等 typed Chat 参数；OpenAI-compatible 站点需以 provider capability matrix 为准。",
+                        "Stored Chat list/messages 使用 OpenAI-compatible list envelope，limit 默认 20 且范围为 1 到 100，order 默认 asc。",
+                        "Stored Responses 支持本地 retrieve/delete/cancel 与 input_items list；input_items 默认 order=desc，limit 默认 20 且范围为 1 到 100。",
+                        "非流式 Chat/Responses 支持 Idempotency-Key 本地响应重放；同 key 不同请求体会被拒绝，幂等记录默认保留 24 小时。",
+                        "Chat stream 支持 stream_options.include_usage，开启后会在 [DONE] 前输出 choices=[] 的 usage chunk；Responses stream event 会携带本地单调递增 sequence_number。",
+                        "OpenAI webhook verifier 按 Standard Webhooks 校验 webhook-id、webhook-timestamp、webhook-signature，并用 webhook-id 做重复投递 marker。",
+                        "OpenAI path 本地限流命中会返回 429、rate_limit_error，并带 Retry-After 与 x-ratelimit remaining/reset headers。",
                         "Realtime、Files、Batches、Caches 等非 Chat 能力需要先查看 provider capability matrix。"
                 ),
                 List.of(
@@ -72,9 +80,17 @@ public class PublicDocsBundleService {
                 ),
                 List.of(
                         "chat.openai-compatible",
+                        "chat.openai-typed-parameters",
+                        "chat.openai-stored-lifecycle",
+                        "openai.list-pagination-envelope",
+                        "openai.idempotency-replay",
+                        "openai.responses-local-lifecycle",
+                        "openai.streaming-event-usage-sequence",
+                        "openai.webhook-signature-replay",
                         "claude.messages.translation",
                         "gemini.generate-content.translation",
                         "ollama.chat.native",
+                        "web_search.provider-adapter",
                         "files.cache.operations"
                 )
         );
@@ -82,7 +98,7 @@ public class PublicDocsBundleService {
 
     private PublicDocsBundleResponse english() {
         return new PublicDocsBundleResponse(
-                "2026.05.06",
+                "2026.05.15",
                 "en-US",
                 "x-ai-gateway Public Compatibility Docs",
                 "/public/docs/openapi.json",
@@ -93,7 +109,7 @@ public class PublicDocsBundleService {
                         "Create or retrieve a Distributed Key.",
                         "Set your OpenAI-compatible base URL to https://gateway.example.com/v1.",
                         "Use the full Distributed Key secret as the Authorization Bearer token.",
-                        "Run /v1/chat/completions first, then enable Claude, Gemini, or Ollama compatible flows.",
+                        "Run /v1/chat/completions first, then enable Chat typed parameters, Claude, Gemini, or Ollama compatible flows.",
                         "On failures, inspect error_code and requestId, then query admin traces."
                 ),
                 compatibility(),
@@ -104,6 +120,13 @@ public class PublicDocsBundleService {
                 List.of(
                         "Routing honors Distributed Key model/provider/client-family restrictions and Route Policy runtime state.",
                         "Retry/Fallback decisions are visible in traces with provider, credential and degradation details.",
+                        "OpenAI Direct supports typed Chat parameters such as response_format, tools/tool_choice, modalities/audio and web_search_options; OpenAI-compatible sites still depend on the provider capability matrix.",
+                        "Stored Chat list/messages use the OpenAI-compatible list envelope; limit defaults to 20 with range 1 to 100, and order defaults to asc.",
+                        "Stored Responses support local retrieve/delete/cancel and input_items lists; input_items defaults to order=desc and limit=20 with range 1 to 100.",
+                        "Non-streaming Chat/Responses support local Idempotency-Key response replay; reusing a key with a different request body is rejected, and records are retained for 24 hours by default.",
+                        "Chat streams support stream_options.include_usage by emitting a choices=[] usage chunk before [DONE]; Responses stream events include a local monotonic sequence_number.",
+                        "The OpenAI webhook verifier follows Standard Webhooks with webhook-id, webhook-timestamp and webhook-signature, and marks duplicate deliveries by webhook-id.",
+                        "Local rate limit hits on OpenAI paths return 429, rate_limit_error, Retry-After and x-ratelimit remaining/reset headers.",
                         "Realtime, Files, Batches and Caches depend on the provider capability matrix."
                 ),
                 List.of(
@@ -113,9 +136,17 @@ public class PublicDocsBundleService {
                 ),
                 List.of(
                         "chat.openai-compatible",
+                        "chat.openai-typed-parameters",
+                        "chat.openai-stored-lifecycle",
+                        "openai.list-pagination-envelope",
+                        "openai.idempotency-replay",
+                        "openai.responses-local-lifecycle",
+                        "openai.streaming-event-usage-sequence",
+                        "openai.webhook-signature-replay",
                         "claude.messages.translation",
                         "gemini.generate-content.translation",
                         "ollama.chat.native",
+                        "web_search.provider-adapter",
                         "files.cache.operations"
                 )
         );
@@ -126,7 +157,7 @@ public class PublicDocsBundleService {
         root.put("openapi", "3.1.0");
         ObjectNode info = root.putObject("info");
         info.put("title", "x-ai-gateway Public API");
-        info.put("version", "2026.05.06");
+        info.put("version", "2026.05.15");
         info.put("description", "公开接入面的最小 OpenAPI 事实源，覆盖 docs、OpenAI-compatible、Claude/Gemini 兼容入口和 Media provider matrix。");
         root.putArray("servers")
                 .addObject()
@@ -135,8 +166,32 @@ public class PublicDocsBundleService {
         ObjectNode paths = root.putObject("paths");
         addPath(paths, "get", "/public/docs/compatibility", "读取公开兼容文档 bundle", false);
         addPath(paths, "get", "/public/docs/openapi.json", "读取公开 OpenAPI JSON", false);
-        addPath(paths, "post", "/v1/chat/completions", "OpenAI-compatible Chat Completions", true);
-        addPath(paths, "post", "/v1/responses", "OpenAI-compatible Responses", true);
+        ObjectNode chatCreate = addPath(paths, "post", "/v1/chat/completions", "OpenAI-compatible Chat Completions", true);
+        addChatCompletionRequestBody(chatCreate);
+        addIdempotencyHeader(chatCreate);
+        ObjectNode chatList = addPath(paths, "get", "/v1/chat/completions", "List stored Chat Completions", true);
+        addStoredChatCompletionListParameters(chatList);
+        ObjectNode chatGet = addPath(paths, "get", "/v1/chat/completions/{completionId}", "Retrieve stored Chat Completion", true);
+        addCompletionIdPathParameter(chatGet);
+        ObjectNode chatUpdate = addPath(paths, "post", "/v1/chat/completions/{completionId}", "Update stored Chat Completion metadata", true);
+        addCompletionIdPathParameter(chatUpdate);
+        ObjectNode chatDelete = addPath(paths, "delete", "/v1/chat/completions/{completionId}", "Delete stored Chat Completion", true);
+        addCompletionIdPathParameter(chatDelete);
+        ObjectNode chatMessages = addPath(paths, "get", "/v1/chat/completions/{completionId}/messages", "List stored Chat Completion messages", true);
+        addCompletionIdPathParameter(chatMessages);
+        addStoredChatMessageListParameters(chatMessages);
+        ObjectNode responsesCreate = addPath(paths, "post", "/v1/responses", "OpenAI-compatible Responses", true);
+        addIdempotencyHeader(responsesCreate);
+        ObjectNode responsesGet = addPath(paths, "get", "/v1/responses/{responseId}", "Retrieve stored Response", true);
+        addResponseIdPathParameter(responsesGet);
+        ObjectNode responsesDelete = addPath(paths, "delete", "/v1/responses/{responseId}", "Delete stored Response", true);
+        addResponseIdPathParameter(responsesDelete);
+        ObjectNode responsesCancel = addPath(paths, "post", "/v1/responses/{responseId}/cancel", "Cancel stored background Response", true);
+        addResponseIdPathParameter(responsesCancel);
+        ObjectNode responsesInputItems = addPath(paths, "get", "/v1/responses/{responseId}/input_items", "List stored Response input items", true);
+        addResponseIdPathParameter(responsesInputItems);
+        addResponseInputItemsListParameters(responsesInputItems);
+        addPath(paths, "post", "/v1/web_search", "Provider-governed Web Search", true);
         addPath(paths, "post", "/v1/messages", "Claude Messages compatible endpoint", true);
         addPath(paths, "post", "/v1beta/models/{model}:generateContent", "Gemini generateContent compatible endpoint", true);
         addPath(paths, "post", "/api/v1/videos/generations", "创建 Video async task", true);
@@ -163,8 +218,8 @@ public class PublicDocsBundleService {
                         "openai",
                         "/v1",
                         List.of("OpenAI SDK", "Codex", "OpenCode", "OpenClaw", "curl"),
-                        List.of("chat.completions", "responses", "embeddings", "files", "batches", "realtime"),
-                        "OpenAI-compatible clients should use /v1 as base path."
+                        List.of("chat.completions", "chat.typed-parameters", "stored_chat.completions", "responses", "responses.lifecycle", "embeddings", "files", "batches", "realtime"),
+                        "OpenAI-compatible clients should use /v1 as base path. OpenAI Direct supports typed Chat parameters; third-party compatible sites are governed by provider capability."
                 ),
                 new PublicDocsCompatibilityResponse(
                         "claude",
@@ -193,6 +248,13 @@ public class PublicDocsBundleService {
                         List.of("Cohere-compatible clients", "Jina rerank clients", "curl"),
                         List.of("rerank"),
                         "Use dedicated rerank provider sites such as Cohere or Jina instead of general chat presets."
+                ),
+                new PublicDocsCompatibilityResponse(
+                        "web_search",
+                        "/v1",
+                        List.of("OpenAI SDK", "Perplexity-compatible clients", "curl"),
+                        List.of("web_search", "citations"),
+                        "Use OpenAI or Perplexity provider presets; generic OpenAI-compatible sites are not assumed to support web search."
                 )
         );
     }
@@ -265,6 +327,36 @@ public class PublicDocsBundleService {
                                 """.trim()
                 ),
                 new PublicDocsExampleResponse(
+                        "openai-sdk-advanced-chat",
+                        "openai",
+                        "javascript",
+                        zh ? "OpenAI Chat 高级参数示例" : "OpenAI Chat Advanced Parameters",
+                        """
+                                const body = {
+                                  model: "gpt-4o-mini",
+                                  messages: [{ role: "user", content: "Return JSON." }],
+                                  response_format: {
+                                    type: "json_schema",
+                                    json_schema: {
+                                      name: "GatewayChatParity",
+                                      strict: true,
+                                      schema: {
+                                        type: "object",
+                                        additionalProperties: false,
+                                        properties: { status: { type: "string" } },
+                                        required: ["status"]
+                                      }
+                                    }
+                                  },
+                                  tools: [{ type: "function", function: { name: "record_gateway_check", parameters: { type: "object", properties: { status: { type: "string" } }, required: ["status"] } } }],
+                                  tool_choice: "auto",
+                                  store: false,
+                                  metadata: { example: "chat-advanced-parameters" },
+                                  web_search_options: { search_context_size: "medium" }
+                                };
+                                """.trim()
+                ),
+                new PublicDocsExampleResponse(
                         "claude-code",
                         "claude",
                         "shell",
@@ -319,8 +411,10 @@ public class PublicDocsBundleService {
                 );
     }
 
-    private void addPath(ObjectNode paths, String method, String path, String summary, boolean bearerAuth) {
-        ObjectNode pathNode = paths.putObject(path);
+    private ObjectNode addPath(ObjectNode paths, String method, String path, String summary, boolean bearerAuth) {
+        ObjectNode pathNode = paths.has(path) && paths.get(path).isObject()
+                ? (ObjectNode) paths.get(path)
+                : paths.putObject(path);
         ObjectNode operation = pathNode.putObject(method);
         operation.put("summary", summary);
         operation.put("operationId", operationId(method, path));
@@ -331,6 +425,103 @@ public class PublicDocsBundleService {
         operation.putObject("responses")
                 .putObject("200")
                 .put("description", "OK");
+        return operation;
+    }
+
+    private void addChatCompletionRequestBody(ObjectNode operation) {
+        ObjectNode schema = operation.putObject("requestBody")
+                .putObject("content")
+                .putObject("application/json")
+                .putObject("schema");
+        schema.put("type", "object");
+        schema.putArray("required").add("model").add("messages");
+        ObjectNode properties = schema.putObject("properties");
+        addProperty(properties, "model", "string", "OpenAI model name or gateway model alias.");
+        addProperty(properties, "messages", "array", "Chat messages in OpenAI-compatible format.");
+        addProperty(properties, "tools", "array", "Function tool definitions.");
+        addProperty(properties, "tool_choice", "object", "Tool choice string or object.");
+        addProperty(properties, "store", "boolean", "When true, persist the Chat Completion as a local chatcmpl_ resource.");
+        addProperty(properties, "metadata", "object", "OpenAI metadata object; also used by stored Chat lifecycle.");
+        addProperty(properties, "response_format", "object", "Typed response format: text, json_object or json_schema.");
+        addProperty(properties, "modalities", "array", "Requested output modalities such as text or audio.");
+        addProperty(properties, "audio", "object", "Audio voice and format when modalities includes audio.");
+        addProperty(properties, "web_search_options", "object", "OpenAI web search context and approximate user location.");
+        addProperty(properties, "service_tier", "string", "OpenAI service tier such as auto or default.");
+        addProperty(properties, "parallel_tool_calls", "boolean", "Whether parallel function tool calls are allowed.");
+        addProperty(properties, "stream_options", "object", "Streaming options such as include_usage; include_usage emits a choices=[] usage chunk before [DONE].");
+        addProperty(properties, "prediction", "object", "OpenAI prediction object for compatible models.");
+        addProperty(properties, "prompt_cache_key", "string", "Prompt cache affinity key.");
+        addProperty(properties, "safety_identifier", "string", "OpenAI safety identifier.");
+    }
+
+    private void addIdempotencyHeader(ObjectNode operation) {
+        ObjectNode parameter = parameters(operation).addObject();
+        parameter.put("name", "Idempotency-Key");
+        parameter.put("in", "header");
+        parameter.put("required", false);
+        parameter.put("description", "Optional key for non-streaming response replay.");
+        parameter.putObject("schema").put("type", "string");
+    }
+
+    private void addCompletionIdPathParameter(ObjectNode operation) {
+        ObjectNode parameter = parameters(operation).addObject();
+        parameter.put("name", "completionId");
+        parameter.put("in", "path");
+        parameter.put("required", true);
+        parameter.put("description", "Stored Chat Completion id.");
+        parameter.putObject("schema").put("type", "string");
+    }
+
+    private void addResponseIdPathParameter(ObjectNode operation) {
+        ObjectNode parameter = parameters(operation).addObject();
+        parameter.put("name", "responseId");
+        parameter.put("in", "path");
+        parameter.put("required", true);
+        parameter.put("description", "Stored Response id.");
+        parameter.putObject("schema").put("type", "string");
+    }
+
+    private void addStoredChatCompletionListParameters(ObjectNode operation) {
+        addQueryParameter(operation, "after", "string", "Cursor id of the last Chat Completion from the previous page.");
+        addQueryParameter(operation, "limit", "integer", "Number of Chat Completions to return. Defaults to 20; valid range is 1 to 100.");
+        addQueryParameter(operation, "model", "string", "Filter by model id.");
+        addQueryParameter(operation, "order", "string", "Sort by creation time: asc or desc. Defaults to asc.");
+        addQueryParameter(operation, "metadata[key]", "string", "Filter by metadata key, for example metadata[purpose]=qa.");
+    }
+
+    private void addStoredChatMessageListParameters(ObjectNode operation) {
+        addQueryParameter(operation, "after", "string", "Cursor id of the last message from the previous page.");
+        addQueryParameter(operation, "limit", "integer", "Number of messages to return. Defaults to 20; valid range is 1 to 100.");
+        addQueryParameter(operation, "order", "string", "Sort by message order: asc or desc. Defaults to asc.");
+    }
+
+    private void addResponseInputItemsListParameters(ObjectNode operation) {
+        addQueryParameter(operation, "after", "string", "Cursor id of the last input item from the previous page.");
+        addQueryParameter(operation, "limit", "integer", "Number of input items to return. Defaults to 20; valid range is 1 to 100.");
+        addQueryParameter(operation, "order", "string", "Sort by input item order: asc or desc. Defaults to desc.");
+    }
+
+    private void addQueryParameter(ObjectNode operation, String name, String type, String description) {
+        ObjectNode parameter = parameters(operation).addObject();
+        parameter.put("name", name);
+        parameter.put("in", "query");
+        parameter.put("required", false);
+        parameter.put("description", description);
+        parameter.putObject("schema").put("type", type);
+    }
+
+    private ArrayNode parameters(ObjectNode operation) {
+        JsonNode existing = operation.path("parameters");
+        if (existing.isArray()) {
+            return (ArrayNode) existing;
+        }
+        return operation.putArray("parameters");
+    }
+
+    private void addProperty(ObjectNode properties, String name, String type, String description) {
+        ObjectNode property = properties.putObject(name);
+        property.put("type", type);
+        property.put("description", description);
     }
 
     private String operationId(String method, String path) {

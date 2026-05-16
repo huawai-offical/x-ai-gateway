@@ -30,8 +30,11 @@ public class OpsTimelineAdminController {
     public List<OpsSystemEventResponse> systemEvents(
             @RequestParam(required = false) String severity,
             @RequestParam(required = false) String source,
+            @RequestParam(required = false) String eventType,
+            @RequestParam(required = false) String entityType,
+            @RequestParam(required = false) String entityRef,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to) {
-        return opsTimelineService.listEvents(severity, source, from, to);
+        return opsTimelineService.listEvents(severity, source, eventType, entityType, entityRef, from, to);
     }
 }

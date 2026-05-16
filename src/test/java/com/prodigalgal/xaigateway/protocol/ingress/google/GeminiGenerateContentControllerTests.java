@@ -161,6 +161,84 @@ class GeminiGenerateContentControllerTests {
     }
 
     @Test
+    void shouldAcceptGeminiThinkingToolConfigAndGroundingTools() {
+        Mockito.when(distributedKeyAuthenticationService.authenticateRawToken("sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<CanonicalRequest>argThat(request -> {
+            var extensions = request == null ? null : request.providerExtensions();
+            return request != null
+                    && request.reasoning() != null
+                    && request.reasoning().rawSettings().path("thinkingBudget").asInt() == 128
+                    && extensions != null
+                    && extensions.path("toolConfig").path("functionCallingConfig").path("mode").asText().equals("ANY")
+                    && extensions.path("tools").get(0).has("googleSearch")
+                    && extensions.path("tools").get(1).has("urlContext");
+        })))
+                .thenReturn(gatewayResponse("req-gemini-managed-tools-1", "grounding accepted", GatewayUsage.empty(), List.of()));
+
+        webTestClient.post()
+                .uri("/v1beta/models/gemini-2.5-pro:generateContent")
+                .header("x-goog-api-key", "sk-gw-test.secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "contents": [
+                            {
+                              "role":"user",
+                              "parts":[{"text":"结合公开信息回答"}]
+                            }
+                          ],
+                          "generationConfig": {
+                            "thinkingConfig":{"thinkingBudget":128,"includeThoughts":true}
+                          },
+                          "tools": [
+                            {"googleSearch": {}},
+                            {"urlContext": {}}
+                          ],
+                          "toolConfig": {
+                            "functionCallingConfig": {
+                              "mode": "ANY",
+                              "allowedFunctionNames": ["lookup_weather"]
+                            }
+                          }
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.candidates[0].content.parts[0].text").isEqualTo("grounding accepted");
+    }
+
+    @Test
+    void shouldRejectGeminiGoogleMapsWithoutGovernance() {
+        Mockito.when(distributedKeyAuthenticationService.authenticateRawToken("sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+
+        webTestClient.post()
+                .uri("/v1beta/models/gemini-2.5-pro:generateContent")
+                .header("x-goog-api-key", "sk-gw-test.secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "contents": [
+                            {
+                              "role":"user",
+                              "parts":[{"text":"附近有什么地点"}]
+                            }
+                          ],
+                          "tools": [
+                            {"googleMaps": {}}
+                          ]
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo("INVALID_ARGUMENT")
+                .jsonPath("$.message").isEqualTo("googleMaps grounding 需要 x_ai_gateway_allow_google_maps=true。");
+    }
+
+    @Test
     void shouldAcceptGeminiFileDataImageParts() {
         Mockito.when(distributedKeyAuthenticationService.authenticateRawToken("sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));

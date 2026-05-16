@@ -1,5 +1,6 @@
 package com.prodigalgal.xaigateway.protocol.ingress.anthropic;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import tools.jackson.databind.JsonNode;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -12,8 +13,23 @@ public record AnthropicMessagesRequest(
         @Valid
         List<Message> messages,
         List<Tool> tools,
+        @JsonProperty("tool_choice")
         JsonNode toolChoice,
+        JsonNode thinking,
         Double temperature,
+        @JsonProperty("service_tier")
+        String serviceTier,
+        JsonNode metadata,
+        JsonNode container,
+        @JsonProperty("context_management")
+        JsonNode contextManagement,
+        @JsonProperty("mcp_servers")
+        JsonNode mcpServers,
+        @JsonProperty("x_ai_gateway_mcp_allowlist")
+        JsonNode mcpAllowlist,
+        @JsonProperty("x_ai_gateway_allow_mcp_servers")
+        Boolean allowMcpServers,
+        @JsonProperty("max_tokens")
         @jakarta.validation.constraints.NotNull(message = "max_tokens 不能为空。")
         Integer maxTokens,
         Boolean stream
@@ -29,6 +45,7 @@ public record AnthropicMessagesRequest(
     public record Tool(
             String name,
             String description,
+            @JsonProperty("input_schema")
             JsonNode inputSchema
     ) {
     }

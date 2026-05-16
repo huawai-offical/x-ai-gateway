@@ -56,6 +56,12 @@ public class RequestLogEntity {
     @Column(name = "workspace_hint", length = 256)
     private String workspaceHint;
 
+    @Column(name = "session_affinity_source", length = 64)
+    private String sessionAffinitySource;
+
+    @Column(name = "session_affinity_key", length = 64)
+    private String sessionAffinityKey;
+
     @Column(name = "protocol", nullable = false, length = 32)
     private String protocol;
 
@@ -206,6 +212,22 @@ public class RequestLogEntity {
 
     public void setWorkspaceHint(String workspaceHint) {
         this.workspaceHint = workspaceHint;
+    }
+
+    public String getSessionAffinitySource() {
+        return sessionAffinitySource;
+    }
+
+    public void setSessionAffinitySource(String sessionAffinitySource) {
+        this.sessionAffinitySource = sessionAffinitySource;
+    }
+
+    public String getSessionAffinityKey() {
+        return sessionAffinityKey;
+    }
+
+    public void setSessionAffinityKey(String sessionAffinityKey) {
+        this.sessionAffinityKey = sessionAffinityKey;
     }
 
     public String getProtocol() {

@@ -91,3 +91,9 @@ databaseChangeLog:
       file: db/changelog/changes/db.changelog-0045-payment-production-closure.yaml
   - include:
       file: db/changelog/changes/db.changelog-0046-client-instance.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0047-codex-session-affinity.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0048-distributed-key-secret-export-grant.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0049-openai-idempotency-record.yaml

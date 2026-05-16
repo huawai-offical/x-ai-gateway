@@ -9,6 +9,7 @@ import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalMessage;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalMessageRole;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalReasoningConfig;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequestMetadata;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolDefinition;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,6 +25,13 @@ public class OpenAiResponsesRequestMapper {
     }
 
     public CanonicalRequest toCanonicalRequest(String distributedKeyPrefix, JsonNode requestBody) {
+        return toCanonicalRequest(distributedKeyPrefix, requestBody, null);
+    }
+
+    public CanonicalRequest toCanonicalRequest(
+            String distributedKeyPrefix,
+            JsonNode requestBody,
+            CanonicalRequestMetadata metadata) {
         if (requestBody == null || !requestBody.isObject()) {
             throw new IllegalArgumentException("responses 请求体必须是 JSON object。");
         }
@@ -51,7 +59,8 @@ public class OpenAiResponsesRequestMapper {
                         ? requestBody.get("max_output_tokens").asInt()
                         : null,
                 buildReasoningConfig(requestBody),
-                requestBody.deepCopy()
+                requestBody.deepCopy(),
+                metadata
         );
     }
 
@@ -282,6 +291,11 @@ public class OpenAiResponsesRequestMapper {
     private CanonicalReasoningConfig buildReasoningConfig(JsonNode requestBody) {
         JsonNode reasoning = requestBody.get("reasoning");
         String reasoningEffort = requestBody.path("reasoning_effort").asText(null);
+        if ((reasoningEffort == null || reasoningEffort.isBlank())
+                && reasoning != null
+                && reasoning.isObject()) {
+            reasoningEffort = reasoning.path("effort").asText(null);
+        }
         if ((reasoning == null || reasoning.isNull()) && (reasoningEffort == null || reasoningEffort.isBlank())) {
             return null;
         }

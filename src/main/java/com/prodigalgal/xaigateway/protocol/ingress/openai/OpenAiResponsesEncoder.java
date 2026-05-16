@@ -1,6 +1,7 @@
 package com.prodigalgal.xaigateway.protocol.ingress.openai;
 
 import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionResult;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionStreamResult;
@@ -12,7 +13,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
@@ -30,14 +33,20 @@ public class OpenAiResponsesEncoder {
     }
 
     public Flux<String> encodeStream(CanonicalExecutionStreamResult response) {
+        return encodeStream(response, null);
+    }
+
+    public Flux<String> encodeStream(CanonicalExecutionStreamResult response, JsonNode streamOptions) {
         String itemId = "msg_" + response.requestId();
         String reasoningItemId = "rs_" + response.requestId();
         AtomicBoolean reasoningStarted = new AtomicBoolean(false);
         AtomicBoolean messageOpened = new AtomicBoolean(true);
+        AtomicInteger sequenceNumber = new AtomicInteger();
+        boolean includeObfuscation = includeObfuscation(streamOptions);
 
         return Flux.concat(
                 Flux.just(
-                        encodeEvent("response.created", Map.of(
+                        encodeEvent(sequenceNumber, "response.created", Map.of(
                                 "type", "response.created",
                                 "response", OpenAiResponsesResponse.completedCanonical(
                                         response.requestId(),
@@ -47,7 +56,7 @@ public class OpenAiResponsesEncoder {
                                         null
                                 )
                         )),
-                        encodeEvent("response.in_progress", Map.of(
+                        encodeEvent(sequenceNumber, "response.in_progress", Map.of(
                                 "type", "response.in_progress",
                                 "response", OpenAiResponsesResponse.completedCanonical(
                                         response.requestId(),
@@ -57,8 +66,8 @@ public class OpenAiResponsesEncoder {
                                         null
                                 )
                         )),
-                        encodeEvent("response.output_item.added", outputItemAddedEvent(itemId)),
-                        encodeEvent("response.content_part.added", contentPartAddedEvent(itemId))
+                        encodeEvent(sequenceNumber, "response.output_item.added", outputItemAddedEvent(itemId)),
+                        encodeEvent(sequenceNumber, "response.content_part.added", contentPartAddedEvent(itemId))
                 ),
                 response.events().concatMap(event -> encodeCanonicalEvent(
                         response.requestId(),
@@ -67,7 +76,9 @@ public class OpenAiResponsesEncoder {
                         itemId,
                         reasoningItemId,
                         reasoningStarted,
-                        messageOpened
+                        messageOpened,
+                        sequenceNumber,
+                        includeObfuscation
                 ))
         );
     }
@@ -110,14 +121,14 @@ public class OpenAiResponsesEncoder {
         );
     }
 
-    private Map<String, Object> reasoningSummaryTextDeltaEvent(String itemId, String delta) {
-        return Map.of(
+    private Map<String, Object> reasoningSummaryTextDeltaEvent(String itemId, String delta, boolean includeObfuscation) {
+        return withObfuscation(Map.of(
                 "type", "response.reasoning_summary_text.delta",
                 "item_id", itemId,
                 "output_index", 1,
                 "summary_index", 0,
                 "delta", delta
-        );
+        ), includeObfuscation);
     }
 
     private Map<String, Object> reasoningSummaryTextDoneEvent(String itemId, String text) {
@@ -153,14 +164,14 @@ public class OpenAiResponsesEncoder {
         );
     }
 
-    private Map<String, Object> outputTextDeltaEvent(String itemId, String delta) {
-        return Map.of(
+    private Map<String, Object> outputTextDeltaEvent(String itemId, String delta, boolean includeObfuscation) {
+        return withObfuscation(Map.of(
                 "type", "response.output_text.delta",
                 "item_id", itemId,
                 "output_index", 0,
                 "content_index", 0,
                 "delta", delta
-        );
+        ), includeObfuscation);
     }
 
     private Map<String, Object> outputTextDoneEvent(String itemId, String text) {
@@ -193,15 +204,19 @@ public class OpenAiResponsesEncoder {
         return Map.of("type", "response.output_item.done", "output_index", 0, "item", item);
     }
 
-    private List<String> encodeToolCallEvents(CanonicalToolCall toolCall, int outputIndex) {
+    private List<String> encodeToolCallEvents(
+            CanonicalToolCall toolCall,
+            int outputIndex,
+            AtomicInteger sequenceNumber,
+            boolean includeObfuscation) {
         String itemId = toolCall.id() == null || toolCall.id().isBlank() ? "fc_" + outputIndex : toolCall.id();
         List<String> events = new ArrayList<>();
-        events.add(encodeEvent("response.output_item.added", functionCallAddedEvent(itemId, outputIndex, toolCall)));
+        events.add(encodeEvent(sequenceNumber, "response.output_item.added", functionCallAddedEvent(itemId, outputIndex, toolCall)));
         if (toolCall.arguments() != null && !toolCall.arguments().isBlank()) {
-            events.add(encodeEvent("response.function_call_arguments.delta", functionCallArgumentsDeltaEvent(itemId, outputIndex, toolCall.arguments())));
-            events.add(encodeEvent("response.function_call_arguments.done", functionCallArgumentsDoneEvent(itemId, outputIndex, toolCall.arguments())));
+            events.add(encodeEvent(sequenceNumber, "response.function_call_arguments.delta", functionCallArgumentsDeltaEvent(itemId, outputIndex, toolCall.arguments(), includeObfuscation)));
+            events.add(encodeEvent(sequenceNumber, "response.function_call_arguments.done", functionCallArgumentsDoneEvent(itemId, outputIndex, toolCall.arguments())));
         }
-        events.add(encodeEvent("response.output_item.done", functionCallDoneEvent(itemId, outputIndex, toolCall)));
+        events.add(encodeEvent(sequenceNumber, "response.output_item.done", functionCallDoneEvent(itemId, outputIndex, toolCall)));
         return events;
     }
 
@@ -220,8 +235,11 @@ public class OpenAiResponsesEncoder {
         );
     }
 
-    private Map<String, Object> functionCallArgumentsDeltaEvent(String itemId, int outputIndex, String arguments) {
-        return Map.of("type", "response.function_call_arguments.delta", "item_id", itemId, "output_index", outputIndex, "delta", arguments);
+    private Map<String, Object> functionCallArgumentsDeltaEvent(String itemId, int outputIndex, String arguments, boolean includeObfuscation) {
+        return withObfuscation(
+                Map.of("type", "response.function_call_arguments.delta", "item_id", itemId, "output_index", outputIndex, "delta", arguments),
+                includeObfuscation
+        );
     }
 
     private Map<String, Object> functionCallArgumentsDoneEvent(String itemId, int outputIndex, String arguments) {
@@ -263,26 +281,28 @@ public class OpenAiResponsesEncoder {
             String itemId,
             String reasoningItemId,
             AtomicBoolean reasoningStarted,
-            AtomicBoolean messageOpened) {
+            AtomicBoolean messageOpened,
+            AtomicInteger sequenceNumber,
+            boolean includeObfuscation) {
         List<String> events = new ArrayList<>();
 
         if (canonicalEvent.type() == CanonicalStreamEventType.REASONING_DELTA && canonicalEvent.reasoningDelta() != null && !canonicalEvent.reasoningDelta().isBlank()) {
             if (reasoningStarted.compareAndSet(false, true)) {
-                events.add(encodeEvent("response.output_item.added", reasoningItemAddedEvent(reasoningItemId)));
-                events.add(encodeEvent("response.reasoning_summary_part.added", reasoningSummaryPartAddedEvent(reasoningItemId)));
+                events.add(encodeEvent(sequenceNumber, "response.output_item.added", reasoningItemAddedEvent(reasoningItemId)));
+                events.add(encodeEvent(sequenceNumber, "response.reasoning_summary_part.added", reasoningSummaryPartAddedEvent(reasoningItemId)));
             }
-            events.add(encodeEvent("response.reasoning_summary_text.delta", reasoningSummaryTextDeltaEvent(reasoningItemId, canonicalEvent.reasoningDelta())));
+            events.add(encodeEvent(sequenceNumber, "response.reasoning_summary_text.delta", reasoningSummaryTextDeltaEvent(reasoningItemId, canonicalEvent.reasoningDelta(), includeObfuscation)));
         }
 
         if (canonicalEvent.type() == CanonicalStreamEventType.TOOL_CALLS && canonicalEvent.toolCalls() != null && !canonicalEvent.toolCalls().isEmpty()) {
             int outputIndexBase = reasoningStarted.get() ? 2 : 1;
             for (int index = 0; index < canonicalEvent.toolCalls().size(); index++) {
-                events.addAll(encodeToolCallEvents(canonicalEvent.toolCalls().get(index), outputIndexBase + index));
+                events.addAll(encodeToolCallEvents(canonicalEvent.toolCalls().get(index), outputIndexBase + index, sequenceNumber, includeObfuscation));
             }
         }
 
         if (canonicalEvent.type() == CanonicalStreamEventType.TEXT_DELTA && canonicalEvent.textDelta() != null && !canonicalEvent.textDelta().isBlank()) {
-            events.add(encodeEvent("response.output_text.delta", outputTextDeltaEvent(itemId, canonicalEvent.textDelta())));
+            events.add(encodeEvent(sequenceNumber, "response.output_text.delta", outputTextDeltaEvent(itemId, canonicalEvent.textDelta(), includeObfuscation)));
         }
 
         if (canonicalEvent.type() != CanonicalStreamEventType.COMPLETED) {
@@ -292,27 +312,57 @@ public class OpenAiResponsesEncoder {
         String finalReasoning = canonicalEvent.reasoning();
         String finalText = canonicalEvent.outputText();
         if (reasoningStarted.get()) {
-            events.add(encodeEvent("response.reasoning_summary_text.done", reasoningSummaryTextDoneEvent(reasoningItemId, finalReasoning == null ? "" : finalReasoning)));
-            events.add(encodeEvent("response.reasoning_summary_part.done", reasoningSummaryPartDoneEvent(reasoningItemId, finalReasoning == null ? "" : finalReasoning)));
-            events.add(encodeEvent("response.output_item.done", reasoningItemDoneEvent(reasoningItemId, finalReasoning == null ? "" : finalReasoning)));
+            events.add(encodeEvent(sequenceNumber, "response.reasoning_summary_text.done", reasoningSummaryTextDoneEvent(reasoningItemId, finalReasoning == null ? "" : finalReasoning)));
+            events.add(encodeEvent(sequenceNumber, "response.reasoning_summary_part.done", reasoningSummaryPartDoneEvent(reasoningItemId, finalReasoning == null ? "" : finalReasoning)));
+            events.add(encodeEvent(sequenceNumber, "response.output_item.done", reasoningItemDoneEvent(reasoningItemId, finalReasoning == null ? "" : finalReasoning)));
         }
         if (messageOpened.get()) {
-            events.add(encodeEvent("response.output_text.done", outputTextDoneEvent(itemId, finalText == null ? "" : finalText)));
-            events.add(encodeEvent("response.content_part.done", contentPartDoneEvent(itemId, finalText == null ? "" : finalText)));
-            events.add(encodeEvent("response.output_item.done", outputItemDoneEvent(itemId, finalText == null ? "" : finalText)));
+            events.add(encodeEvent(sequenceNumber, "response.output_text.done", outputTextDoneEvent(itemId, finalText == null ? "" : finalText)));
+            events.add(encodeEvent(sequenceNumber, "response.content_part.done", contentPartDoneEvent(itemId, finalText == null ? "" : finalText)));
+            events.add(encodeEvent(sequenceNumber, "response.output_item.done", outputItemDoneEvent(itemId, finalText == null ? "" : finalText)));
         }
-        events.add(encodeEvent("response.completed", Map.of(
+        events.add(encodeEvent(sequenceNumber, "response.completed", Map.of(
                 "type", "response.completed",
                 "response", OpenAiResponsesResponse.completedCanonical(requestId, publicModel, finalText, canonicalEvent.usage(), finalReasoning)
         )));
         return Flux.fromIterable(events);
     }
 
-    private String encodeEvent(String eventName, Object payload) {
+    private boolean includeObfuscation(JsonNode streamOptions) {
+        if (streamOptions == null || streamOptions.isMissingNode() || streamOptions.isNull()) {
+            return true;
+        }
+        JsonNode value = streamOptions.path("include_obfuscation");
+        return value.isMissingNode() || value.isNull() || value.asBoolean(true);
+    }
+
+    private Map<String, Object> withObfuscation(Map<String, Object> payload, boolean includeObfuscation) {
+        if (!includeObfuscation) {
+            return payload;
+        }
+        Map<String, Object> result = new LinkedHashMap<>(payload);
+        result.put("obfuscation", UUID.randomUUID().toString().replace("-", ""));
+        return result;
+    }
+
+    private String encodeEvent(AtomicInteger sequenceNumber, String eventName, Object payload) {
         try {
-            return "event: " + eventName + "\n" + "data: " + objectMapper.writeValueAsString(payload) + "\n\n";
+            return "event: " + eventName + "\n" + "data: " + objectMapper.writeValueAsString(withSequenceNumber(eventName, payload, sequenceNumber.getAndIncrement())) + "\n\n";
         } catch (JacksonException exception) {
             throw new IllegalStateException("无法序列化 Responses stream 响应。", exception);
         }
+    }
+
+    private Object withSequenceNumber(String eventName, Object payload, int sequenceNumber) {
+        if (!(payload instanceof Map<?, ?> payloadMap)) {
+            return payload;
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : payloadMap.entrySet()) {
+            result.put(String.valueOf(entry.getKey()), entry.getValue());
+        }
+        result.putIfAbsent("type", eventName);
+        result.put("sequence_number", sequenceNumber);
+        return result;
     }
 }

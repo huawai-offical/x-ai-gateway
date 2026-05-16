@@ -202,6 +202,48 @@
       "unsupportedFeatures": ["realtime_client_secret: current gateway does not trust aggregated realtime surface."]
     },
     {
+      "code": "xai",
+      "displayName": "xAI Grok",
+      "siteKind": "GROK",
+      "defaultBaseUrl": "https://api.x.ai/v1",
+      "description": "xAI Grok REST API 以 OpenAI-compatible chat/responses 作为主兼容面，专有能力按 xAI adapter 边界单独声明。",
+      "capabilityTags": ["chat", "responses", "openai_compatible", "reasoning", "vision", "xai"],
+      "costProfile": "xai-public-pricing",
+      "errorMode": "openai_error",
+      "deprecated": false,
+      "conformanceChecks": ["chat.native", "openai-compatible.surface", "responses.emulated"],
+      "compatibilitySurface": "openai-compatible-chat",
+      "supportStrategy": "cloud-openai-compatible",
+      "modelFamilies": ["grok-4.3", "grok-4", "grok-3", "grok-2"],
+      "pricingMetadata": "public-list-price-xai",
+      "unsupportedFeatures": [
+        "deprecated_model_redirect: xAI retires grok-4-1-fast-reasoning, grok-4-1-fast-non-reasoning, grok-4-fast-reasoning, grok-4-fast-non-reasoning, grok-4-0709, grok-code-fast-1, grok-3 and grok-imagine-image-pro on 2026-05-15 12:00 PT with grok-4.3/image redirects.",
+        "file_object: xAI Files API exists but current gateway does not generalize it into OpenAI object lifecycle.",
+        "web_search: xAI web search is exposed through provider-specific Responses tooling, not the current /v1/web_search adapter."
+      ]
+    },
+    {
+      "code": "perplexity",
+      "displayName": "Perplexity",
+      "siteKind": "PERPLEXITY",
+      "defaultBaseUrl": "https://api.perplexity.ai",
+      "description": "Perplexity OpenAI SDK compatible chat/search API，作为 web-grounded search provider 单独建模，不泛化为全量 OpenAI-compatible lifecycle。",
+      "capabilityTags": ["chat", "openai_compatible", "web_search", "citations", "perplexity"],
+      "costProfile": "perplexity-public-pricing",
+      "errorMode": "openai_error",
+      "deprecated": false,
+      "conformanceChecks": ["chat.native", "openai-compatible.surface", "web-search.adapter-boundary"],
+      "compatibilitySurface": "openai-compatible-web-search",
+      "supportStrategy": "web-search-openai-compatible",
+      "modelFamilies": ["sonar", "sonar-pro", "sonar-reasoning"],
+      "pricingMetadata": "public-list-price-perplexity",
+      "unsupportedFeatures": [
+        "responses: Perplexity preset is modeled as Chat Completions compatible search, not generic OpenAI Responses.",
+        "file_object: Perplexity is not treated as an object lifecycle provider.",
+        "realtime_client_secret: Perplexity does not expose an OpenAI-equivalent realtime session contract."
+      ]
+    },
+    {
       "code": "cohere",
       "displayName": "Cohere",
       "siteKind": "COHERE",
@@ -325,6 +367,26 @@
       "modelFamilies": ["gemini-2.5-pro", "gemini-2.5-flash", "text-embedding"],
       "pricingMetadata": "public-list-price-gemini",
       "unsupportedFeatures": ["realtime_client_secret: Gemini live token is not equivalent to OpenAI realtime client_secret."]
+    },
+    {
+      "code": "vertex",
+      "displayName": "Vertex AI",
+      "siteKind": "VERTEX_AI",
+      "defaultBaseUrl": "https://{location}-aiplatform.googleapis.com",
+      "description": "Google Vertex AI Gemini API，使用 project/location 与 Google Cloud bearer/service account 凭证，不等价于 AI Studio API key surface。",
+      "capabilityTags": ["chat", "embeddings", "files", "batches", "google_native", "vertex", "project_location"],
+      "costProfile": "vertex-ai-public-pricing",
+      "errorMode": "gemini_error",
+      "deprecated": false,
+      "conformanceChecks": ["generate-content.native", "vertex.project-location", "files.orchestrated", "batches.orchestrated"],
+      "compatibilitySurface": "google-native",
+      "supportStrategy": "vertex-google-native",
+      "modelFamilies": ["gemini-2.5-pro", "gemini-2.5-flash", "text-embedding", "veo"],
+      "pricingMetadata": "public-list-price-vertex-ai",
+      "unsupportedFeatures": [
+        "ai_studio_key: Vertex requires Google Cloud project/location bearer credentials instead of AI Studio API keys.",
+        "realtime_client_secret: Vertex live token is not equivalent to OpenAI realtime client_secret."
+      ]
     }
   ]
 }

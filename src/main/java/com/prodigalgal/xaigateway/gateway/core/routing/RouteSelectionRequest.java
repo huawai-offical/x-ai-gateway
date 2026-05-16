@@ -9,7 +9,8 @@ public record RouteSelectionRequest(
         String requestedModel,
         Object requestBody,
         GatewayClientFamily clientFamily,
-        boolean reserveGovernance
+        boolean reserveGovernance,
+        String sessionAffinityKey
 ) {
     public RouteSelectionRequest(
             String distributedKeyPrefix,
@@ -17,6 +18,17 @@ public record RouteSelectionRequest(
             String requestPath,
             String requestedModel,
             Object requestBody) {
-        this(distributedKeyPrefix, protocol, requestPath, requestedModel, requestBody, GatewayClientFamily.GENERIC_OPENAI, false);
+        this(distributedKeyPrefix, protocol, requestPath, requestedModel, requestBody, GatewayClientFamily.GENERIC_OPENAI, false, null);
+    }
+
+    public RouteSelectionRequest(
+            String distributedKeyPrefix,
+            String protocol,
+            String requestPath,
+            String requestedModel,
+            Object requestBody,
+            GatewayClientFamily clientFamily,
+            boolean reserveGovernance) {
+        this(distributedKeyPrefix, protocol, requestPath, requestedModel, requestBody, clientFamily, reserveGovernance, null);
     }
 }

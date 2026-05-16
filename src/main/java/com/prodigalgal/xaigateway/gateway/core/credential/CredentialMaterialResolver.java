@@ -41,12 +41,21 @@ public class CredentialMaterialResolver {
         if (selectionResult == null) {
             return resolveStored(credential);
         }
-        Optional<UpstreamAccountEntity> account = accountSelectionService.resolveActiveAccount(
+        GatewayClientFamily clientFamily = selectionResult.clientFamily() == null
+                ? GatewayClientFamily.GENERIC_OPENAI
+                : selectionResult.clientFamily();
+        Optional<UpstreamAccountEntity> account = selectionResult.sessionAffinityKey() == null
+                ? accountSelectionService.resolveActiveAccount(
                 selectionResult.distributedKeyId(),
                 selectionResult.selectedCandidate().candidate().providerType(),
-                selectionResult.clientFamily() == null ? GatewayClientFamily.GENERIC_OPENAI : selectionResult.clientFamily(),
-                300
-        );
+                clientFamily,
+                300)
+                : accountSelectionService.resolveActiveAccount(
+                selectionResult.distributedKeyId(),
+                selectionResult.selectedCandidate().candidate().providerType(),
+                clientFamily,
+                300,
+                selectionResult.sessionAffinityKey());
         return account.map(value -> resolveFromAccount(credential, value)).orElseGet(() -> resolveStored(credential));
     }
 

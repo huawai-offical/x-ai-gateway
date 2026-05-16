@@ -46,6 +46,11 @@ public class AccountAdminController {
         return accountAdminService.refresh(id);
     }
 
+    @PostMapping("/{id}/runtime-reset")
+    public UpstreamAccountResponse resetRuntime(@PathVariable Long id) {
+        return accountAdminService.resetRuntime(id);
+    }
+
     @PostMapping("/{id}/network")
     public UpstreamAccountResponse updateNetwork(@PathVariable Long id, @RequestBody AccountNetworkBindingRequest request) {
         return accountAdminService.updateNetwork(id, request.proxyId(), request.tlsFingerprintProfileId());
@@ -83,5 +88,12 @@ public class AccountAdminController {
     @GetMapping("/{id}/official/quota")
     public OfficialAccountQuotaResponse officialQuota(@PathVariable Long id) {
         return officialAccountAdminService.quota(id);
+    }
+
+    @PostMapping("/{id}/official/codex/responses-smoke")
+    public OfficialCodexResponsesSmokeResponse codexResponsesSmoke(
+            @PathVariable Long id,
+            @RequestBody(required = false) OfficialCodexResponsesSmokeRequest request) {
+        return officialAccountAdminService.codexResponsesSmoke(id, request);
     }
 }

@@ -65,6 +65,9 @@ public class UpstreamSitePolicyService {
                 if (normalized.contains("openrouter.ai")) {
                     yield UpstreamSiteKind.OPENROUTER;
                 }
+                if (normalized.contains("api.perplexity.ai")) {
+                    yield UpstreamSiteKind.PERPLEXITY;
+                }
                 yield UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC;
             }
             case ANTHROPIC_DIRECT -> UpstreamSiteKind.ANTHROPIC_DIRECT;
@@ -139,6 +142,27 @@ public class UpstreamSitePolicyService {
                     false,
                     "sse",
                     "provider-specific-fallback",
+                    null
+            );
+            case PERPLEXITY -> new SitePolicy(
+                    ProviderFamily.OPENAI,
+                    AuthStrategy.BEARER,
+                    PathStrategy.OPENAI_V1,
+                    ModelAddressingStrategy.MODEL_NAME,
+                    ErrorSchemaStrategy.OPENAI_ERROR,
+                    List.of("openai"),
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false,
+                    "sse",
+                    "web-search-openai-compatible",
                     null
             );
             case DIFY -> new SitePolicy(
@@ -325,6 +349,7 @@ public class UpstreamSitePolicyService {
                     : InteropCapabilityLevel.NATIVE;
             case IMAGE_INPUT -> switch (siteKind) {
                 case ANTHROPIC_DIRECT, GEMINI_DIRECT, VERTEX_AI, OPENAI_DIRECT, AZURE_OPENAI -> InteropCapabilityLevel.NATIVE;
+                case PERPLEXITY -> InteropCapabilityLevel.UNSUPPORTED;
                 case OLLAMA_DIRECT -> InteropCapabilityLevel.UNSUPPORTED;
                 default -> InteropCapabilityLevel.EMULATED;
             };
@@ -373,7 +398,7 @@ public class UpstreamSitePolicyService {
                     ? InteropCapabilityLevel.NATIVE
                     : InteropCapabilityLevel.UNSUPPORTED;
             case VIDEO_GENERATION, MUSIC_GENERATION, ASYNC_TASK -> InteropCapabilityLevel.UNSUPPORTED;
-            case WEB_SEARCH -> siteKind == UpstreamSiteKind.OPENAI_DIRECT
+            case WEB_SEARCH -> (siteKind == UpstreamSiteKind.OPENAI_DIRECT || siteKind == UpstreamSiteKind.PERPLEXITY)
                     ? InteropCapabilityLevel.NATIVE
                     : InteropCapabilityLevel.UNSUPPORTED;
         };

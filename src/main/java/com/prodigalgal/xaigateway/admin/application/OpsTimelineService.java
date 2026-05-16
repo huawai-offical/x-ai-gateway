@@ -168,12 +168,25 @@ public class OpsTimelineService {
     }
 
     @Transactional(readOnly = true)
-    public List<OpsSystemEventResponse> listEvents(String severity, String source, Instant from, Instant to) {
+    public List<OpsSystemEventResponse> listEvents(
+            String severity,
+            String source,
+            String eventType,
+            String entityType,
+            String entityRef,
+            Instant from,
+            Instant to) {
         String normalizedSeverity = severity == null || severity.isBlank() ? null : normalizeSeverity(severity);
         String normalizedSource = source == null || source.isBlank() ? null : source.trim();
+        String normalizedEventType = eventType == null || eventType.isBlank() ? null : eventType.trim();
+        String normalizedEntityType = entityType == null || entityType.isBlank() ? null : entityType.trim();
+        String normalizedEntityRef = entityRef == null || entityRef.isBlank() ? null : entityRef.trim();
         return systemEventRepository.findTop500ByOrderByOccurredAtDesc().stream()
                 .filter(event -> normalizedSeverity == null || normalizedSeverity.equals(event.getSeverity()))
                 .filter(event -> normalizedSource == null || normalizedSource.equals(event.getSource()))
+                .filter(event -> normalizedEventType == null || normalizedEventType.equals(event.getEventType()))
+                .filter(event -> normalizedEntityType == null || normalizedEntityType.equals(event.getEntityType()))
+                .filter(event -> normalizedEntityRef == null || normalizedEntityRef.equals(event.getEntityRef()))
                 .filter(event -> from == null || !event.getOccurredAt().isBefore(from))
                 .filter(event -> to == null || !event.getOccurredAt().isAfter(to))
                 .map(this::toSystemEventResponse)

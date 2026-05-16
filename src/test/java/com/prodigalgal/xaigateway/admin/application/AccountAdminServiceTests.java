@@ -17,6 +17,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 import tools.jackson.databind.ObjectMapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AccountAdminServiceTests {
@@ -92,6 +94,149 @@ class AccountAdminServiceTests {
     }
 
     @Test
+    void shouldUpdateExistingCodexAuthJsonImportByStableIdentityAndSanitizeSnapshots() {
+        UpstreamAccountRepository accountRepository = Mockito.mock(UpstreamAccountRepository.class);
+        UpstreamAccountPoolRepository poolRepository = Mockito.mock(UpstreamAccountPoolRepository.class);
+        CredentialCryptoService cryptoService = Mockito.mock(CredentialCryptoService.class);
+        SupportedModelCatalogService modelCatalogService = Mockito.mock(SupportedModelCatalogService.class);
+        OAuthSessionRefreshService refreshService = Mockito.mock(OAuthSessionRefreshService.class);
+        ObjectMapper objectMapper = new ObjectMapper();
+        AccountAdminService service = new AccountAdminService(
+                accountRepository,
+                poolRepository,
+                cryptoService,
+                modelCatalogService,
+                refreshService,
+                objectMapper
+        );
+        UpstreamAccountPoolEntity pool = new UpstreamAccountPoolEntity();
+        ReflectionTestUtils.setField(pool, "id", 5L);
+        pool.setPoolName("codex-pool");
+        pool.setProviderType(UpstreamAccountProviderType.CODEX_OAUTH);
+        UpstreamAccountEntity existing = new UpstreamAccountEntity();
+        ReflectionTestUtils.setField(existing, "id", 71L);
+        existing.setPool(pool);
+        existing.setProviderType(UpstreamAccountProviderType.CODEX_OAUTH);
+        existing.setExternalAccountId("legacy-account-id");
+        existing.setAccountName("old-codex");
+        String identityKey = new CodexAuthJsonParser(objectMapper).parse(codexAuthJson(
+                "codex-new-access-secret",
+                "codex-new-refresh-secret",
+                "acct-can-change"
+        )).identityKey();
+        existing.setMetadataJson("{\"account_identity\":{\"identityKey\":\"" + identityKey + "\"}}");
+        Mockito.when(poolRepository.findById(5L)).thenReturn(Optional.of(pool));
+        Mockito.when(accountRepository.findFirstByProviderTypeAndExternalAccountIdOrderByUpdatedAtDesc(
+                Mockito.eq(UpstreamAccountProviderType.CODEX_OAUTH),
+                Mockito.anyString()
+        )).thenReturn(Optional.empty());
+        Mockito.when(accountRepository.findAllByProviderTypeOrderByUpdatedAtDesc(UpstreamAccountProviderType.CODEX_OAUTH))
+                .thenReturn(List.of(existing));
+        Mockito.when(cryptoService.encrypt(Mockito.anyString())).thenAnswer(invocation -> "enc:" + invocation.getArgument(0));
+        Mockito.when(modelCatalogService.resolveForAccountImport(Mockito.eq(pool), Mockito.any()))
+                .thenReturn(List.of("gpt-5.4"));
+        Mockito.when(modelCatalogService.normalize(Mockito.anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+        Mockito.when(accountRepository.save(Mockito.any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpstreamAccountResponse response = service.importAuthJson(new AccountImportAuthJsonRequest(
+                5L,
+                null,
+                "acct-can-change",
+                "codex-new-access-secret",
+                "codex-new-refresh-secret",
+                codexAuthJson("codex-new-access-secret", "codex-new-refresh-secret", "acct-can-change"),
+                true,
+                null,
+                null,
+                null,
+                List.of("gpt-5.4"),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+        ));
+
+        assertEquals(71L, response.id());
+        assertEquals(identityKey, response.externalAccountId());
+        assertEquals("enc:codex-new-access-secret", existing.getAccessTokenCiphertext());
+        assertEquals("enc:codex-new-refresh-secret", existing.getRefreshTokenCiphertext());
+        assertFalse(existing.getMetadataJson().contains("codex-new-access-secret"));
+        assertFalse(existing.getMetadataJson().contains("codex-new-refresh-secret"));
+        assertFalse(existing.getHeaderSnapshotJson().contains("Bearer abcdefghijklmnopqrstuvwxyz"));
+        assertTrue(existing.getHeaderSnapshotJson().contains("\"authorization\":\"***\""));
+        assertTrue(existing.getMetadataJson().contains("\"identityStrength\":\"STRONG\""));
+    }
+
+    @Test
+    void shouldNotMergeWeakCodexTokenIdentityByMetadataScan() {
+        UpstreamAccountRepository accountRepository = Mockito.mock(UpstreamAccountRepository.class);
+        UpstreamAccountPoolRepository poolRepository = Mockito.mock(UpstreamAccountPoolRepository.class);
+        CredentialCryptoService cryptoService = Mockito.mock(CredentialCryptoService.class);
+        SupportedModelCatalogService modelCatalogService = Mockito.mock(SupportedModelCatalogService.class);
+        OAuthSessionRefreshService refreshService = Mockito.mock(OAuthSessionRefreshService.class);
+        AccountAdminService service = new AccountAdminService(
+                accountRepository,
+                poolRepository,
+                cryptoService,
+                modelCatalogService,
+                refreshService,
+                new ObjectMapper()
+        );
+        UpstreamAccountPoolEntity pool = new UpstreamAccountPoolEntity();
+        ReflectionTestUtils.setField(pool, "id", 6L);
+        pool.setPoolName("codex-pool");
+        pool.setProviderType(UpstreamAccountProviderType.CODEX_OAUTH);
+        Mockito.when(poolRepository.findById(6L)).thenReturn(Optional.of(pool));
+        Mockito.when(accountRepository.findFirstByProviderTypeAndExternalAccountIdOrderByUpdatedAtDesc(
+                Mockito.eq(UpstreamAccountProviderType.CODEX_OAUTH),
+                Mockito.anyString()
+        )).thenReturn(Optional.empty());
+        Mockito.when(cryptoService.encrypt(Mockito.anyString())).thenAnswer(invocation -> "enc:" + invocation.getArgument(0));
+        Mockito.when(modelCatalogService.resolveForAccountImport(Mockito.eq(pool), Mockito.any()))
+                .thenReturn(List.of("gpt-5.4"));
+        Mockito.when(modelCatalogService.normalize(Mockito.anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+        Mockito.when(accountRepository.save(Mockito.any())).thenAnswer(invocation -> {
+            UpstreamAccountEntity entity = invocation.getArgument(0);
+            ReflectionTestUtils.setField(entity, "id", 72L);
+            return entity;
+        });
+
+        UpstreamAccountResponse response = service.importAuthJson(new AccountImportAuthJsonRequest(
+                6L,
+                "weak-codex",
+                null,
+                "codex-access-only-secret",
+                null,
+                "{\"access_token\":\"codex-access-only-secret\"}",
+                true,
+                null,
+                null,
+                null,
+                List.of("gpt-5.4"),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+        ));
+
+        assertEquals(72L, response.id());
+        assertTrue(response.externalAccountId().startsWith("codex:weak-token:"));
+        Mockito.verify(accountRepository, Mockito.never()).findAllByProviderTypeOrderByUpdatedAtDesc(UpstreamAccountProviderType.CODEX_OAUTH);
+    }
+
+    @Test
     void shouldMarkManualRefreshResultWithoutChangingSecrets() {
         UpstreamAccountRepository accountRepository = Mockito.mock(UpstreamAccountRepository.class);
         UpstreamAccountPoolRepository poolRepository = Mockito.mock(UpstreamAccountPoolRepository.class);
@@ -131,6 +276,51 @@ class AccountAdminServiceTests {
         assertEquals("enc:access", entity.getAccessTokenCiphertext());
         assertEquals("enc:refresh", entity.getRefreshTokenCiphertext());
         Mockito.verify(refreshService).refreshAccount(7L);
+    }
+
+    @Test
+    void shouldResetRuntimeFailureStateWithoutChangingSecrets() {
+        UpstreamAccountRepository accountRepository = Mockito.mock(UpstreamAccountRepository.class);
+        UpstreamAccountPoolRepository poolRepository = Mockito.mock(UpstreamAccountPoolRepository.class);
+        CredentialCryptoService cryptoService = Mockito.mock(CredentialCryptoService.class);
+        SupportedModelCatalogService modelCatalogService = Mockito.mock(SupportedModelCatalogService.class);
+        OAuthSessionRefreshService refreshService = Mockito.mock(OAuthSessionRefreshService.class);
+        AccountAdminService service = new AccountAdminService(
+                accountRepository,
+                poolRepository,
+                cryptoService,
+                modelCatalogService,
+                refreshService,
+                new ObjectMapper()
+        );
+        UpstreamAccountEntity entity = new UpstreamAccountEntity();
+        ReflectionTestUtils.setField(entity, "id", 17L);
+        entity.setAccountName("codex-runtime");
+        entity.setProviderType(UpstreamAccountProviderType.CODEX_OAUTH);
+        entity.setFrozen(true);
+        entity.setHealthy(false);
+        entity.setLastErrorMessage("model temporary unavailable");
+        entity.setRefreshFailureCount(4);
+        entity.setRefreshStatus("QUOTA_FAILED");
+        entity.setCooldownUntil(Instant.parse("2026-05-07T10:00:00Z"));
+        entity.setNextRefreshAfter(Instant.parse("2026-05-07T10:05:00Z"));
+        entity.setAccessTokenCiphertext("enc:access");
+        entity.setRefreshTokenCiphertext("enc:refresh");
+        Mockito.when(accountRepository.findById(17L)).thenReturn(Optional.of(entity));
+        Mockito.when(accountRepository.save(Mockito.any())).thenAnswer(invocation -> invocation.getArgument(0));
+        Mockito.when(modelCatalogService.normalize(Mockito.anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpstreamAccountResponse response = service.resetRuntime(17L);
+
+        assertEquals("READY", response.refreshStatus());
+        assertEquals(0, response.refreshFailureCount());
+        assertTrue(response.healthy());
+        assertEquals(false, response.frozen());
+        assertNull(entity.getCooldownUntil());
+        assertNull(entity.getNextRefreshAfter());
+        assertNull(entity.getLastErrorMessage());
+        assertEquals("enc:access", entity.getAccessTokenCiphertext());
+        assertEquals("enc:refresh", entity.getRefreshTokenCiphertext());
     }
 
     @Test
@@ -183,5 +373,25 @@ class AccountAdminServiceTests {
         assertEquals("coder@example.com", identity.identityEmail());
         assertTrue(identity.routeEligible());
         assertEquals(10_000L, identity.quotaRemainingTokens());
+    }
+
+    private String codexAuthJson(String accessToken, String refreshToken, String accountId) {
+        return """
+                {
+                  "auth_mode": "login",
+                  "tokens": {
+                    "access_token": "%s",
+                    "refresh_token": "%s",
+                    "account_id": "%s",
+                    "expires_at": "2026-05-08T01:00:00Z"
+                  },
+                  "profile": {
+                    "email": "codex-test@example.com"
+                  },
+                  "headers": {
+                    "authorization": "Bearer abcdefghijklmnopqrstuvwxyz"
+                  }
+                }
+                """.formatted(accessToken, refreshToken, accountId);
     }
 }

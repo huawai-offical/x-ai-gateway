@@ -93,6 +93,9 @@ import reactor.core.publisher.Mono;
 @Transactional
 public class GatewayAsyncResourceService {
 
+    private static final int DEFAULT_LIST_LIMIT = 20;
+    private static final int MAX_LIST_LIMIT = 100;
+
     private final GatewayAsyncResourceRepository gatewayAsyncResourceRepository;
     private final DistributedKeyQueryService distributedKeyQueryService;
     private final UpstreamCredentialRepository upstreamCredentialRepository;
@@ -148,7 +151,10 @@ public class GatewayAsyncResourceService {
         this.objectMapper = objectMapper;
         this.clock = clock;
         this.webClientBuilder = webClientBuilder;
-        this.mediaProviderAdapters = List.of(new GeminiVeoMediaProviderAdapter(objectMapper, clock));
+        this.mediaProviderAdapters = List.of(
+                new GeminiVeoMediaProviderAdapter(objectMapper, clock),
+                new SunoMusicMediaProviderAdapter(objectMapper, clock)
+        );
     }
 
     public GatewayAsyncResourceService(
@@ -296,6 +302,7 @@ public class GatewayAsyncResourceService {
 
     public JsonNode deleteResponse(String responseId, Long distributedKeyId) {
         GatewayAsyncResourceEntity entity = getRequired(responseId, GatewayAsyncResourceType.RESPONSE, distributedKeyId);
+        assertStoredResponse(entity);
         entity.setDeleted(true);
         entity.setStatus("deleted");
         entity.setMetadataJson(writeJson(appendEvent(readObject(entity.getMetadataJson()), "deleted", "deleted")));
@@ -303,9 +310,339 @@ public class GatewayAsyncResourceService {
 
         ObjectNode payload = objectMapper.createObjectNode();
         payload.put("id", responseId);
-        payload.put("object", "response.deleted");
+        payload.put("object", "response");
         payload.put("deleted", true);
         return payload;
+    }
+
+    public JsonNode cancelResponse(String responseId, Long distributedKeyId) {
+        GatewayAsyncResourceEntity entity = getRequired(responseId, GatewayAsyncResourceType.RESPONSE, distributedKeyId);
+        ObjectNode response = assertStoredResponse(entity);
+        String status = entity.getStatus() == null ? response.path("status").asText("completed") : entity.getStatus();
+        if ("cancelled".equalsIgnoreCase(status) || "canceled".equalsIgnoreCase(status)) {
+            return response;
+        }
+        if (!readObject(entity.getRequestPayloadJson()).path("background").asBoolean(false)) {
+            throw new IllegalArgumentException("只有 background=true 的 Response 支持取消。");
+        }
+        if (isTerminalResponseStatus(status)) {
+            throw new IllegalArgumentException("已完成的 Response 不允许取消。");
+        }
+        entity.setStatus("cancelled");
+        response.put("status", "cancelled");
+        response.put("cancelled_at", now().getEpochSecond());
+        entity.setResponsePayloadJson(writeJson(response));
+        entity.setMetadataJson(writeJson(appendEvent(readObject(entity.getMetadataJson()), "cancelled", "cancelled")));
+        gatewayAsyncResourceRepository.save(entity);
+        return response;
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode listResponseInputItems(String responseId, Long distributedKeyId, String after, Integer limit, String order) {
+        GatewayAsyncResourceEntity entity = getRequired(responseId, GatewayAsyncResourceType.RESPONSE, distributedKeyId);
+        assertStoredResponse(entity);
+        int pageSize = normalizeListLimit(limit);
+        String normalizedOrder = normalizeResponseInputItemsOrder(order);
+        List<JsonNode> ordered = responseInputItems(responseId, readObject(entity.getRequestPayloadJson()).path("input"));
+        if ("desc".equals(normalizedOrder)) {
+            java.util.Collections.reverse(ordered);
+        }
+        if (after != null && !after.isBlank()) {
+            int cursor = -1;
+            for (int index = 0; index < ordered.size(); index++) {
+                if (after.equals(ordered.get(index).path("id").asText())) {
+                    cursor = index;
+                    break;
+                }
+            }
+            ordered = cursor < 0 ? List.of() : ordered.subList(cursor + 1, ordered.size());
+        }
+
+        boolean hasMore = ordered.size() > pageSize;
+        List<JsonNode> page = ordered.stream().limit(pageSize).toList();
+        var data = objectMapper.createArrayNode();
+        page.forEach(data::add);
+
+        ObjectNode response = objectMapper.createObjectNode();
+        response.put("object", "list");
+        response.set("data", data);
+        response.put("has_more", hasMore);
+        if (!page.isEmpty()) {
+            response.put("first_id", page.getFirst().path("id").asText());
+            response.put("last_id", page.getLast().path("id").asText());
+        }
+        return response;
+    }
+
+    public JsonNode storeChatCompletion(Long distributedKeyId, String requestModel, JsonNode requestPayload, JsonNode responsePayload) {
+        String resourceKey = "chatcmpl_" + UUID.randomUUID().toString().replace("-", "");
+        ObjectNode storedResponse = copyObject(responsePayload);
+        storedResponse.put("id", resourceKey);
+        storedResponse.put("object", "chat.completion");
+        if (!storedResponse.has("status")) {
+            storedResponse.put("status", "completed");
+        }
+
+        ObjectNode metadata = objectMapper.createObjectNode();
+        metadata.put("object_mode", "gateway_stored_chat_completion");
+        appendEvent(metadata, "stored", storedResponse.path("status").asText("completed"));
+
+        GatewayAsyncResourceEntity entity = new GatewayAsyncResourceEntity();
+        entity.setResourceKey(resourceKey);
+        entity.setDistributedKeyId(distributedKeyId);
+        entity.setResourceType(GatewayAsyncResourceType.RESPONSE);
+        entity.setRequestModel(requestModel);
+        entity.setStatus(storedResponse.path("status").asText("completed"));
+        entity.setRequestPayloadJson(writeJson(requestPayload));
+        entity.setResponsePayloadJson(writeJson(storedResponse));
+        entity.setMetadataJson(writeJson(metadata));
+        gatewayAsyncResourceRepository.save(entity);
+        return storedResponse;
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode listChatCompletions(
+            Long distributedKeyId,
+            String after,
+            Integer limit,
+            String model,
+            String order,
+            Map<String, String> metadataFilter) {
+        int pageSize = normalizeListLimit(limit);
+        String normalizedOrder = normalizeListOrder(order);
+        int scanSize = Math.max(100, pageSize * 5);
+        List<GatewayAsyncResourceEntity> entities = gatewayAsyncResourceRepository.search(
+                distributedKeyId,
+                GatewayAsyncResourceType.RESPONSE,
+                null,
+                PageRequest.of(0, scanSize));
+
+        List<JsonNode> matching = entities.stream()
+                .<JsonNode>map(entity -> readObject(entity.getResponsePayloadJson()))
+                .filter(response -> "chat.completion".equals(response.path("object").asText()))
+                .filter(response -> model == null || model.isBlank() || model.equals(response.path("model").asText()))
+                .filter(response -> metadataMatches(response.path("metadata"), metadataFilter))
+                .toList();
+
+        List<JsonNode> ordered = new ArrayList<>(matching);
+        if ("asc".equals(normalizedOrder)) {
+            java.util.Collections.reverse(ordered);
+        }
+        if (after != null && !after.isBlank()) {
+            int cursor = -1;
+            for (int index = 0; index < ordered.size(); index++) {
+                if (after.equals(ordered.get(index).path("id").asText())) {
+                    cursor = index;
+                    break;
+                }
+            }
+            ordered = cursor < 0 ? List.of() : ordered.subList(cursor + 1, ordered.size());
+        }
+
+        boolean hasMore = ordered.size() > pageSize;
+        List<JsonNode> page = ordered.stream().limit(pageSize).toList();
+        var data = objectMapper.createArrayNode();
+        page.forEach(data::add);
+
+        ObjectNode response = objectMapper.createObjectNode();
+        response.put("object", "list");
+        response.set("data", data);
+        response.put("has_more", hasMore);
+        if (!page.isEmpty()) {
+            response.put("first_id", page.getFirst().path("id").asText());
+            response.put("last_id", page.getLast().path("id").asText());
+        }
+        return response;
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode getChatCompletion(String completionId, Long distributedKeyId) {
+        GatewayAsyncResourceEntity entity = getRequired(completionId, GatewayAsyncResourceType.RESPONSE, distributedKeyId);
+        ObjectNode response = readObject(entity.getResponsePayloadJson());
+        if (!"chat.completion".equals(response.path("object").asText())) {
+            throw new IllegalArgumentException("未找到 stored Chat Completion。");
+        }
+        return response;
+    }
+
+    public JsonNode updateChatCompletionMetadata(String completionId, Long distributedKeyId, JsonNode metadataPatch) {
+        GatewayAsyncResourceEntity entity = getRequired(completionId, GatewayAsyncResourceType.RESPONSE, distributedKeyId);
+        ObjectNode response = readObject(entity.getResponsePayloadJson());
+        if (!"chat.completion".equals(response.path("object").asText())) {
+            throw new IllegalArgumentException("未找到 stored Chat Completion。");
+        }
+        if (metadataPatch == null || metadataPatch.isMissingNode() || metadataPatch.isNull()) {
+            response.set("metadata", objectMapper.createObjectNode());
+        } else if (metadataPatch.isObject()) {
+            response.set("metadata", metadataPatch.deepCopy());
+        } else {
+            throw new IllegalArgumentException("metadata 必须是 JSON object 或 null。");
+        }
+        entity.setResponsePayloadJson(writeJson(response));
+        entity.setMetadataJson(writeJson(appendEvent(readObject(entity.getMetadataJson()), "metadata_updated", entity.getStatus())));
+        gatewayAsyncResourceRepository.save(entity);
+        return response;
+    }
+
+    public JsonNode deleteChatCompletion(String completionId, Long distributedKeyId) {
+        GatewayAsyncResourceEntity entity = getRequired(completionId, GatewayAsyncResourceType.RESPONSE, distributedKeyId);
+        ObjectNode response = readObject(entity.getResponsePayloadJson());
+        if (!"chat.completion".equals(response.path("object").asText())) {
+            throw new IllegalArgumentException("未找到 stored Chat Completion。");
+        }
+        entity.setDeleted(true);
+        entity.setStatus("deleted");
+        entity.setMetadataJson(writeJson(appendEvent(readObject(entity.getMetadataJson()), "deleted", "deleted")));
+        gatewayAsyncResourceRepository.save(entity);
+
+        ObjectNode payload = objectMapper.createObjectNode();
+        payload.put("id", completionId);
+        payload.put("object", "chat.completion.deleted");
+        payload.put("deleted", true);
+        return payload;
+    }
+
+    @Transactional(readOnly = true)
+    public JsonNode listChatCompletionMessages(String completionId, Long distributedKeyId, String after, Integer limit, String order) {
+        GatewayAsyncResourceEntity entity = getRequired(completionId, GatewayAsyncResourceType.RESPONSE, distributedKeyId);
+        ObjectNode responsePayload = readObject(entity.getResponsePayloadJson());
+        if (!"chat.completion".equals(responsePayload.path("object").asText())) {
+            throw new IllegalArgumentException("未找到 stored Chat Completion。");
+        }
+        JsonNode messages = readObject(entity.getRequestPayloadJson()).path("messages");
+        List<JsonNode> ordered = new ArrayList<>();
+        if (messages.isArray()) {
+            for (JsonNode message : messages) {
+                ordered.add(message.deepCopy());
+            }
+        }
+        String normalizedOrder = normalizeListOrder(order);
+        if ("desc".equals(normalizedOrder)) {
+            java.util.Collections.reverse(ordered);
+        }
+        if (after != null && !after.isBlank()) {
+            int cursor = -1;
+            for (int index = 0; index < ordered.size(); index++) {
+                if (after.equals(ordered.get(index).path("id").asText())) {
+                    cursor = index;
+                    break;
+                }
+            }
+            ordered = cursor < 0 ? List.of() : ordered.subList(cursor + 1, ordered.size());
+        }
+
+        int pageSize = normalizeListLimit(limit);
+        boolean hasMore = ordered.size() > pageSize;
+        List<JsonNode> page = ordered.stream().limit(pageSize).toList();
+        var data = objectMapper.createArrayNode();
+        page.forEach(data::add);
+
+        ObjectNode response = objectMapper.createObjectNode();
+        response.put("object", "list");
+        response.set("data", data);
+        response.put("has_more", hasMore);
+        if (!page.isEmpty()) {
+            response.put("first_id", page.getFirst().path("id").asText());
+            response.put("last_id", page.getLast().path("id").asText());
+        }
+        return response;
+    }
+
+    private boolean metadataMatches(JsonNode metadata, Map<String, String> metadataFilter) {
+        if (metadataFilter == null || metadataFilter.isEmpty()) {
+            return true;
+        }
+        if (metadata == null || !metadata.isObject()) {
+            return false;
+        }
+        return metadataFilter.entrySet().stream()
+                .allMatch(entry -> entry.getValue().equals(metadata.path(entry.getKey()).asText(null)));
+    }
+
+    private ObjectNode assertStoredResponse(GatewayAsyncResourceEntity entity) {
+        ObjectNode response = readObject(entity.getResponsePayloadJson());
+        if (!"response".equals(response.path("object").asText())) {
+            throw new IllegalArgumentException("未找到 stored Response。");
+        }
+        return response;
+    }
+
+    private boolean isTerminalResponseStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return false;
+        }
+        String normalized = status.trim().toLowerCase(Locale.ROOT);
+        return "completed".equals(normalized)
+                || "failed".equals(normalized)
+                || "cancelled".equals(normalized)
+                || "canceled".equals(normalized)
+                || "deleted".equals(normalized);
+    }
+
+    private List<JsonNode> responseInputItems(String responseId, JsonNode input) {
+        if (input == null || input.isMissingNode() || input.isNull()) {
+            return List.of();
+        }
+        List<JsonNode> items = new ArrayList<>();
+        if (input.isArray()) {
+            int index = 0;
+            for (JsonNode item : input) {
+                items.add(responseInputItem(responseId, item, index++));
+            }
+            return items;
+        }
+        return List.of(responseInputItem(responseId, input, 0));
+    }
+
+    private JsonNode responseInputItem(String responseId, JsonNode item, int index) {
+        ObjectNode normalized;
+        if (item != null && item.isObject()) {
+            normalized = copyObject(item);
+            if (!normalized.has("type") && normalized.has("role")) {
+                normalized.put("type", "message");
+            }
+        } else {
+            normalized = objectMapper.createObjectNode();
+            normalized.put("type", "message");
+            normalized.put("role", "user");
+            var content = objectMapper.createArrayNode();
+            content.add(objectMapper.createObjectNode()
+                    .put("type", "input_text")
+                    .put("text", item == null || item.isNull() ? "" : item.asText()));
+            normalized.set("content", content);
+        }
+        if (!normalized.has("id") || normalized.path("id").asText().isBlank()) {
+            normalized.put("id", "msg_" + responseId + "_" + index);
+        }
+        return normalized;
+    }
+
+    private String normalizeResponseInputItemsOrder(String order) {
+        if (order == null || order.isBlank()) {
+            return "desc";
+        }
+        return normalizeListOrder(order);
+    }
+
+    private int normalizeListLimit(Integer limit) {
+        if (limit == null) {
+            return DEFAULT_LIST_LIMIT;
+        }
+        if (limit < 1 || limit > MAX_LIST_LIMIT) {
+            throw new IllegalArgumentException("limit 必须在 1 到 100 之间。");
+        }
+        return limit;
+    }
+
+    private String normalizeListOrder(String order) {
+        if (order == null || order.isBlank()) {
+            return "asc";
+        }
+        String normalized = order.trim().toLowerCase();
+        if ("asc".equals(normalized) || "desc".equals(normalized)) {
+            return normalized;
+        }
+        throw new IllegalArgumentException("order 必须是 asc 或 desc。");
     }
 
     public JsonNode createUpload(Long distributedKeyId, JsonNode requestBody) {
@@ -526,7 +863,7 @@ public class GatewayAsyncResourceService {
     public JsonNode mediaProviderMatrix() {
         ObjectNode root = objectMapper.createObjectNode();
         root.put("object", "gateway.media_provider_matrix");
-        root.put("version", "2026-05-06");
+        root.put("version", "2026-05-14");
         root.put("generated_at", now().getEpochSecond());
         var video = root.putArray("video");
         video.add(mediaProviderMatrixItem(
@@ -543,7 +880,10 @@ public class GatewayAsyncResourceService {
                 "SUPPORTED",
                 "provider_specific_adapter",
                 "Gemini Veo provider adapter",
-                "支持 provider_mode=adapter 的 create/get/cancel/download 本地生命周期；真实 smoke 需环境变量注入凭证。"
+                "支持 provider_mode=adapter 的 create/get/cancel/download 本地生命周期；真实 smoke 需环境变量注入凭证。",
+                "video_generation",
+                "operator_configured_gemini_veo_pricing",
+                "设置 XAG_SMOKE_GEMINI=true 与 Gemini key 后执行真实 smoke；默认跳过。"
         ));
         video.add(mediaProviderMatrixItem(
                 "minimax",
@@ -574,10 +914,13 @@ public class GatewayAsyncResourceService {
         music.add(mediaProviderMatrixItem(
                 "suno",
                 "Suno-like Music",
-                "ADAPTER_REQUIRED",
-                "provider_specific_adapter_required",
-                "Suno task API",
-                "可通过兼容层接入，专有 API 需要签名、轮询和产物映射适配。"
+                "SUPPORTED",
+                "provider_specific_adapter",
+                "Suno Music provider adapter",
+                "支持 provider_mode=adapter, provider_family=suno 的 create/get/cancel/download 本地生命周期；真实 smoke 仅在显式环境变量启用时访问远端。",
+                "music_generation",
+                "operator_configured_suno_music_pricing",
+                "设置 XAG_SMOKE_SUNO=true、XAG_SMOKE_SUNO_BASE_URL 与 Suno key 后执行真实 smoke；默认跳过。"
         ));
         music.add(mediaProviderMatrixItem(
                 "minimax",
@@ -1674,6 +2017,19 @@ public class GatewayAsyncResourceService {
             String supportTier,
             String nativePath,
             String note) {
+        return mediaProviderMatrixItem(providerFamily, displayName, supportStatus, supportTier, nativePath, note, null, null, null);
+    }
+
+    private ObjectNode mediaProviderMatrixItem(
+            String providerFamily,
+            String displayName,
+            String supportStatus,
+            String supportTier,
+            String nativePath,
+            String note,
+            String capability,
+            String pricingSource,
+            String smokeHint) {
         ObjectNode item = objectMapper.createObjectNode();
         item.put("provider_family", providerFamily);
         item.put("display_name", displayName);
@@ -1681,6 +2037,9 @@ public class GatewayAsyncResourceService {
         item.put("support_tier", supportTier);
         item.put("native_path", nativePath);
         item.put("note", note);
+        putIfPresent(item, "capability", capability);
+        putIfPresent(item, "pricing_source", pricingSource);
+        putIfPresent(item, "smoke_hint", smokeHint);
         return item;
     }
 

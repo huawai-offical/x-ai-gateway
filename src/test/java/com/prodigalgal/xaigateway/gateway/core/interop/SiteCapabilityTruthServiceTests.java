@@ -276,6 +276,31 @@ class SiteCapabilityTruthServiceTests {
     }
 
     @Test
+    void shouldTreatPerplexityAsDedicatedWebSearchAdapterOnly() {
+        SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        Mockito.when(repository.findBySiteProfile_Id(16L)).thenReturn(Optional.of(snapshot(false, false, false, false, false, false, false, false, false, false)));
+        Mockito.when(repository.findBySiteProfile_Id(17L)).thenReturn(Optional.of(snapshot(true, true, false, false, false, false, false, false, false, false)));
+        SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
+
+        CatalogCandidateView perplexity = candidate(16L, ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.PERPLEXITY);
+        CatalogCandidateView generic = candidate(17L, ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC);
+        GatewayRequestSemantics webSearch = new GatewayRequestSemantics(
+                TranslationResourceType.WEB_SEARCH,
+                TranslationOperation.WEB_SEARCH_CREATE,
+                List.of(InteropFeature.WEB_SEARCH),
+                true
+        );
+
+        FeatureCompatibilityReport perplexityReport = service.evaluate(perplexity, webSearch);
+        FeatureCompatibilityReport genericReport = service.evaluate(generic, webSearch);
+
+        assertEquals(SupportStatus.NATIVE, perplexityReport.supportStatus());
+        assertEquals(ExecutionKind.NATIVE, perplexityReport.executionKind());
+        assertEquals(SupportStatus.BLOCKED, genericReport.supportStatus());
+        assertTrue(genericReport.blockedReasons().stream().anyMatch(item -> item.contains("web_search")));
+    }
+
+    @Test
     void shouldTreatVertexChatAndEmbeddingsAsNative() {
         SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
         Mockito.when(repository.findBySiteProfile_Id(8L)).thenReturn(Optional.of(snapshot(false, true, true, true, true, true, false, true, true, false)));

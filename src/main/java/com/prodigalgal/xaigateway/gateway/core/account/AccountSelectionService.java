@@ -78,13 +78,22 @@ public class AccountSelectionService {
     }
 
     public Optional<UpstreamAccountEntity> resolveActiveAccount(Long distributedKeyId, ProviderType providerType, GatewayClientFamily clientFamily, int stickyTtlSeconds) {
+        return resolveActiveAccount(distributedKeyId, providerType, clientFamily, stickyTtlSeconds, null);
+    }
+
+    public Optional<UpstreamAccountEntity> resolveActiveAccount(
+            Long distributedKeyId,
+            ProviderType providerType,
+            GatewayClientFamily clientFamily,
+            int stickyTtlSeconds,
+            String sessionAffinityKey) {
         List<DistributedKeyAccountPoolBindingEntity> bindings = distributedKeyAccountPoolBindingRepository
                 .findAllByDistributedKey_IdAndProviderTypeAndActiveTrueOrderByPriorityAscCreatedAtAsc(distributedKeyId, providerType);
         if (bindings.isEmpty()) {
             return Optional.empty();
         }
 
-        String stickyKey = stickyKey(distributedKeyId, providerType, clientFamily);
+        String stickyKey = stickyKey(distributedKeyId, providerType, clientFamily, sessionAffinityKey);
         String stickyAccountId = stringRedisTemplate.opsForValue().get(stickyKey);
         if (stickyAccountId != null) {
             Optional<UpstreamAccountEntity> sticky = upstreamAccountRepository.findById(Long.parseLong(stickyAccountId))
@@ -138,7 +147,15 @@ public class AccountSelectionService {
         return governancePolicyEngine.evaluate(context).allowed();
     }
 
-    private String stickyKey(Long distributedKeyId, ProviderType providerType, GatewayClientFamily clientFamily) {
-        return "xag:account:sticky:" + distributedKeyId + ":" + providerType.name() + ":" + clientFamily.name();
+    private String stickyKey(
+            Long distributedKeyId,
+            ProviderType providerType,
+            GatewayClientFamily clientFamily,
+            String sessionAffinityKey) {
+        String base = "xag:account:sticky:" + distributedKeyId + ":" + providerType.name() + ":" + clientFamily.name();
+        if (sessionAffinityKey == null || sessionAffinityKey.isBlank()) {
+            return base;
+        }
+        return base + ":session:" + sessionAffinityKey.trim();
     }
 }

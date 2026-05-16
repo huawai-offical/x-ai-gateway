@@ -56,6 +56,8 @@ class ProviderExecutionSupportServiceTests {
         assertEquals("gpt-4o", prepared.options().getModel());
         assertEquals("PREFIX_AFFINITY", prepared.options().getMetadata().get("gateway.selection_source"));
         assertEquals(1, prepared.options().getTools().size());
+        assertEquals("lookup_weather", prepared.options().getTools().getFirst().getFunction().getName());
+        assertEquals("Lookup weather", prepared.options().getTools().getFirst().getFunction().getDescription());
         assertEquals("auto", prepared.options().getToolChoice());
     }
 

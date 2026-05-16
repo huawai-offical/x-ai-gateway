@@ -332,6 +332,29 @@ class ExecutionSupportMatrixServiceTests {
         );
     }
 
+    @Test
+    void shouldOnlyExposeWebSearchForOpenAiAndPerplexityAdapters() {
+        GatewayRequestSemantics webSearchSemantics = new GatewayRequestSemantics(
+                TranslationResourceType.WEB_SEARCH,
+                TranslationOperation.WEB_SEARCH_CREATE,
+                List.of(InteropFeature.WEB_SEARCH),
+                true
+        );
+
+        assertEquals(
+                InteropCapabilityLevel.NATIVE,
+                service.implementedLevel(openAiCandidate(ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT), webSearchSemantics, InteropFeature.WEB_SEARCH)
+        );
+        assertEquals(
+                InteropCapabilityLevel.NATIVE,
+                service.implementedLevel(openAiCandidate(ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.PERPLEXITY), webSearchSemantics, InteropFeature.WEB_SEARCH)
+        );
+        assertEquals(
+                InteropCapabilityLevel.UNSUPPORTED,
+                service.implementedLevel(openAiCandidate(ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC), webSearchSemantics, InteropFeature.WEB_SEARCH)
+        );
+    }
+
     private CatalogCandidateView geminiCandidate(UpstreamSiteKind siteKind) {
         return new CatalogCandidateView(
                 101L,

@@ -49,7 +49,7 @@
 - 已读取 Linear 项目 `x-ai-gateway V1 多协议 AI 网关` 的全部当前可见 issue，共 `180` 条。
 - 已将 Linear 全量 issue 清单落地为：[LINEAR-20260505](../migrations/LINEAR-20260505-x-ai-gateway-issue-archive.md)。
 - 已新增历史归档任务：[TASK-20260505-002](../../tasks/done/TASK-20260505-002-linear-all-issue-history-archive.md)。
-- 已将唯一仍为 Backlog 的 X-263 拆成本地任务：[TASK-20260505-003](../../tasks/backlog/TASK-20260505-003-linear-x263-second-gap-overview.md)。
+- 已将唯一仍为 Backlog 的 X-263 拆成本地任务，并已闭环归档：[TASK-20260505-003](../../tasks/done/TASK-20260505-003-linear-x263-second-gap-overview.md)。
 
 ## 验证情况
 

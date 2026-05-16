@@ -19,6 +19,7 @@ public class TraceIdWebFilter implements WebFilter {
         String traceId = resolveTraceId(exchange);
         exchange.getAttributes().put(TRACE_ID_ATTRIBUTE, traceId);
         exchange.getResponse().getHeaders().set(TRACE_ID_HEADER, traceId);
+        exchange.getResponse().getHeaders().set(REQUEST_ID_HEADER, traceId);
         return chain.filter(exchange);
     }
 

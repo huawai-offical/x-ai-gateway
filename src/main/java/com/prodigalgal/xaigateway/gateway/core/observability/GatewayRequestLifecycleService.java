@@ -5,6 +5,7 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequestMetadata;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceResponse;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
@@ -100,7 +101,7 @@ public class GatewayRequestLifecycleService {
             CanonicalRequest request,
             boolean stream,
             Instant startedAt) {
-        startRequest(requestId, selectionResult, request.requestPath(), null, null, null, null, null, null, null, stream, startedAt);
+        startRequest(requestId, selectionResult, request.requestPath(), null, null, null, null, null, null, null, request.metadata(), stream, startedAt);
     }
 
     public void startRequest(
@@ -121,6 +122,7 @@ public class GatewayRequestLifecycleService {
                 plan == null ? null : plan.degradationLevel() == null ? null : plan.degradationLevel().name(),
                 plan == null ? null : plan.objectMode(),
                 gatewayResourceKey(request, plan, null),
+                null,
                 stream,
                 startedAt
         );
@@ -185,6 +187,7 @@ public class GatewayRequestLifecycleService {
             String degradationLevel,
             String objectMode,
             String gatewayResourceKey,
+            CanonicalRequestMetadata metadata,
             boolean stream,
             Instant startedAt) {
         GatewayObservabilityAsyncPersistenceService.RequestLogSnapshot snapshot =
@@ -192,6 +195,11 @@ public class GatewayRequestLifecycleService {
                         requestId,
                         selectionResult.distributedKeyId(),
                         selectionResult.distributedKeyPrefix(),
+                        clientFamily(metadata, selectionResult),
+                        metadata == null ? null : metadata.clientInstance(),
+                        metadata == null ? null : metadata.workspaceHint(),
+                        metadata == null ? null : metadata.sessionAffinitySource(),
+                        metadata == null ? selectionResult.sessionAffinityKey() : metadata.sessionAffinityKey(),
                         selectionResult.protocol(),
                         requestPath,
                         resourceType,
@@ -705,6 +713,21 @@ public class GatewayRequestLifecycleService {
         entity.setRequestId(snapshot.requestId());
         entity.setDistributedKeyId(snapshot.distributedKeyId());
         entity.setDistributedKeyPrefix(snapshot.distributedKeyPrefix());
+        if (snapshot.clientFamily() != null) {
+            entity.setClientFamily(snapshot.clientFamily());
+        }
+        if (snapshot.clientInstance() != null) {
+            entity.setClientInstance(snapshot.clientInstance());
+        }
+        if (snapshot.workspaceHint() != null) {
+            entity.setWorkspaceHint(snapshot.workspaceHint());
+        }
+        if (snapshot.sessionAffinitySource() != null) {
+            entity.setSessionAffinitySource(snapshot.sessionAffinitySource());
+        }
+        if (snapshot.sessionAffinityKey() != null) {
+            entity.setSessionAffinityKey(snapshot.sessionAffinityKey());
+        }
         entity.setProtocol(snapshot.protocol());
         entity.setRequestPath(snapshot.requestPath());
         entity.setResourceType(snapshot.resourceType());
@@ -781,6 +804,13 @@ public class GatewayRequestLifecycleService {
                 .filter(value -> value != null && !value.isBlank())
                 .findFirst()
                 .orElse(null);
+    }
+
+    private String clientFamily(CanonicalRequestMetadata metadata, RouteSelectionResult selectionResult) {
+        if (metadata != null && metadata.clientFamily() != null && !metadata.clientFamily().isBlank()) {
+            return metadata.clientFamily();
+        }
+        return selectionResult == null || selectionResult.clientFamily() == null ? null : selectionResult.clientFamily().name();
     }
 
     private boolean supportsGatewayResourceKey(TranslationResourceType resourceType) {

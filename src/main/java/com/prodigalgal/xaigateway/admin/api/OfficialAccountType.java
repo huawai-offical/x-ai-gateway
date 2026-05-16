@@ -8,7 +8,7 @@ public enum OfficialAccountType {
             UpstreamAccountProviderType.CODEX_OAUTH,
             "CODEX",
             "codex",
-            List.of("gpt-4.1", "o4-mini"),
+            List.of("gpt-5.4@low", "gpt-5.4-mini@low", "gpt-5.4-nano@low"),
             "OFFICIAL",
             86_400,
             2_000_000L,

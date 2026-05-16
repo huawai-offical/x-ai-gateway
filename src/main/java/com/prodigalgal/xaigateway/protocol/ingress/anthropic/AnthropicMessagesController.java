@@ -50,10 +50,11 @@ public class AnthropicMessagesController {
     public ResponseEntity<?> createMessage(
             @RequestHeader(API_KEY_HEADER) String apiKey,
             @RequestHeader(value = CLIENT_FAMILY_HEADER, required = false) String explicitClientFamily,
+            @RequestHeader(value = "anthropic-beta", required = false) String anthropicBeta,
             @RequestHeader(value = "User-Agent", required = false) String userAgent,
             @Valid @RequestBody AnthropicMessagesRequest request) {
         AuthenticatedDistributedKey distributedKey = distributedKeyAuthenticationService.authenticateRawToken(apiKey);
-        CanonicalRequest canonicalRequest = anthropicMessagesRequestMapper.toCanonicalRequest(distributedKey, request);
+        CanonicalRequest canonicalRequest = anthropicMessagesRequestMapper.toCanonicalRequest(distributedKey, request, anthropicBeta);
         GatewayClientFamily clientFamily = gatewayClientFamilyResolver.resolve(explicitClientFamily, userAgent);
 
         if (Boolean.TRUE.equals(request.stream())) {

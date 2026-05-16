@@ -17,11 +17,99 @@ public record OpenAiChatCompletionRequest(
         JsonNode reasoning,
         @JsonProperty("reasoning_effort")
         String reasoningEffort,
+        Boolean store,
+        JsonNode metadata,
+        @JsonProperty("frequency_penalty")
+        Double frequencyPenalty,
+        @JsonProperty("logit_bias")
+        JsonNode logitBias,
+        Boolean logprobs,
+        @JsonProperty("top_logprobs")
+        Integer topLogprobs,
         Double temperature,
+        @JsonProperty("top_p")
+        Double topP,
         @JsonProperty("max_tokens")
         Integer maxTokens,
+        @JsonProperty("max_completion_tokens")
+        Integer maxCompletionTokens,
+        Integer n,
+        JsonNode modalities,
+        JsonNode audio,
+        @JsonProperty("presence_penalty")
+        Double presencePenalty,
+        @JsonProperty("response_format")
+        JsonNode responseFormat,
+        Integer seed,
+        @JsonProperty("service_tier")
+        String serviceTier,
+        JsonNode stop,
+        @JsonProperty("stream_options")
+        JsonNode streamOptions,
+        @JsonProperty("parallel_tool_calls")
+        Boolean parallelToolCalls,
+        String user,
+        @JsonProperty("web_search_options")
+        JsonNode webSearchOptions,
+        String verbosity,
+        @JsonProperty("prompt_cache_key")
+        String promptCacheKey,
+        @JsonProperty("safety_identifier")
+        String safetyIdentifier,
+        JsonNode prediction,
+        JsonNode functions,
+        @JsonProperty("function_call")
+        JsonNode functionCall,
         Boolean stream
 ) {
+    public OpenAiChatCompletionRequest(
+            String model,
+            List<Message> messages,
+            List<Tool> tools,
+            JsonNode toolChoice,
+            JsonNode reasoning,
+            String reasoningEffort,
+            Double temperature,
+            Integer maxTokens,
+            Boolean stream) {
+        this(
+                model,
+                messages,
+                tools,
+                toolChoice,
+                reasoning,
+                reasoningEffort,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                temperature,
+                null,
+                maxTokens,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                stream
+        );
+    }
 
     public record Message(
             @NotBlank(message = "role 不能为空。")

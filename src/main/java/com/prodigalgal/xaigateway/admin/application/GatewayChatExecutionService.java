@@ -27,6 +27,7 @@ import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalMessage;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalMessageRole;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalPartType;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequestMetadata;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResponse;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEvent;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolCall;
@@ -262,7 +263,8 @@ public class GatewayChatExecutionService {
                 filteredRequest.requestedModel(),
                 routeBody,
                 effectiveClientFamily,
-                true
+                true,
+                sessionAffinityKey(filteredRequest)
         ));
         GatewayRequestSemantics semantics = gatewayRequestFeatureService.describe(filteredRequest.requestPath(), routeBody);
         gatewayRequestLifecycleService.startRequest(requestId, selectionResult, filteredRequest, false, startedAt);
@@ -395,7 +397,8 @@ public class GatewayChatExecutionService {
                 filteredRequest.requestedModel(),
                 routeBody,
                 effectiveClientFamily,
-                true
+                true,
+                sessionAffinityKey(filteredRequest)
         ));
         GatewayRequestSemantics semantics = gatewayRequestFeatureService.describe(filteredRequest.requestPath(), routeBody);
         gatewayRequestLifecycleService.startRequest(requestId, selectionResult, filteredRequest, true, startedAt);
@@ -975,7 +978,34 @@ public class GatewayChatExecutionService {
             }
         }
 
+        writeIngressMetadata(root, canonicalRequest.metadata());
         return root;
+    }
+
+    private void writeIngressMetadata(ObjectNode root, CanonicalRequestMetadata metadata) {
+        if (metadata == null) {
+            return;
+        }
+        ObjectNode ingress = root.putObject("x_ai_gateway_ingress");
+        putText(ingress, "client_family", metadata.clientFamily());
+        putText(ingress, "client_instance", metadata.clientInstance());
+        putText(ingress, "workspace_hint", metadata.workspaceHint());
+        putText(ingress, "session_affinity_source", metadata.sessionAffinitySource());
+        putText(ingress, "session_affinity_key", metadata.sessionAffinityKey());
+        ObjectNode headers = ingress.putObject("headers");
+        putText(headers, "openai_beta", metadata.openAiBeta());
+        putText(headers, "originator", metadata.originator());
+        putText(headers, "user_agent", metadata.userAgent());
+    }
+
+    private void putText(ObjectNode node, String field, String value) {
+        if (value != null && !value.isBlank()) {
+            node.put(field, value);
+        }
+    }
+
+    private String sessionAffinityKey(CanonicalRequest request) {
+        return request == null || request.metadata() == null ? null : request.metadata().sessionAffinityKey();
     }
 
 

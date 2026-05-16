@@ -26,6 +26,7 @@ import tools.jackson.databind.node.JsonNodeFactory;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -368,6 +369,99 @@ class ObservabilityQueryServiceTests {
         assertEquals(1, trace.upstreamCacheReferences().size());
         assertNotNull(trace.asyncResourceSummary());
         assertNotNull(trace.asyncResourceDetail());
+    }
+
+    @Test
+    void shouldBuildCodexObservabilityProjectionWithUsageCacheAndRedaction() {
+        RouteDecisionLogRepository routeDecisionLogRepository = Mockito.mock(RouteDecisionLogRepository.class);
+        CacheHitLogRepository cacheHitLogRepository = Mockito.mock(CacheHitLogRepository.class);
+        RequestLogRepository requestLogRepository = Mockito.mock(RequestLogRepository.class);
+        UpstreamCacheReferenceRepository upstreamCacheReferenceRepository = Mockito.mock(UpstreamCacheReferenceRepository.class);
+        UsageRecordRepository usageRecordRepository = Mockito.mock(UsageRecordRepository.class);
+
+        RequestLogEntity requestLog = new RequestLogEntity();
+        requestLog.setRequestId("req-codex-1");
+        requestLog.setDistributedKeyId(7L);
+        requestLog.setDistributedKeyPrefix("xag_codex");
+        requestLog.setClientFamily("CODEX");
+        requestLog.setClientInstance("codex-cli-default");
+        requestLog.setSessionAffinitySource("client-instance");
+        requestLog.setSessionAffinityKey("session-alpha");
+        requestLog.setProtocol("responses");
+        requestLog.setRequestPath("/v1/responses");
+        requestLog.setRequestedModel("gpt-5.4@low");
+        requestLog.setPublicModel("gpt-5.4@low");
+        requestLog.setResolvedModelKey("gpt-5.4@low");
+        requestLog.setModelGroup("gpt-5.4");
+        requestLog.setProviderType(ProviderType.OPENAI_DIRECT);
+        requestLog.setCredentialId(17L);
+        requestLog.setSupportStatus("NATIVE");
+        requestLog.setStatus(GatewayRequestStatus.FAILED);
+        requestLog.setErrorCode("UPSTREAM_429");
+        requestLog.setErrorMessage("Bearer abcdefghijklmnopqrstuvwxyz hit rate limit");
+        when(requestLogRepository.search(Mockito.isNull(), Mockito.isNull(), ArgumentMatchers.any(Pageable.class)))
+                .thenReturn(List.of(requestLog));
+
+        RouteDecisionLogEntity routeDecision = new RouteDecisionLogEntity();
+        routeDecision.setRequestId("req-codex-1");
+        routeDecision.setDistributedKeyId(7L);
+        routeDecision.setRequestedModel("gpt-5.4@low");
+        routeDecision.setPublicModel("gpt-5.4@low");
+        routeDecision.setResolvedModelKey("gpt-5.4@low");
+        routeDecision.setProtocol("responses");
+        routeDecision.setModelGroup("gpt-5.4");
+        routeDecision.setSelectedProviderType(ProviderType.OPENAI_DIRECT);
+        routeDecision.setSelectedCredentialId(17L);
+        routeDecision.setSupportStatus("NATIVE");
+        routeDecision.setCandidateCount(3);
+        routeDecision.setCandidateSummaryJson("{\"x_ai_gateway_filter\":{\"action\":\"REDACT\"}}");
+        when(routeDecisionLogRepository.findTopByRequestIdOrderByCreatedAtDesc("req-codex-1"))
+                .thenReturn(Optional.of(routeDecision));
+
+        CacheHitLogEntity cacheHit = new CacheHitLogEntity();
+        cacheHit.setRequestId("req-codex-1");
+        cacheHit.setCacheHitTokens(20);
+        cacheHit.setCacheWriteTokens(5);
+        cacheHit.setSavedInputTokens(40);
+        when(cacheHitLogRepository.findAllByRequestIdOrderByCreatedAtDesc("req-codex-1"))
+                .thenReturn(List.of(cacheHit));
+
+        UsageRecordEntity usageRecord = new UsageRecordEntity();
+        usageRecord.setRequestId("req-codex-1");
+        usageRecord.setPromptTokens(120);
+        usageRecord.setCompletionTokens(30);
+        usageRecord.setReasoningTokens(10);
+        usageRecord.setTotalTokens(160);
+        when(usageRecordRepository.findAllByRequestIdIn(ArgumentMatchers.any()))
+                .thenReturn(List.of(usageRecord));
+
+        ObservabilityQueryService service = new ObservabilityQueryService(
+                routeDecisionLogRepository,
+                cacheHitLogRepository,
+                requestLogRepository,
+                upstreamCacheReferenceRepository,
+                usageRecordRepository
+        );
+
+        var rows = service.listCodexRequests(
+                null,
+                null,
+                null,
+                "codex-cli",
+                "session-alpha",
+                "gpt-5",
+                "FAILED",
+                null,
+                null
+        );
+
+        assertEquals(1, rows.size());
+        assertEquals("req-codex-1", rows.get(0).requestId());
+        assertEquals(120, rows.get(0).usageInputTokens());
+        assertEquals(160, rows.get(0).usageTotalTokens());
+        assertEquals(20, rows.get(0).cacheHitTokens());
+        assertTrue(rows.get(0).filterSummaryJson().contains("route_candidate_summary"));
+        assertTrue(rows.get(0).errorSummary().contains("Bearer ***"));
     }
 
     private RequestLogEntity requestLog(String requestId, String gatewayResourceKey) {

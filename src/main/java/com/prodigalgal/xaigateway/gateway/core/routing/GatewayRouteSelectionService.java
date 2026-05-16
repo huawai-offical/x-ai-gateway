@@ -349,6 +349,7 @@ public class GatewayRouteSelectionService {
                 fingerprint,
                 snapshot.modelGroup(),
                 clientFamily,
+                request.sessionAffinityKey(),
                 governanceDecision.notes(),
                 governanceDecision.concurrencyReservationKey(),
                 selectedEvaluation.selectionSource(),

@@ -86,6 +86,30 @@ public class ObservabilityAdminController {
         );
     }
 
+    @GetMapping("/codex-requests")
+    public List<CodexObservabilityRequestResponse> listCodexRequests(
+            @RequestParam(required = false) Long distributedKeyId,
+            @RequestParam(required = false) ProviderType providerType,
+            @RequestParam(required = false) String requestId,
+            @RequestParam(required = false) String clientInstance,
+            @RequestParam(required = false) String sessionAffinityKey,
+            @RequestParam(required = false) String model,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to) {
+        return observabilityQueryService.listCodexRequests(
+                distributedKeyId,
+                providerType,
+                requestId,
+                clientInstance,
+                sessionAffinityKey,
+                model,
+                status,
+                from,
+                to
+        );
+    }
+
     @GetMapping("/upstream-cache-references")
     public List<UpstreamCacheReferenceResponse> listUpstreamCacheReferences(
             @RequestParam(required = false) Long distributedKeyId,

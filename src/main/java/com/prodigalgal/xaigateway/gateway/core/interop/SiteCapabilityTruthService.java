@@ -391,7 +391,7 @@ public class SiteCapabilityTruthService {
         return switch (siteKind) {
             case OPENAI_DIRECT, AZURE_OPENAI -> ProviderType.OPENAI_DIRECT;
             case DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE, MINIMAX, DIFY, GROK, MISTRAL, COHERE, JINA,
-                    TOGETHER, FIREWORKS, OPENROUTER, OPENAI_COMPATIBLE_GENERIC -> ProviderType.OPENAI_COMPATIBLE;
+                    TOGETHER, FIREWORKS, OPENROUTER, PERPLEXITY, OPENAI_COMPATIBLE_GENERIC -> ProviderType.OPENAI_COMPATIBLE;
             case ANTHROPIC_DIRECT -> ProviderType.ANTHROPIC_DIRECT;
             case GEMINI_DIRECT, VERTEX_AI -> ProviderType.GEMINI_DIRECT;
             case OLLAMA_DIRECT -> ProviderType.OLLAMA_DIRECT;
@@ -567,7 +567,7 @@ public class SiteCapabilityTruthService {
     }
 
     private boolean supportsUpstreamWebSearch(UpstreamSiteKind siteKind) {
-        return siteKind == UpstreamSiteKind.OPENAI_DIRECT;
+        return siteKind == UpstreamSiteKind.OPENAI_DIRECT || siteKind == UpstreamSiteKind.PERPLEXITY;
     }
 
     private boolean supportsUpstreamMedia(UpstreamSiteKind siteKind) {
@@ -590,7 +590,7 @@ public class SiteCapabilityTruthService {
 
     private boolean siteSupportsImageInput(UpstreamSiteKind siteKind) {
         return switch (siteKind) {
-            case DIFY, JINA, COHERE, OLLAMA_DIRECT -> false;
+            case DIFY, JINA, COHERE, PERPLEXITY, OLLAMA_DIRECT -> false;
             default -> true;
         };
     }
@@ -601,7 +601,7 @@ public class SiteCapabilityTruthService {
 
     private boolean siteSupportsThinking(UpstreamSiteKind siteKind) {
         return switch (siteKind) {
-            case DIFY, JINA, COHERE, OLLAMA_DIRECT -> false;
+            case DIFY, JINA, COHERE, PERPLEXITY, OLLAMA_DIRECT -> false;
             default -> siteSupportsChat(siteKind);
         };
     }
@@ -677,7 +677,7 @@ public class SiteCapabilityTruthService {
                 default -> null;
             };
             case OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE, MINIMAX, GROK, MISTRAL,
-                    COHERE, TOGETHER, FIREWORKS, OPENROUTER -> switch (feature) {
+                    COHERE, TOGETHER, FIREWORKS, OPENROUTER, PERPLEXITY -> switch (feature) {
                 case FILE_OBJECT ->
                         "OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；files 仍作为 accepted exception，不在当前实现面内。";
                 case UPLOAD_CREATE ->

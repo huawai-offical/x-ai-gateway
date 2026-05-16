@@ -1,6 +1,8 @@
 package com.prodigalgal.xaigateway.admin.application;
 
 import com.prodigalgal.xaigateway.admin.api.OfficialAccountImportRequest;
+import com.prodigalgal.xaigateway.admin.api.OfficialCodexResponsesSmokeRequest;
+import com.prodigalgal.xaigateway.admin.api.OfficialCodexResponsesSmokeResponse;
 import com.prodigalgal.xaigateway.admin.api.OfficialAccountQuotaRefreshRequest;
 import com.prodigalgal.xaigateway.admin.api.OfficialAccountQuotaResponse;
 import com.prodigalgal.xaigateway.admin.api.OfficialAccountType;
@@ -9,14 +11,19 @@ import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountEntity
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountPoolEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountPoolRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountRepository;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
@@ -28,12 +35,16 @@ import tools.jackson.databind.ObjectMapper;
 public class OfficialAccountAdminService {
 
     private static final String IMPORT_REFRESH_ADAPTER = "official-account-quota-local";
+    private static final String CODEX_AUTH_JSON_ADAPTER = "codex-auth-json-local-inspection";
 
     private final UpstreamAccountRepository upstreamAccountRepository;
     private final UpstreamAccountPoolRepository upstreamAccountPoolRepository;
     private final CredentialCryptoService credentialCryptoService;
     private final SupportedModelCatalogService supportedModelCatalogService;
     private final ObjectMapper objectMapper;
+    private final CodexAuthJsonParser codexAuthJsonParser;
+    private final CodexResponsesSmokeHttpClient codexResponsesSmokeHttpClient;
+    private final SensitiveJsonSanitizer sensitiveJsonSanitizer;
 
     public OfficialAccountAdminService(
             UpstreamAccountRepository upstreamAccountRepository,
@@ -46,26 +57,44 @@ public class OfficialAccountAdminService {
         this.credentialCryptoService = credentialCryptoService;
         this.supportedModelCatalogService = supportedModelCatalogService;
         this.objectMapper = objectMapper;
+        this.codexAuthJsonParser = new CodexAuthJsonParser(objectMapper);
+        this.codexResponsesSmokeHttpClient = new CodexResponsesSmokeHttpClient(objectMapper);
+        this.sensitiveJsonSanitizer = new SensitiveJsonSanitizer(objectMapper);
     }
 
     public OfficialAccountQuotaResponse importOfficialAccount(OfficialAccountImportRequest request) {
         OfficialAccountType accountType = request.accountType();
+        CodexAuthJsonParser.ParsedCodexAuthJson parsedCodexAuth = tryParseCodexAuthJson(accountType, request.metadataJson());
         UpstreamAccountPoolEntity pool = resolvePool(request.poolId(), accountType);
-        String accessToken = requireSecret(request.accessToken(), "accessToken");
-        String refreshToken = normalizeBlank(request.refreshToken());
+        String accessToken = requireSecret(firstNonBlank(
+                request.accessToken(),
+                parsedCodexAuth == null ? null : parsedCodexAuth.accessToken()
+        ), "accessToken");
+        String refreshToken = normalizeBlank(firstNonBlank(
+                request.refreshToken(),
+                parsedCodexAuth == null ? null : parsedCodexAuth.refreshToken()
+        ));
         Instant now = Instant.now();
 
-        UpstreamAccountEntity entity = new UpstreamAccountEntity();
+        String externalAccountId = resolveOfficialExternalAccountId(request.externalAccountId(), parsedCodexAuth, accountType);
+        UpstreamAccountEntity entity = resolveExistingOfficialAccount(accountType, parsedCodexAuth, externalAccountId)
+                .orElseGet(UpstreamAccountEntity::new);
+        boolean created = entity.getId() == null;
         entity.setPool(pool);
         entity.setProviderType(accountType.providerType());
-        entity.setAccountName(resolveAccountName(request.accountName(), accountType));
-        entity.setExternalAccountId(resolveExternalAccountId(request.externalAccountId(), accountType));
+        entity.setAccountName(resolveAccountName(firstNonBlank(
+                request.accountName(),
+                parsedCodexAuth == null ? null : parsedCodexAuth.accountName()
+        ), accountType));
+        entity.setExternalAccountId(externalAccountId);
         entity.setAccessTokenCiphertext(credentialCryptoService.encrypt(accessToken));
         entity.setRefreshTokenCiphertext(refreshToken == null ? null : credentialCryptoService.encrypt(refreshToken));
         entity.setActive(request.active() == null || request.active());
         entity.setFrozen(false);
         entity.setHealthy(true);
-        entity.setTokenExpiresAt(request.tokenExpiresAt());
+        entity.setTokenExpiresAt(request.tokenExpiresAt() == null && parsedCodexAuth != null
+                ? parsedCodexAuth.tokenExpiresAt()
+                : request.tokenExpiresAt());
         entity.setLastRefreshAt(now);
         entity.setRefreshStatus("IMPORTED");
         entity.setSupportedModels(resolveSupportedModels(pool, request.supportedModels(), accountType));
@@ -78,6 +107,17 @@ public class OfficialAccountAdminService {
         metadata.put("client_family", accountType.clientFamily());
         metadata.put("managed_by", "official_account_import");
         metadata.put("imported_at", now.toString());
+        metadata.put("import_status", created ? "CREATED" : "UPDATED");
+        if (parsedCodexAuth != null) {
+            metadata.put("codex_auth_json", parsedCodexAuth.safeSummary());
+            metadata.put("account_identity", Map.of(
+                    "identityKey", parsedCodexAuth.identityKey(),
+                    "identitySource", parsedCodexAuth.identitySource(),
+                    "identityStrength", parsedCodexAuth.identityStrength(),
+                    "accountId", parsedCodexAuth.accountId() == null ? "unknown" : parsedCodexAuth.accountId()
+            ));
+            metadata.put("import_dedupe_key", externalAccountId);
+        }
         entity.setMetadataJson(writeJson(metadata));
 
         if (request.refreshQuotaAfterImport() == null || request.refreshQuotaAfterImport()) {
@@ -98,6 +138,10 @@ public class OfficialAccountAdminService {
         UpstreamAccountEntity entity = getRequired(accountId);
         OfficialAccountType accountType = resolveOfficialAccountType(entity);
         Instant now = Instant.now();
+        if (accountType == OfficialAccountType.CODEX && request == null) {
+            applyCodexAuthJsonSnapshot(entity, accountType, now);
+            return toResponse(upstreamAccountRepository.save(entity));
+        }
         QuotaInput input = QuotaInput.fromRefresh(request);
         if (Boolean.TRUE.equals(input.forceFailure()) || !isBlank(input.quotaError())) {
             applyQuotaFailure(entity, accountType, defaultString(input.quotaError(), "官方账号配额刷新失败。"), now);
@@ -112,9 +156,320 @@ public class OfficialAccountAdminService {
         return toResponse(getRequired(accountId));
     }
 
+    public OfficialCodexResponsesSmokeResponse codexResponsesSmoke(Long accountId, OfficialCodexResponsesSmokeRequest request) {
+        UpstreamAccountEntity entity = getRequired(accountId);
+        OfficialAccountType accountType = resolveOfficialAccountType(entity);
+        if (accountType != OfficialAccountType.CODEX) {
+            throw new IllegalArgumentException("只有 CODEX 官方账号支持 Codex App API responses smoke。");
+        }
+        Instant now = Instant.now();
+        String routeBlockReason = routeBlockReason(entity);
+        boolean routeEligible = routeBlockReason == null;
+        String model = firstNonBlank(
+                request == null ? null : request.model(),
+                entity.getSupportedModels() == null || entity.getSupportedModels().isEmpty() ? null : entity.getSupportedModels().get(0),
+                accountType.defaultModels().get(0)
+        );
+        boolean dryRun = request == null || request.dryRun() == null || request.dryRun();
+        String requestedBaseUrl = request == null ? null : request.baseUrl();
+        String chatGptAccountId = resolveChatGptAccountId(entity);
+        String status = routeEligible ? (dryRun ? "DRY_RUN_READY" : "LIVE_SMOKE_PENDING") : "ROUTE_BLOCKED";
+        Map<String, Object> requestPreview = codexResponsesSmokePreview(
+                model,
+                request == null ? null : request.input(),
+                requestedBaseUrl,
+                chatGptAccountId
+        );
+        String path = text(requestPreview.get("path"));
+        String baseUrl = text(requestPreview.get("baseUrl"));
+        boolean codexAppApi = Boolean.TRUE.equals(requestPreview.get("codexAppApi"));
+        CodexResponsesSmokeHttpClient.CodexResponsesSmokeResult liveResult = null;
+        String message = routeEligible ? "Codex App API responses dry-run smoke 已具备执行前置条件。" : "Codex 账号当前被路由保护阻断。";
+        if (routeEligible && !dryRun) {
+            try {
+                liveResult = codexResponsesSmokeHttpClient.execute(
+                        credentialCryptoService.decrypt(entity.getAccessTokenCiphertext()),
+                        model,
+                        request == null ? null : request.input(),
+                        requestedBaseUrl,
+                        request == null ? null : request.timeoutSeconds(),
+                        chatGptAccountId
+                );
+                path = liveResult.path();
+                baseUrl = liveResult.baseUrl();
+                codexAppApi = liveResult.codexAppApi();
+                status = liveResult.success() ? "LIVE_SMOKE_OK" : "LIVE_SMOKE_FAILED";
+                message = liveResult.success() ? "Codex App API responses 真实 smoke 成功。" : "Codex App API responses 真实 smoke 失败，可按脱敏 failureType 重试或排查。";
+            } catch (RuntimeException exception) {
+                liveResult = new CodexResponsesSmokeHttpClient.CodexResponsesSmokeResult(
+                        false,
+                        null,
+                        null,
+                        null,
+                        0L,
+                        baseUrl,
+                        path,
+                        codexAppApi,
+                        "CREDENTIAL_DECRYPT_FAILED",
+                        truncate(exception.getMessage(), 240),
+                        null
+                );
+                status = "LIVE_SMOKE_FAILED";
+                message = "Codex 账号凭证无法解密，真实 smoke 未发起。";
+            }
+        }
+        String classification = smokeClassification(routeEligible, dryRun, routeBlockReason, liveResult);
+        String skippedReason = smokeSkippedReason(classification, routeEligible, dryRun, routeBlockReason, liveResult);
+        message = smokeMessage(classification, routeEligible, dryRun, message);
+        String credentialFingerprint = routeEligible
+                ? credentialFingerprint(entity)
+                : credentialCiphertextFingerprint(entity);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("status", status);
+        result.put("classification", classification);
+        result.put("adapter", CODEX_AUTH_JSON_ADAPTER);
+        result.put("accountType", accountType.name());
+        result.put("method", "POST");
+        result.put("path", path);
+        result.put("baseUrl", baseUrl);
+        result.put("codexAppApi", codexAppApi);
+        result.put("model", model);
+        result.put("dryRun", dryRun);
+        result.put("routeEligible", routeEligible);
+        if (skippedReason != null) {
+            result.put("skippedReason", skippedReason);
+        }
+        if (routeBlockReason != null) {
+            result.put("routeBlockReason", routeBlockReason);
+        }
+        if (liveResult != null) {
+            result.put("httpStatus", liveResult.httpStatus());
+            result.put("upstreamRequestId", liveResult.upstreamRequestId());
+            result.put("upstreamResponseId", liveResult.upstreamResponseId());
+            result.put("durationMs", liveResult.durationMs());
+            result.put("failureType", liveResult.failureType());
+            result.put("failureMessage", liveResult.failureMessage());
+            if (liveResult.usageProbe() != null) {
+                result.put("keepalive", liveResult.usageProbe().toSafeMap());
+            }
+        }
+        result.put("checkedAt", now.toString());
+        entity.setLastRefreshResultJson(writeJson(result));
+        upstreamAccountRepository.save(entity);
+        return new OfficialCodexResponsesSmokeResponse(
+                entity.getId(),
+                status,
+                classification,
+                skippedReason,
+                "POST",
+                path,
+                baseUrl,
+                codexAppApi,
+                model,
+                dryRun,
+                routeEligible,
+                routeBlockReason,
+                credentialFingerprint,
+                liveResult == null ? null : liveResult.httpStatus(),
+                liveResult == null ? null : liveResult.upstreamRequestId(),
+                liveResult == null ? null : liveResult.upstreamResponseId(),
+                liveResult == null ? null : liveResult.durationMs(),
+                liveResult == null ? null : liveResult.failureType(),
+                liveResult == null ? null : liveResult.failureMessage(),
+                liveResult == null || liveResult.usageProbe() == null ? null : liveResult.usageProbe().toSafeMap(),
+                now,
+                message,
+                requestPreview
+        );
+    }
+
+    private String smokeClassification(
+            boolean routeEligible,
+            boolean dryRun,
+            String routeBlockReason,
+            CodexResponsesSmokeHttpClient.CodexResponsesSmokeResult liveResult) {
+        if (!routeEligible) {
+            return isBudgetBlockReason(routeBlockReason) ? "BUDGET_BLOCKED" : "SKIPPED";
+        }
+        if (dryRun) {
+            return "SKIPPED";
+        }
+        if (liveResult == null) {
+            return "SKIPPED";
+        }
+        if (liveResult.success()) {
+            return "PASS";
+        }
+        if (isUnsupportedFailure(liveResult)) {
+            return "UNSUPPORTED";
+        }
+        if (isNoPermissionFailure(liveResult)) {
+            return "NO_PERMISSION";
+        }
+        if (isBudgetFailure(liveResult)) {
+            return "BUDGET_BLOCKED";
+        }
+        return "FAIL";
+    }
+
+    private String smokeSkippedReason(
+            String classification,
+            boolean routeEligible,
+            boolean dryRun,
+            String routeBlockReason,
+            CodexResponsesSmokeHttpClient.CodexResponsesSmokeResult liveResult) {
+        if ("PASS".equals(classification) || "FAIL".equals(classification)) {
+            return null;
+        }
+        if (!routeEligible) {
+            return routeBlockReason;
+        }
+        if (dryRun) {
+            return "DRY_RUN";
+        }
+        if (liveResult != null && !isBlank(liveResult.failureType())) {
+            return liveResult.failureType();
+        }
+        return classification;
+    }
+
+    private String smokeMessage(String classification, boolean routeEligible, boolean dryRun, String fallback) {
+        return switch (classification) {
+            case "PASS" -> "Codex App API responses 真实 smoke 成功。";
+            case "BUDGET_BLOCKED" -> routeEligible && !dryRun
+                    ? "Codex App API responses 真实 smoke 已被额度或速率预算保护阻断。"
+                    : "Codex 账号当前被配额预算保护阻断。";
+            case "NO_PERMISSION" -> "Codex App API responses 真实 smoke 已因认证或权限不足跳过。";
+            case "UNSUPPORTED" -> "Codex App API responses 真实 smoke 已确认模型或参数不支持。";
+            case "SKIPPED" -> dryRun
+                    ? "Codex App API responses dry-run smoke 已完成安全预检，未消耗额度。"
+                    : fallback;
+            default -> fallback;
+        };
+    }
+
+    private boolean isUnsupportedFailure(CodexResponsesSmokeHttpClient.CodexResponsesSmokeResult liveResult) {
+        String failureType = upper(liveResult.failureType());
+        return failureType.contains("UNSUPPORTED")
+                || failureType.contains("NOT_SUPPORTED")
+                || failureType.contains("MODEL_NOT_SUPPORTED");
+    }
+
+    private boolean isNoPermissionFailure(CodexResponsesSmokeHttpClient.CodexResponsesSmokeResult liveResult) {
+        if (liveResult.httpStatus() != null && (liveResult.httpStatus() == 401 || liveResult.httpStatus() == 403)) {
+            return true;
+        }
+        String failureType = upper(liveResult.failureType());
+        return failureType.contains("AUTH")
+                || failureType.contains("PERMISSION")
+                || failureType.contains("UNAUTHORIZED")
+                || failureType.contains("FORBIDDEN")
+                || failureType.contains("NO_PERMISSION");
+    }
+
+    private boolean isBudgetFailure(CodexResponsesSmokeHttpClient.CodexResponsesSmokeResult liveResult) {
+        if (liveResult.httpStatus() != null && liveResult.httpStatus() == 429) {
+            return true;
+        }
+        String failureType = upper(liveResult.failureType());
+        if (failureType.contains("BUDGET")
+                || failureType.contains("QUOTA")
+                || failureType.contains("RATE_LIMIT")
+                || failureType.contains("RATE")
+                || failureType.contains("LIMIT")) {
+            return true;
+        }
+        CodexResponsesSmokeHttpClient.CodexUsageProbeResult usageProbe = liveResult.usageProbe();
+        if (usageProbe == null) {
+            return false;
+        }
+        return Boolean.TRUE.equals(usageProbe.limitReached())
+                || Boolean.FALSE.equals(usageProbe.allowed())
+                || (usageProbe.httpStatus() != null && usageProbe.httpStatus() == 429)
+                || isBudgetBlockReason(usageProbe.failureType());
+    }
+
+    private boolean isBudgetBlockReason(String value) {
+        String upper = upper(value);
+        return upper.contains("QUOTA")
+                || upper.contains("BUDGET")
+                || upper.contains("RATE_LIMIT")
+                || upper.contains("RATE")
+                || upper.contains("LIMIT");
+    }
+
+    private String upper(String value) {
+        return value == null ? "" : value.toUpperCase(java.util.Locale.ROOT);
+    }
+
     private UpstreamAccountEntity getRequired(Long accountId) {
         return upstreamAccountRepository.findById(accountId)
                 .orElseThrow(() -> new IllegalArgumentException("未找到指定官方账号。"));
+    }
+
+    private String resolveOfficialExternalAccountId(
+            String requestedExternalAccountId,
+            CodexAuthJsonParser.ParsedCodexAuthJson parsedCodexAuth,
+            OfficialAccountType accountType) {
+        if (accountType == OfficialAccountType.CODEX && parsedCodexAuth != null
+                && !"WEAK_TOKEN".equals(parsedCodexAuth.identityStrength())) {
+            return parsedCodexAuth.identityKey();
+        }
+        return resolveExternalAccountId(firstNonBlank(
+                requestedExternalAccountId,
+                parsedCodexAuth == null ? null : parsedCodexAuth.identityKey()
+        ), accountType);
+    }
+
+    private Optional<UpstreamAccountEntity> resolveExistingOfficialAccount(
+            OfficialAccountType accountType,
+            CodexAuthJsonParser.ParsedCodexAuthJson parsedCodexAuth,
+            String externalAccountId) {
+        if (accountType != OfficialAccountType.CODEX || parsedCodexAuth == null) {
+            return Optional.empty();
+        }
+        Optional<UpstreamAccountEntity> byExternalId = upstreamAccountRepository
+                .findFirstByProviderTypeAndExternalAccountIdOrderByUpdatedAtDesc(accountType.providerType(), externalAccountId);
+        if (byExternalId != null && byExternalId.isPresent()) {
+            return byExternalId;
+        }
+        if (parsedCodexAuth.accountId() != null && !parsedCodexAuth.accountId().isBlank()) {
+            Optional<UpstreamAccountEntity> byLegacyAccountId = upstreamAccountRepository
+                    .findFirstByProviderTypeAndExternalAccountIdOrderByUpdatedAtDesc(accountType.providerType(), parsedCodexAuth.accountId());
+            if (byLegacyAccountId != null && byLegacyAccountId.isPresent()) {
+                return byLegacyAccountId;
+            }
+        }
+        if ("WEAK_TOKEN".equals(parsedCodexAuth.identityStrength())) {
+            return Optional.empty();
+        }
+        List<UpstreamAccountEntity> accounts = upstreamAccountRepository.findAllByProviderTypeOrderByUpdatedAtDesc(accountType.providerType());
+        if (accounts == null) {
+            return Optional.empty();
+        }
+        return accounts.stream()
+                .filter(account -> parsedCodexAuth.identityKey().equals(metadataIdentityKey(account.getMetadataJson())))
+                .findFirst();
+    }
+
+    private String metadataIdentityKey(String metadataJson) {
+        Map<String, Object> metadata = sensitiveJsonSanitizer.readMap(metadataJson);
+        Object accountIdentity = metadata.get("account_identity");
+        if (accountIdentity instanceof Map<?, ?> accountIdentityMap) {
+            String value = text(accountIdentityMap.get("identityKey"));
+            if (!isBlank(value)) {
+                return value;
+            }
+        }
+        Object codexAuthJson = metadata.get("codex_auth_json");
+        if (codexAuthJson instanceof Map<?, ?> codexAuthMap) {
+            String value = text(codexAuthMap.get("identityKey"));
+            if (!isBlank(value)) {
+                return value;
+            }
+            return text(codexAuthMap.get("identity_key"));
+        }
+        return text(metadata.get("identityKey"));
     }
 
     private UpstreamAccountPoolEntity resolvePool(Long poolId, OfficialAccountType accountType) {
@@ -235,6 +590,44 @@ public class OfficialAccountAdminService {
         )));
     }
 
+    private void applyCodexAuthJsonSnapshot(UpstreamAccountEntity entity, OfficialAccountType accountType, Instant now) {
+        QuotaInput input = new QuotaInput(
+                text(readMetadataMap(entity.getMetadataJson()).get("plan_tier")),
+                text(readMetadataMap(entity.getMetadataJson()).get("subscription_tier")),
+                null,
+                null,
+                null,
+                entity.getTokenExpiresAt(),
+                null,
+                false
+        );
+        applyQuotaSuccess(entity, accountType, input, now, "codex_auth_json_snapshot");
+        Map<String, Object> metadata = readMetadataMap(entity.getMetadataJson());
+        metadata.put("codex_adapter_status", "LOCAL_INSPECTION_READY");
+        metadata.put("codex_responses_smoke_status", "DRY_RUN_READY");
+        entity.setMetadataJson(writeJson(sanitizeMetadata(metadata)));
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("status", "refreshed");
+        result.put("adapter", CODEX_AUTH_JSON_ADAPTER);
+        result.put("accountType", accountType.name());
+        result.put("planTier", defaultString(text(metadata.get("plan_tier")), accountType.defaultPlanTier()));
+        result.put("subscriptionTier", defaultString(text(metadata.get("subscription_tier")), accountType.defaultPlanTier()));
+        result.put("credentialPresence", Map.of(
+                "accessToken", entity.getAccessTokenCiphertext() != null,
+                "refreshToken", entity.getRefreshTokenCiphertext() != null
+        ));
+        result.put("responsesSmoke", codexResponsesSmokePreview(
+                entity.getSupportedModels() == null || entity.getSupportedModels().isEmpty()
+                        ? accountType.defaultModels().get(0)
+                        : entity.getSupportedModels().get(0),
+                null,
+                null,
+                resolveChatGptAccountId(entity)
+        ));
+        result.put("refreshedAt", now.toString());
+        entity.setLastRefreshResultJson(writeJson(result));
+    }
+
     private OfficialAccountQuotaResponse toResponse(UpstreamAccountEntity entity) {
         OfficialAccountType accountType = resolveOfficialAccountType(entity);
         Map<String, Object> metadata = readMetadataMap(entity.getMetadataJson());
@@ -294,6 +687,81 @@ public class OfficialAccountAdminService {
             return OfficialAccountType.GEMINI_CLI;
         }
         throw new IllegalArgumentException("该账号不是受支持的 AI IDE/CLI 官方账号：" + providerType);
+    }
+
+    private CodexAuthJsonParser.ParsedCodexAuthJson tryParseCodexAuthJson(OfficialAccountType accountType, String metadataJson) {
+        if (accountType != OfficialAccountType.CODEX || isBlank(metadataJson)) {
+            return null;
+        }
+        try {
+            return codexAuthJsonParser.parse(metadataJson);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    private Map<String, Object> codexResponsesSmokePreview(
+            String model,
+            String input,
+            String requestedBaseUrl,
+            String chatGptAccountId) {
+        return codexResponsesSmokeHttpClient.requestPreview(model, input, requestedBaseUrl, chatGptAccountId);
+    }
+
+    private String resolveChatGptAccountId(UpstreamAccountEntity entity) {
+        Map<String, Object> metadata = readMetadataMap(entity.getMetadataJson());
+        String fromIdentity = rawAccountId(metadata.get("account_identity"));
+        if (!isBlank(fromIdentity)) {
+            return fromIdentity;
+        }
+        String fromSummary = rawAccountId(metadata.get("codex_auth_json"));
+        if (!isBlank(fromSummary)) {
+            return fromSummary;
+        }
+        String external = entity.getExternalAccountId();
+        if (!isBlank(external) && !external.startsWith("codex:")) {
+            return external;
+        }
+        return null;
+    }
+
+    private String rawAccountId(Object value) {
+        if (value instanceof Map<?, ?> map) {
+            String accountId = text(map.get("accountId"));
+            if (!isBlank(accountId) && !"unknown".equalsIgnoreCase(accountId)) {
+                return accountId;
+            }
+            String snake = text(map.get("account_id"));
+            if (!isBlank(snake) && !"unknown".equalsIgnoreCase(snake)) {
+                return snake;
+            }
+        }
+        return null;
+    }
+
+    private String credentialFingerprint(UpstreamAccountEntity entity) {
+        if (isBlank(entity.getAccessTokenCiphertext())) {
+            return null;
+        }
+        try {
+            return sha256Fingerprint(credentialCryptoService.decrypt(entity.getAccessTokenCiphertext()));
+        } catch (RuntimeException exception) {
+            return sha256Fingerprint(entity.getAccessTokenCiphertext());
+        }
+    }
+
+    private String credentialCiphertextFingerprint(UpstreamAccountEntity entity) {
+        return isBlank(entity.getAccessTokenCiphertext()) ? null : sha256Fingerprint(entity.getAccessTokenCiphertext());
+    }
+
+    private String sha256Fingerprint(String value) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            String hex = HexFormat.of().formatHex(digest.digest(value.getBytes(StandardCharsets.UTF_8)));
+            return hex.substring(0, 16).toLowerCase(Locale.ROOT);
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("当前运行环境缺少 SHA-256。", exception);
+        }
     }
 
     private Instant nextRefreshAfter(Instant now, Instant resetAt, int windowSeconds) {

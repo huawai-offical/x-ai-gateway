@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-06",
+  "generatedAt": "2026-05-15",
   "openapi": "../openapi/public-openapi.json",
   "baseUrlEnv": "X_AI_GATEWAY_BASE_URL",
   "apiKeyEnv": "X_AI_GATEWAY_API_KEY",
@@ -13,6 +13,12 @@
       "language": "javascript",
       "file": "javascript/chat-completions.mjs",
       "entrypoint": "node chat-completions.mjs"
+    },
+    {
+      "language": "javascript",
+      "file": "javascript/chat-advanced-parameters.mjs",
+      "entrypoint": "node chat-advanced-parameters.mjs",
+      "notes": "Optional advanced Chat parameters: response_format, tools, store, metadata, web_search_options and audio are opt-in."
     },
     {
       "language": "go",

@@ -1,9 +1,11 @@
 package com.prodigalgal.xaigateway.protocol.ingress.openai;
 
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
 import com.prodigalgal.xaigateway.admin.application.GatewayChatExecutionService;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthenticationService;
+import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamilyResolver;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
@@ -34,6 +36,8 @@ import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
 import com.prodigalgal.xaigateway.gateway.core.usage.GatewayUsage;
 import com.prodigalgal.xaigateway.testsupport.PermitAllSecurityTestConfig;
 import java.util.List;
+import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -60,6 +64,30 @@ class OpenAiResponsesControllerTests {
 
     @MockitoBean
     private GatewayAsyncResourceService gatewayAsyncResourceService;
+
+    @MockitoBean
+    private OpenAiIdempotencyReplayService openAiIdempotencyReplayService;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @BeforeEach
+    void setUpIdempotencyReplayService() {
+        Mockito.when(openAiIdempotencyReplayService.replay(
+                        Mockito.anyLong(),
+                        Mockito.anyString(),
+                        Mockito.<String>nullable(String.class),
+                        Mockito.any(tools.jackson.databind.JsonNode.class)
+                ))
+                .thenReturn(Optional.empty());
+        Mockito.when(openAiIdempotencyReplayService.remember(
+                        Mockito.anyLong(),
+                        Mockito.anyString(),
+                        Mockito.<String>nullable(String.class),
+                        Mockito.any(tools.jackson.databind.JsonNode.class),
+                        Mockito.any(tools.jackson.databind.JsonNode.class)
+                ))
+                .thenAnswer(invocation -> invocation.getArgument(4));
+    }
 
     @Test
     void shouldExecuteMinimalResponsesRequest() {
@@ -107,6 +135,48 @@ class OpenAiResponsesControllerTests {
                 .jsonPath("$.output[1].type").isEqualTo("message")
                 .jsonPath("$.output[1].content[0].type").isEqualTo("output_text")
                 .jsonPath("$.usage.input_tokens_details.cached_tokens").isEqualTo(60);
+    }
+
+    @Test
+    void shouldReplayIdempotentResponsesPayloadWithoutExecutingGateway() throws Exception {
+        Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        var replayedPayload = objectMapper.readTree("""
+                {
+                  "id": "resp_cached",
+                  "object": "response",
+                  "model": "writer-fast",
+                  "output_text": "cached response",
+                  "output": []
+                }
+                """);
+        Mockito.when(openAiIdempotencyReplayService.replay(
+                        Mockito.eq(1L),
+                        Mockito.eq("/v1/responses"),
+                        Mockito.eq("idem-responses-replay-1"),
+                        Mockito.any(tools.jackson.databind.JsonNode.class)
+                ))
+                .thenReturn(Optional.of(replayedPayload));
+
+        webTestClient.post()
+                .uri("/v1/responses")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .header("Idempotency-Key", "idem-responses-replay-1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "model":"writer-fast",
+                          "input":"hello replay"
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().valueEquals(OpenAiIdempotencyReplayService.REPLAYED_HEADER, "true")
+                .expectBody()
+                .jsonPath("$.id").isEqualTo("resp_cached")
+                .jsonPath("$.output_text").isEqualTo("cached response");
+
+        Mockito.verifyNoInteractions(gatewayChatExecutionService);
     }
 
     @Test
@@ -165,6 +235,99 @@ class OpenAiResponsesControllerTests {
                 .jsonPath("$.output[0].type").isEqualTo("function_call")
                 .jsonPath("$.output[0].name").isEqualTo("lookup_weather")
                 .jsonPath("$.output[0].arguments").isEqualTo("{\"city\":\"Shanghai\"}");
+    }
+
+    @Test
+    void shouldPreserveCodexCliIngressMetadataForRoutingAndTracing() {
+        Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(
+                        Mockito.<CanonicalRequest>argThat(request -> {
+                            var metadata = request == null ? null : request.metadata();
+                            return metadata != null
+                                    && "CODEX".equals(metadata.clientFamily())
+                                    && "desktop-main".equals(metadata.clientInstance())
+                                    && "workspace-alpha".equals(metadata.workspaceHint())
+                                    && "session_id".equals(metadata.sessionAffinitySource())
+                                    && metadata.sessionAffinityKey() != null
+                                    && metadata.sessionAffinityKey().length() == 32
+                                    && !"session-raw-1".equals(metadata.sessionAffinityKey())
+                                    && "assistants=v2".equals(metadata.openAiBeta())
+                                    && "org-codex-1".equals(metadata.openAiOrganization())
+                                    && "proj-codex-1".equals(metadata.openAiProject())
+                                    && "idem-codex-1".equals(metadata.idempotencyKey())
+                                    && "codex-cli".equals(metadata.originator())
+                                    && metadata.userAgent().contains("codex");
+                        }),
+                        Mockito.eq(GatewayClientFamily.CODEX)
+                ))
+                .thenReturn(gatewayResponse("req-codex-metadata-1", "ok", GatewayUsage.empty(), List.of(), null, GatewayFinishReason.STOP));
+
+        webTestClient.post()
+                .uri("/v1/responses")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .header(HttpHeaders.USER_AGENT, "codex-cli/0.32.0")
+                .header("X-AI-Gateway-Client-Instance", "desktop-main")
+                .header("X-AI-Gateway-Workspace-Hint", "workspace-alpha")
+                .header("openai-beta", "assistants=v2")
+                .header("OpenAI-Organization", "org-codex-1")
+                .header("OpenAI-Project", "proj-codex-1")
+                .header("Idempotency-Key", "idem-codex-1")
+                .header("originator", "codex-cli")
+                .header("session_id", "session-raw-1")
+                .header("conversation_id", "conversation-raw-1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "model":"writer-fast",
+                          "input":"hello codex"
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.output_text").isEqualTo("ok");
+    }
+
+    @Test
+    void shouldPreserveResponsesParityFieldsAndNestedReasoningEffort() {
+        Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<CanonicalRequest>argThat(request -> {
+            var extensions = request == null ? null : request.providerExtensions();
+            return request != null
+                    && request.reasoning() != null
+                    && "medium".equals(request.reasoning().effort())
+                    && extensions != null
+                    && "auto".equals(extensions.path("service_tier").asText())
+                    && !extensions.path("parallel_tool_calls").asBoolean(true)
+                    && "cache-key-1".equals(extensions.path("prompt_cache_key").asText())
+                    && "auto".equals(extensions.path("truncation").asText())
+                    && "json_schema".equals(extensions.path("text").path("format").path("type").asText());
+        })))
+                .thenReturn(gatewayResponse("req-responses-parity-1", "ok", GatewayUsage.empty(), List.of(), null, GatewayFinishReason.STOP));
+
+        webTestClient.post()
+                .uri("/v1/responses")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "model":"writer-fast",
+                          "input":"hello parity",
+                          "service_tier":"auto",
+                          "parallel_tool_calls":false,
+                          "prompt_cache_key":"cache-key-1",
+                          "top_logprobs":2,
+                          "truncation":"auto",
+                          "text":{"format":{"type":"json_schema","name":"answer"}},
+                          "reasoning":{"effort":"medium","summary":"auto"}
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.output_text").isEqualTo("ok");
     }
 
     @Test
@@ -287,7 +450,7 @@ class OpenAiResponsesControllerTests {
     }
 
     @Test
-    void shouldStreamResponsesEvents() {
+    void shouldStreamResponsesEvents() throws Exception {
         Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
         Mockito.when(gatewayChatExecutionService.executeGatewayStream(Mockito.<CanonicalRequest>argThat(request ->
@@ -329,6 +492,10 @@ class OpenAiResponsesControllerTests {
         org.junit.jupiter.api.Assertions.assertTrue(joined.contains("event: response.output_text.delta"));
         org.junit.jupiter.api.Assertions.assertTrue(joined.contains("\"delta\":\"hello\""));
         org.junit.jupiter.api.Assertions.assertTrue(joined.contains("event: response.completed"));
+        List<JsonNode> events = dataEvents(body);
+        for (int index = 0; index < events.size(); index++) {
+            org.junit.jupiter.api.Assertions.assertEquals(index, events.get(index).path("sequence_number").asInt());
+        }
     }
 
     @Test
@@ -460,7 +627,7 @@ class OpenAiResponsesControllerTests {
         Mockito.when(gatewayAsyncResourceService.deleteResponse("resp_stored_1", 1L))
                 .thenReturn(new ObjectMapper().createObjectNode()
                         .put("id", "resp_stored_1")
-                        .put("object", "response.deleted")
+                        .put("object", "response")
                         .put("deleted", true));
 
         webTestClient.delete()
@@ -469,8 +636,57 @@ class OpenAiResponsesControllerTests {
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
-                .jsonPath("$.object").isEqualTo("response.deleted")
+                .jsonPath("$.object").isEqualTo("response")
                 .jsonPath("$.deleted").isEqualTo(true);
+    }
+
+    @Test
+    void shouldCancelStoredResponse() {
+        Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayAsyncResourceService.cancelResponse("resp_stored_1", 1L))
+                .thenReturn(new ObjectMapper().createObjectNode()
+                        .put("id", "resp_stored_1")
+                        .put("object", "response")
+                        .put("status", "cancelled"));
+
+        webTestClient.post()
+                .uri("/v1/responses/resp_stored_1/cancel")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.object").isEqualTo("response")
+                .jsonPath("$.status").isEqualTo("cancelled");
+    }
+
+    @Test
+    void shouldListResponseInputItems() {
+        Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        var data = new ObjectMapper().createArrayNode();
+        data.add(new ObjectMapper().createObjectNode()
+                .put("id", "msg_resp_stored_1_0")
+                .put("type", "message")
+                .put("role", "user"));
+        var list = new ObjectMapper().createObjectNode();
+        list.put("object", "list");
+        list.set("data", data);
+        list.put("has_more", false);
+        list.put("first_id", "msg_resp_stored_1_0");
+        list.put("last_id", "msg_resp_stored_1_0");
+        Mockito.when(gatewayAsyncResourceService.listResponseInputItems("resp_stored_1", 1L, null, 20, "asc"))
+                .thenReturn(list);
+
+        webTestClient.get()
+                .uri("/v1/responses/resp_stored_1/input_items?limit=20&order=asc")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.object").isEqualTo("list")
+                .jsonPath("$.data[0].id").isEqualTo("msg_resp_stored_1_0")
+                .jsonPath("$.has_more").isEqualTo(false);
     }
 
     @Test
@@ -496,8 +712,9 @@ class OpenAiResponsesControllerTests {
                 .exchange()
                 .expectStatus().isBadRequest()
                 .expectBody()
-                .jsonPath("$.code").isEqualTo("INVALID_ARGUMENT")
-                .jsonPath("$.message").isEqualTo("function_call_output 缺少 call_id。");
+                .jsonPath("$.error.code").isEqualTo("invalid_argument")
+                .jsonPath("$.error.type").isEqualTo("invalid_request_error")
+                .jsonPath("$.error.message").isEqualTo("function_call_output 缺少 call_id。");
     }
 
     private RouteSelectionResult selectionResult() {
@@ -636,6 +853,18 @@ class OpenAiResponsesControllerTests {
                 List.of(),
                 List.of()
         );
+    }
+
+    private List<JsonNode> dataEvents(List<String> body) throws Exception {
+        java.util.ArrayList<JsonNode> events = new java.util.ArrayList<>();
+        for (String item : body) {
+            for (String line : item.split("\\R")) {
+                if (line.startsWith("data: ")) {
+                    events.add(objectMapper.readTree(line.substring("data: ".length())));
+                }
+            }
+        }
+        return events;
     }
 
     private List<CanonicalToolCall> toCanonicalToolCalls(List<GatewayToolCall> toolCalls) {

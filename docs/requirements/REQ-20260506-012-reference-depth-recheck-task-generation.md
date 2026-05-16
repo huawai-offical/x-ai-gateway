@@ -52,7 +52,7 @@
 
 - 新增或更新深度复核报告，覆盖五个参考项目。
 - 报告明确功能完善度、功能丰富度、当前状态、差距和建议任务。
-- 缺失或不完善项已转为 `tasks/backlog/` 下的本地 task。
+- 缺失或不完善项已转为本地 task，并在后续批次完成后归档到 `tasks/done/`。
 - `docs/index.md` 与 `tasks/index.md` 已更新。
 - 本轮分析任务归档到 `tasks/done/`，需求文档记录验收结果。
 
@@ -60,17 +60,17 @@
 
 已完成五个参考项目再次深度复核，并生成 [REP-20260506 参考项目功能深度再复核](../reports/REP-20260506-reference-feature-depth-recheck.md)。
 
-本轮新增 9 个后续 backlog task：
+本轮新增的 9 个后续 task 现均已完成并归档：
 
-- [TASK-20260506-017 Provider 真实凭证 Smoke 与价格同步自动化](../../tasks/backlog/TASK-20260506-017-provider-smoke-pricing-sync.md)
-- [TASK-20260506-018 支付定时对账、订阅发票与跨币种结算](../../tasks/backlog/TASK-20260506-018-payment-scheduled-reconcile-invoice-currency.md)
-- [TASK-20260506-019 Realtime 长连接池与专有 Media Adapter](../../tasks/backlog/TASK-20260506-019-realtime-pool-media-adapters.md)
-- [TASK-20260506-020 云端 Request Filter 高级规则、审计与 UI](../../tasks/backlog/TASK-20260506-020-cloud-request-filter-audit-ui.md)
-- [TASK-20260506-021 AI IDE/CLI 官方账号导入与配额刷新](../../tasks/backlog/TASK-20260506-021-ai-ide-account-import-quota-refresh.md)
-- [TASK-20260506-022 Client Instance 管理与插件/Deep Link 授权下发](../../tasks/backlog/TASK-20260506-022-client-instance-plugin-deeplink.md)
-- [TASK-20260506-023 OpenAPI 自动生成、SDK 示例与前端 i18n 抽取](../../tasks/backlog/TASK-20260506-023-openapi-sdk-frontend-i18n.md)
-- [TASK-20260506-024 Linux/systemd 部署、数据管理与迁移兼容](../../tasks/backlog/TASK-20260506-024-linux-systemd-data-migration.md)
-- [TASK-20260506-025 桌面 Companion、MCP/Skills/Session/Workspace 可行性评估](../../tasks/backlog/TASK-20260506-025-desktop-companion-local-workflow-evaluation.md)
+- [TASK-20260506-017 Provider 真实凭证 Smoke 与价格同步自动化](../../tasks/done/TASK-20260506-017-provider-smoke-pricing-sync.md)
+- [TASK-20260506-018 支付定时对账、订阅发票与跨币种结算](../../tasks/done/TASK-20260506-018-payment-scheduled-reconcile-invoice-currency.md)
+- [TASK-20260506-019 Realtime 长连接池与专有 Media Adapter](../../tasks/done/TASK-20260506-019-realtime-pool-media-adapters.md)
+- [TASK-20260506-020 云端 Request Filter 高级规则、审计与 UI](../../tasks/done/TASK-20260506-020-cloud-request-filter-audit-ui.md)
+- [TASK-20260506-021 AI IDE/CLI 官方账号导入与配额刷新](../../tasks/done/TASK-20260506-021-ai-ide-account-import-quota-refresh.md)
+- [TASK-20260506-022 Client Instance 管理与插件/Deep Link 授权下发](../../tasks/done/TASK-20260506-022-client-instance-plugin-deeplink.md)
+- [TASK-20260506-023 OpenAPI 自动生成、SDK 示例与前端 i18n 抽取](../../tasks/done/TASK-20260506-023-openapi-sdk-frontend-i18n.md)
+- [TASK-20260506-024 Linux/systemd 部署、数据管理与迁移兼容](../../tasks/done/TASK-20260506-024-linux-systemd-data-migration.md)
+- [TASK-20260506-025 桌面 Companion、MCP/Skills/Session/Workspace 可行性评估](../../tasks/done/TASK-20260506-025-desktop-companion-local-workflow-evaluation.md)
 
 ## 测试/验证
 

@@ -335,6 +335,21 @@ public class GatewayObservabilityAsyncPersistenceService {
         entity.setRequestId(snapshot.requestId());
         entity.setDistributedKeyId(snapshot.distributedKeyId());
         entity.setDistributedKeyPrefix(snapshot.distributedKeyPrefix());
+        if (snapshot.clientFamily() != null) {
+            entity.setClientFamily(snapshot.clientFamily());
+        }
+        if (snapshot.clientInstance() != null) {
+            entity.setClientInstance(snapshot.clientInstance());
+        }
+        if (snapshot.workspaceHint() != null) {
+            entity.setWorkspaceHint(snapshot.workspaceHint());
+        }
+        if (snapshot.sessionAffinitySource() != null) {
+            entity.setSessionAffinitySource(snapshot.sessionAffinitySource());
+        }
+        if (snapshot.sessionAffinityKey() != null) {
+            entity.setSessionAffinityKey(snapshot.sessionAffinityKey());
+        }
         entity.setProtocol(snapshot.protocol());
         entity.setRequestPath(snapshot.requestPath());
         entity.setResourceType(snapshot.resourceType());
@@ -467,6 +482,11 @@ public class GatewayObservabilityAsyncPersistenceService {
             String requestId,
             Long distributedKeyId,
             String distributedKeyPrefix,
+            String clientFamily,
+            String clientInstance,
+            String workspaceHint,
+            String sessionAffinitySource,
+            String sessionAffinityKey,
             String protocol,
             String requestPath,
             String resourceType,
@@ -497,6 +517,81 @@ public class GatewayObservabilityAsyncPersistenceService {
             Long durationMs,
             Instant startedAt,
             Instant completedAt) {
+        public RequestLogSnapshot(
+                String requestId,
+                Long distributedKeyId,
+                String distributedKeyPrefix,
+                String protocol,
+                String requestPath,
+                String resourceType,
+                String operation,
+                String requestedModel,
+                String publicModel,
+                String resolvedModelKey,
+                String modelGroup,
+                ProviderType providerType,
+                Long credentialId,
+                String selectionSource,
+                String executionBackend,
+                String supportStatus,
+                String degradationLevel,
+                String objectMode,
+                String gatewayResourceKey,
+                String responseKind,
+                String responseObjectType,
+                String responseObjectId,
+                String responseStatus,
+                Integer canonicalEventCount,
+                String prefixHash,
+                String fingerprint,
+                boolean stream,
+                GatewayRequestStatus status,
+                String errorCode,
+                String errorMessage,
+                Long durationMs,
+                Instant startedAt,
+                Instant completedAt) {
+            this(
+                    requestId,
+                    distributedKeyId,
+                    distributedKeyPrefix,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    protocol,
+                    requestPath,
+                    resourceType,
+                    operation,
+                    requestedModel,
+                    publicModel,
+                    resolvedModelKey,
+                    modelGroup,
+                    providerType,
+                    credentialId,
+                    selectionSource,
+                    executionBackend,
+                    supportStatus,
+                    degradationLevel,
+                    objectMode,
+                    gatewayResourceKey,
+                    responseKind,
+                    responseObjectType,
+                    responseObjectId,
+                    responseStatus,
+                    canonicalEventCount,
+                    prefixHash,
+                    fingerprint,
+                    stream,
+                    status,
+                    errorCode,
+                    errorMessage,
+                    durationMs,
+                    startedAt,
+                    completedAt
+            );
+        }
     }
 
     public record UsageRecordSnapshot(

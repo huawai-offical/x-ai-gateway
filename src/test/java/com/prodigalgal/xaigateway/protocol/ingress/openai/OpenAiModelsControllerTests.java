@@ -121,7 +121,8 @@ class OpenAiModelsControllerTests {
                 .exchange()
                 .expectStatus().isNotFound()
                 .expectBody()
-                .jsonPath("$.code").isEqualTo("NOT_FOUND")
-                .jsonPath("$.message").isEqualTo("未找到指定模型。");
+                .jsonPath("$.error.code").isEqualTo("not_found")
+                .jsonPath("$.error.type").isEqualTo("invalid_request_error")
+                .jsonPath("$.error.message").isEqualTo("未找到指定模型。");
     }
 }

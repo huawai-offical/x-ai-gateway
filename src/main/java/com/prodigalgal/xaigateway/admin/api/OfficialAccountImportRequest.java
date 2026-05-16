@@ -1,6 +1,5 @@
 package com.prodigalgal.xaigateway.admin.api;
 
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
 import java.util.List;
@@ -10,7 +9,7 @@ public record OfficialAccountImportRequest(
         Long poolId,
         String accountName,
         String externalAccountId,
-        @NotBlank String accessToken,
+        String accessToken,
         String refreshToken,
         String metadataJson,
         Boolean active,

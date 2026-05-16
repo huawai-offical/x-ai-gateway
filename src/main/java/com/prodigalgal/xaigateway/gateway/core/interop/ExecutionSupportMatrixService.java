@@ -85,7 +85,7 @@ public class ExecutionSupportMatrixService {
                             ? InteropCapabilityLevel.NATIVE
                             : InteropCapabilityLevel.UNSUPPORTED;
             case WEB_SEARCH ->
-                    siteKind == UpstreamSiteKind.OPENAI_DIRECT
+                    (siteKind == UpstreamSiteKind.OPENAI_DIRECT || siteKind == UpstreamSiteKind.PERPLEXITY)
                             ? InteropCapabilityLevel.NATIVE
                             : InteropCapabilityLevel.UNSUPPORTED;
         };

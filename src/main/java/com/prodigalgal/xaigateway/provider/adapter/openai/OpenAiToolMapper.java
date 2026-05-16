@@ -49,8 +49,8 @@ public class OpenAiToolMapper {
                 : objectMapper.convertValue(tool.inputSchema(), MAP_TYPE);
 
         OpenAiApi.FunctionTool.Function function = new OpenAiApi.FunctionTool.Function(
-                tool.name(),
                 tool.description(),
+                tool.name(),
                 parameters,
                 tool.strict()
         );

@@ -7,6 +7,7 @@ import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalContentPart;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalMessage;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalMessageRole;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalReasoningConfig;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolDefinition;
 import java.util.ArrayList;
@@ -53,6 +54,7 @@ public class GeminiGenerateContentRequestMapper {
             String model,
             GeminiGenerateContentRequest request,
             boolean stream) {
+        validateManagedTools(request);
         List<CanonicalMessage> messages = toMessages(request.systemInstruction(), request.contents());
         ensureUserMessage(messages);
 
@@ -75,9 +77,39 @@ public class GeminiGenerateContentRequestMapper {
                 null,
                 temperature,
                 maxTokens,
-                null,
+                buildReasoningConfig(request.generationConfig()),
                 objectMapper.valueToTree(request)
         );
+    }
+
+    private void validateManagedTools(GeminiGenerateContentRequest request) {
+        JsonNode tools = request.tools();
+        if (tools == null || !tools.isArray()) {
+            return;
+        }
+        for (JsonNode tool : tools) {
+            if (tool.has("googleMaps") && !Boolean.TRUE.equals(request.allowGoogleMaps())) {
+                throw new IllegalArgumentException("googleMaps grounding 需要 x_ai_gateway_allow_google_maps=true。");
+            }
+        }
+    }
+
+    private CanonicalReasoningConfig buildReasoningConfig(JsonNode generationConfig) {
+        if (generationConfig == null || !generationConfig.isObject()) {
+            return null;
+        }
+        JsonNode thinkingConfig = generationConfig.path("thinkingConfig");
+        if (thinkingConfig.isObject()) {
+            String effort = thinkingConfig.path("thinkingLevel").asText(null);
+            if (effort == null || effort.isBlank()) {
+                effort = thinkingConfig.has("thinkingBudget") ? "budget:" + thinkingConfig.path("thinkingBudget").asInt() : null;
+            }
+            return new CanonicalReasoningConfig(thinkingConfig, effort);
+        }
+        if (generationConfig.has("thinkingBudget") || generationConfig.has("thinkingLevel")) {
+            return new CanonicalReasoningConfig(generationConfig, generationConfig.path("thinkingLevel").asText(null));
+        }
+        return null;
     }
 
     private List<CanonicalMessage> toMessages(JsonNode systemInstruction, JsonNode contents) {

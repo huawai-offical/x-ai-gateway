@@ -3,6 +3,7 @@ package com.prodigalgal.xaigateway.admin.application;
 import com.prodigalgal.xaigateway.admin.api.AsyncResourceDetailResponse;
 import com.prodigalgal.xaigateway.admin.api.AsyncResourceSummaryResponse;
 import com.prodigalgal.xaigateway.admin.api.CacheHitLogResponse;
+import com.prodigalgal.xaigateway.admin.api.CodexObservabilityRequestResponse;
 import com.prodigalgal.xaigateway.admin.api.ObservabilitySummaryResponse;
 import com.prodigalgal.xaigateway.admin.api.ObservabilityTraceResponse;
 import com.prodigalgal.xaigateway.admin.api.RequestLogResponse;
@@ -22,8 +23,11 @@ import com.prodigalgal.xaigateway.infra.persistence.repository.UsageRecordReposi
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -213,6 +217,54 @@ public class ObservabilityQueryService {
                     window.to());
         }
         return entities.stream().map(this::toRequestLogResponse).toList();
+    }
+
+    public List<CodexObservabilityRequestResponse> listCodexRequests(
+            Long distributedKeyId,
+            ProviderType providerType,
+            String requestId,
+            String clientInstance,
+            String sessionAffinityKey,
+            String model,
+            String status,
+            Instant from,
+            Instant to) {
+        List<RequestLogResponse> requestLogs = listRequestLogs(
+                distributedKeyId,
+                providerType,
+                from,
+                to,
+                requestId,
+                null,
+                null
+        );
+        List<String> requestIds = requestLogs.stream()
+                .map(RequestLogResponse::requestId)
+                .filter(Objects::nonNull)
+                .toList();
+        Map<String, UsageRecordEntity> usageByRequestId = usageRecordRepository.findAllByRequestIdIn(requestIds).stream()
+                .collect(LinkedHashMap::new, (target, entity) -> target.put(entity.getRequestId(), entity), Map::putAll);
+
+        return requestLogs.stream()
+                .map(row -> toCodexObservabilityResponse(
+                        row,
+                        routeDecisionLogRepository.findTopByRequestIdOrderByCreatedAtDesc(row.requestId())
+                                .map(this::toRouteDecisionResponse)
+                                .orElse(null),
+                        cacheHitLogRepository.findAllByRequestIdOrderByCreatedAtDesc(row.requestId()).stream()
+                                .map(this::toCacheHitResponse)
+                                .toList(),
+                        usageByRequestId.get(row.requestId())
+                ))
+                .filter(response -> isCodexRequest(response))
+                .filter(response -> matchesText(response.clientInstance(), clientInstance)
+                        || matchesText(response.workspaceHint(), clientInstance)
+                        || matchesText(response.clientFamily(), clientInstance))
+                .filter(response -> matchesText(response.sessionAffinityKey(), sessionAffinityKey)
+                        || matchesText(response.sessionAffinitySource(), sessionAffinityKey))
+                .filter(response -> matchesText(response.model(), model))
+                .filter(response -> matchesText(response.status(), status))
+                .toList();
     }
 
     public List<UpstreamCacheReferenceResponse> listUpstreamCacheReferences(Long distributedKeyId, String status) {
@@ -652,6 +704,11 @@ public class ObservabilityQueryService {
                 entity.getRequestId(),
                 entity.getDistributedKeyId(),
                 entity.getDistributedKeyPrefix(),
+                entity.getClientFamily(),
+                entity.getClientInstance(),
+                entity.getWorkspaceHint(),
+                entity.getSessionAffinitySource(),
+                entity.getSessionAffinityKey(),
                 entity.getProtocol(),
                 entity.getRequestPath(),
                 entity.getResourceType(),
@@ -714,11 +771,242 @@ public class ObservabilityQueryService {
         );
     }
 
+    private CodexObservabilityRequestResponse toCodexObservabilityResponse(
+            RequestLogResponse requestLog,
+            RouteDecisionLogResponse routeDecision,
+            List<CacheHitLogResponse> cacheHits,
+            UsageRecordEntity usageRecord) {
+        int cacheHitTokens = cacheHits.stream().mapToInt(CacheHitLogResponse::cacheHitTokens).sum();
+        int cacheWriteTokens = cacheHits.stream().mapToInt(CacheHitLogResponse::cacheWriteTokens).sum();
+        int savedInputTokens = cacheHits.stream().mapToInt(CacheHitLogResponse::savedInputTokens).sum();
+        Integer inputTokens = usageRecord == null ? null : usageRecord.getPromptTokens();
+        Integer outputTokens = usageRecord == null ? null : usageRecord.getCompletionTokens();
+        Integer reasoningTokens = usageRecord == null ? null : usageRecord.getReasoningTokens();
+        Integer totalTokens = usageRecord == null ? null : usageRecord.getTotalTokens();
+        String filterSummaryJson = extractFilterSummaryJson(routeDecision == null ? null : routeDecision.candidateSummaryJson());
+        String filterSummary = filterSummaryJson == null ? "未记录 filter 命中" : "选路候选包含过滤命中元数据";
+        String model = firstNonBlank(
+                requestLog.publicModel(),
+                requestLog.requestedModel(),
+                requestLog.resolvedModelKey(),
+                routeDecision == null ? null : routeDecision.publicModel(),
+                routeDecision == null ? null : routeDecision.requestedModel(),
+                routeDecision == null ? null : routeDecision.resolvedModelKey()
+        );
+        String status = firstNonBlank(
+                requestLog.status() == null ? null : requestLog.status().name(),
+                requestLog.responseStatus(),
+                requestLog.supportStatus(),
+                routeDecision == null ? null : routeDecision.supportStatus()
+        );
+        ProviderType providerType = requestLog.providerType() != null
+                ? requestLog.providerType()
+                : routeDecision == null ? null : routeDecision.selectedProviderType();
+        Long credentialId = requestLog.credentialId() != null
+                ? requestLog.credentialId()
+                : routeDecision == null ? null : routeDecision.selectedCredentialId();
+        String routeSummary = routeDecision == null
+                ? "选路详情待加载"
+                : String.join(" / ", List.of(
+                                routeDecision.selectedProviderType() == null ? "" : routeDecision.selectedProviderType().name(),
+                                routeDecision.selectedCredentialId() == null ? "" : "credential " + routeDecision.selectedCredentialId(),
+                                "candidates " + routeDecision.candidateCount(),
+                                defaultString(routeDecision.supportStatus(), ""),
+                                defaultString(routeDecision.degradationLevel(), "")
+                        ).stream()
+                        .filter(value -> !value.isBlank())
+                        .toList());
+        String cacheSummary = buildCacheSummary(cacheHitTokens, cacheWriteTokens, savedInputTokens, usageRecord);
+        String errorSummary = buildErrorSummary(requestLog);
+        String diagnosticJson = buildDiagnosticJson(
+                requestLog,
+                routeDecision,
+                model,
+                status,
+                providerType,
+                credentialId,
+                filterSummary,
+                cacheSummary,
+                errorSummary
+        );
+
+        return new CodexObservabilityRequestResponse(
+                requestLog.requestId(),
+                requestLog.distributedKeyId(),
+                requestLog.distributedKeyPrefix(),
+                requestLog.clientFamily(),
+                requestLog.clientInstance(),
+                requestLog.workspaceHint(),
+                requestLog.sessionAffinitySource(),
+                requestLog.sessionAffinityKey(),
+                model,
+                status,
+                providerType,
+                credentialId,
+                routeSummary,
+                routeDecision == null ? null : routeDecision.candidateCount(),
+                routeDecision == null ? requestLog.supportStatus() : routeDecision.supportStatus(),
+                routeDecision == null ? requestLog.degradationLevel() : routeDecision.degradationLevel(),
+                filterSummary,
+                filterSummaryJson,
+                inputTokens,
+                outputTokens,
+                reasoningTokens,
+                totalTokens,
+                cacheHitTokens,
+                cacheWriteTokens,
+                savedInputTokens,
+                cacheSummary,
+                errorSummary,
+                diagnosticJson,
+                requestLog.startedAt(),
+                requestLog.completedAt(),
+                requestLog.createdAt(),
+                requestLog.durationMs()
+        );
+    }
+
+    private boolean isCodexRequest(CodexObservabilityRequestResponse response) {
+        String values = String.join(" ",
+                defaultString(response.clientFamily(), ""),
+                defaultString(response.clientInstance(), ""),
+                defaultString(response.workspaceHint(), ""),
+                defaultString(response.model(), ""),
+                defaultString(response.providerType() == null ? null : response.providerType().name(), ""),
+                defaultString(response.routeSummary(), "")
+        ).toLowerCase(Locale.ROOT);
+        return values.contains("codex")
+                || values.contains("gpt-5")
+                || values.contains("responses");
+    }
+
+    private boolean matchesText(String value, String filter) {
+        String normalizedFilter = normalizeFilter(filter);
+        if (normalizedFilter == null) {
+            return true;
+        }
+        if (value == null) {
+            return false;
+        }
+        return value.toLowerCase(Locale.ROOT).contains(normalizedFilter.toLowerCase(Locale.ROOT));
+    }
+
+    private String extractFilterSummaryJson(String candidateSummaryJson) {
+        if (candidateSummaryJson == null || candidateSummaryJson.isBlank()) {
+            return null;
+        }
+        String normalized = candidateSummaryJson.toLowerCase(Locale.ROOT);
+        if (!normalized.contains("x_ai_gateway_filter") && !normalized.contains("filter")) {
+            return null;
+        }
+        ObjectNode node = JsonNodeFactory.instance.objectNode();
+        node.put("source", "route_candidate_summary");
+        node.put("summary", "candidate summary includes filter metadata");
+        node.put("sample", redactText(candidateSummaryJson, 360));
+        return node.toString();
+    }
+
+    private String buildCacheSummary(
+            int cacheHitTokens,
+            int cacheWriteTokens,
+            int savedInputTokens,
+            UsageRecordEntity usageRecord) {
+        int usageCacheHitTokens = usageRecord == null ? 0 : usageRecord.getCacheHitTokens() + usageRecord.getUpstreamCacheHitTokens();
+        int usageCacheWriteTokens = usageRecord == null ? 0 : usageRecord.getCacheWriteTokens() + usageRecord.getUpstreamCacheWriteTokens();
+        int effectiveHitTokens = Math.max(cacheHitTokens, usageCacheHitTokens);
+        int effectiveWriteTokens = Math.max(cacheWriteTokens, usageCacheWriteTokens);
+        int effectiveSavedTokens = Math.max(savedInputTokens, usageRecord == null ? 0 : usageRecord.getSavedInputTokens());
+        if (effectiveHitTokens == 0 && effectiveWriteTokens == 0 && effectiveSavedTokens == 0) {
+            return "无缓存收益";
+        }
+        return "saved " + effectiveSavedTokens + " / hit " + effectiveHitTokens + " / write " + effectiveWriteTokens;
+    }
+
+    private String buildErrorSummary(RequestLogResponse requestLog) {
+        String value = List.of(
+                defaultString(requestLog.errorCode(), ""),
+                defaultString(requestLog.errorMessage(), "")
+        ).stream().filter(part -> !part.isBlank()).toList().toString();
+        if ("[]".equals(value)) {
+            return "无错误摘要";
+        }
+        return redactText(value.replace("[", "").replace("]", ""), 220);
+    }
+
+    private String buildDiagnosticJson(
+            RequestLogResponse requestLog,
+            RouteDecisionLogResponse routeDecision,
+            String model,
+            String status,
+            ProviderType providerType,
+            Long credentialId,
+            String filterSummary,
+            String cacheSummary,
+            String errorSummary) {
+        ObjectNode node = JsonNodeFactory.instance.objectNode();
+        putString(node, "requestId", requestLog.requestId());
+        putString(node, "model", model);
+        putString(node, "status", status);
+        putString(node, "providerType", providerType == null ? null : providerType.name());
+        putLong(node, "credentialId", credentialId);
+        putString(node, "clientFamily", requestLog.clientFamily());
+        putString(node, "clientInstance", requestLog.clientInstance());
+        putString(node, "workspaceHint", requestLog.workspaceHint());
+        putString(node, "sessionAffinitySource", requestLog.sessionAffinitySource());
+        putString(node, "sessionAffinityKey", requestLog.sessionAffinityKey());
+        putString(node, "routeSummary", routeDecision == null ? "选路详情待加载" : routeDecision.supportStatus());
+        putString(node, "filterSummary", filterSummary);
+        putString(node, "cacheSummary", cacheSummary);
+        putString(node, "errorSummary", errorSummary);
+        node.put("redaction", "已移除 prompt、token、secret、完整 auth.json 和完整 upstream 错误正文。");
+        return node.toString();
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return "-";
+    }
+
+    private String defaultString(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value.trim();
+    }
+
+    private String redactText(String value, int maxLength) {
+        if (value == null) {
+            return "";
+        }
+        String sanitized = value
+                .replaceAll("(sk-[A-Za-z0-9_-]{8})[A-Za-z0-9_-]+", "$1***")
+                .replaceAll("Bearer\\s+[A-Za-z0-9._-]+", "Bearer ***")
+                .replaceAll("([A-Za-z0-9_-]{12,}\\.[A-Za-z0-9_-]{12,}\\.)[A-Za-z0-9_-]{12,}", "$1***");
+        return sanitized.substring(0, Math.min(maxLength, sanitized.length()));
+    }
+
     private void putInstant(ObjectNode node, String fieldName, Instant value) {
         if (value == null) {
             node.putNull(fieldName);
         } else {
             node.put(fieldName, value.toString());
+        }
+    }
+
+    private void putString(ObjectNode node, String fieldName, String value) {
+        if (value == null) {
+            node.putNull(fieldName);
+        } else {
+            node.put(fieldName, value);
+        }
+    }
+
+    private void putLong(ObjectNode node, String fieldName, Long value) {
+        if (value == null) {
+            node.putNull(fieldName);
+        } else {
+            node.put(fieldName, value);
         }
     }
 

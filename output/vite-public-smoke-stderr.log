@@ -1,0 +1,75 @@
+$ vite --host 0.0.0.0 --port "5174"
+[2m23:20:46[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mNo `HydrateFallback` element provided to render during initial hydration
+[2m23:20:47[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m加载控制台会话失败。 ApiError: not found
+    at toApiError (http://127.0.0.1:5174/src/lib/api.ts:136:10)
+    at async apiRequest (http://127.0.0.1:5174/src/lib/api.ts:38:21)
+    at async bootstrapSession (http://127.0.0.1:5174/src/features/auth/auth-provider.tsx:25:25)
+[2m23:20:52[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mNo `HydrateFallback` element provided to render during initial hydration
+[2m23:20:54[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m加载控制台会话失败。 ApiError: not found
+    at toApiError (http://127.0.0.1:5174/src/lib/api.ts:136:10)
+    at async apiRequest (http://127.0.0.1:5174/src/lib/api.ts:38:21)
+    at async bootstrapSession (http://127.0.0.1:5174/src/features/auth/auth-provider.tsx:25:25)
+[2m23:20:58[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mNo `HydrateFallback` element provided to render during initial hydration
+[2m23:21:00[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m加载控制台会话失败。 ApiError: not found
+    at toApiError (http://127.0.0.1:5174/src/lib/api.ts:136:10)
+    at async apiRequest (http://127.0.0.1:5174/src/lib/api.ts:38:21)
+    at async bootstrapSession (http://127.0.0.1:5174/src/features/auth/auth-provider.tsx:25:25)
+[2m23:21:02[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mNo `HydrateFallback` element provided to render during initial hydration
+[2m23:21:03[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m加载控制台会话失败。 ApiError: not found
+    at toApiError (http://127.0.0.1:5174/src/lib/api.ts:136:10)
+    at async apiRequest (http://127.0.0.1:5174/src/lib/api.ts:38:21)
+    at async bootstrapSession (http://127.0.0.1:5174/src/features/auth/auth-provider.tsx:25:25)
+[2m23:21:19[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mNo `HydrateFallback` element provided to render during initial hydration
+[2m23:21:20[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m加载控制台会话失败。 ApiError: not found
+    at toApiError (http://127.0.0.1:5174/src/lib/api.ts:136:10)
+    at async apiRequest (http://127.0.0.1:5174/src/lib/api.ts:38:21)
+    at async bootstrapSession (http://127.0.0.1:5174/src/features/auth/auth-provider.tsx:25:25)
+[2m23:21:22[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mNo `HydrateFallback` element provided to render during initial hydration
+[2m23:21:22[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m加载控制台会话失败。 ApiError: not found
+    at toApiError (http://127.0.0.1:5174/src/lib/api.ts:136:10)
+    at async apiRequest (http://127.0.0.1:5174/src/lib/api.ts:38:21)
+    at async bootstrapSession (http://127.0.0.1:5174/src/features/auth/auth-provider.tsx:25:25)
+[2m23:21:45[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mNo `HydrateFallback` element provided to render during initial hydration
+[2m23:21:46[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m加载控制台会话失败。 ApiError: not found
+    at toApiError (http://127.0.0.1:5174/src/lib/api.ts:136:10)
+    at async apiRequest (http://127.0.0.1:5174/src/lib/api.ts:38:21)
+    at async bootstrapSession (http://127.0.0.1:5174/src/features/auth/auth-provider.tsx:25:25)
+[2m23:21:49[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mNo `HydrateFallback` element provided to render during initial hydration
+[2m23:21:51[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m加载控制台会话失败。 ApiError: not found
+    at toApiError (http://127.0.0.1:5174/src/lib/api.ts:136:10)
+    at async apiRequest (http://127.0.0.1:5174/src/lib/api.ts:38:21)
+    at async bootstrapSession (http://127.0.0.1:5174/src/features/auth/auth-provider.tsx:25:25)
+[2m23:21:53[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mNo `HydrateFallback` element provided to render during initial hydration
+[2m23:21:54[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m加载控制台会话失败。 ApiError: not found
+    at toApiError (http://127.0.0.1:5174/src/lib/api.ts:136:10)
+    at async apiRequest (http://127.0.0.1:5174/src/lib/api.ts:38:21)
+    at async bootstrapSession (http://127.0.0.1:5174/src/features/auth/auth-provider.tsx:25:25)
+[2m23:21:57[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mNo `HydrateFallback` element provided to render during initial hydration
+[2m23:21:59[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m加载控制台会话失败。 ApiError: not found
+    at toApiError (http://127.0.0.1:5174/src/lib/api.ts:136:10)
+    at async apiRequest (http://127.0.0.1:5174/src/lib/api.ts:38:21)
+    at async bootstrapSession (http://127.0.0.1:5174/src/features/auth/auth-provider.tsx:25:25)
+[2m23:22:43[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mNo `HydrateFallback` element provided to render during initial hydration
+[2m23:22:45[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m加载控制台会话失败。 ApiError: not found
+    at toApiError (http://127.0.0.1:5174/src/lib/api.ts:136:10)
+    at async apiRequest (http://127.0.0.1:5174/src/lib/api.ts:38:21)
+    at async bootstrapSession (http://127.0.0.1:5174/src/features/auth/auth-provider.tsx:25:25)
+[2m23:22:48[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mNo `HydrateFallback` element provided to render during initial hydration
+[2m23:22:49[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m加载控制台会话失败。 ApiError: not found
+    at toApiError (http://127.0.0.1:5174/src/lib/api.ts:136:10)
+    at async apiRequest (http://127.0.0.1:5174/src/lib/api.ts:38:21)
+    at async bootstrapSession (http://127.0.0.1:5174/src/features/auth/auth-provider.tsx:25:25)
+[2m23:22:52[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mNo `HydrateFallback` element provided to render during initial hydration
+[2m23:22:53[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m加载控制台会话失败。 ApiError: not found
+    at toApiError (http://127.0.0.1:5174/src/lib/api.ts:136:10)
+    at async apiRequest (http://127.0.0.1:5174/src/lib/api.ts:38:21)
+    at async bootstrapSession (http://127.0.0.1:5174/src/features/auth/auth-provider.tsx:25:25)
+[2m23:22:55[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mNo `HydrateFallback` element provided to render during initial hydration
+[2m23:22:56[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m加载控制台会话失败。 ApiError: not found
+    at toApiError (http://127.0.0.1:5174/src/lib/api.ts:136:10)
+    at async apiRequest (http://127.0.0.1:5174/src/lib/api.ts:38:21)
+    at async bootstrapSession (http://127.0.0.1:5174/src/features/auth/auth-provider.tsx:25:25)
+[2m23:26:32[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mNo `HydrateFallback` element provided to render during initial hydration
+[2m23:26:36[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mNo `HydrateFallback` element provided to render during initial hydration
+[2m23:26:38[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mNo `HydrateFallback` element provided to render during initial hydration
+[2m23:26:41[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mNo `HydrateFallback` element provided to render during initial hydration

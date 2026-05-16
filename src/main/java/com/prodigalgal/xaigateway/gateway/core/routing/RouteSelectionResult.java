@@ -14,6 +14,7 @@ public record RouteSelectionResult(
         String fingerprint,
         String modelGroup,
         GatewayClientFamily clientFamily,
+        String sessionAffinityKey,
         List<String> governanceNotes,
         String governanceReservationKey,
         RouteSelectionSource selectionSource,
@@ -50,6 +51,7 @@ public record RouteSelectionResult(
                 fingerprint,
                 modelGroup,
                 clientFamily,
+                null,
                 governanceNotes,
                 governanceReservationKey,
                 selectionSource,
@@ -85,6 +87,7 @@ public record RouteSelectionResult(
                 fingerprint,
                 modelGroup,
                 GatewayClientFamily.GENERIC_OPENAI,
+                null,
                 List.of(),
                 null,
                 selectionSource,
@@ -92,6 +95,47 @@ public record RouteSelectionResult(
                 candidates,
                 List.of(),
                 List.of()
+        );
+    }
+
+    public RouteSelectionResult(
+            Long distributedKeyId,
+            String distributedKeyPrefix,
+            String requestedModel,
+            String publicModel,
+            String resolvedModelKey,
+            String protocol,
+            String prefixHash,
+            String fingerprint,
+            String modelGroup,
+            GatewayClientFamily clientFamily,
+            List<String> governanceNotes,
+            String governanceReservationKey,
+            RouteSelectionSource selectionSource,
+            RouteCandidateView selectedCandidate,
+            List<RouteCandidateView> candidates,
+            List<RouteCandidateEvaluation> candidateEvaluations,
+            List<RouteExecutionAttempt> attempts
+    ) {
+        this(
+                distributedKeyId,
+                distributedKeyPrefix,
+                requestedModel,
+                publicModel,
+                resolvedModelKey,
+                protocol,
+                prefixHash,
+                fingerprint,
+                modelGroup,
+                clientFamily,
+                null,
+                governanceNotes,
+                governanceReservationKey,
+                selectionSource,
+                selectedCandidate,
+                candidates,
+                candidateEvaluations,
+                attempts
         );
     }
 
@@ -107,6 +151,7 @@ public record RouteSelectionResult(
                 fingerprint,
                 modelGroup,
                 clientFamily,
+                sessionAffinityKey,
                 governanceNotes,
                 governanceReservationKey,
                 source,
@@ -129,6 +174,7 @@ public record RouteSelectionResult(
                 fingerprint,
                 modelGroup,
                 clientFamily,
+                sessionAffinityKey,
                 governanceNotes,
                 governanceReservationKey,
                 selectionSource,

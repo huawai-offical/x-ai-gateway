@@ -34,6 +34,18 @@ class ProviderCatalogLoaderTests {
                 .filter(item -> item.code().equals("dify"))
                 .findFirst()
                 .orElseThrow();
+        ProviderPresetDefinition xai = snapshot.presets().stream()
+                .filter(item -> item.code().equals("xai"))
+                .findFirst()
+                .orElseThrow();
+        ProviderPresetDefinition perplexity = snapshot.presets().stream()
+                .filter(item -> item.code().equals("perplexity"))
+                .findFirst()
+                .orElseThrow();
+        ProviderPresetDefinition vertex = snapshot.presets().stream()
+                .filter(item -> item.code().equals("vertex"))
+                .findFirst()
+                .orElseThrow();
 
         assertEquals(UpstreamSiteKind.QWEN, qwen.siteKind());
         assertEquals("openai-compatible-chat", qwen.compatibilitySurface());
@@ -49,6 +61,22 @@ class ProviderCatalogLoaderTests {
         assertEquals(UpstreamSiteKind.DIFY, dify.siteKind());
         assertEquals("dify-compatible", dify.compatibilitySurface());
         assertEquals("workflow-openai-compatible", dify.supportStrategy());
+
+        assertEquals(UpstreamSiteKind.GROK, xai.siteKind());
+        assertEquals("openai-compatible-chat", xai.compatibilitySurface());
+        assertTrue(xai.capabilityTags().contains("xai"));
+        assertTrue(xai.modelFamilies().contains("grok-4.3"));
+        assertTrue(xai.unsupportedFeatures().stream().anyMatch(item -> item.contains("2026-05-15")));
+
+        assertEquals(UpstreamSiteKind.PERPLEXITY, perplexity.siteKind());
+        assertEquals("openai-compatible-web-search", perplexity.compatibilitySurface());
+        assertEquals("web-search-openai-compatible", perplexity.supportStrategy());
+        assertTrue(perplexity.capabilityTags().contains("web_search"));
+
+        assertEquals(UpstreamSiteKind.VERTEX_AI, vertex.siteKind());
+        assertEquals("google-native", vertex.compatibilitySurface());
+        assertEquals("vertex-google-native", vertex.supportStrategy());
+        assertTrue(vertex.capabilityTags().contains("project_location"));
     }
 
     @Test

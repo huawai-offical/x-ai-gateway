@@ -10,6 +10,7 @@
 - `openapi` 版本存在。
 - `info.title`、`info.version` 存在。
 - 公开 paths 包含 `/v1/chat/completions`、`/v1/responses`、`/public/docs/openapi.json`。
+- `/v1/chat/completions` request body schema 包含 `response_format`、`tools`、`tool_choice`、`store`、`metadata`、`web_search_options` 等关键字段。
 - bearer auth security scheme 存在。
 
 ## SDK 示例
@@ -20,6 +21,7 @@
 | --- | --- |
 | Python | [chat_completions.py](sdk-examples/python/chat_completions.py) |
 | JavaScript | [chat-completions.mjs](sdk-examples/javascript/chat-completions.mjs) |
+| JavaScript advanced | [chat-advanced-parameters.mjs](sdk-examples/javascript/chat-advanced-parameters.mjs) |
 | Go | [chat_completions.go](sdk-examples/go/chat_completions.go) |
 | Java | [ChatCompletionsExample.java](sdk-examples/java/ChatCompletionsExample.java) |
 
@@ -28,5 +30,7 @@
 - `X_AI_GATEWAY_BASE_URL`
 - `X_AI_GATEWAY_API_KEY`
 - `X_AI_GATEWAY_MODEL`
+
+Advanced JavaScript 示例额外展示 `response_format`、`tools/tool_choice`、`store/metadata`、`parallel_tool_calls`、`service_tier`、`stream_options`，并通过 `X_AI_GATEWAY_CHAT_WEB_SEARCH=1` 与 `X_AI_GATEWAY_CHAT_AUDIO=1` 显式启用 `web_search_options` 和 `modalities/audio`。
 
 没有真实 provider key 时，示例用于展示接入形态和 SDK 代码，不承诺上游真实调用成功。

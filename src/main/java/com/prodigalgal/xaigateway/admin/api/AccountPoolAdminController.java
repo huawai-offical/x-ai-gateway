@@ -41,6 +41,20 @@ public class AccountPoolAdminController {
         return accountPoolAdminService.bindDistributedKey(id, request);
     }
 
+    @PostMapping("/{id}/codex-runtime/batch-recovery-preflight")
+    public CodexRuntimeBatchRecoveryResponse codexRuntimeBatchRecoveryPreflight(
+            @PathVariable Long id,
+            @RequestBody(required = false) CodexRuntimeBatchRecoveryRequest request) {
+        return accountPoolAdminService.codexRuntimeBatchRecovery(id, request, false);
+    }
+
+    @PostMapping("/{id}/codex-runtime/batch-recovery")
+    public CodexRuntimeBatchRecoveryResponse codexRuntimeBatchRecovery(
+            @PathVariable Long id,
+            @RequestBody(required = false) CodexRuntimeBatchRecoveryRequest request) {
+        return accountPoolAdminService.codexRuntimeBatchRecovery(id, request, true);
+    }
+
     @PostMapping("/{id}/status")
     public AccountPoolResponse toggle(@PathVariable Long id, @RequestParam boolean active) {
         return accountPoolAdminService.toggle(id, active);

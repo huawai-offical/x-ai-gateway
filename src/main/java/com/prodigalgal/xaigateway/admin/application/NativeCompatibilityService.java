@@ -2,6 +2,7 @@ package com.prodigalgal.xaigateway.admin.application;
 
 import com.prodigalgal.xaigateway.admin.api.NativeCompatibilityResponse;
 import com.prodigalgal.xaigateway.admin.api.NativeCompatibilityRoute;
+import com.prodigalgal.xaigateway.admin.api.NativeTranslationConformanceRow;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
@@ -28,6 +29,88 @@ public class NativeCompatibilityService {
                 new NativeCompatibilityRoute("google", "/v1beta", "*", "/v1beta/**", "SUPPORTED_GOVERNED", true, "AUTH_GOVERNED", "通用 Gemini `/v1beta` 已支持 models/files/batches 已建模路径，未知路径显式拒绝。"),
                 new NativeCompatibilityRoute("google", "/google/v1beta", "*", "/google/v1beta/**", "EXPLICIT_UNSUPPORTED", true, "AUTH_GOVERNED", "非显式支持路径返回兼容矩阵，不做未治理透明代理。"),
                 new NativeCompatibilityRoute("google", "/google/upload/v1beta", "*", "/google/upload/v1beta/**", "EXPLICIT_UNSUPPORTED", true, "AUTH_GOVERNED", "非显式支持 upload path 返回兼容矩阵，不做未治理透明代理。")
-        ));
+        ), translationConformance());
+    }
+
+    private List<NativeTranslationConformanceRow> translationConformance() {
+        return List.of(
+                new NativeTranslationConformanceRow(
+                        "OpenAI",
+                        "openai",
+                        "/v1/chat/completions",
+                        "native",
+                        List.of("text", "vision", "tools", "tool_choice", "streaming", "usage", "finish_reason"),
+                        List.of("provider-specific extra_body"),
+                        List.of("unknown extension fields passthrough"),
+                        "OpenAiChatCompletionsControllerTests + GatewayEndToEndSmokeTests",
+                        "Chat Completions 已进入 canonical chat 主链路，OpenAI-compatible provider 需要按站点声明扩展参数。"
+                ),
+                new NativeTranslationConformanceRow(
+                        "OpenAI",
+                        "responses",
+                        "/v1/responses",
+                        "native",
+                        List.of("input_text", "input_image", "input_file", "function_call_output", "tools", "reasoning"),
+                        List.of("partial provider annotations"),
+                        List.of("computer_use action replay"),
+                        "OpenAiResponsesControllerTests + TranslationExplainServiceTests",
+                        "Responses 主链路已建模，少量前沿 tool 类型需要继续以 lossy/unsupported 显式标记。"
+                ),
+                new NativeTranslationConformanceRow(
+                        "Anthropic",
+                        "anthropic",
+                        "/v1/messages",
+                        "lossy",
+                        List.of("text", "image", "document", "tool_result", "system", "usage"),
+                        List.of("streaming tool_use deltas", "thinking deltas", "tool schema passthrough"),
+                        List.of("message batches native passthrough in chat runtime"),
+                        "AnthropicMessagesControllerTests + AnthropicNativeGatewayChatRuntimeTests",
+                        "Messages 可运行，但 streaming tool/reasoning 的事件级保真仍需硬化。"
+                ),
+                new NativeTranslationConformanceRow(
+                        "Gemini",
+                        "google",
+                        "/v1beta/models/{model}:generateContent",
+                        "lossy",
+                        List.of("text", "fileData", "functionResponse", "functionDeclarations", "streaming", "usage"),
+                        List.of("thinkingConfig", "toolChoice", "safety block normalization"),
+                        List.of("Vertex project/location native path"),
+                        "GeminiGenerateContentControllerTests + GeminiNativeGatewayChatRuntimeTests",
+                        "Gemini 主入口已支持，Vertex 与 thinking/toolChoice 差异需要后续补齐。"
+                ),
+                new NativeTranslationConformanceRow(
+                        "OpenAI-compatible",
+                        "openai-compatible",
+                        "/v1/chat/completions",
+                        "emulated",
+                        List.of("text", "vision where provider supports it", "streaming", "basic usage"),
+                        List.of("provider-specific params", "custom error code", "rate-limit headers"),
+                        List.of("native non-OpenAI endpoints"),
+                        "ProviderCatalogLoaderTests + SiteConformanceHarnessTests",
+                        "OpenAI-compatible 以 catalog 和站点能力声明为事实源，不能自动等同原生 OpenAI。"
+                ),
+                new NativeTranslationConformanceRow(
+                        "Azure OpenAI",
+                        "azure-openai",
+                        "/openai/deployments/{deployment}/chat/completions",
+                        "emulated",
+                        List.of("chat body via OpenAI shape", "deployment-to-model mapping"),
+                        List.of("api-version behavior", "azure content filter details"),
+                        List.of("deployment management APIs"),
+                        "ProviderCatalogLoaderTests",
+                        "需要用 deployment 与 api-version 维度继续完善真实 conformance。"
+                ),
+                new NativeTranslationConformanceRow(
+                        "xAI / Perplexity / Vertex",
+                        "provider-specific",
+                        "provider native endpoints",
+                        "partial",
+                        List.of("xAI OpenAI-compatible chat", "Perplexity search-augmented chat", "Vertex generateContent project/location path"),
+                        List.of("provider-specific request/response extensions", "service-account smoke", "citation normalization"),
+                        List.of("Bedrock/Baidu/Zhipu/Tencent native adapters", "provider-specific media lifecycle"),
+                        "ProviderCatalogLoaderTests + SiteConformanceHarnessTests + ProviderReferenceGapServiceTests",
+                        "xAI、Perplexity、Vertex 已从笼统缺口收敛为可建模兼容面；仍不能宣称所有长尾 provider 全自动无损翻译。"
+                )
+        );
     }
 }

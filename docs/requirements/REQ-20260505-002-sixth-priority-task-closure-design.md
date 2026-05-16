@@ -1,6 +1,6 @@
 # REQ-20260505-002 第六批最高优先级任务闭环设计
 
-状态：In Progress
+状态：Done
 创建日期：2026-05-05
 关联决策：[ADR-0007](../decisions/ADR-0007-sixth-batch-runtime-and-oauth-scope.md)
 关联任务：
@@ -85,5 +85,5 @@
 
 ## 遗留问题
 
-- 真实共享 Redis smoke、真实第三方 OAuth smoke 与 ops dry-run 串联已拆到 [TASK-20260505-006](../../tasks/backlog/TASK-20260505-006-redis-oauth-ops-smoke-harness.md)。
+- 真实共享 Redis smoke、真实第三方 OAuth smoke 与 ops dry-run 串联已拆到并闭环到 [TASK-20260505-006](../../tasks/done/TASK-20260505-006-redis-oauth-ops-smoke-harness.md)。
 - Ollama document/file 真支持、Ops/Maintenance/Release 真实演练证据仍在 backlog。

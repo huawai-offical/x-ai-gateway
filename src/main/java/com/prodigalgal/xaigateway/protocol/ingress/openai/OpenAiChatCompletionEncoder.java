@@ -7,8 +7,10 @@ import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionStrea
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEvent;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEventType;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayFinishReason;
+import java.time.Instant;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
+import tools.jackson.databind.JsonNode;
 
 @Service
 public class OpenAiChatCompletionEncoder {
@@ -24,31 +26,62 @@ public class OpenAiChatCompletionEncoder {
     }
 
     public Flux<String> encodeStream(CanonicalExecutionStreamResult response) {
+        return encodeStream(response, null);
+    }
+
+    public Flux<String> encodeStream(CanonicalExecutionStreamResult response, JsonNode streamOptions) {
+        String streamId = "chatcmpl-" + response.requestId();
+        long created = Instant.now().getEpochSecond();
+        boolean includeUsage = includeUsage(streamOptions);
+        String publicModel = response.routeSelection().publicModel();
         return Flux.concat(
-                Flux.just(encode(OpenAiChatCompletionResponse.roleChunk(response.routeSelection().publicModel()))),
-                response.events().concatMap(event -> encodeEvent(response.routeSelection().publicModel(), event)),
+                Flux.just(encode(OpenAiChatCompletionResponse.roleChunk(streamId, created, publicModel))),
+                response.events().concatMap(event -> encodeEvent(publicModel, streamId, created, includeUsage, event)),
                 Flux.just("data: [DONE]\n\n")
         );
     }
 
-    private Flux<String> encodeEvent(String publicModel, CanonicalStreamEvent canonicalEvent) {
+    private Flux<String> encodeEvent(
+            String publicModel,
+            String streamId,
+            long created,
+            boolean includeUsage,
+            CanonicalStreamEvent canonicalEvent) {
         if (canonicalEvent.type() == CanonicalStreamEventType.TEXT_DELTA && canonicalEvent.textDelta() != null && !canonicalEvent.textDelta().isBlank()) {
             return Flux.just(encode(OpenAiChatCompletionResponse.contentChunk(
+                    streamId,
+                    created,
                     publicModel,
                     canonicalEvent.textDelta()
             )));
         }
         if (canonicalEvent.type() == CanonicalStreamEventType.TOOL_CALLS && canonicalEvent.toolCalls() != null && !canonicalEvent.toolCalls().isEmpty()) {
             return Flux.just(encode(OpenAiChatCompletionResponse.toolCallChunkCanonical(
+                    streamId,
+                    created,
                     publicModel,
                     canonicalEvent.toolCalls()
             )));
         }
         if (canonicalEvent.type() == CanonicalStreamEventType.COMPLETED) {
-            return Flux.just(encode(OpenAiChatCompletionResponse.finishChunk(
+            String finishChunk = encode(OpenAiChatCompletionResponse.finishChunk(
+                    streamId,
+                    created,
                     publicModel,
                     toFinishReason(canonicalEvent.finishReason())
-            )));
+            ));
+            if (includeUsage) {
+                return Flux.just(
+                        finishChunk,
+                        encode(OpenAiChatCompletionResponse.usageChunk(
+                                streamId,
+                                created,
+                                publicModel,
+                                canonicalEvent.usage()
+                        ))
+                );
+            }
+            return Flux.just(finishChunk);
         }
         return Flux.empty();
     }
@@ -71,5 +104,11 @@ public class OpenAiChatCompletionEncoder {
         } catch (JacksonException exception) {
             throw new IllegalStateException("无法序列化 OpenAI Chat Completions 响应。", exception);
         }
+    }
+
+    private boolean includeUsage(JsonNode streamOptions) {
+        return streamOptions != null
+                && streamOptions.isObject()
+                && streamOptions.path("include_usage").asBoolean(false);
     }
 }

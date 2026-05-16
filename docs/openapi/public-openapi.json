@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "x-ai-gateway Public API",
-    "version": "2026.05.06",
+    "version": "2026.05.15",
     "description": "公开接入面的最小 OpenAPI 事实源，运行时也可通过 /public/docs/openapi.json 读取。"
   },
   "servers": [
@@ -12,19 +12,410 @@
     }
   ],
   "paths": {
-    "/public/docs/compatibility": { "get": { "summary": "读取公开兼容文档 bundle" } },
-    "/public/docs/openapi.json": { "get": { "summary": "读取公开 OpenAPI JSON" } },
-    "/v1/chat/completions": { "post": { "summary": "OpenAI-compatible Chat Completions" } },
-    "/v1/responses": { "post": { "summary": "OpenAI-compatible Responses" } },
-    "/v1/messages": { "post": { "summary": "Claude Messages compatible endpoint" } },
-    "/v1beta/models/{model}:generateContent": { "post": { "summary": "Gemini generateContent compatible endpoint" } },
-    "/api/v1/videos/generations": { "post": { "summary": "创建 Video async task" } },
-    "/api/v1/videos/{videoId}": { "get": { "summary": "读取 Video async task" } },
-    "/api/v1/videos/{videoId}/cancel": { "post": { "summary": "取消 Video async task" } },
-    "/api/v1/music/generations": { "post": { "summary": "创建 Music async task" } },
-    "/api/v1/music/{musicId}": { "get": { "summary": "读取 Music async task" } },
-    "/api/v1/music/{musicId}/cancel": { "post": { "summary": "取消 Music async task" } },
-    "/api/v1/media/provider-matrix": { "get": { "summary": "读取 Video/Music provider support matrix" } }
+    "/public/docs/compatibility": {
+      "get": {
+        "summary": "读取公开兼容文档 bundle"
+      }
+    },
+    "/public/docs/openapi.json": {
+      "get": {
+        "summary": "读取公开 OpenAPI JSON"
+      }
+    },
+    "/v1/chat/completions": {
+      "post": {
+        "summary": "OpenAI-compatible Chat Completions",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Optional key for non-streaming response replay.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["model", "messages"],
+                "properties": {
+                  "model": {
+                    "type": "string",
+                    "description": "OpenAI model name or gateway model alias."
+                  },
+                  "messages": {
+                    "type": "array",
+                    "description": "Chat messages in OpenAI-compatible format."
+                  },
+                  "tools": {
+                    "type": "array",
+                    "description": "Function tool definitions."
+                  },
+                  "tool_choice": {
+                    "type": "object",
+                    "description": "Tool choice string or object."
+                  },
+                  "store": {
+                    "type": "boolean",
+                    "description": "When true, persist the Chat Completion as a local chatcmpl_ resource."
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "description": "OpenAI metadata object; also used by stored Chat lifecycle."
+                  },
+                  "response_format": {
+                    "type": "object",
+                    "description": "Typed response format: text, json_object or json_schema."
+                  },
+                  "modalities": {
+                    "type": "array",
+                    "description": "Requested output modalities such as text or audio."
+                  },
+                  "audio": {
+                    "type": "object",
+                    "description": "Audio voice and format when modalities includes audio."
+                  },
+                  "web_search_options": {
+                    "type": "object",
+                    "description": "OpenAI web search context and approximate user location."
+                  },
+                  "service_tier": {
+                    "type": "string",
+                    "description": "OpenAI service tier such as auto or default."
+                  },
+                  "parallel_tool_calls": {
+                    "type": "boolean",
+                    "description": "Whether parallel function tool calls are allowed."
+                  },
+                  "stream_options": {
+                    "type": "object",
+                    "description": "Streaming options such as include_usage; include_usage emits a choices=[] usage chunk before [DONE]."
+                  },
+                  "prediction": {
+                    "type": "object",
+                    "description": "OpenAI prediction object for compatible models."
+                  },
+                  "prompt_cache_key": {
+                    "type": "string",
+                    "description": "Prompt cache affinity key."
+                  },
+                  "safety_identifier": {
+                    "type": "string",
+                    "description": "OpenAI safety identifier."
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "List stored Chat Completions",
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "description": "Cursor id of the last Chat Completion from the previous page.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Number of Chat Completions to return. Defaults to 20; valid range is 1 to 100.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "required": false,
+            "description": "Filter by model id.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "description": "Sort by creation time: asc or desc. Defaults to asc.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "metadata[key]",
+            "in": "query",
+            "required": false,
+            "description": "Filter by metadata key, for example metadata[purpose]=qa.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/chat/completions/{completionId}": {
+      "get": {
+        "summary": "Retrieve stored Chat Completion",
+        "parameters": [
+          {
+            "name": "completionId",
+            "in": "path",
+            "required": true,
+            "description": "Stored Chat Completion id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "post": {
+        "summary": "Update stored Chat Completion metadata",
+        "parameters": [
+          {
+            "name": "completionId",
+            "in": "path",
+            "required": true,
+            "description": "Stored Chat Completion id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "summary": "Delete stored Chat Completion",
+        "parameters": [
+          {
+            "name": "completionId",
+            "in": "path",
+            "required": true,
+            "description": "Stored Chat Completion id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/chat/completions/{completionId}/messages": {
+      "get": {
+        "summary": "List stored Chat Completion messages",
+        "parameters": [
+          {
+            "name": "completionId",
+            "in": "path",
+            "required": true,
+            "description": "Stored Chat Completion id.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "description": "Cursor id of the last message from the previous page.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Number of messages to return. Defaults to 20; valid range is 1 to 100.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "description": "Sort by message order: asc or desc. Defaults to asc.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/responses": {
+      "post": {
+        "summary": "OpenAI-compatible Responses",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Optional key for non-streaming response replay.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/responses/{responseId}": {
+      "get": {
+        "summary": "Retrieve stored Response",
+        "parameters": [
+          {
+            "name": "responseId",
+            "in": "path",
+            "required": true,
+            "description": "Stored Response id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "summary": "Delete stored Response",
+        "parameters": [
+          {
+            "name": "responseId",
+            "in": "path",
+            "required": true,
+            "description": "Stored Response id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/responses/{responseId}/cancel": {
+      "post": {
+        "summary": "Cancel stored background Response",
+        "parameters": [
+          {
+            "name": "responseId",
+            "in": "path",
+            "required": true,
+            "description": "Stored Response id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/responses/{responseId}/input_items": {
+      "get": {
+        "summary": "List stored Response input items",
+        "parameters": [
+          {
+            "name": "responseId",
+            "in": "path",
+            "required": true,
+            "description": "Stored Response id.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "description": "Cursor id of the last input item from the previous page.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Number of input items to return. Defaults to 20; valid range is 1 to 100.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "description": "Sort by input item order: asc or desc. Defaults to desc.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/web_search": {
+      "post": {
+        "summary": "Provider-governed Web Search"
+      }
+    },
+    "/v1/messages": {
+      "post": {
+        "summary": "Claude Messages compatible endpoint"
+      }
+    },
+    "/v1beta/models/{model}:generateContent": {
+      "post": {
+        "summary": "Gemini generateContent compatible endpoint"
+      }
+    },
+    "/api/v1/videos/generations": {
+      "post": {
+        "summary": "创建 Video async task"
+      }
+    },
+    "/api/v1/videos/{videoId}": {
+      "get": {
+        "summary": "读取 Video async task"
+      }
+    },
+    "/api/v1/videos/{videoId}/cancel": {
+      "post": {
+        "summary": "取消 Video async task"
+      }
+    },
+    "/api/v1/videos/{videoId}/download": {
+      "get": {
+        "summary": "下载 Video async task 产物引用"
+      }
+    },
+    "/api/v1/music/generations": {
+      "post": {
+        "summary": "创建 Music async task"
+      }
+    },
+    "/api/v1/music/{musicId}": {
+      "get": {
+        "summary": "读取 Music async task"
+      }
+    },
+    "/api/v1/music/{musicId}/cancel": {
+      "post": {
+        "summary": "取消 Music async task"
+      }
+    },
+    "/api/v1/music/{musicId}/download": {
+      "get": {
+        "summary": "下载 Music async task 产物引用"
+      }
+    },
+    "/api/v1/media/provider-matrix": {
+      "get": {
+        "summary": "读取 Video/Music provider support matrix"
+      }
+    }
   },
   "components": {
     "securitySchemes": {

@@ -18,6 +18,7 @@ public enum UpstreamSiteKind {
     TOGETHER,
     FIREWORKS,
     OPENROUTER,
+    PERPLEXITY,
     ANTHROPIC_DIRECT,
     GEMINI_DIRECT,
     OLLAMA_DIRECT,

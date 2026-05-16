@@ -280,6 +280,10 @@ class SiteConformanceHarnessTests {
             root.putArray("documents").add("hello").add("world");
             return root;
         }
+        if ("/v1/web_search".equals(fixture.requestPath())) {
+            root.put("query", "latest gateway conformance");
+            return root;
+        }
         if ("/v1/embeddings".equals(fixture.requestPath())) {
             root.put("input", "hi");
             return root;

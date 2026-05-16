@@ -1,5 +1,6 @@
 package com.prodigalgal.xaigateway.protocol.ingress.google;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import tools.jackson.databind.JsonNode;
 
 public record GeminiGenerateContentRequest(
@@ -7,6 +8,8 @@ public record GeminiGenerateContentRequest(
         JsonNode systemInstruction,
         JsonNode generationConfig,
         JsonNode tools,
-        JsonNode toolConfig
+        JsonNode toolConfig,
+        @JsonProperty("x_ai_gateway_allow_google_maps")
+        Boolean allowGoogleMaps
 ) {
 }

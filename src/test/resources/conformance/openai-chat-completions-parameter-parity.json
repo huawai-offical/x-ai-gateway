@@ -1,0 +1,348 @@
+[
+  {
+    "parameter": "store",
+    "status": "supported",
+    "mapping": "canonical_extension_and_local_lifecycle",
+    "scope": ["OPENAI_DIRECT", "OPENAI_COMPATIBLE"],
+    "notes": "store=true creates a local chatcmpl_ resource while the request parameter remains visible to execution.",
+    "evidenceSources": [
+      "src/main/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiChatCompletionRequest.java",
+      "src/main/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiChatCompletionsController.java",
+      "src/test/java/com/prodigalgal/xaigateway/gateway/core/resource/GatewayAsyncResourceStoredChatTests.java",
+      "tasks/done/TASK-20260515-004-openai-stored-chat-lifecycle-foundation.md"
+    ]
+  },
+  {
+    "parameter": "metadata",
+    "status": "supported",
+    "mapping": "canonical_extension_and_stored_resource_metadata",
+    "scope": ["OPENAI_DIRECT", "OPENAI_COMPATIBLE"],
+    "notes": "metadata is preserved on create and can be updated on stored chat completions.",
+    "evidenceSources": [
+      "src/main/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiChatCompletionRequestMapper.java",
+      "src/test/java/com/prodigalgal/xaigateway/gateway/core/resource/GatewayAsyncResourceStoredChatTests.java",
+      "tasks/done/TASK-20260515-004-openai-stored-chat-lifecycle-foundation.md"
+    ]
+  },
+  {
+    "parameter": "frequency_penalty",
+    "status": "supported",
+    "mapping": "spring_ai_typed_option",
+    "scope": ["OPENAI_DIRECT", "OPENAI_COMPATIBLE"],
+    "notes": "numeric penalty is received by DTO and mapped to the native OpenAI request option.",
+    "evidenceSources": [
+      "src/main/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntime.java",
+      "src/test/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntimeTests.java",
+      "tasks/done/TASK-20260515-003-openai-chat-create-parameter-parity-foundation.md"
+    ]
+  },
+  {
+    "parameter": "logit_bias",
+    "status": "supported",
+    "mapping": "spring_ai_typed_option",
+    "scope": ["OPENAI_DIRECT", "OPENAI_COMPATIBLE"],
+    "notes": "token bias JSON object is preserved as native OpenAI options.",
+    "evidenceSources": [
+      "src/main/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntime.java",
+      "src/test/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntimeTests.java",
+      "tasks/done/TASK-20260515-003-openai-chat-create-parameter-parity-foundation.md"
+    ]
+  },
+  {
+    "parameter": "logprobs",
+    "status": "supported",
+    "mapping": "spring_ai_typed_option",
+    "scope": ["OPENAI_DIRECT", "OPENAI_COMPATIBLE"],
+    "notes": "logprob flag is mapped to the native request where supported.",
+    "evidenceSources": [
+      "src/main/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntime.java",
+      "src/test/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntimeTests.java",
+      "tasks/done/TASK-20260515-003-openai-chat-create-parameter-parity-foundation.md"
+    ]
+  },
+  {
+    "parameter": "top_logprobs",
+    "status": "supported",
+    "mapping": "spring_ai_typed_option",
+    "scope": ["OPENAI_DIRECT", "OPENAI_COMPATIBLE"],
+    "notes": "top_logprobs is mapped with logprob semantics and tested with the native request builder.",
+    "evidenceSources": [
+      "src/main/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntime.java",
+      "src/test/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntimeTests.java",
+      "tasks/done/TASK-20260515-003-openai-chat-create-parameter-parity-foundation.md"
+    ]
+  },
+  {
+    "parameter": "max_completion_tokens",
+    "status": "supported",
+    "mapping": "spring_ai_typed_option",
+    "scope": ["OPENAI_DIRECT", "OPENAI_COMPATIBLE"],
+    "notes": "max_completion_tokens is preferred over legacy max_tokens for newer chat models.",
+    "evidenceSources": [
+      "src/main/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiChatCompletionRequest.java",
+      "src/main/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntime.java",
+      "tasks/done/TASK-20260515-003-openai-chat-create-parameter-parity-foundation.md"
+    ]
+  },
+  {
+    "parameter": "n",
+    "status": "supported",
+    "mapping": "spring_ai_typed_option",
+    "scope": ["OPENAI_DIRECT", "OPENAI_COMPATIBLE"],
+    "notes": "choice count is preserved for upstream execution.",
+    "evidenceSources": [
+      "src/main/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntime.java",
+      "src/test/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntimeTests.java",
+      "tasks/done/TASK-20260515-003-openai-chat-create-parameter-parity-foundation.md"
+    ]
+  },
+  {
+    "parameter": "presence_penalty",
+    "status": "supported",
+    "mapping": "spring_ai_typed_option",
+    "scope": ["OPENAI_DIRECT", "OPENAI_COMPATIBLE"],
+    "notes": "numeric penalty is preserved for native execution.",
+    "evidenceSources": [
+      "src/main/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntime.java",
+      "src/test/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntimeTests.java",
+      "tasks/done/TASK-20260515-003-openai-chat-create-parameter-parity-foundation.md"
+    ]
+  },
+  {
+    "parameter": "seed",
+    "status": "supported",
+    "mapping": "spring_ai_typed_option",
+    "scope": ["OPENAI_DIRECT", "OPENAI_COMPATIBLE"],
+    "notes": "seed is preserved for deterministic generation where the upstream supports it.",
+    "evidenceSources": [
+      "src/main/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntime.java",
+      "src/test/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntimeTests.java",
+      "tasks/done/TASK-20260515-003-openai-chat-create-parameter-parity-foundation.md"
+    ]
+  },
+  {
+    "parameter": "service_tier",
+    "status": "supported",
+    "mapping": "spring_ai_typed_option",
+    "scope": ["OPENAI_DIRECT", "OPENAI_COMPATIBLE"],
+    "notes": "service_tier is preserved for OpenAI Direct and remains visible for compatible routing decisions.",
+    "evidenceSources": [
+      "src/main/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntime.java",
+      "src/test/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntimeTests.java",
+      "tasks/done/TASK-20260515-003-openai-chat-create-parameter-parity-foundation.md"
+    ]
+  },
+  {
+    "parameter": "stop",
+    "status": "supported",
+    "mapping": "spring_ai_typed_option",
+    "scope": ["OPENAI_DIRECT", "OPENAI_COMPATIBLE"],
+    "notes": "string or array stop sequences are accepted by the DTO and mapped by the runtime.",
+    "evidenceSources": [
+      "src/main/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiChatCompletionRequest.java",
+      "src/main/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntime.java",
+      "tasks/done/TASK-20260515-003-openai-chat-create-parameter-parity-foundation.md"
+    ]
+  },
+  {
+    "parameter": "top_p",
+    "status": "supported",
+    "mapping": "spring_ai_typed_option",
+    "scope": ["OPENAI_DIRECT", "OPENAI_COMPATIBLE"],
+    "notes": "top_p is mapped to the native request option.",
+    "evidenceSources": [
+      "src/main/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntime.java",
+      "src/test/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntimeTests.java",
+      "tasks/done/TASK-20260515-003-openai-chat-create-parameter-parity-foundation.md"
+    ]
+  },
+  {
+    "parameter": "parallel_tool_calls",
+    "status": "supported",
+    "mapping": "spring_ai_typed_option",
+    "scope": ["OPENAI_DIRECT", "OPENAI_COMPATIBLE"],
+    "notes": "parallel tool call preference is mapped to native OpenAI options.",
+    "evidenceSources": [
+      "src/main/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntime.java",
+      "src/test/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntimeTests.java",
+      "tasks/done/TASK-20260515-003-openai-chat-create-parameter-parity-foundation.md"
+    ]
+  },
+  {
+    "parameter": "user",
+    "status": "supported",
+    "mapping": "spring_ai_typed_option",
+    "scope": ["OPENAI_DIRECT", "OPENAI_COMPATIBLE"],
+    "notes": "end-user identifier is preserved in the native request.",
+    "evidenceSources": [
+      "src/main/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntime.java",
+      "src/test/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntimeTests.java",
+      "tasks/done/TASK-20260515-003-openai-chat-create-parameter-parity-foundation.md"
+    ]
+  },
+  {
+    "parameter": "verbosity",
+    "status": "supported",
+    "mapping": "spring_ai_typed_option",
+    "scope": ["OPENAI_DIRECT", "OPENAI_COMPATIBLE"],
+    "notes": "verbosity is preserved for models and upstreams that expose the option.",
+    "evidenceSources": [
+      "src/main/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntime.java",
+      "src/test/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntimeTests.java",
+      "tasks/done/TASK-20260515-003-openai-chat-create-parameter-parity-foundation.md"
+    ]
+  },
+  {
+    "parameter": "prompt_cache_key",
+    "status": "supported",
+    "mapping": "spring_ai_typed_option",
+    "scope": ["OPENAI_DIRECT", "OPENAI_COMPATIBLE"],
+    "notes": "prompt_cache_key is preserved and also available to provider-specific affinity logic.",
+    "evidenceSources": [
+      "src/main/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntime.java",
+      "src/test/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntimeTests.java",
+      "tasks/done/TASK-20260515-003-openai-chat-create-parameter-parity-foundation.md"
+    ]
+  },
+  {
+    "parameter": "safety_identifier",
+    "status": "supported",
+    "mapping": "spring_ai_typed_option",
+    "scope": ["OPENAI_DIRECT", "OPENAI_COMPATIBLE"],
+    "notes": "safety_identifier is forwarded through the native options path.",
+    "evidenceSources": [
+      "src/main/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntime.java",
+      "src/test/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntimeTests.java",
+      "tasks/done/TASK-20260515-003-openai-chat-create-parameter-parity-foundation.md"
+    ]
+  },
+  {
+    "parameter": "response_format",
+    "status": "typed",
+    "mapping": "spring_ai_response_format",
+    "scope": ["OPENAI_DIRECT", "OPENAI_COMPATIBLE"],
+    "notes": "text, json_object and json_schema are validated and mapped to Spring AI ResponseFormat.",
+    "evidenceSources": [
+      "src/main/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiChatCompletionRequestMapper.java",
+      "src/main/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntime.java",
+      "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiChatCompletionsControllerTests.java",
+      "src/test/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntimeTests.java",
+      "tasks/done/TASK-20260515-006-openai-chat-response-format-typed-mapping.md"
+    ]
+  },
+  {
+    "parameter": "modalities",
+    "status": "typed",
+    "mapping": "spring_ai_output_modalities",
+    "scope": ["OPENAI_DIRECT", "OPENAI_COMPATIBLE"],
+    "notes": "text and audio modalities are validated and mapped to native output modality enums.",
+    "evidenceSources": [
+      "src/main/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiChatCompletionRequestMapper.java",
+      "src/main/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntime.java",
+      "src/test/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntimeTests.java",
+      "tasks/done/TASK-20260515-007-openai-chat-modalities-audio-web-search-typed-mapping.md"
+    ]
+  },
+  {
+    "parameter": "audio",
+    "status": "typed",
+    "mapping": "spring_ai_audio_parameters",
+    "scope": ["OPENAI_DIRECT", "OPENAI_COMPATIBLE"],
+    "notes": "audio.voice and audio.format are validated against native OpenAI enum support.",
+    "evidenceSources": [
+      "src/main/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiChatCompletionRequestMapper.java",
+      "src/main/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntime.java",
+      "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiChatCompletionsControllerTests.java",
+      "src/test/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntimeTests.java",
+      "tasks/done/TASK-20260515-007-openai-chat-modalities-audio-web-search-typed-mapping.md"
+    ]
+  },
+  {
+    "parameter": "web_search_options",
+    "status": "typed",
+    "mapping": "spring_ai_web_search_options",
+    "scope": ["OPENAI_DIRECT", "OPENAI_COMPATIBLE"],
+    "notes": "search_context_size and approximate user location are validated and mapped to native request options.",
+    "evidenceSources": [
+      "src/main/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiChatCompletionRequestMapper.java",
+      "src/main/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntime.java",
+      "src/test/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntimeTests.java",
+      "tasks/done/TASK-20260515-007-openai-chat-modalities-audio-web-search-typed-mapping.md"
+    ]
+  },
+  {
+    "parameter": "stream_options",
+    "status": "pass_through",
+    "mapping": "extra_body_for_openai_native",
+    "scope": ["OPENAI_DIRECT", "OPENAI_COMPATIBLE"],
+    "notes": "stream_options is preserved as an advanced OpenAI field until the SDK exposes a typed option.",
+    "evidenceSources": [
+      "src/main/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiChatCompletionRequestMapper.java",
+      "src/main/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntime.java",
+      "tasks/done/TASK-20260515-003-openai-chat-create-parameter-parity-foundation.md"
+    ]
+  },
+  {
+    "parameter": "prediction",
+    "status": "pass_through",
+    "mapping": "extra_body_for_openai_native",
+    "scope": ["OPENAI_DIRECT", "OPENAI_COMPATIBLE"],
+    "notes": "prediction remains an advanced JSON object and is preserved as extra body.",
+    "evidenceSources": [
+      "src/main/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiChatCompletionRequest.java",
+      "src/main/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntime.java",
+      "tasks/done/TASK-20260515-003-openai-chat-create-parameter-parity-foundation.md"
+    ]
+  },
+  {
+    "parameter": "tools",
+    "status": "supported",
+    "mapping": "canonical_tools_to_spring_ai_function_tool",
+    "scope": ["OPENAI_DIRECT", "OPENAI_COMPATIBLE"],
+    "notes": "modern tool definitions are canonicalized and mapped to Spring AI function tools.",
+    "evidenceSources": [
+      "src/main/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiChatCompletionRequestMapper.java",
+      "src/main/java/com/prodigalgal/xaigateway/provider/adapter/openai/OpenAiToolMapper.java",
+      "src/test/java/com/prodigalgal/xaigateway/provider/adapter/ProviderExecutionSupportServiceTests.java",
+      "tasks/done/TASK-20260515-005-openai-chat-legacy-functions-tool-choice-compatibility.md"
+    ]
+  },
+  {
+    "parameter": "tool_choice",
+    "status": "supported",
+    "mapping": "canonical_tool_choice",
+    "scope": ["OPENAI_DIRECT", "OPENAI_COMPATIBLE"],
+    "notes": "modern tool_choice wins over legacy function_call and is preserved in canonical request metadata.",
+    "evidenceSources": [
+      "src/main/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiChatCompletionRequestMapper.java",
+      "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiChatCompletionsControllerTests.java",
+      "tasks/done/TASK-20260515-005-openai-chat-legacy-functions-tool-choice-compatibility.md"
+    ]
+  },
+  {
+    "parameter": "functions",
+    "status": "translated",
+    "mapping": "legacy_functions_to_canonical_tools",
+    "scope": ["OPENAI_DIRECT", "OPENAI_COMPATIBLE"],
+    "notes": "deprecated legacy functions are translated into canonical tools; OpenAI-compatible raw fallback is preserved only for compatible sites.",
+    "evidenceSources": [
+      "src/main/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiChatCompletionRequestMapper.java",
+      "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiChatCompletionsControllerTests.java",
+      "src/test/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntimeTests.java",
+      "tasks/done/TASK-20260515-005-openai-chat-legacy-functions-tool-choice-compatibility.md"
+    ]
+  },
+  {
+    "parameter": "function_call",
+    "status": "translated",
+    "mapping": "legacy_function_call_to_canonical_tool_choice",
+    "scope": ["OPENAI_DIRECT", "OPENAI_COMPATIBLE"],
+    "notes": "deprecated legacy function_call is translated to canonical tool_choice when modern tool_choice is absent.",
+    "evidenceSources": [
+      "src/main/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiChatCompletionRequestMapper.java",
+      "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiChatCompletionsControllerTests.java",
+      "src/test/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntimeTests.java",
+      "tasks/done/TASK-20260515-005-openai-chat-legacy-functions-tool-choice-compatibility.md"
+    ]
+  }
+]

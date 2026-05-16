@@ -14,6 +14,34 @@ public record CanonicalRequest(
         Double temperature,
         Integer maxTokens,
         CanonicalReasoningConfig reasoning,
-        JsonNode providerExtensions
+        JsonNode providerExtensions,
+        CanonicalRequestMetadata metadata
 ) {
+    public CanonicalRequest(
+            String distributedKeyPrefix,
+            CanonicalIngressProtocol ingressProtocol,
+            String requestPath,
+            String requestedModel,
+            List<CanonicalMessage> messages,
+            List<CanonicalToolDefinition> tools,
+            JsonNode toolChoice,
+            Double temperature,
+            Integer maxTokens,
+            CanonicalReasoningConfig reasoning,
+            JsonNode providerExtensions) {
+        this(
+                distributedKeyPrefix,
+                ingressProtocol,
+                requestPath,
+                requestedModel,
+                messages,
+                tools,
+                toolChoice,
+                temperature,
+                maxTokens,
+                reasoning,
+                providerExtensions,
+                null
+        );
+    }
 }

@@ -427,7 +427,8 @@ public class CloudCliRequestFilterService {
                 request.temperature(),
                 request.maxTokens(),
                 request.reasoning(),
-                providerExtensions
+                providerExtensions,
+                request.metadata()
         );
     }
 

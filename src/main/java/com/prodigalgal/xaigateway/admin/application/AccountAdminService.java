@@ -4,6 +4,7 @@ import com.prodigalgal.xaigateway.admin.api.ExportedClientConfigResponse;
 import com.prodigalgal.xaigateway.admin.api.AccountImportAuthJsonRequest;
 import com.prodigalgal.xaigateway.admin.api.ProgrammingAccountIdentityResponse;
 import com.prodigalgal.xaigateway.admin.api.UpstreamAccountResponse;
+import com.prodigalgal.xaigateway.gateway.core.account.UpstreamAccountProviderType;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountPoolEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountPoolRepository;
@@ -13,8 +14,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
+import java.util.Map;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -28,6 +31,8 @@ public class AccountAdminService {
     private final SupportedModelCatalogService supportedModelCatalogService;
     private final OAuthSessionRefreshService oauthSessionRefreshService;
     private final ObjectMapper objectMapper;
+    private final CodexAuthJsonParser codexAuthJsonParser;
+    private final SensitiveJsonSanitizer sensitiveJsonSanitizer;
 
     public AccountAdminService(
             UpstreamAccountRepository upstreamAccountRepository,
@@ -42,6 +47,8 @@ public class AccountAdminService {
         this.supportedModelCatalogService = supportedModelCatalogService;
         this.oauthSessionRefreshService = oauthSessionRefreshService;
         this.objectMapper = objectMapper;
+        this.codexAuthJsonParser = new CodexAuthJsonParser(objectMapper);
+        this.sensitiveJsonSanitizer = new SensitiveJsonSanitizer(objectMapper);
     }
 
     @Transactional(readOnly = true)
@@ -71,6 +78,22 @@ public class AccountAdminService {
     public UpstreamAccountResponse refresh(Long id) {
         oauthSessionRefreshService.refreshAccount(id);
         return toResponse(getRequired(id));
+    }
+
+    public UpstreamAccountResponse resetRuntime(Long id) {
+        UpstreamAccountEntity entity = getRequired(id);
+        entity.setFrozen(false);
+        entity.setHealthy(true);
+        entity.setLastErrorMessage(null);
+        entity.setRefreshFailureCount(0);
+        entity.setCooldownUntil(null);
+        entity.setNextRefreshAfter(null);
+        if (entity.getRefreshStatus() == null || entity.getRefreshStatus().isBlank()
+                || "FAILED".equalsIgnoreCase(entity.getRefreshStatus())
+                || "QUOTA_FAILED".equalsIgnoreCase(entity.getRefreshStatus())) {
+            entity.setRefreshStatus("READY");
+        }
+        return toResponse(upstreamAccountRepository.save(entity));
     }
 
     public UpstreamAccountResponse updateNetwork(Long id, Long proxyId, Long tlsFingerprintProfileId) {
@@ -144,32 +167,44 @@ public class AccountAdminService {
 
     public UpstreamAccountResponse importAuthJson(AccountImportAuthJsonRequest request) {
         UpstreamAccountPoolEntity pool = resolvePool(request.poolId());
+        UpstreamAccountProviderType providerType = pool != null
+                ? pool.getProviderType()
+                : UpstreamAccountProviderType.OPENAI_OAUTH;
+        String metadataJson = request.metadataJson() == null || request.metadataJson().isBlank() ? "{}" : request.metadataJson().trim();
+        JsonNode metadata = readMetadata(metadataJson);
+        CodexAuthJsonParser.ParsedCodexAuthJson parsedCodexAuth = tryParseCodexAuthJson(providerType, metadataJson);
 
-        String accessToken = request.accessToken().trim();
-        if (accessToken.isBlank()) {
+        String accessToken = firstNonBlank(
+                request.accessToken(),
+                parsedCodexAuth == null ? null : parsedCodexAuth.accessToken()
+        );
+        if (accessToken == null || accessToken.isBlank()) {
             throw new IllegalArgumentException("accessToken 不能为空。");
         }
+        String refreshToken = firstNonBlank(
+                request.refreshToken(),
+                parsedCodexAuth == null ? null : parsedCodexAuth.refreshToken()
+        );
+        String externalAccountId = resolveImportExternalAccountId(request.externalAccountId(), parsedCodexAuth, providerType.name());
 
-        UpstreamAccountEntity entity = new UpstreamAccountEntity();
+        UpstreamAccountEntity entity = resolveExistingImportedAccount(providerType, parsedCodexAuth, externalAccountId)
+                .orElseGet(UpstreamAccountEntity::new);
         entity.setPool(pool);
-        com.prodigalgal.xaigateway.gateway.core.account.UpstreamAccountProviderType providerType =
-                pool != null
-                        ? pool.getProviderType()
-                        : com.prodigalgal.xaigateway.gateway.core.account.UpstreamAccountProviderType.OPENAI_OAUTH;
         entity.setProviderType(providerType);
-        entity.setAccountName(resolveAccountName(request.accountName(), pool == null ? null : pool.getPoolName()));
-        entity.setExternalAccountId(resolveExternalAccountId(request.externalAccountId(), providerType.name()));
-        entity.setAccessTokenCiphertext(credentialCryptoService.encrypt(accessToken));
-        entity.setRefreshTokenCiphertext(request.refreshToken() == null || request.refreshToken().isBlank()
+        entity.setAccountName(resolveAccountName(
+                firstNonBlank(request.accountName(), parsedCodexAuth == null ? null : parsedCodexAuth.accountName()),
+                pool == null ? null : pool.getPoolName()
+        ));
+        entity.setExternalAccountId(externalAccountId);
+        entity.setAccessTokenCiphertext(credentialCryptoService.encrypt(accessToken.trim()));
+        entity.setRefreshTokenCiphertext(refreshToken == null || refreshToken.isBlank()
                 ? null
-                : credentialCryptoService.encrypt(request.refreshToken().trim()));
+                : credentialCryptoService.encrypt(refreshToken.trim()));
         entity.setActive(request.active() == null || request.active());
         entity.setFrozen(false);
         entity.setHealthy(true);
         entity.setLastRefreshAt(Instant.now());
-        String metadataJson = request.metadataJson() == null || request.metadataJson().isBlank() ? "{}" : request.metadataJson().trim();
-        JsonNode metadata = readMetadata(metadataJson);
-        entity.setMetadataJson(metadataJson);
+        entity.setMetadataJson(buildSanitizedImportMetadata(metadataJson, parsedCodexAuth, providerType));
         entity.setSupportedModels(supportedModelCatalogService.resolveForAccountImport(pool, request.supportedModels()));
         entity.setProxyId(request.proxyId());
         entity.setTlsFingerprintProfileId(request.tlsFingerprintProfileId());
@@ -187,10 +222,108 @@ public class AccountAdminService {
         entity.setQuotaWindowSeconds(resolveInteger(request.quotaWindowSeconds(), metadata, List.of("quota_window_seconds", "quotaWindowSeconds", "window_seconds", "windowSeconds")));
         entity.setQuotaRemainingTokens(resolveLong(request.quotaRemainingTokens(), metadata, List.of("quota_remaining_tokens", "quotaRemainingTokens", "remaining_tokens", "remainingTokens")));
         entity.setQuotaRemainingRequests(resolveLong(request.quotaRemainingRequests(), metadata, List.of("quota_remaining_requests", "quotaRemainingRequests", "remaining_requests", "remainingRequests")));
-        entity.setHeaderSnapshotJson(resolveJsonSnapshot(request.headerSnapshotJson(), metadata, List.of("header_snapshot", "headerSnapshot", "headers", "request_headers", "requestHeaders")));
-        entity.setLastRefreshResultJson(resolveJsonSnapshot(request.lastRefreshResultJson(), metadata, List.of("last_refresh_result", "lastRefreshResult", "refresh_result", "refreshResult")));
+        entity.setHeaderSnapshotJson(sensitiveJsonSanitizer.sanitizeJson(resolveJsonSnapshot(request.headerSnapshotJson(), metadata, List.of("header_snapshot", "headerSnapshot", "headers", "request_headers", "requestHeaders"))));
+        entity.setLastRefreshResultJson(sensitiveJsonSanitizer.sanitizeJson(resolveJsonSnapshot(request.lastRefreshResultJson(), metadata, List.of("last_refresh_result", "lastRefreshResult", "refresh_result", "refreshResult"))));
 
         return toResponse(upstreamAccountRepository.save(entity));
+    }
+
+    private CodexAuthJsonParser.ParsedCodexAuthJson tryParseCodexAuthJson(
+            UpstreamAccountProviderType providerType,
+            String metadataJson) {
+        if (providerType != UpstreamAccountProviderType.CODEX_OAUTH || metadataJson == null || metadataJson.isBlank()) {
+            return null;
+        }
+        try {
+            return codexAuthJsonParser.parse(metadataJson);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    private String resolveImportExternalAccountId(
+            String requestedExternalAccountId,
+            CodexAuthJsonParser.ParsedCodexAuthJson parsedCodexAuth,
+            String providerName) {
+        if (parsedCodexAuth != null && !"WEAK_TOKEN".equals(parsedCodexAuth.identityStrength())) {
+            return parsedCodexAuth.identityKey();
+        }
+        return resolveExternalAccountId(firstNonBlank(
+                requestedExternalAccountId,
+                parsedCodexAuth == null ? null : parsedCodexAuth.identityKey()
+        ), providerName);
+    }
+
+    private Optional<UpstreamAccountEntity> resolveExistingImportedAccount(
+            UpstreamAccountProviderType providerType,
+            CodexAuthJsonParser.ParsedCodexAuthJson parsedCodexAuth,
+            String externalAccountId) {
+        if (parsedCodexAuth == null) {
+            return Optional.empty();
+        }
+        Optional<UpstreamAccountEntity> byExternalId = upstreamAccountRepository
+                .findFirstByProviderTypeAndExternalAccountIdOrderByUpdatedAtDesc(providerType, externalAccountId);
+        if (byExternalId != null && byExternalId.isPresent()) {
+            return byExternalId;
+        }
+        if (parsedCodexAuth.accountId() != null && !parsedCodexAuth.accountId().isBlank()) {
+            Optional<UpstreamAccountEntity> byLegacyAccountId = upstreamAccountRepository
+                    .findFirstByProviderTypeAndExternalAccountIdOrderByUpdatedAtDesc(providerType, parsedCodexAuth.accountId());
+            if (byLegacyAccountId != null && byLegacyAccountId.isPresent()) {
+                return byLegacyAccountId;
+            }
+        }
+        if ("WEAK_TOKEN".equals(parsedCodexAuth.identityStrength())) {
+            return Optional.empty();
+        }
+        List<UpstreamAccountEntity> accounts = upstreamAccountRepository.findAllByProviderTypeOrderByUpdatedAtDesc(providerType);
+        if (accounts == null) {
+            return Optional.empty();
+        }
+        return accounts.stream()
+                .filter(account -> parsedCodexAuth.identityKey().equals(metadataIdentityKey(account.getMetadataJson())))
+                .findFirst();
+    }
+
+    private String buildSanitizedImportMetadata(
+            String metadataJson,
+            CodexAuthJsonParser.ParsedCodexAuthJson parsedCodexAuth,
+            UpstreamAccountProviderType providerType) {
+        Map<String, Object> metadata = sensitiveJsonSanitizer.readMap(metadataJson);
+        if (parsedCodexAuth != null) {
+            metadata.put("official_account_type", "CODEX");
+            metadata.put("client_family", "CODEX");
+            metadata.put("codex_auth_json", parsedCodexAuth.safeSummary());
+            metadata.put("account_identity", Map.of(
+                    "identityKey", parsedCodexAuth.identityKey(),
+                    "identitySource", parsedCodexAuth.identitySource(),
+                    "identityStrength", parsedCodexAuth.identityStrength(),
+                    "accountId", parsedCodexAuth.accountId() == null ? "unknown" : parsedCodexAuth.accountId()
+            ));
+        } else {
+            metadata.putIfAbsent("provider_type", providerType.name());
+        }
+        return sensitiveJsonSanitizer.writeJson(metadata);
+    }
+
+    private String metadataIdentityKey(String metadataJson) {
+        Map<String, Object> metadata = sensitiveJsonSanitizer.readMap(metadataJson);
+        Object accountIdentity = metadata.get("account_identity");
+        if (accountIdentity instanceof Map<?, ?> accountIdentityMap) {
+            String value = text(accountIdentityMap.get("identityKey"));
+            if (value != null) {
+                return value;
+            }
+        }
+        Object codexAuthJson = metadata.get("codex_auth_json");
+        if (codexAuthJson instanceof Map<?, ?> codexAuthMap) {
+            String value = text(codexAuthMap.get("identityKey"));
+            if (value != null) {
+                return value;
+            }
+            return text(codexAuthMap.get("identity_key"));
+        }
+        return text(metadata.get("identityKey"));
     }
 
     private UpstreamAccountEntity getRequired(Long id) {
@@ -453,6 +586,10 @@ public class AccountAdminService {
 
     private String defaultString(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value.trim();
+    }
+
+    private String text(Object value) {
+        return value == null ? null : String.valueOf(value);
     }
 
     private String firstNonBlank(String... values) {

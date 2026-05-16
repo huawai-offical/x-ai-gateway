@@ -104,6 +104,6 @@
 
 ## 后续建议
 
-- 推进 [TASK-20260501-023 真实社交 OAuth Provider Client 与 JWK 验签](../../tasks/backlog/TASK-20260501-023-social-oauth-real-provider-clients.md)。
-- 推进 [TASK-20260501-024 真实 Realtime Provider WebSocket Adapter](../../tasks/backlog/TASK-20260501-024-realtime-real-provider-websocket.md)。
-- 推进 [TASK-20260501-025 分布式 Route Policy 熔断/限流执行器](../../tasks/backlog/TASK-20260501-025-distributed-routing-circuit-rate-limit.md)。
+- 已推进并归档 [TASK-20260501-023 真实社交 OAuth Provider Client 与 JWK 验签](../../tasks/done/TASK-20260501-023-social-oauth-real-provider-clients.md)。
+- 已推进并归档 [TASK-20260501-024 真实 Realtime Provider WebSocket Adapter](../../tasks/done/TASK-20260501-024-realtime-real-provider-websocket.md)。
+- 已推进并归档 [TASK-20260501-025 分布式 Route Policy 熔断/限流执行器](../../tasks/done/TASK-20260501-025-distributed-routing-circuit-rate-limit.md)。

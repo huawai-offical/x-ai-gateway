@@ -105,7 +105,8 @@ public record OpenAiChatCompletionResponse(
             String object,
             long created,
             String model,
-            List<ChunkChoice> choices
+            List<ChunkChoice> choices,
+            Usage usage
     ) {
     }
 
@@ -126,42 +127,73 @@ public record OpenAiChatCompletionResponse(
     }
 
     public static Chunk roleChunk(String model) {
+        return roleChunk("chatcmpl-" + Instant.now().toEpochMilli(), Instant.now().getEpochSecond(), model);
+    }
+
+    public static Chunk roleChunk(String id, long created, String model) {
         return new Chunk(
-                "chatcmpl-" + Instant.now().toEpochMilli(),
+                id,
                 "chat.completion.chunk",
-                Instant.now().getEpochSecond(),
+                created,
                 model,
-                List.of(new ChunkChoice(0, new Delta("assistant", null, null), null))
+                List.of(new ChunkChoice(0, new Delta("assistant", null, null), null)),
+                null
         );
     }
 
     public static Chunk contentChunk(String model, String textDelta) {
+        return contentChunk("chatcmpl-" + Instant.now().toEpochMilli(), Instant.now().getEpochSecond(), model, textDelta);
+    }
+
+    public static Chunk contentChunk(String id, long created, String model, String textDelta) {
         return new Chunk(
-                "chatcmpl-" + Instant.now().toEpochMilli(),
+                id,
                 "chat.completion.chunk",
-                Instant.now().getEpochSecond(),
+                created,
                 model,
-                List.of(new ChunkChoice(0, new Delta(null, textDelta, null), null))
+                List.of(new ChunkChoice(0, new Delta(null, textDelta, null), null)),
+                null
         );
     }
 
     public static Chunk toolCallChunkCanonical(String model, List<CanonicalToolCall> toolCalls) {
+        return toolCallChunkCanonical("chatcmpl-" + Instant.now().toEpochMilli(), Instant.now().getEpochSecond(), model, toolCalls);
+    }
+
+    public static Chunk toolCallChunkCanonical(String id, long created, String model, List<CanonicalToolCall> toolCalls) {
         return new Chunk(
-                "chatcmpl-" + Instant.now().toEpochMilli(),
+                id,
                 "chat.completion.chunk",
-                Instant.now().getEpochSecond(),
+                created,
                 model,
-                List.of(new ChunkChoice(0, new Delta(null, null, toToolCallsCanonical(toolCalls)), null))
+                List.of(new ChunkChoice(0, new Delta(null, null, toToolCallsCanonical(toolCalls)), null)),
+                null
         );
     }
 
     public static Chunk finishChunk(String model, String finishReason) {
+        return finishChunk("chatcmpl-" + Instant.now().toEpochMilli(), Instant.now().getEpochSecond(), model, finishReason);
+    }
+
+    public static Chunk finishChunk(String id, long created, String model, String finishReason) {
         return new Chunk(
-                "chatcmpl-" + Instant.now().toEpochMilli(),
+                id,
                 "chat.completion.chunk",
-                Instant.now().getEpochSecond(),
+                created,
                 model,
-                List.of(new ChunkChoice(0, new Delta(null, null, null), finishReason))
+                List.of(new ChunkChoice(0, new Delta(null, null, null), finishReason)),
+                null
+        );
+    }
+
+    public static Chunk usageChunk(String id, long created, String model, CanonicalUsage usage) {
+        return new Chunk(
+                id,
+                "chat.completion.chunk",
+                created,
+                model,
+                List.of(),
+                toUsage(usage)
         );
     }
 

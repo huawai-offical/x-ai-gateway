@@ -55,6 +55,7 @@ public class GatewayOpenAiPassthroughService {
     private final CredentialMaterialResolver credentialMaterialResolver;
     private final ErrorRuleService errorRuleService;
     private final WebClient.Builder webClientBuilder;
+    private final PerplexityWebSearchAdapter perplexityWebSearchAdapter = new PerplexityWebSearchAdapter();
 
     public GatewayOpenAiPassthroughService(
             GatewayRouteSelectionService gatewayRouteSelectionService,
@@ -89,6 +90,14 @@ public class GatewayOpenAiPassthroughService {
         try {
             ObjectNode upstreamPayload = payload.deepCopy();
             upstreamPayload.put("model", context.selectionResult().resolvedModelKey());
+            if (perplexityWebSearchAdapter.supports(
+                    context.selectionResult().selectedCandidate().candidate().siteKind(),
+                    context.requestPath())) {
+                upstreamPayload = perplexityWebSearchAdapter.toUpstreamPayload(
+                        upstreamPayload,
+                        context.selectionResult().resolvedModelKey()
+                );
+            }
 
             return executePreparedJson(context.selectionResult(), context.credential(), context.client(), context.upstreamPath(), context.requestPath(), upstreamPayload);
         } catch (RuntimeException exception) {
@@ -397,6 +406,9 @@ public class GatewayOpenAiPassthroughService {
         WebClient.Builder builder = webClientBuilder.clone()
                 .baseUrl(normalizeBaseUrl(credential.getBaseUrl()));
         String path = resolvePath(credential.getBaseUrl(), requestPath);
+        if (perplexityWebSearchAdapter.supports(candidate.siteKind(), requestPath)) {
+            path = perplexityWebSearchAdapter.upstreamPath();
+        }
         if (candidate.pathStrategy() == PathStrategy.AZURE_OPENAI_DEPLOYMENT) {
             builder.defaultHeader("api-key", credentialMaterial.secret());
             path = resolveAzurePath(requestPath, selectionResult.resolvedModelKey());

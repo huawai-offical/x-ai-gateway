@@ -7,10 +7,14 @@ import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalContentPart;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalMessage;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalMessageRole;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalReasoningConfig;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolDefinition;
+import java.net.URI;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -41,8 +45,20 @@ public class AnthropicMessagesRequestMapper {
     public CanonicalRequest toCanonicalRequest(
             AuthenticatedDistributedKey distributedKey,
             AnthropicMessagesRequest request) {
+        return toCanonicalRequest(distributedKey, request, null);
+    }
+
+    public CanonicalRequest toCanonicalRequest(
+            AuthenticatedDistributedKey distributedKey,
+            AnthropicMessagesRequest request,
+            String anthropicBeta) {
+        validateMcpServers(request);
         List<CanonicalMessage> messages = toMessages(request.system(), request.messages());
         ensureUserMessage(messages);
+        JsonNode providerExtensions = objectMapper.valueToTree(request);
+        if (anthropicBeta != null && !anthropicBeta.isBlank() && providerExtensions instanceof tools.jackson.databind.node.ObjectNode objectNode) {
+            objectNode.put("x_ai_gateway_anthropic_beta", anthropicBeta.trim());
+        }
         return new CanonicalRequest(
                 distributedKey.keyPrefix(),
                 CanonicalIngressProtocol.ANTHROPIC_NATIVE,
@@ -53,9 +69,70 @@ public class AnthropicMessagesRequestMapper {
                 request.toolChoice(),
                 request.temperature(),
                 request.maxTokens(),
-                null,
-                objectMapper.valueToTree(request)
+                buildReasoningConfig(request),
+                providerExtensions
         );
+    }
+
+    private void validateMcpServers(AnthropicMessagesRequest request) {
+        JsonNode mcpServers = request.mcpServers();
+        if (mcpServers == null || mcpServers.isMissingNode() || mcpServers.isNull()) {
+            return;
+        }
+        if (!mcpServers.isArray()) {
+            throw new IllegalArgumentException("mcp_servers 必须是数组。");
+        }
+        if (mcpServers.isEmpty()) {
+            return;
+        }
+        if (Boolean.TRUE.equals(request.allowMcpServers())) {
+            return;
+        }
+        Set<String> allowlist = mcpAllowlist(request.mcpAllowlist());
+        if (allowlist.isEmpty()) {
+            throw new IllegalArgumentException("mcp_servers 需要 x_ai_gateway_mcp_allowlist 或 x_ai_gateway_allow_mcp_servers=true。");
+        }
+        for (JsonNode server : mcpServers) {
+            String url = server.path("url").asText(null);
+            if (url == null || url.isBlank()) {
+                throw new IllegalArgumentException("mcp_servers 中每个 server 都必须提供 url。");
+            }
+            URI uri;
+            try {
+                uri = URI.create(url);
+            } catch (IllegalArgumentException exception) {
+                throw new IllegalArgumentException("mcp_servers 包含非法 url：" + url, exception);
+            }
+            String host = uri.getHost();
+            if (host == null || host.isBlank() || (!"https".equalsIgnoreCase(uri.getScheme()) && !"http".equalsIgnoreCase(uri.getScheme()))) {
+                throw new IllegalArgumentException("mcp_servers 仅允许 HTTP(S) 远程 server：" + url);
+            }
+            if (!allowlist.contains(host.toLowerCase(java.util.Locale.ROOT)) && !allowlist.contains(url.toLowerCase(java.util.Locale.ROOT))) {
+                throw new IllegalArgumentException("mcp_servers 未通过 allowlist：" + host);
+            }
+        }
+    }
+
+    private Set<String> mcpAllowlist(JsonNode allowlistNode) {
+        Set<String> allowlist = new HashSet<>();
+        if (allowlistNode == null || !allowlistNode.isArray()) {
+            return allowlist;
+        }
+        for (JsonNode item : allowlistNode) {
+            String value = item.asText(null);
+            if (value != null && !value.isBlank()) {
+                allowlist.add(value.trim().toLowerCase(java.util.Locale.ROOT));
+            }
+        }
+        return allowlist;
+    }
+
+    private CanonicalReasoningConfig buildReasoningConfig(AnthropicMessagesRequest request) {
+        JsonNode thinking = request.thinking();
+        if (thinking == null || thinking.isNull() || thinking.isMissingNode()) {
+            return null;
+        }
+        return new CanonicalReasoningConfig(thinking, thinking.path("type").asText(null));
     }
 
     private List<CanonicalMessage> toMessages(JsonNode systemNode, List<AnthropicMessagesRequest.Message> messages) {

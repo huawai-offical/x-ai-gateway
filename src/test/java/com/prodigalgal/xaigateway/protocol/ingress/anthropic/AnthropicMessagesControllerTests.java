@@ -71,7 +71,7 @@ class AnthropicMessagesControllerTests {
                           "messages": [
                             {"role":"user","content":"hello"}
                           ],
-                          "maxTokens": 256
+                          "max_tokens": 256
                         }
                         """)
                 .exchange()
@@ -115,10 +115,10 @@ class AnthropicMessagesControllerTests {
                             {
                               "name":"lookup_weather",
                               "description":"Lookup weather",
-                              "inputSchema":{"type":"object"}
+                              "input_schema":{"type":"object"}
                             }
                           ],
-                          "maxTokens": 256
+                          "max_tokens": 256
                         }
                         """)
                 .exchange()
@@ -128,6 +128,121 @@ class AnthropicMessagesControllerTests {
                 .jsonPath("$.content[0].type").isEqualTo("tool_use")
                 .jsonPath("$.content[0].name").isEqualTo("lookup_weather")
                 .jsonPath("$.content[0].input.city").isEqualTo("Shanghai");
+    }
+
+    @Test
+    void shouldAcceptOfficialAnthropicSnakeCaseControls() {
+        Mockito.when(distributedKeyAuthenticationService.authenticateRawToken("sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<CanonicalRequest>argThat(request ->
+                        request != null
+                                && Integer.valueOf(512).equals(request.maxTokens())
+                                && request.toolChoice() != null
+                                && "tool".equals(request.toolChoice().path("type").asText())
+                                && "lookup_weather".equals(request.toolChoice().path("name").asText())
+                                && request.reasoning() != null
+                                && "enabled".equals(request.reasoning().rawSettings().path("type").asText())
+                                && request.reasoning().rawSettings().path("budget_tokens").asInt() == 1024
+                                && request.tools().size() == 1
+                                && "object".equals(request.tools().get(0).inputSchema().path("type").asText())
+                )))
+                .thenReturn(gatewayResponse("req-anthropic-official-fields-1", "official controls accepted", GatewayUsage.empty(), List.of(), GatewayFinishReason.END_TURN));
+
+        webTestClient.post()
+                .uri("/v1/messages")
+                .header("x-api-key", "sk-gw-test.secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "model": "claude-sonnet-4",
+                          "messages": [
+                            {"role":"user","content":"帮我查天气"}
+                          ],
+                          "tools": [
+                            {
+                              "name":"lookup_weather",
+                              "description":"Lookup weather",
+                              "input_schema":{"type":"object"}
+                            }
+                          ],
+                          "tool_choice":{"type":"tool","name":"lookup_weather"},
+                          "thinking":{"type":"enabled","budget_tokens":1024},
+                          "service_tier":"auto",
+                          "max_tokens": 512
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.content[0].text").isEqualTo("official controls accepted");
+    }
+
+    @Test
+    void shouldAcceptManagedAnthropicExtensionFields() {
+        Mockito.when(distributedKeyAuthenticationService.authenticateRawToken("sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<CanonicalRequest>argThat(request -> {
+            var extensions = request == null ? null : request.providerExtensions();
+            return extensions != null
+                    && "auto".equals(extensions.path("service_tier").asText())
+                    && "session-1".equals(extensions.path("container").asText())
+                    && "user-1".equals(extensions.path("metadata").path("user_id").asText())
+                    && extensions.path("context_management").path("clear_function_results").asBoolean(false)
+                    && "https://mcp.example.com/sse".equals(extensions.path("mcp_servers").get(0).path("url").asText())
+                    && "context-2025-10-01".equals(extensions.path("x_ai_gateway_anthropic_beta").asText());
+        })))
+                .thenReturn(gatewayResponse("req-anthropic-managed-fields-1", "managed controls accepted", GatewayUsage.empty(), List.of(), GatewayFinishReason.END_TURN));
+
+        webTestClient.post()
+                .uri("/v1/messages")
+                .header("x-api-key", "sk-gw-test.secret")
+                .header("anthropic-beta", "context-2025-10-01")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "model": "claude-sonnet-4",
+                          "messages": [
+                            {"role":"user","content":"列出工具"}
+                          ],
+                          "service_tier":"auto",
+                          "container":"session-1",
+                          "metadata":{"user_id":"user-1"},
+                          "context_management":{"clear_function_results":true},
+                          "mcp_servers":[{"type":"url","url":"https://mcp.example.com/sse","name":"docs"}],
+                          "x_ai_gateway_mcp_allowlist":["mcp.example.com"],
+                          "max_tokens": 512
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.content[0].text").isEqualTo("managed controls accepted");
+    }
+
+    @Test
+    void shouldRejectAnthropicMcpServersWithoutGovernance() {
+        Mockito.when(distributedKeyAuthenticationService.authenticateRawToken("sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+
+        webTestClient.post()
+                .uri("/v1/messages")
+                .header("x-api-key", "sk-gw-test.secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "model": "claude-sonnet-4",
+                          "messages": [
+                            {"role":"user","content":"列出工具"}
+                          ],
+                          "mcp_servers":[{"type":"url","url":"https://mcp.example.com/sse","name":"docs"}],
+                          "max_tokens": 512
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo("INVALID_ARGUMENT")
+                .jsonPath("$.message").isEqualTo("mcp_servers 需要 x_ai_gateway_mcp_allowlist 或 x_ai_gateway_allow_mcp_servers=true。");
     }
 
     @Test
@@ -153,7 +268,7 @@ class AnthropicMessagesControllerTests {
                               ]
                             }
                           ],
-                          "maxTokens": 256
+                          "max_tokens": 256
                         }
                         """)
                 .exchange()
@@ -185,7 +300,7 @@ class AnthropicMessagesControllerTests {
                               ]
                             }
                           ],
-                          "maxTokens": 256
+                          "max_tokens": 256
                         }
                         """)
                 .exchange()
@@ -216,7 +331,7 @@ class AnthropicMessagesControllerTests {
                               ]
                             }
                           ],
-                          "maxTokens": 256
+                          "max_tokens": 256
                         }
                         """)
                 .exchange()
@@ -247,7 +362,7 @@ class AnthropicMessagesControllerTests {
                               ]
                             }
                           ],
-                          "maxTokens": 256
+                          "max_tokens": 256
                         }
                         """)
                 .exchange()
@@ -281,7 +396,7 @@ class AnthropicMessagesControllerTests {
                           "messages": [
                             {"role":"user","content":"hello"}
                           ],
-                          "maxTokens": 256,
+                          "max_tokens": 256,
                           "stream": true
                         }
                         """)
@@ -312,7 +427,7 @@ class AnthropicMessagesControllerTests {
                           "messages": [
                             {"role":"assistant","content":"hello"}
                           ],
-                          "maxTokens": 256
+                          "max_tokens": 256
                         }
                         """)
                 .exchange()

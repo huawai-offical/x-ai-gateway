@@ -11,11 +11,17 @@ import com.anthropic.models.messages.ImageBlockParam;
 import com.anthropic.models.messages.Message;
 import com.anthropic.models.messages.MessageCreateParams;
 import com.anthropic.models.messages.MessageDeltaUsage;
+import com.anthropic.models.messages.Metadata;
 import com.anthropic.models.messages.MessageParam;
 import com.anthropic.models.messages.RawMessageStreamEvent;
 import com.anthropic.models.messages.TextBlockParam;
 import com.anthropic.models.messages.ThinkingConfigEnabled;
 import com.anthropic.models.messages.Tool;
+import com.anthropic.models.messages.ToolChoice;
+import com.anthropic.models.messages.ToolChoiceAny;
+import com.anthropic.models.messages.ToolChoiceAuto;
+import com.anthropic.models.messages.ToolChoiceNone;
+import com.anthropic.models.messages.ToolChoiceTool;
 import com.anthropic.models.messages.ToolResultBlockParam;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyQueryService;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
@@ -36,9 +42,14 @@ import com.prodigalgal.xaigateway.gateway.core.response.GatewayFinishReason;
 import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.provider.adapter.anthropic.AnthropicChatModelFactory;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
@@ -46,10 +57,12 @@ import reactor.core.publisher.Flux;
 public class AnthropicNativeGatewayChatRuntime implements GatewayChatRuntime {
 
     private static final long DEFAULT_MAX_TOKENS = 4096L;
+    private static final String MCP_BETA = "mcp-client-2025-04-04";
 
     private final AnthropicChatModelFactory anthropicChatModelFactory;
     private final GatewayFileService gatewayFileService;
     private final DistributedKeyQueryService distributedKeyQueryService;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public AnthropicNativeGatewayChatRuntime(
             AnthropicChatModelFactory anthropicChatModelFactory,
@@ -94,10 +107,11 @@ public class AnthropicNativeGatewayChatRuntime implements GatewayChatRuntime {
         );
     }
 
-    private MessageCreateParams buildRequest(CanonicalRequest request, String model) {
+    MessageCreateParams buildRequest(CanonicalRequest request, String model) {
         MessageCreateParams.Builder builder = MessageCreateParams.builder()
                 .model(model)
                 .maxTokens(request.maxTokens() == null ? DEFAULT_MAX_TOKENS : request.maxTokens().longValue());
+        applyProviderControls(builder, request.providerExtensions());
         if (request.temperature() != null) {
             builder.temperature(request.temperature());
         }
@@ -106,7 +120,10 @@ public class AnthropicNativeGatewayChatRuntime implements GatewayChatRuntime {
             builder.system(systemPrompt);
         }
         if (request.reasoning() != null) {
-            builder.thinking(ThinkingConfigEnabled.builder().budgetTokens(2048).build());
+            builder.thinking(ThinkingConfigEnabled.builder().budgetTokens(thinkingBudgetTokens(request)).build());
+        }
+        if (request.toolChoice() != null && !request.toolChoice().isNull() && !request.toolChoice().isMissingNode()) {
+            builder.toolChoice(mapToolChoice(request.toolChoice()));
         }
         if (request.tools() != null) {
             for (CanonicalToolDefinition tool : request.tools()) {
@@ -127,6 +144,112 @@ public class AnthropicNativeGatewayChatRuntime implements GatewayChatRuntime {
             }
         }
         return builder.build();
+    }
+
+    private void applyProviderControls(MessageCreateParams.Builder builder, JsonNode extensions) {
+        if (extensions == null || !extensions.isObject()) {
+            return;
+        }
+        String serviceTier = optionalText(extensions, "service_tier");
+        if (serviceTier != null) {
+            builder.serviceTier(MessageCreateParams.ServiceTier.of(serviceTier));
+        }
+        String container = optionalText(extensions, "container");
+        if (container != null) {
+            builder.container(container);
+        }
+        JsonNode metadata = extensions.path("metadata");
+        if (metadata.isObject()) {
+            builder.metadata(toAnthropicMetadata(metadata));
+        }
+        copyAdditionalBody(builder, extensions, "context_management");
+        copyAdditionalBody(builder, extensions, "mcp_servers");
+        if (extensions.has("mcp_servers") && !extensions.path("mcp_servers").isNull()) {
+            builder.putAdditionalHeader("anthropic-beta", mergeBeta(optionalText(extensions, "x_ai_gateway_anthropic_beta"), MCP_BETA));
+        } else {
+            String beta = optionalText(extensions, "x_ai_gateway_anthropic_beta");
+            if (beta != null) {
+                builder.putAdditionalHeader("anthropic-beta", beta);
+            }
+        }
+    }
+
+    private Metadata toAnthropicMetadata(JsonNode metadata) {
+        Metadata.Builder builder = Metadata.builder();
+        metadata.properties().forEach(entry -> {
+            JsonNode value = entry.getValue();
+            if ("user_id".equals(entry.getKey()) && value != null && value.isValueNode()) {
+                builder.userId(value.asText());
+                return;
+            }
+            if (value != null && !value.isNull()) {
+                builder.putAdditionalProperty(entry.getKey(), JsonValue.from(toJavaValue(value)));
+            }
+        });
+        return builder.build();
+    }
+
+    private void copyAdditionalBody(MessageCreateParams.Builder builder, JsonNode extensions, String field) {
+        if (extensions.has(field) && !extensions.get(field).isNull()) {
+            builder.putAdditionalBodyProperty(field, JsonValue.from(toJavaValue(extensions.get(field))));
+        }
+    }
+
+    private Object toJavaValue(JsonNode node) {
+        return objectMapper.convertValue(node, Object.class);
+    }
+
+    private String optionalText(JsonNode node, String field) {
+        if (node == null || !node.has(field) || node.get(field).isNull()) {
+            return null;
+        }
+        String value = node.get(field).asText(null);
+        return value == null || value.isBlank() ? null : value;
+    }
+
+    private String mergeBeta(String current, String required) {
+        if (current == null || current.isBlank()) {
+            return required;
+        }
+        for (String item : current.split(",")) {
+            if (required.equals(item.trim())) {
+                return current;
+            }
+        }
+        return current + "," + required;
+    }
+
+    private long thinkingBudgetTokens(CanonicalRequest request) {
+        if (request.reasoning() == null || request.reasoning().rawSettings() == null) {
+            return 2048L;
+        }
+        long budgetTokens = request.reasoning().rawSettings().path("budget_tokens").asLong(2048L);
+        return budgetTokens > 0 ? budgetTokens : 2048L;
+    }
+
+    private ToolChoice mapToolChoice(tools.jackson.databind.JsonNode toolChoice) {
+        if (toolChoice.isTextual()) {
+            return switch (toolChoice.asText().toLowerCase(Locale.ROOT)) {
+                case "any", "required" -> ToolChoice.ofAny(ToolChoiceAny.builder().build());
+                case "none" -> ToolChoice.ofNone(ToolChoiceNone.builder().build());
+                case "auto" -> ToolChoice.ofAuto(ToolChoiceAuto.builder().build());
+                default -> ToolChoice.ofAuto(ToolChoiceAuto.builder().build());
+            };
+        }
+
+        String type = toolChoice.path("type").asText();
+        if ("tool".equalsIgnoreCase(type)) {
+            return ToolChoice.ofTool(ToolChoiceTool.builder()
+                    .name(toolChoice.path("name").asText())
+                    .build());
+        }
+        if ("any".equalsIgnoreCase(type)) {
+            return ToolChoice.ofAny(ToolChoiceAny.builder().build());
+        }
+        if ("none".equalsIgnoreCase(type)) {
+            return ToolChoice.ofNone(ToolChoiceNone.builder().build());
+        }
+        return ToolChoice.ofAuto(ToolChoiceAuto.builder().build());
     }
 
     private MessageParam toMessageParam(String distributedKeyPrefix, CanonicalMessage message) {
