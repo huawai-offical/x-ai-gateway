@@ -67,11 +67,12 @@
 - [TASK-20260515-007 OpenAI Chat modalities/audio/web_search_options 强类型映射](../done/TASK-20260515-007-openai-chat-modalities-audio-web-search-typed-mapping.md)：Chat `modalities`、`audio` 与 `web_search_options` 现在映射到 Spring AI typed request 字段，非法 enum/shape 前置 OpenAI-style 错误，并清理 `extraBody` 重复字段。
 - [TASK-20260515-008 OpenAI Chat 参数兼容证明、公开文档与 SDK 示例](../done/TASK-20260515-008-openai-chat-conformance-docs-sdk-evidence.md)：新增 Chat 参数级 parity matrix，更新 public OpenAPI/docs bundle/SDK advanced example，并用文档测试锁定 `response_format`、`tools/tool_choice`、`store/metadata`、`modalities/audio`、`web_search_options` 等关键字段。
 - [TASK-20260515-014 OpenAI Streaming Event Usage 与 Sequence 基线](../done/TASK-20260515-014-openai-streaming-event-usage-sequence-baseline.md)：Chat stream 支持 `stream_options.include_usage` usage chunk，同一 stream 内 chunk `id`/`created` 保持一致，并用 WebFlux 测试锁定。
+- [TASK-20260516-004 OpenAI Stored Chat 数据库游标分页与过滤硬化](../done/TASK-20260516-004-openai-stored-chat-db-pagination-filter-hardening.md)：stored Chat Completion list 已使用专用数据库游标查询下推租户、类型前缀、model、createdAt/id cursor 与排序；metadata 保留 JSON 精确过滤并跨批次扫描，固定 scan window 漏页风险已移除。
 
 ## 剩余切片
 
 - Chat create 主要复杂对象已完成 typed mapping，参数级 conformance/docs/SDK 证明也已补齐；剩余需要真实 smoke 证据。
-- Stored Chat Completion 已有内存级 cursor/metadata filter 基线；大数据量下的数据库级 pagination、索引与 filter 优化仍需要联动 `TASK-20260514-030` 的 pagination 横切任务。
+- Stored Chat Completion 数据库游标 pagination 与索引已由 `TASK-20260516-004` 闭环；剩余需要真实 smoke 证据。
 
 ## 关联文档
 

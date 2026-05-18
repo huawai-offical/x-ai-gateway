@@ -14,7 +14,7 @@ OpenAI 官方 API Reference 已覆盖 Vector Stores、Evals、Containers、Realt
 
 - 建立 OpenAI 官方资源族覆盖矩阵，逐项标注 `Supported`、`Partial`、`Missing`、`Out of scope`。
 - 对缺失资源族拆分实现顺序：先补客户常用对象生命周期，再补管理/企业 API。
-- 为 Batch list、Fine-tuning events/checkpoints/pause/resume、Models delete、Responses input items/count/cancel/compact、Conversations/Items、Vector Stores、Containers、Evals、Realtime calls 给出实现或明确非目标声明。
+- Batch list 已由 `TASK-20260516-011` 补齐，Models delete 的 gateway registry 边界已由 `TASK-20260516-012` 补齐，Fine-tuning events/checkpoints 本地 lineage 已由 `TASK-20260516-013` 补齐；继续为 Fine-tuning pause/resume/permissions、Models upstream owner-role delete passthrough、Conversations/Items、Vector Stores、Containers、Evals、Realtime calls 给出实现或明确非目标声明。
 - Provider catalog 不再把 OpenAI Direct 误标为全量无缺口。
 
 ## 非目标
@@ -32,7 +32,7 @@ OpenAI 官方 API Reference 已覆盖 Vector Stores、Evals、Containers、Realt
 
 - OpenAI resource family coverage matrix。
 - 资源族实现拆分任务或 out-of-scope 决策。
-- 至少补齐 Batch list、Fine-tuning events/checkpoints、Models delete 的明确任务边界。
+- Batch list、Models delete gateway registry 边界与 Fine-tuning events/checkpoints 本地 lineage 已完成实现切片；继续补齐 Fine-tuning pause/resume/permissions 与 Models upstream owner-role delete passthrough 的明确任务边界。
 - Provider catalog `unsupportedFeatures` 与文档声明更新。
 
 ## 影响范围
@@ -82,3 +82,9 @@ OpenAI 官方 API Reference 已覆盖 Vector Stores、Evals、Containers、Realt
 - [TASK-20260514-026 OpenAI Evals、Graders 与 Runs API](TASK-20260514-026-openai-evals-graders-runs.md)
 - [TASK-20260514-027 OpenAI Skills API 与工具分发](TASK-20260514-027-openai-skills-api-tool-distribution.md)
 - [TASK-20260514-028 OpenAI Administration API 权限隔离与只读优先](TASK-20260514-028-openai-administration-api-boundary.md)
+
+## 已完成切片
+
+- [TASK-20260516-011 OpenAI Batches List Envelope 与本地游标分页](../done/TASK-20260516-011-openai-batches-list-envelope.md)：OpenAI Direct `GET /v1/batches` 已从 accepted exception 转为本地 lineage list 能力。
+- [TASK-20260516-012 OpenAI Models Delete 与 Fine-tuned Model 删除边界](../done/TASK-20260516-012-openai-models-delete-finetuned-boundary.md)：OpenAI Direct `DELETE /v1/models/{model}` 已转为当前 DistributedKey 下 gateway-registered fine-tuned model registry delete。
+- [TASK-20260516-013 OpenAI Fine-tuning Events/Checkpoints 本地 Lineage 列表](../done/TASK-20260516-013-openai-fine-tuning-events-checkpoints-local-lineage.md)：OpenAI Direct `GET /v1/fine_tuning/jobs/{jobId}/events` 与 `GET /v1/fine_tuning/jobs/{jobId}/checkpoints` 已转为当前 DistributedKey 下 gateway-tracked tuning job 的本地 lineage list。

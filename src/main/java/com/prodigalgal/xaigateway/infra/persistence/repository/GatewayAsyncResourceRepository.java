@@ -14,6 +14,8 @@ public interface GatewayAsyncResourceRepository extends JpaRepository<GatewayAsy
 
     Optional<GatewayAsyncResourceEntity> findByResourceKeyAndDeletedFalse(String resourceKey);
 
+    boolean existsByResourceKey(String resourceKey);
+
     Optional<GatewayAsyncResourceEntity> findByResourceKeyAndDistributedKeyIdAndDeletedFalse(
             String resourceKey,
             Long distributedKeyId);
@@ -37,6 +39,10 @@ public interface GatewayAsyncResourceRepository extends JpaRepository<GatewayAsy
     List<GatewayAsyncResourceEntity> findAllByDistributedKeyIdAndUpstreamObjectIdAndDeletedFalse(
             Long distributedKeyId,
             String upstreamObjectId);
+
+    List<GatewayAsyncResourceEntity> findAllByDistributedKeyIdAndResourceTypeAndDeletedFalse(
+            Long distributedKeyId,
+            GatewayAsyncResourceType resourceType);
 
     @Query("""
             select entity
@@ -70,4 +76,96 @@ public interface GatewayAsyncResourceRepository extends JpaRepository<GatewayAsy
             @Param("status") String status,
             @Param("from") Instant from,
             @Param("to") Instant to);
+
+    @Query("""
+            select entity
+            from GatewayAsyncResourceEntity entity
+            where entity.deleted = false
+              and entity.distributedKeyId = :distributedKeyId
+              and entity.resourceType = :resourceType
+              and entity.resourceKey like concat(:resourceKeyPrefix, '%')
+              and (:model is null or entity.requestModel = :model)
+              and (
+                    :cursorCreatedAt is null
+                    or entity.createdAt > :cursorCreatedAt
+                    or (entity.createdAt = :cursorCreatedAt and entity.id > :cursorId)
+                  )
+            order by entity.createdAt asc, entity.id asc
+            """)
+    List<GatewayAsyncResourceEntity> findStoredResourcesAfterCursorAsc(
+            @Param("distributedKeyId") Long distributedKeyId,
+            @Param("resourceType") GatewayAsyncResourceType resourceType,
+            @Param("resourceKeyPrefix") String resourceKeyPrefix,
+            @Param("model") String model,
+            @Param("cursorCreatedAt") Instant cursorCreatedAt,
+            @Param("cursorId") Long cursorId,
+            Pageable pageable);
+
+    @Query("""
+            select entity
+            from GatewayAsyncResourceEntity entity
+            where entity.deleted = false
+              and entity.distributedKeyId = :distributedKeyId
+              and entity.resourceType = :resourceType
+              and entity.resourceKey like concat(:resourceKeyPrefix, '%')
+              and (:model is null or entity.requestModel = :model)
+              and (
+                    :cursorCreatedAt is null
+                    or entity.createdAt < :cursorCreatedAt
+                    or (entity.createdAt = :cursorCreatedAt and entity.id < :cursorId)
+                  )
+            order by entity.createdAt desc, entity.id desc
+            """)
+    List<GatewayAsyncResourceEntity> findStoredResourcesAfterCursorDesc(
+            @Param("distributedKeyId") Long distributedKeyId,
+            @Param("resourceType") GatewayAsyncResourceType resourceType,
+            @Param("resourceKeyPrefix") String resourceKeyPrefix,
+            @Param("model") String model,
+            @Param("cursorCreatedAt") Instant cursorCreatedAt,
+            @Param("cursorId") Long cursorId,
+            Pageable pageable);
+
+    @Query("""
+            select entity
+            from GatewayAsyncResourceEntity entity
+            where entity.deleted = false
+              and entity.distributedKeyId = :distributedKeyId
+              and entity.resourceType = :resourceType
+              and entity.upstreamObjectId = :parentResourceKey
+              and (
+                    :cursorCreatedAt is null
+                    or entity.createdAt > :cursorCreatedAt
+                    or (entity.createdAt = :cursorCreatedAt and entity.id > :cursorId)
+                  )
+            order by entity.createdAt asc, entity.id asc
+            """)
+    List<GatewayAsyncResourceEntity> findChildResourcesAfterCursorAsc(
+            @Param("distributedKeyId") Long distributedKeyId,
+            @Param("resourceType") GatewayAsyncResourceType resourceType,
+            @Param("parentResourceKey") String parentResourceKey,
+            @Param("cursorCreatedAt") Instant cursorCreatedAt,
+            @Param("cursorId") Long cursorId,
+            Pageable pageable);
+
+    @Query("""
+            select entity
+            from GatewayAsyncResourceEntity entity
+            where entity.deleted = false
+              and entity.distributedKeyId = :distributedKeyId
+              and entity.resourceType = :resourceType
+              and entity.upstreamObjectId = :parentResourceKey
+              and (
+                    :cursorCreatedAt is null
+                    or entity.createdAt < :cursorCreatedAt
+                    or (entity.createdAt = :cursorCreatedAt and entity.id < :cursorId)
+                  )
+            order by entity.createdAt desc, entity.id desc
+            """)
+    List<GatewayAsyncResourceEntity> findChildResourcesAfterCursorDesc(
+            @Param("distributedKeyId") Long distributedKeyId,
+            @Param("resourceType") GatewayAsyncResourceType resourceType,
+            @Param("parentResourceKey") String parentResourceKey,
+            @Param("cursorCreatedAt") Instant cursorCreatedAt,
+            @Param("cursorId") Long cursorId,
+            Pageable pageable);
 }

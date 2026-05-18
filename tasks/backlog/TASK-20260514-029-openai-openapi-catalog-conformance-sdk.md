@@ -64,10 +64,11 @@
 ## 已完成切片
 
 - [TASK-20260515-008 OpenAI Chat 参数兼容证明、公开文档与 SDK 示例](../done/TASK-20260515-008-openai-chat-conformance-docs-sdk-evidence.md)：先完成 Chat 参数证明切片，新增参数级 parity matrix、public OpenAPI Chat request schema、runtime docs bundle typed parameter 说明、JavaScript advanced 示例和漂移防护测试。
+- [TASK-20260516-010 OpenAI Provider Catalog 覆盖边界校准](../done/TASK-20260516-010-openai-provider-catalog-coverage-boundary.md)：OpenAI Direct provider catalog 现在公开 native-first 支持面与未完成官方资源族边界，避免客户把当前 gateway 误认为官方 API 全量覆盖。
 
 ## 剩余切片
 
-- 全量 OpenAI coverage matrix 仍需覆盖 Chat 以外的 Responses、Files/Uploads/Batches、Fine-tuning、Vector Stores、Realtime、Administration 等资源族，并继续推动 public OpenAPI、catalog unsupportedFeatures、conformance accepted exceptions 和 SDK examples 的统一派生。
+- 全量 OpenAI coverage matrix 仍需覆盖 Chat 以外的 Responses、Files/Uploads/Batches、Fine-tuning、Vector Stores、Realtime、Administration 等资源族，并继续推动 public OpenAPI、conformance accepted exceptions 和 SDK examples 的统一派生。
 
 ## 关联文档
 

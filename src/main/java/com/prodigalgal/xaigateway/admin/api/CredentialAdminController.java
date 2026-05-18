@@ -79,4 +79,25 @@ public class CredentialAdminController {
     public CredentialModelRefreshResponse refreshModels(@PathVariable Long id) {
         return credentialAdminService.refreshModels(id);
     }
+
+    @PostMapping("/{id}/openai-direct/smoke")
+    public OpenAiDirectSmokeResponse openAiDirectSmoke(
+            @PathVariable Long id,
+            @RequestBody(required = false) OpenAiDirectSmokeRequest request) {
+        return credentialAdminService.openAiDirectSmoke(id, request);
+    }
+
+    @PostMapping("/{id}/openai-direct/resource-smoke")
+    public OpenAiDirectResourceSmokeResponse openAiDirectResourceSmoke(
+            @PathVariable Long id,
+            @RequestBody(required = false) OpenAiDirectResourceSmokeRequest request) {
+        return credentialAdminService.openAiDirectResourceSmoke(id, request);
+    }
+
+    @PostMapping("/{id}/openai-direct/resource-smoke/certification")
+    public OpenAiDirectSmokeCertificationResponse openAiDirectResourceSmokeCertification(
+            @PathVariable Long id,
+            @RequestBody(required = false) OpenAiDirectResourceSmokeRequest request) {
+        return credentialAdminService.openAiDirectResourceSmokeCertification(id, request);
+    }
 }

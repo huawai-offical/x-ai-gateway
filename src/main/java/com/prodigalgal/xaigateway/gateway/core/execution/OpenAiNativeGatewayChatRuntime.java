@@ -24,10 +24,15 @@ import com.prodigalgal.xaigateway.provider.adapter.openai.OpenAiChatModelFactory
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -39,6 +44,7 @@ import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.ai.openai.api.ResponseFormat;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
 
 @Service
 public class OpenAiNativeGatewayChatRuntime implements GatewayChatRuntime {
@@ -110,6 +116,9 @@ public class OpenAiNativeGatewayChatRuntime implements GatewayChatRuntime {
 
     @Override
     public Flux<CanonicalStreamEvent> executeStream(GatewayChatRuntimeContext context) {
+        if (shouldUseNativeResponsesHttp(context)) {
+            return executeNativeResponsesStream(context);
+        }
         CanonicalRequest request = context.canonicalRequest();
         OpenAiApi api = openAiChatModelFactory.createApi(
                 context.credential().getBaseUrl(),
@@ -481,7 +490,7 @@ public class OpenAiNativeGatewayChatRuntime implements GatewayChatRuntime {
 
     private CanonicalResponse executeNativeResponsesCreate(GatewayChatRuntimeContext context) {
         CanonicalRequest request = context.canonicalRequest();
-        ObjectNode payload = nativeResponsesPayload(request, context.selectionResult().resolvedModelKey());
+        ObjectNode payload = nativeResponsesPayload(request, context.selectionResult().resolvedModelKey(), false);
         HttpRequest.Builder builder = HttpRequest.newBuilder()
                 .uri(URI.create(responsesUrl(context.credential().getBaseUrl())))
                 .timeout(Duration.ofSeconds(90))
@@ -511,7 +520,8 @@ public class OpenAiNativeGatewayChatRuntime implements GatewayChatRuntime {
                     responsesReasoning(body),
                     responsesToolCalls(body),
                     responsesUsage(body),
-                    responsesFinishReason(body)
+                    responsesFinishReason(body),
+                    body
             );
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
@@ -524,12 +534,81 @@ public class OpenAiNativeGatewayChatRuntime implements GatewayChatRuntime {
         }
     }
 
-    private ObjectNode nativeResponsesPayload(CanonicalRequest request, String resolvedModel) {
+    private Flux<CanonicalStreamEvent> executeNativeResponsesStream(GatewayChatRuntimeContext context) {
+        CanonicalRequest request = context.canonicalRequest();
+        ObjectNode payload = nativeResponsesPayload(request, context.selectionResult().resolvedModelKey(), true);
+        return Flux.using(
+                        () -> openNativeResponsesStreamReader(context, payload),
+                        reader -> Flux.generate(sink -> {
+                            try {
+                                String line = reader.readLine();
+                                if (line == null) {
+                                    sink.complete();
+                                    return;
+                                }
+                                sink.next(CanonicalStreamEvent.rawSse(line + "\n"));
+                            } catch (IOException exception) {
+                                sink.error(new IllegalStateException("读取 OpenAI Responses native SSE 失败。", exception));
+                            }
+                        }),
+                        reader -> {
+                            try {
+                                reader.close();
+                            } catch (IOException ignored) {
+                                // 流关闭失败不影响已传递给下游的 upstream SSE 结果。
+                            }
+                        }
+                )
+                .cast(CanonicalStreamEvent.class)
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    private BufferedReader openNativeResponsesStreamReader(GatewayChatRuntimeContext context, ObjectNode payload) throws Exception {
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
+                .uri(URI.create(responsesUrl(context.credential().getBaseUrl())))
+                .timeout(Duration.ofSeconds(90))
+                .header("authorization", "Bearer " + context.apiKey())
+                .header("content-type", "application/json")
+                .header("accept", "text/event-stream");
+        upstreamHeaders(context.selectionResult().selectedCandidate().candidate().siteKind(), context.canonicalRequest())
+                .forEach(builder::header);
+        try {
+            HttpResponse<InputStream> upstreamResponse = HttpClient.newHttpClient().send(
+                    builder.POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload))).build(),
+                    HttpResponse.BodyHandlers.ofInputStream()
+            );
+            if (upstreamResponse.statusCode() < 200 || upstreamResponse.statusCode() >= 300) {
+                String body = readBody(upstreamResponse.body());
+                throw new IllegalStateException("OpenAI Responses native stream 请求失败：HTTP "
+                        + upstreamResponse.statusCode() + " " + truncate(body, 240));
+            }
+            return new BufferedReader(new InputStreamReader(upstreamResponse.body(), StandardCharsets.UTF_8));
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("OpenAI Responses native stream 请求被中断。", exception);
+        } catch (Exception exception) {
+            if (exception instanceof IllegalStateException stateException) {
+                throw stateException;
+            }
+            throw new IllegalStateException("OpenAI Responses native stream 请求失败：" + truncate(exception.getMessage(), 240), exception);
+        }
+    }
+
+    private String readBody(InputStream body) throws IOException {
+        if (body == null) {
+            return "";
+        }
+        try (InputStream input = body) {
+            return new String(input.readAllBytes(), StandardCharsets.UTF_8);
+        }
+    }
+
+    private ObjectNode nativeResponsesPayload(CanonicalRequest request, String resolvedModel, boolean stream) {
         ObjectNode payload = request.providerExtensions() != null && request.providerExtensions().isObject()
                 ? ((ObjectNode) request.providerExtensions()).deepCopy()
                 : objectMapper.createObjectNode();
         payload.put("model", resolvedModel);
-        payload.put("stream", false);
+        payload.put("stream", stream);
         return payload;
     }
 

@@ -8,14 +8,14 @@
 
 ## 背景
 
-当前项目已有 Files、Uploads、Batches 和 Models 的部分路径，但 Files list 是本地 catalog，Batches 缺 list，Models 缺 delete，Uploads 需要对齐官方路径与响应语义。
+当前项目已有 Files、Uploads、Batches 和 Models 的部分路径；`TASK-20260516-011` 已补齐 Batches list 的本地 lineage envelope，`TASK-20260516-012` 已补齐 gateway-registered fine-tuned model registry delete，但 Files list 仍是本地 catalog，Models 上游 Owner role delete passthrough 仍未实现，Uploads 需要继续对齐官方路径与响应语义。
 
 ## 目标
 
 - 补齐 Files list query、pagination、purpose filter、delete/content 语义。
 - 补齐 Uploads create/parts/complete/cancel 的官方参数和状态机。
-- 补齐 Batches list/create/get/cancel、error file lineage 和 endpoint allowlist。
-- 补齐 Models list/get/delete，区分 public model 与 fine-tuned model。
+- 保持 Batches create/get/cancel/list 基础生命周期，并继续补齐 error file lineage 和 endpoint allowlist。
+- 补齐 Models list/get/delete，区分 public model 与 fine-tuned model；本地 registry delete 已完成，上游 Owner role delete passthrough 后续继续拆分。
 
 ## 非目标
 
@@ -63,3 +63,7 @@
 - [REQ-20260514-009](../../docs/requirements/REQ-20260514-009-openai-full-api-coverage-task-system.md)
 - [REP-20260514 OpenAI 全量覆盖任务拆解](../../docs/reports/REP-20260514-openai-full-api-coverage-task-breakdown.md)
 
+## 已完成切片
+
+- [TASK-20260516-011 OpenAI Batches List Envelope 与本地游标分页](../done/TASK-20260516-011-openai-batches-list-envelope.md)：`GET /v1/batches` 已返回当前 DistributedKey 下经 gateway 创建并落库的 Batch lineage list envelope；该端点已从 accepted exception 中移除。
+- [TASK-20260516-012 OpenAI Models Delete 与 Fine-tuned Model 删除边界](../done/TASK-20260516-012-openai-models-delete-finetuned-boundary.md)：`DELETE /v1/models/{model}` 已删除当前 DistributedKey 下经 gateway fine-tuning/import 登记的 fine-tuned model registry，并保护公共模型与跨租户模型。

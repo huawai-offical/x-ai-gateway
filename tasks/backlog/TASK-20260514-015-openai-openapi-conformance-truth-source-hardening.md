@@ -8,7 +8,7 @@
 
 ## 背景
 
-当前 `docs/openapi/public-openapi.json` 只公开 Chat/Responses/Web Search/Messages/Gemini/Media 等少数路径，但代码已经实现 Embeddings、Audio、Images、Files、Uploads、Batches、Fine-tuning、Moderations、Models、Realtime client secrets 等更多路径。与此同时 provider catalog 对 OpenAI Direct 的 unsupported features 为空，conformance accepted exceptions 又记录了未暴露的 list/events/checkpoints，三者不一致。
+当前 `docs/openapi/public-openapi.json` 曾只公开 Chat/Responses/Web Search/Messages/Gemini/Media 等少数路径，但代码已经实现 Embeddings、Audio、Images、Files、Uploads、Batches、Fine-tuning、Moderations、Models、Realtime client secrets 等更多路径。与此同时 provider catalog、public OpenAPI 与 conformance accepted exceptions 曾对 Batches list、Fine-tuning events/checkpoints、Models delete 等边界描述不一致。
 
 ## 目标
 
@@ -77,3 +77,10 @@
 
 - [TASK-20260514-029 OpenAI OpenAPI、Catalog、Conformance 与 SDK 事实源统一](TASK-20260514-029-openai-openapi-catalog-conformance-sdk.md)
 - [TASK-20260514-031 OpenAI 真实 Smoke 与认证成本防护](TASK-20260514-031-openai-real-smoke-certification-harness.md)
+
+## 已完成切片
+
+- [TASK-20260516-010 OpenAI Provider Catalog 覆盖边界校准](../done/TASK-20260516-010-openai-provider-catalog-coverage-boundary.md)：OpenAI Direct preset 已从 `unsupportedFeatures: []` 调整为明确列出 Conversations、Vector Stores full stack、Fine-tuning events/checkpoints、Models delete、Containers、Evals、Administration、Realtime full calls/WebRTC/SIP 等当时未完成边界；`conformanceChecks` 同步加入近期已闭环的 Chat/Responses/Realtime/smoke 证据。
+- [TASK-20260516-011 OpenAI Batches List Envelope 与本地游标分页](../done/TASK-20260516-011-openai-batches-list-envelope.md)：`GET /v1/batches` 已纳入 controller/service/interop/conformance/public docs，`accepted-exceptions.json` 不再记录 `/v1/batches [GET]`。
+- [TASK-20260516-012 OpenAI Models Delete 与 Fine-tuned Model 删除边界](../done/TASK-20260516-012-openai-models-delete-finetuned-boundary.md)：`DELETE /v1/models/{model}` 已纳入 OpenAI ingress、public docs bundle、provider catalog 与 public OpenAPI；catalog 不再声明 endpoint 未暴露，只保留上游 Owner role passthrough 未完成边界。
+- [TASK-20260516-013 OpenAI Fine-tuning Events/Checkpoints 本地 Lineage 列表](../done/TASK-20260516-013-openai-fine-tuning-events-checkpoints-local-lineage.md)：Fine-tuning events/checkpoints 已纳入 controller/service/interop/conformance/public docs/OpenAPI，`accepted-exceptions.json` 不再记录对应 not_exposed 缺口。

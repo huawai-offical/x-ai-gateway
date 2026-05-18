@@ -1,5 +1,6 @@
 package com.prodigalgal.xaigateway.protocol.ingress.openai;
 
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
@@ -31,6 +32,43 @@ class OpenAiBatchesControllerTests {
 
     @MockitoBean
     private GatewayResourceExecutionService gatewayResourceExecutionService;
+
+    @Test
+    void shouldListBatchesWithPaginationQuery() {
+        ObjectNode response = objectMapper.createObjectNode();
+        response.put("object", "list");
+        response.putArray("data")
+                .addObject()
+                .put("id", "batch_1")
+                .put("object", "batch");
+        response.put("has_more", false);
+
+        Mockito.when(gatewayTokenAuthenticationResolver.authenticate("Bearer sk-gw-test.secret", null, null, null))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayResourceExecutionService.executeLifecycleJson(Mockito.eq(1L), Mockito.eq("sk-gw-test"), Mockito.eq("GET"), Mockito.eq("/v1/batches"), Mockito.eq("resource-orchestration"), Mockito.any()))
+                .thenReturn(response);
+
+        webTestClient.get()
+                .uri("/v1/batches?limit=1&after=batch_prev")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.object").isEqualTo("list")
+                .jsonPath("$.data[0].id").isEqualTo("batch_1")
+                .jsonPath("$.has_more").isEqualTo(false);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(JsonNode.class);
+        Mockito.verify(gatewayResourceExecutionService).executeLifecycleJson(
+                Mockito.eq(1L),
+                Mockito.eq("sk-gw-test"),
+                Mockito.eq("GET"),
+                Mockito.eq("/v1/batches"),
+                Mockito.eq("resource-orchestration"),
+                captor.capture());
+        org.junit.jupiter.api.Assertions.assertEquals("1", captor.getValue().path("limit").asText());
+        org.junit.jupiter.api.Assertions.assertEquals("batch_prev", captor.getValue().path("after").asText());
+    }
 
     @Test
     void shouldCreateBatch() {

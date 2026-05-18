@@ -27,9 +27,31 @@ class PublicOpenApiSnapshotTests {
         assertTrue(root.path("paths").has("/v1/chat/completions/{completionId}"));
         assertTrue(root.path("paths").has("/v1/chat/completions/{completionId}/messages"));
         assertTrue(root.path("paths").has("/v1/responses"));
+        assertTrue(root.path("paths").has("/v1/responses/input_tokens"));
+        assertTrue(root.path("paths").has("/v1/responses/compact"));
         assertTrue(root.path("paths").has("/v1/responses/{responseId}"));
         assertTrue(root.path("paths").has("/v1/responses/{responseId}/cancel"));
         assertTrue(root.path("paths").has("/v1/responses/{responseId}/input_items"));
+        assertTrue(root.path("paths").has("/v1/conversations"));
+        assertTrue(root.path("paths").has("/v1/conversations/{conversationId}"));
+        assertTrue(root.path("paths").has("/v1/conversations/{conversationId}/items"));
+        assertTrue(root.path("paths").has("/v1/conversations/{conversationId}/items/{itemId}"));
+        assertTrue(root.path("paths").has("/v1/vector_stores"));
+        assertTrue(root.path("paths").has("/v1/vector_stores/{vectorStoreId}"));
+        assertTrue(root.path("paths").has("/v1/vector_stores/{vectorStoreId}/search"));
+        assertTrue(root.path("paths").has("/v1/vector_stores/{vectorStoreId}/files"));
+        assertTrue(root.path("paths").has("/v1/vector_stores/{vectorStoreId}/files/{fileId}"));
+        assertTrue(root.path("paths").has("/v1/vector_stores/{vectorStoreId}/files/{fileId}/content"));
+        assertTrue(root.path("paths").has("/v1/vector_stores/{vectorStoreId}/file_batches"));
+        assertTrue(root.path("paths").has("/v1/vector_stores/{vectorStoreId}/file_batches/{batchId}"));
+        assertTrue(root.path("paths").has("/v1/vector_stores/{vectorStoreId}/file_batches/{batchId}/cancel"));
+        assertTrue(root.path("paths").has("/v1/vector_stores/{vectorStoreId}/file_batches/{batchId}/files"));
+        assertTrue(root.path("paths").has("/v1/webhooks/openai"));
+        assertTrue(root.path("paths").has("/v1/batches"));
+        assertTrue(root.path("paths").has("/v1/models"));
+        assertTrue(root.path("paths").has("/v1/models/{model}"));
+        assertTrue(root.path("paths").has("/v1/fine_tuning/jobs/{jobId}/events"));
+        assertTrue(root.path("paths").has("/v1/fine_tuning/jobs/{jobId}/checkpoints"));
         JsonNode chatProperties = root.path("paths")
                 .path("/v1/chat/completions")
                 .path("post")
@@ -60,6 +82,38 @@ class PublicOpenApiSnapshotTests {
                 .path(0)
                 .path("name")
                 .asText());
+        JsonNode responsesProperties = root.path("paths")
+                .path("/v1/responses")
+                .path("post")
+                .path("requestBody")
+                .path("content")
+                .path("application/json")
+                .path("schema")
+                .path("properties");
+        assertTrue(responsesProperties.has("stream_options"));
+        assertTrue(responsesProperties.path("stream_options").path("description").asText().contains("include_obfuscation"));
+        assertTrue(responsesProperties.has("tools"));
+        assertTrue(responsesProperties.path("tools").path("description").asText().contains("file_search"));
+        assertTrue(responsesProperties.has("tool_choice"));
+        assertTrue(responsesProperties.path("tool_choice").path("description").asText().contains("Non-function"));
+        assertTrue(root.path("paths")
+                .path("/v1/responses/input_tokens")
+                .path("post")
+                .path("requestBody")
+                .path("content")
+                .path("application/json")
+                .path("schema")
+                .path("properties")
+                .has("input"));
+        assertTrue(root.path("paths")
+                .path("/v1/responses/compact")
+                .path("post")
+                .path("requestBody")
+                .path("content")
+                .path("application/json")
+                .path("schema")
+                .path("properties")
+                .has("input"));
         assertTrue(hasParameter(root.path("paths").path("/v1/chat/completions").path("get"), "after"));
         assertTrue(hasParameter(root.path("paths").path("/v1/chat/completions").path("get"), "limit"));
         assertTrue(hasParameter(root.path("paths").path("/v1/chat/completions").path("get"), "order"));
@@ -70,11 +124,100 @@ class PublicOpenApiSnapshotTests {
         assertTrue(hasParameter(root.path("paths").path("/v1/chat/completions/{completionId}/messages").path("get"), "limit"));
         assertTrue(hasParameter(root.path("paths").path("/v1/chat/completions/{completionId}/messages").path("get"), "order"));
         assertTrue(hasParameter(root.path("paths").path("/v1/responses/{responseId}").path("get"), "responseId"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/responses/{responseId}").path("get"), "include"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/responses/{responseId}").path("get"), "model"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/responses/{responseId}").path("get"), "X-AI-Gateway-OpenAI-Model"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/responses/{responseId}").path("delete"), "model"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/responses/{responseId}").path("delete"), "X-AI-Gateway-OpenAI-Model"));
         assertTrue(hasParameter(root.path("paths").path("/v1/responses/{responseId}/cancel").path("post"), "responseId"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/responses/{responseId}/cancel").path("post"), "model"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/responses/{responseId}/cancel").path("post"), "X-AI-Gateway-OpenAI-Model"));
         assertTrue(hasParameter(root.path("paths").path("/v1/responses/{responseId}/input_items").path("get"), "responseId"));
         assertTrue(hasParameter(root.path("paths").path("/v1/responses/{responseId}/input_items").path("get"), "after"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/responses/{responseId}/input_items").path("get"), "include"));
         assertTrue(hasParameter(root.path("paths").path("/v1/responses/{responseId}/input_items").path("get"), "limit"));
         assertTrue(hasParameter(root.path("paths").path("/v1/responses/{responseId}/input_items").path("get"), "order"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/responses/{responseId}/input_items").path("get"), "model"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/responses/{responseId}/input_items").path("get"), "X-AI-Gateway-OpenAI-Model"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/conversations/{conversationId}").path("get"), "conversationId"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/conversations/{conversationId}/items").path("post"), "conversationId"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/conversations/{conversationId}/items").path("post"), "include"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/conversations/{conversationId}/items").path("get"), "after"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/conversations/{conversationId}/items").path("get"), "include"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/conversations/{conversationId}/items").path("get"), "limit"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/conversations/{conversationId}/items").path("get"), "order"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/conversations/{conversationId}/items/{itemId}").path("get"), "conversationId"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/conversations/{conversationId}/items/{itemId}").path("get"), "itemId"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/vector_stores").path("get"), "after"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/vector_stores").path("get"), "limit"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/vector_stores").path("get"), "order"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/vector_stores/{vectorStoreId}").path("get"), "vectorStoreId"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/vector_stores/{vectorStoreId}").path("post"), "vectorStoreId"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/vector_stores/{vectorStoreId}/search").path("post"), "vectorStoreId"));
+        assertTrue(root.path("paths")
+                .path("/v1/vector_stores/{vectorStoreId}/search")
+                .path("post")
+                .path("requestBody")
+                .path("content")
+                .path("application/json")
+                .path("schema")
+                .path("properties")
+                .has("query"));
+        assertTrue(root.path("paths")
+                .path("/v1/vector_stores/{vectorStoreId}/search")
+                .path("post")
+                .path("requestBody")
+                .path("content")
+                .path("application/json")
+                .path("schema")
+                .path("properties")
+                .has("max_num_results"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/vector_stores/{vectorStoreId}").path("delete"), "vectorStoreId"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/vector_stores/{vectorStoreId}/files").path("post"), "vectorStoreId"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/vector_stores/{vectorStoreId}/files").path("get"), "after"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/vector_stores/{vectorStoreId}/files").path("get"), "limit"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/vector_stores/{vectorStoreId}/files").path("get"), "order"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/vector_stores/{vectorStoreId}/files").path("get"), "filter"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/vector_stores/{vectorStoreId}/files/{fileId}").path("get"), "vectorStoreId"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/vector_stores/{vectorStoreId}/files/{fileId}").path("get"), "fileId"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/vector_stores/{vectorStoreId}/files/{fileId}/content").path("get"), "fileId"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/vector_stores/{vectorStoreId}/files/{fileId}").path("delete"), "fileId"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/vector_stores/{vectorStoreId}/file_batches").path("post"), "vectorStoreId"));
+        assertTrue(root.path("paths")
+                .path("/v1/vector_stores/{vectorStoreId}/file_batches")
+                .path("post")
+                .path("requestBody")
+                .path("content")
+                .path("application/json")
+                .path("schema")
+                .path("properties")
+                .has("files"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/vector_stores/{vectorStoreId}/file_batches/{batchId}").path("get"), "batchId"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/vector_stores/{vectorStoreId}/file_batches/{batchId}/cancel").path("post"), "batchId"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/vector_stores/{vectorStoreId}/file_batches/{batchId}/files").path("get"), "after"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/vector_stores/{vectorStoreId}/file_batches/{batchId}/files").path("get"), "filter"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/webhooks/openai").path("post"), "webhook-id"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/webhooks/openai").path("post"), "webhook-timestamp"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/webhooks/openai").path("post"), "webhook-signature"));
+        assertTrue(root.path("paths")
+                .path("/v1/webhooks/openai")
+                .path("post")
+                .path("requestBody")
+                .path("content")
+                .path("application/json")
+                .path("schema")
+                .path("properties")
+                .has("type"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/batches").path("get"), "after"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/batches").path("get"), "limit"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/models/{model}").path("get"), "model"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/models/{model}").path("delete"), "model"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/fine_tuning/jobs/{jobId}/events").path("get"), "jobId"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/fine_tuning/jobs/{jobId}/events").path("get"), "after"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/fine_tuning/jobs/{jobId}/events").path("get"), "limit"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/fine_tuning/jobs/{jobId}/checkpoints").path("get"), "jobId"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/fine_tuning/jobs/{jobId}/checkpoints").path("get"), "after"));
+        assertTrue(hasParameter(root.path("paths").path("/v1/fine_tuning/jobs/{jobId}/checkpoints").path("get"), "limit"));
         assertTrue(root.path("components").path("securitySchemes").has("bearerAuth"));
     }
 

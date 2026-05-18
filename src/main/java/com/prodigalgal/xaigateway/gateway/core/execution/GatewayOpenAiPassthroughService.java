@@ -1,6 +1,7 @@
 package com.prodigalgal.xaigateway.gateway.core.execution;
 
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 import com.prodigalgal.xaigateway.admin.application.CredentialCryptoService;
 import com.prodigalgal.xaigateway.admin.application.ErrorRuleService;
@@ -23,12 +24,14 @@ import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEnt
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.multipart.FilePart;
@@ -83,11 +86,66 @@ public class GatewayOpenAiPassthroughService {
             String requestPath,
             JsonNode requestBody,
             String defaultModel) {
+        return executeJson(distributedKeyPrefix, requestPath, requestBody, defaultModel, false);
+    }
+
+    public ResponseEntity<JsonNode> executeOpenAiDirectJson(
+            String distributedKeyPrefix,
+            String requestPath,
+            JsonNode requestBody,
+            String defaultModel) {
+        return executeJson(distributedKeyPrefix, requestPath, requestBody, defaultModel, true);
+    }
+
+    public ResponseEntity<JsonNode> executeOpenAiDirectLifecycleJson(
+            String distributedKeyPrefix,
+            String httpMethod,
+            String requestPath,
+            String modelHint) {
+        ObjectNode routePayload = JsonNodeFactory.instance.objectNode();
+        routePayload.put("model", modelHint);
+        String requestedModel = resolveRequestedModel(routePayload, null);
+        RouteExecutionContext context = prepareExecution(distributedKeyPrefix, requestPath, requestedModel, routePayload);
+        boolean directRouteMismatch = context.selectionResult().selectedCandidate().candidate().providerType() != ProviderType.OPENAI_DIRECT;
+
+        try {
+            if (directRouteMismatch) {
+                throw new IllegalArgumentException("当前路由不是 OpenAI Direct native passthrough。");
+            }
+            return executePreparedLifecycleJson(
+                    context.selectionResult(),
+                    context.credential(),
+                    context.client(),
+                    context.upstreamPath(),
+                    context.requestPath(),
+                    httpMethod
+            );
+        } catch (RuntimeException exception) {
+            if (!directRouteMismatch) {
+                gatewayRouteSelectionService.invalidateSelection(context.selectionResult());
+            }
+            throw exception;
+        } finally {
+            distributedKeyGovernanceService.releaseConcurrency(context.selectionResult().governanceReservationKey());
+        }
+    }
+
+    private ResponseEntity<JsonNode> executeJson(
+            String distributedKeyPrefix,
+            String requestPath,
+            JsonNode requestBody,
+            String defaultModel,
+            boolean requireOpenAiDirect) {
         ObjectNode payload = requireObjectPayload(requestBody);
         String requestedModel = resolveRequestedModel(payload, defaultModel);
         RouteExecutionContext context = prepareExecution(distributedKeyPrefix, requestPath, requestedModel, payload);
+        boolean directRouteMismatch = requireOpenAiDirect
+                && context.selectionResult().selectedCandidate().candidate().providerType() != ProviderType.OPENAI_DIRECT;
 
         try {
+            if (directRouteMismatch) {
+                throw new IllegalArgumentException("当前路由不是 OpenAI Direct native passthrough。");
+            }
             ObjectNode upstreamPayload = payload.deepCopy();
             upstreamPayload.put("model", context.selectionResult().resolvedModelKey());
             if (perplexityWebSearchAdapter.supports(
@@ -101,7 +159,9 @@ public class GatewayOpenAiPassthroughService {
 
             return executePreparedJson(context.selectionResult(), context.credential(), context.client(), context.upstreamPath(), context.requestPath(), upstreamPayload);
         } catch (RuntimeException exception) {
-            gatewayRouteSelectionService.invalidateSelection(context.selectionResult());
+            if (!directRouteMismatch) {
+                gatewayRouteSelectionService.invalidateSelection(context.selectionResult());
+            }
             throw exception;
         } finally {
             distributedKeyGovernanceService.releaseConcurrency(context.selectionResult().governanceReservationKey());
@@ -166,6 +226,22 @@ public class GatewayOpenAiPassthroughService {
                 .uri(upstreamPath)
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(upstreamPayload)
+                .exchangeToMono(response -> response.toEntity(JsonNode.class))
+                .block();
+        return finalizeJsonResponse(context, upstreamResponse);
+    }
+
+    ResponseEntity<JsonNode> executePreparedLifecycleJson(
+            RouteSelectionResult selectionResult,
+            UpstreamCredentialEntity credential,
+            WebClient client,
+            String upstreamPath,
+            String requestPath,
+            String httpMethod) {
+        RouteExecutionContext context = new RouteExecutionContext(selectionResult, credential, client, upstreamPath, requestPath);
+        HttpMethod method = HttpMethod.valueOf(httpMethod.toUpperCase(Locale.ROOT));
+        ResponseEntity<JsonNode> upstreamResponse = client.method(method)
+                .uri(upstreamPath)
                 .exchangeToMono(response -> response.toEntity(JsonNode.class))
                 .block();
         return finalizeJsonResponse(context, upstreamResponse);

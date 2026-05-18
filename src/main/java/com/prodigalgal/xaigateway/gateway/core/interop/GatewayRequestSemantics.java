@@ -87,9 +87,10 @@ public record GatewayRequestSemantics(
             case MODERATION_CREATE -> "moderations";
             case FILE_CREATE, FILE_LIST, FILE_GET, FILE_CONTENT_GET, FILE_DELETE -> "files";
             case UPLOAD_CREATE, UPLOAD_GET, UPLOAD_PART_ADD, UPLOAD_COMPLETE, UPLOAD_CANCEL -> "uploads";
-            case BATCH_CREATE, BATCH_GET, BATCH_CANCEL -> "batches";
+            case BATCH_LIST, BATCH_CREATE, BATCH_GET, BATCH_CANCEL -> "batches";
             case ANTHROPIC_MESSAGE_BATCH_CREATE, ANTHROPIC_MESSAGE_BATCH_GET, ANTHROPIC_MESSAGE_BATCH_CANCEL -> "messages.batches";
-            case TUNING_LIST, TUNING_CREATE, TUNING_GET, TUNING_CANCEL -> "fine_tuning";
+            case TUNING_LIST, TUNING_CREATE, TUNING_GET, TUNING_CANCEL,
+                    TUNING_EVENTS_LIST, TUNING_CHECKPOINTS_LIST -> "fine_tuning";
             case REALTIME_CLIENT_SECRET_CREATE -> "realtime";
             case RERANK_CREATE -> "rerank";
             case VIDEO_GENERATION_CREATE, VIDEO_GENERATION_GET, VIDEO_GENERATION_CANCEL -> "videos";
@@ -120,7 +121,7 @@ public record GatewayRequestSemantics(
             case UPLOAD_PART_ADD -> "/v1/uploads/{uploadId}/parts";
             case UPLOAD_COMPLETE -> "/v1/uploads/{uploadId}/complete";
             case UPLOAD_CANCEL -> "/v1/uploads/{uploadId}/cancel";
-            case BATCH_CREATE -> "/v1/batches";
+            case BATCH_LIST, BATCH_CREATE -> "/v1/batches";
             case BATCH_GET -> "/v1/batches/{batchId}";
             case BATCH_CANCEL -> "/v1/batches/{batchId}/cancel";
             case ANTHROPIC_MESSAGE_BATCH_CREATE -> "/v1/messages/batches";
@@ -129,6 +130,8 @@ public record GatewayRequestSemantics(
             case TUNING_LIST, TUNING_CREATE -> "/v1/fine_tuning/jobs";
             case TUNING_GET -> "/v1/fine_tuning/jobs/{jobId}";
             case TUNING_CANCEL -> "/v1/fine_tuning/jobs/{jobId}/cancel";
+            case TUNING_EVENTS_LIST -> "/v1/fine_tuning/jobs/{jobId}/events";
+            case TUNING_CHECKPOINTS_LIST -> "/v1/fine_tuning/jobs/{jobId}/checkpoints";
             case REALTIME_CLIENT_SECRET_CREATE -> "/v1/realtime/client_secrets";
             case RERANK_CREATE -> "/v1/rerank";
             case VIDEO_GENERATION_CREATE -> "/v1/videos/generations";
@@ -158,12 +161,12 @@ public record GatewayRequestSemantics(
             TranslationResourceType resourceType,
             TranslationOperation operation) {
         return switch (operation == null ? TranslationOperation.UNKNOWN : operation) {
-            case FILE_LIST -> RouteSelectionMode.LOCAL_CATALOG;
+            case FILE_LIST, BATCH_LIST -> RouteSelectionMode.LOCAL_CATALOG;
             case FILE_GET, FILE_DELETE, FILE_CONTENT_GET,
                     UPLOAD_GET, UPLOAD_PART_ADD, UPLOAD_COMPLETE, UPLOAD_CANCEL,
                     BATCH_GET, BATCH_CANCEL,
                     ANTHROPIC_MESSAGE_BATCH_GET, ANTHROPIC_MESSAGE_BATCH_CANCEL,
-                    TUNING_GET, TUNING_CANCEL,
+                    TUNING_GET, TUNING_CANCEL, TUNING_EVENTS_LIST, TUNING_CHECKPOINTS_LIST,
                     VIDEO_GENERATION_GET, VIDEO_GENERATION_CANCEL,
                     MUSIC_GENERATION_GET, MUSIC_GENERATION_CANCEL,
                     TASK_GET, TASK_CANCEL -> RouteSelectionMode.STORED_LINEAGE;

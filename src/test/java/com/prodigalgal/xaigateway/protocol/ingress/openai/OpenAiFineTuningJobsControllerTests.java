@@ -1,6 +1,7 @@
 package com.prodigalgal.xaigateway.protocol.ingress.openai;
 
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayTokenAuthenticationResolver;
@@ -15,6 +16,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
+
+import org.mockito.ArgumentCaptor;
 
 @WebFluxTest(controllers = OpenAiFineTuningJobsController.class)
 @Import(PermitAllSecurityTestConfig.class)
@@ -102,6 +105,94 @@ class OpenAiFineTuningJobsControllerTests {
                 .expectBody()
                 .jsonPath("$.id").isEqualTo("ftjob_1")
                 .jsonPath("$.status").isEqualTo("running");
+    }
+
+    @Test
+    void shouldListTuningEventsWithCursorQuery() {
+        ObjectNode response = objectMapper.createObjectNode();
+        response.put("object", "list");
+        response.putArray("data").addObject()
+                .put("id", "ftevent_1")
+                .put("object", "fine_tuning.job.event")
+                .put("level", "info")
+                .put("message", "Fine-tuning job created.")
+                .put("type", "message");
+        response.put("has_more", false);
+
+        Mockito.when(gatewayTokenAuthenticationResolver.authenticate("Bearer sk-gw-test.secret", null, null, null))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayResourceExecutionService.executeLifecycleJson(
+                        Mockito.eq(1L),
+                        Mockito.eq("sk-gw-test"),
+                        Mockito.eq("GET"),
+                        Mockito.eq("/v1/fine_tuning/jobs/ftjob_1/events"),
+                        Mockito.eq("resource-orchestration"),
+                        Mockito.any()))
+                .thenReturn(response);
+
+        webTestClient.get()
+                .uri("/v1/fine_tuning/jobs/ftjob_1/events?limit=1&after=ftevent_0")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.object").isEqualTo("list")
+                .jsonPath("$.data[0].object").isEqualTo("fine_tuning.job.event");
+
+        ArgumentCaptor<JsonNode> captor = ArgumentCaptor.forClass(JsonNode.class);
+        Mockito.verify(gatewayResourceExecutionService).executeLifecycleJson(
+                Mockito.eq(1L),
+                Mockito.eq("sk-gw-test"),
+                Mockito.eq("GET"),
+                Mockito.eq("/v1/fine_tuning/jobs/ftjob_1/events"),
+                Mockito.eq("resource-orchestration"),
+                captor.capture());
+        org.junit.jupiter.api.Assertions.assertEquals("1", captor.getValue().path("limit").asText());
+        org.junit.jupiter.api.Assertions.assertEquals("ftevent_0", captor.getValue().path("after").asText());
+    }
+
+    @Test
+    void shouldListTuningCheckpointsWithCursorQuery() {
+        ObjectNode response = objectMapper.createObjectNode();
+        response.put("object", "list");
+        response.putArray("data").addObject()
+                .put("id", "ftckpt_1")
+                .put("object", "fine_tuning.job.checkpoint")
+                .put("fine_tuned_model_checkpoint", "ft:gpt-4o-mini:test:demo")
+                .put("fine_tuning_job_id", "ftjob_1")
+                .put("step_number", 1);
+        response.put("has_more", false);
+
+        Mockito.when(gatewayTokenAuthenticationResolver.authenticate("Bearer sk-gw-test.secret", null, null, null))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayResourceExecutionService.executeLifecycleJson(
+                        Mockito.eq(1L),
+                        Mockito.eq("sk-gw-test"),
+                        Mockito.eq("GET"),
+                        Mockito.eq("/v1/fine_tuning/jobs/ftjob_1/checkpoints"),
+                        Mockito.eq("resource-orchestration"),
+                        Mockito.any()))
+                .thenReturn(response);
+
+        webTestClient.get()
+                .uri("/v1/fine_tuning/jobs/ftjob_1/checkpoints?limit=1&after=ftckpt_0")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.object").isEqualTo("list")
+                .jsonPath("$.data[0].object").isEqualTo("fine_tuning.job.checkpoint");
+
+        ArgumentCaptor<JsonNode> captor = ArgumentCaptor.forClass(JsonNode.class);
+        Mockito.verify(gatewayResourceExecutionService).executeLifecycleJson(
+                Mockito.eq(1L),
+                Mockito.eq("sk-gw-test"),
+                Mockito.eq("GET"),
+                Mockito.eq("/v1/fine_tuning/jobs/ftjob_1/checkpoints"),
+                Mockito.eq("resource-orchestration"),
+                captor.capture());
+        org.junit.jupiter.api.Assertions.assertEquals("1", captor.getValue().path("limit").asText());
+        org.junit.jupiter.api.Assertions.assertEquals("ftckpt_0", captor.getValue().path("after").asText());
     }
 
     @Test

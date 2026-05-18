@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "x-ai-gateway Public API",
-    "version": "2026.05.15",
+    "version": "2026.05.18",
     "description": "公开接入面的最小 OpenAPI 事实源，运行时也可通过 /public/docs/openapi.json 读取。"
   },
   "servers": [
@@ -41,7 +41,10 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["model", "messages"],
+                "required": [
+                  "model",
+                  "messages"
+                ],
                 "properties": {
                   "model": {
                     "type": "string",
@@ -264,12 +267,199 @@
               "type": "string"
             }
           }
-        ]
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "model"
+                ],
+                "properties": {
+                  "model": {
+                    "type": "string",
+                    "description": "OpenAI model name or gateway model alias."
+                  },
+                  "input": {
+                    "type": "object",
+                    "description": "Responses input string, message array or item array."
+                  },
+                  "stream": {
+                    "type": "boolean",
+                    "description": "When true, emit OpenAI Responses-style server-sent events. OpenAI Direct streams pass through upstream raw SSE events when native passthrough is available."
+                  },
+                  "stream_options": {
+                    "type": "object",
+                    "description": "Responses streaming options such as include_obfuscation; obfuscation is included on delta events by default and can be disabled with include_obfuscation=false."
+                  },
+                  "store": {
+                    "type": "boolean",
+                    "description": "When true, persist the Response as a local resp_ resource."
+                  },
+                  "background": {
+                    "type": "boolean",
+                    "description": "When true, mark stored local Response as background-capable for cancel."
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "description": "OpenAI metadata object preserved by the gateway."
+                  },
+                  "include": {
+                    "type": "array",
+                    "description": "Additional output fields requested by OpenAI Responses clients."
+                  },
+                  "previous_response_id": {
+                    "type": "string",
+                    "description": "Previous Response id for conversation continuation."
+                  },
+                  "tools": {
+                    "type": "array",
+                    "description": "Responses tool definitions. Function tools execute through canonical tool calling; file_search can bind local vector_store_ids and inject local search context; other hosted/MCP/custom tools are rejected explicitly instead of being ignored."
+                  },
+                  "tool_choice": {
+                    "type": "object",
+                    "description": "Responses tool choice string or object. Non-function forced tool choices are rejected explicitly until their execution boundary is implemented."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/responses/input_tokens": {
+      "post": {
+        "summary": "Count Response input tokens",
+        "description": "Counts Response input tokens. OpenAI Direct routes use native upstream counting when available; route-unavailable cases fall back to the local deterministic estimate.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "model"
+                ],
+                "properties": {
+                  "model": {
+                    "type": "string",
+                    "description": "OpenAI model name or gateway model alias."
+                  },
+                  "input": {
+                    "type": "object",
+                    "description": "Responses input string, message array or item array."
+                  },
+                  "stream": {
+                    "type": "boolean",
+                    "description": "When true, emit OpenAI Responses-style server-sent events. OpenAI Direct streams pass through upstream raw SSE events when native passthrough is available."
+                  },
+                  "stream_options": {
+                    "type": "object",
+                    "description": "Responses streaming options such as include_obfuscation; obfuscation is included on delta events by default and can be disabled with include_obfuscation=false."
+                  },
+                  "store": {
+                    "type": "boolean",
+                    "description": "When true, persist the Response as a local resp_ resource."
+                  },
+                  "background": {
+                    "type": "boolean",
+                    "description": "When true, mark stored local Response as background-capable for cancel."
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "description": "OpenAI metadata object preserved by the gateway."
+                  },
+                  "include": {
+                    "type": "array",
+                    "description": "Additional output fields requested by OpenAI Responses clients."
+                  },
+                  "previous_response_id": {
+                    "type": "string",
+                    "description": "Previous Response id for conversation continuation."
+                  },
+                  "tools": {
+                    "type": "array",
+                    "description": "Responses tool definitions. Function tools execute through canonical tool calling; file_search can bind local vector_store_ids and inject local search context; other hosted/MCP/custom tools are rejected explicitly instead of being ignored."
+                  },
+                  "tool_choice": {
+                    "type": "object",
+                    "description": "Responses tool choice string or object. Non-function forced tool choices are rejected explicitly until their execution boundary is implemented."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/responses/compact": {
+      "post": {
+        "summary": "Compact Response input context",
+        "description": "Compacts Response input context. OpenAI Direct routes use native upstream compaction when available; route-unavailable cases fall back to the local opaque marker emulation.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "model"
+                ],
+                "properties": {
+                  "model": {
+                    "type": "string",
+                    "description": "OpenAI model name or gateway model alias."
+                  },
+                  "input": {
+                    "type": "object",
+                    "description": "Responses input string, message array or item array."
+                  },
+                  "stream": {
+                    "type": "boolean",
+                    "description": "When true, emit OpenAI Responses-style server-sent events. OpenAI Direct streams pass through upstream raw SSE events when native passthrough is available."
+                  },
+                  "stream_options": {
+                    "type": "object",
+                    "description": "Responses streaming options such as include_obfuscation; obfuscation is included on delta events by default and can be disabled with include_obfuscation=false."
+                  },
+                  "store": {
+                    "type": "boolean",
+                    "description": "When true, persist the Response as a local resp_ resource."
+                  },
+                  "background": {
+                    "type": "boolean",
+                    "description": "When true, mark stored local Response as background-capable for cancel."
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "description": "OpenAI metadata object preserved by the gateway."
+                  },
+                  "include": {
+                    "type": "array",
+                    "description": "Additional output fields requested by OpenAI Responses clients."
+                  },
+                  "previous_response_id": {
+                    "type": "string",
+                    "description": "Previous Response id for conversation continuation."
+                  },
+                  "tools": {
+                    "type": "array",
+                    "description": "Responses tool definitions. Function tools execute through canonical tool calling; file_search can bind local vector_store_ids and inject local search context; other hosted/MCP/custom tools are rejected explicitly instead of being ignored."
+                  },
+                  "tool_choice": {
+                    "type": "object",
+                    "description": "Responses tool choice string or object. Non-function forced tool choices are rejected explicitly until their execution boundary is implemented."
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/v1/responses/{responseId}": {
       "get": {
         "summary": "Retrieve stored Response",
+        "description": "Returns local stored Responses from gateway cache; OpenAI Direct stored Responses with upstream lineage are synced from the original upstream Response first. If the local object is missing, model query or X-AI-Gateway-OpenAI-Model can explicitly route an unknown remote resp_ id to OpenAI Direct.",
         "parameters": [
           {
             "name": "responseId",
@@ -279,17 +469,63 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "include",
+            "in": "query",
+            "required": false,
+            "description": "Additional OpenAI Responses fields to include. Local stored baseline accepts this parameter as a no-op; OpenAI Direct objects with upstream lineage or explicit route hints forward it upstream.",
+            "schema": {
+              "type": "array"
+            }
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "required": false,
+            "description": "Gateway route hint for unknown remote OpenAI Direct resp_ ids that do not have local lineage.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AI-Gateway-OpenAI-Model",
+            "in": "header",
+            "required": false,
+            "description": "Gateway route hint header for unknown remote OpenAI Direct resp_ ids that do not have local lineage.",
+            "schema": {
+              "type": "string"
+            }
           }
         ]
       },
       "delete": {
         "summary": "Delete stored Response",
+        "description": "Deletes local stored Responses; OpenAI Direct stored Responses with upstream lineage issue DELETE to the original upstream Response before marking the local object deleted. Unknown remote resp_ ids require an explicit model route hint.",
         "parameters": [
           {
             "name": "responseId",
             "in": "path",
             "required": true,
             "description": "Stored Response id.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "required": false,
+            "description": "Gateway route hint for unknown remote OpenAI Direct resp_ ids that do not have local lineage.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AI-Gateway-OpenAI-Model",
+            "in": "header",
+            "required": false,
+            "description": "Gateway route hint header for unknown remote OpenAI Direct resp_ ids that do not have local lineage.",
             "schema": {
               "type": "string"
             }
@@ -300,12 +536,31 @@
     "/v1/responses/{responseId}/cancel": {
       "post": {
         "summary": "Cancel stored background Response",
+        "description": "Cancels local background Responses or forwards cancel to the original OpenAI Direct upstream Response when lineage is available. Unknown remote resp_ ids require an explicit model route hint.",
         "parameters": [
           {
             "name": "responseId",
             "in": "path",
             "required": true,
             "description": "Stored Response id.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "required": false,
+            "description": "Gateway route hint for unknown remote OpenAI Direct resp_ ids that do not have local lineage.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AI-Gateway-OpenAI-Model",
+            "in": "header",
+            "required": false,
+            "description": "Gateway route hint header for unknown remote OpenAI Direct resp_ ids that do not have local lineage.",
             "schema": {
               "type": "string"
             }
@@ -316,6 +571,7 @@
     "/v1/responses/{responseId}/input_items": {
       "get": {
         "summary": "List stored Response input items",
+        "description": "Lists local input items or forwards the query to the original OpenAI Direct upstream Response when lineage is available. Unknown remote resp_ ids require an explicit model route hint.",
         "parameters": [
           {
             "name": "responseId",
@@ -336,6 +592,15 @@
             }
           },
           {
+            "name": "include",
+            "in": "query",
+            "required": false,
+            "description": "Additional OpenAI Responses fields to include. Local stored baseline accepts this parameter as a no-op; OpenAI Direct objects with upstream lineage or explicit route hints forward it upstream.",
+            "schema": {
+              "type": "array"
+            }
+          },
+          {
             "name": "limit",
             "in": "query",
             "required": false,
@@ -351,6 +616,158 @@
             "description": "Sort by input item order: asc or desc. Defaults to desc.",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "required": false,
+            "description": "Gateway route hint for unknown remote OpenAI Direct resp_ ids that do not have local lineage.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AI-Gateway-OpenAI-Model",
+            "in": "header",
+            "required": false,
+            "description": "Gateway route hint header for unknown remote OpenAI Direct resp_ ids that do not have local lineage.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/batches": {
+      "get": {
+        "summary": "List gateway-tracked OpenAI Batch objects",
+        "description": "Returns Batch objects created through this gateway for the current Distributed Key. It does not enumerate upstream organization history that was not created through the gateway.",
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "description": "Cursor id of the last Batch from the previous page.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Number of Batch objects to return. Defaults to 20; valid range is 1 to 100.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/models": {
+      "get": {
+        "summary": "List accessible OpenAI-compatible models",
+        "description": "Lists public gateway model ids and aliases accessible to the current Distributed Key."
+      }
+    },
+    "/v1/models/{model}": {
+      "get": {
+        "summary": "Retrieve an accessible OpenAI-compatible model",
+        "description": "Retrieves model metadata from the gateway model catalog when the current Distributed Key may access it.",
+        "parameters": [
+          {
+            "name": "model",
+            "in": "path",
+            "required": true,
+            "description": "Model id or gateway fine-tuned model alias.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "summary": "Delete a gateway-registered fine-tuned model",
+        "description": "Deletes only fine-tuned model registry entries created or imported through this gateway for the current Distributed Key. It does not delete public models or call upstream owner-role model deletion.",
+        "parameters": [
+          {
+            "name": "model",
+            "in": "path",
+            "required": true,
+            "description": "Model id or gateway fine-tuned model alias.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/fine_tuning/jobs/{jobId}/events": {
+      "get": {
+        "summary": "List gateway-tracked Fine-tuning job events",
+        "description": "Returns local lifecycle events recorded by this gateway for the current Distributed Key's Fine-tuning job. It does not enumerate the upstream organization's full event history.",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "description": "Gateway-tracked Fine-tuning job id.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "description": "Cursor id of the last Fine-tuning event from the previous page.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Number of Fine-tuning event records to return. Defaults to 20; valid range is 1 to 100.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/fine_tuning/jobs/{jobId}/checkpoints": {
+      "get": {
+        "summary": "List gateway-tracked Fine-tuning checkpoints",
+        "description": "Returns local checkpoint evidence for the current Distributed Key's Fine-tuning job. If the gateway has no completed model or checkpoint evidence, data is empty.",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "description": "Gateway-tracked Fine-tuning job id.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "description": "Cursor id of the last Fine-tuning checkpoint from the previous page.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Number of Fine-tuning checkpoint records to return. Defaults to 20; valid range is 1 to 100.",
+            "schema": {
+              "type": "integer"
             }
           }
         ]
@@ -414,6 +831,946 @@
     "/api/v1/media/provider-matrix": {
       "get": {
         "summary": "读取 Video/Music provider support matrix"
+      }
+    },
+    "/v1/conversations": {
+      "post": {
+        "summary": "Create a local OpenAI Conversation",
+        "operationId": "post_v1_conversations",
+        "tags": [
+          "gateway"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Creates a gateway-local Conversation lineage object with optional metadata and up to 20 initial items.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "metadata": {
+                    "type": "object",
+                    "description": "OpenAI metadata object. Keys are capped at 64 chars and values at 512 chars."
+                  },
+                  "items": {
+                    "type": "array",
+                    "description": "Initial Conversation items. The gateway accepts at most 20 items per call."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/conversations/{conversationId}": {
+      "get": {
+        "summary": "Retrieve a local OpenAI Conversation",
+        "operationId": "get_v1_conversations_conversationId",
+        "tags": [
+          "gateway"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "description": "Local Conversation id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "post": {
+        "summary": "Update local OpenAI Conversation metadata",
+        "operationId": "post_v1_conversations_conversationId",
+        "tags": [
+          "gateway"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "description": "Local Conversation id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "metadata": {
+                    "type": "object",
+                    "description": "OpenAI metadata object. Keys are capped at 64 chars and values at 512 chars."
+                  },
+                  "items": {
+                    "type": "array",
+                    "description": "Initial Conversation items. The gateway accepts at most 20 items per call."
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a local OpenAI Conversation",
+        "operationId": "delete_v1_conversations_conversationId",
+        "tags": [
+          "gateway"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "description": "Local Conversation id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/conversations/{conversationId}/items": {
+      "post": {
+        "summary": "Create local OpenAI Conversation items",
+        "operationId": "post_v1_conversations_conversationId_items",
+        "tags": [
+          "gateway"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Adds up to 20 items to a gateway-local Conversation and returns an OpenAI-compatible list envelope.",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "description": "Local Conversation id.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "include",
+            "in": "query",
+            "required": false,
+            "description": "Additional OpenAI Responses fields to include. Local stored baseline accepts this parameter as a no-op; OpenAI Direct objects with upstream lineage forward it upstream.",
+            "schema": {
+              "type": "array"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "items"
+                ],
+                "properties": {
+                  "items": {
+                    "type": "array",
+                    "description": "Conversation items to add. The gateway accepts at most 20 items per call."
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "List local OpenAI Conversation items",
+        "operationId": "get_v1_conversations_conversationId_items",
+        "tags": [
+          "gateway"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "description": "Lists gateway-local Conversation items. The local baseline accepts include as a no-op and supports after, limit and order.",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "description": "Local Conversation id.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "description": "Cursor id of the last Conversation item from the previous page.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "include",
+            "in": "query",
+            "required": false,
+            "description": "Additional OpenAI Responses fields to include. Local stored baseline accepts this parameter as a no-op; OpenAI Direct objects with upstream lineage forward it upstream.",
+            "schema": {
+              "type": "array"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Number of Conversation items to return. Defaults to 20; valid range is 1 to 100.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "description": "Sort by item creation order: asc or desc. Defaults to desc.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/conversations/{conversationId}/items/{itemId}": {
+      "get": {
+        "summary": "Retrieve a local OpenAI Conversation item",
+        "operationId": "get_v1_conversations_conversationId_items_itemId",
+        "tags": [
+          "gateway"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "description": "Local Conversation id.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "description": "Local Conversation item id.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "include",
+            "in": "query",
+            "required": false,
+            "description": "Additional OpenAI Responses fields to include. Local stored baseline accepts this parameter as a no-op; OpenAI Direct objects with upstream lineage forward it upstream.",
+            "schema": {
+              "type": "array"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "summary": "Delete a local OpenAI Conversation item",
+        "operationId": "delete_v1_conversations_conversationId_items_itemId",
+        "tags": [
+          "gateway"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "description": "Local Conversation id.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "description": "Local Conversation item id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/vector_stores": {
+      "post": {
+        "summary": "Create a local OpenAI Vector Store",
+        "description": "Creates a gateway-local Vector Store lifecycle object. File ids are accepted as local references; local content read and local text search are available, while real vector ingestion is not implemented in this baseline.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Optional Vector Store name."
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "description": "OpenAI metadata object preserved by the gateway."
+                  },
+                  "file_ids": {
+                    "type": "array",
+                    "description": "Local file ids to associate as references. Local content read and local text search are available; real vector ingestion is not implemented in this baseline."
+                  },
+                  "expires_after": {
+                    "type": "object",
+                    "description": "OpenAI expires_after object, for example anchor=last_active_at and days=7."
+                  },
+                  "expires_at": {
+                    "type": "integer",
+                    "description": "Optional Unix seconds expiration timestamp."
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "List local OpenAI Vector Stores",
+        "description": "Lists gateway-local Vector Stores for the current Distributed Key with OpenAI-compatible list envelope pagination.",
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "description": "Cursor id of the last Vector Store from the previous page.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Number of Vector Stores to return. Defaults to 20; valid range is 1 to 100.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "description": "Sort by creation time: asc or desc. Defaults to desc.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/vector_stores/{vectorStoreId}": {
+      "get": {
+        "summary": "Retrieve a local OpenAI Vector Store",
+        "parameters": [
+          {
+            "name": "vectorStoreId",
+            "in": "path",
+            "required": true,
+            "description": "Local Vector Store id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "post": {
+        "summary": "Update a local OpenAI Vector Store",
+        "parameters": [
+          {
+            "name": "vectorStoreId",
+            "in": "path",
+            "required": true,
+            "description": "Local Vector Store id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Optional Vector Store name."
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "description": "OpenAI metadata object preserved by the gateway."
+                  },
+                  "file_ids": {
+                    "type": "array",
+                    "description": "Local file ids to associate as references. Local content read and local text search are available; real vector ingestion is not implemented in this baseline."
+                  },
+                  "expires_after": {
+                    "type": "object",
+                    "description": "OpenAI expires_after object, for example anchor=last_active_at and days=7."
+                  },
+                  "expires_at": {
+                    "type": "integer",
+                    "description": "Optional Unix seconds expiration timestamp."
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a local OpenAI Vector Store",
+        "parameters": [
+          {
+            "name": "vectorStoreId",
+            "in": "path",
+            "required": true,
+            "description": "Local Vector Store id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/vector_stores/{vectorStoreId}/search": {
+      "post": {
+        "summary": "Search a local OpenAI Vector Store",
+        "description": "Searches readable gateway-local vector_store.file attachments with a deterministic UTF-8 lexical baseline. This does not perform hosted OpenAI semantic vector ingestion or rerank.",
+        "parameters": [
+          {
+            "name": "vectorStoreId",
+            "in": "path",
+            "required": true,
+            "description": "Local Vector Store id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "query"
+                ],
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "description": "Search query string or string array. Local baseline accepts either shape."
+                  },
+                  "filters": {
+                    "type": "object",
+                    "description": "Attribute filter tree over vector_store.file attributes. Supports eq/ne/gt/gte/lt/lte/in/nin and and/or."
+                  },
+                  "max_num_results": {
+                    "type": "integer",
+                    "description": "Maximum local results to return. Defaults to 10; valid range is 1 to 50."
+                  },
+                  "ranking_options": {
+                    "type": "object",
+                    "description": "Local lexical score_threshold is honored; ranker is preserved as metadata only."
+                  },
+                  "rewrite_query": {
+                    "type": "boolean",
+                    "description": "Accepted as a compatibility no-op in the local lexical baseline."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/vector_stores/{vectorStoreId}/files": {
+      "post": {
+        "summary": "Attach a local OpenAI Vector Store File",
+        "description": "Attaches a file id to a gateway-local Vector Store as a local vector_store.file reference. This does not perform real vector ingestion.",
+        "parameters": [
+          {
+            "name": "vectorStoreId",
+            "in": "path",
+            "required": true,
+            "description": "Local Vector Store id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file_id"
+                ],
+                "properties": {
+                  "file_id": {
+                    "type": "string",
+                    "description": "File id to attach to the local Vector Store."
+                  },
+                  "attributes": {
+                    "type": "object",
+                    "description": "OpenAI Vector Store File attributes. Values may be strings, numbers, booleans or null."
+                  },
+                  "chunking_strategy": {
+                    "type": "object",
+                    "description": "OpenAI chunking strategy object. Defaults locally to auto."
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "List local OpenAI Vector Store Files",
+        "description": "Lists gateway-local Vector Store File attachments. Local file content read and deterministic local text search are available; real vector ingestion and semantic vector search are not implemented in this baseline.",
+        "parameters": [
+          {
+            "name": "vectorStoreId",
+            "in": "path",
+            "required": true,
+            "description": "Local Vector Store id.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "description": "Cursor id of the last Vector Store File from the previous page.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Number of Vector Store Files to return. Defaults to 20; valid range is 1 to 100.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "description": "Sort by creation time: asc or desc. Defaults to desc.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "filter",
+            "in": "query",
+            "required": false,
+            "description": "Optional local status filter such as completed or failed.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/vector_stores/{vectorStoreId}/files/{fileId}": {
+      "get": {
+        "summary": "Retrieve a local OpenAI Vector Store File",
+        "parameters": [
+          {
+            "name": "vectorStoreId",
+            "in": "path",
+            "required": true,
+            "description": "Local Vector Store id.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fileId",
+            "in": "path",
+            "required": true,
+            "description": "File id attached to the local Vector Store.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "delete": {
+        "summary": "Delete a local OpenAI Vector Store File",
+        "parameters": [
+          {
+            "name": "vectorStoreId",
+            "in": "path",
+            "required": true,
+            "description": "Local Vector Store id.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fileId",
+            "in": "path",
+            "required": true,
+            "description": "File id attached to the local Vector Store.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/vector_stores/{vectorStoreId}/files/{fileId}/content": {
+      "get": {
+        "summary": "Retrieve local OpenAI Vector Store File content",
+        "description": "Returns a gateway-local vector_store.file_content.page by reading the attached gateway file as a UTF-8 text page. This does not perform hosted OpenAI parsing, embedding or vector ingestion.",
+        "parameters": [
+          {
+            "name": "vectorStoreId",
+            "in": "path",
+            "required": true,
+            "description": "Local Vector Store id.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fileId",
+            "in": "path",
+            "required": true,
+            "description": "File id attached to the local Vector Store.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/vector_stores/{vectorStoreId}/file_batches": {
+      "post": {
+        "summary": "Create a local OpenAI Vector Store File Batch",
+        "description": "Creates a gateway-local vector_store.file_batch and attaches multiple file ids after all duplicate checks pass. This does not perform real vector ingestion.",
+        "parameters": [
+          {
+            "name": "vectorStoreId",
+            "in": "path",
+            "required": true,
+            "description": "Local Vector Store id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file_ids": {
+                    "type": "array",
+                    "description": "File ids to attach in one local batch. Provide either file_ids or files, not both."
+                  },
+                  "files": {
+                    "type": "array",
+                    "description": "Per-file batch entries. Each item requires file_id and may include attributes or chunking_strategy."
+                  },
+                  "attributes": {
+                    "type": "object",
+                    "description": "Attributes applied to every file when file_ids is used."
+                  },
+                  "chunking_strategy": {
+                    "type": "object",
+                    "description": "Chunking strategy applied to every file when file_ids is used."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/vector_stores/{vectorStoreId}/file_batches/{batchId}": {
+      "get": {
+        "summary": "Retrieve a local OpenAI Vector Store File Batch",
+        "parameters": [
+          {
+            "name": "vectorStoreId",
+            "in": "path",
+            "required": true,
+            "description": "Local Vector Store id.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "batchId",
+            "in": "path",
+            "required": true,
+            "description": "Local Vector Store File Batch id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/vector_stores/{vectorStoreId}/file_batches/{batchId}/cancel": {
+      "post": {
+        "summary": "Cancel a local OpenAI Vector Store File Batch",
+        "description": "Rejects cancel for gateway-local completed batches; future asynchronous ingestion may extend cancellable in-progress states.",
+        "parameters": [
+          {
+            "name": "vectorStoreId",
+            "in": "path",
+            "required": true,
+            "description": "Local Vector Store id.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "batchId",
+            "in": "path",
+            "required": true,
+            "description": "Local Vector Store File Batch id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/vector_stores/{vectorStoreId}/file_batches/{batchId}/files": {
+      "get": {
+        "summary": "List files in a local OpenAI Vector Store File Batch",
+        "description": "Lists active vector_store.file attachments that were created by this gateway-local file batch.",
+        "parameters": [
+          {
+            "name": "vectorStoreId",
+            "in": "path",
+            "required": true,
+            "description": "Local Vector Store id.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "batchId",
+            "in": "path",
+            "required": true,
+            "description": "Local Vector Store File Batch id.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "description": "Cursor id of the last Vector Store File from the previous page.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Number of Vector Store Files to return. Defaults to 20; valid range is 1 to 100.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "description": "Sort by creation time: asc or desc. Defaults to desc.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "filter",
+            "in": "query",
+            "required": false,
+            "description": "Optional local status filter such as completed or failed.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/webhooks/openai": {
+      "post": {
+        "summary": "Accept OpenAI webhook delivery",
+        "description": "Verifies Standard Webhooks headers against the raw request body and stores valid OpenAI events as gateway-local WEBHOOK_EVENT resources. Duplicate webhook deliveries or duplicate event ids return duplicate=true without another write.",
+        "parameters": [
+          {
+            "name": "webhook-id",
+            "in": "header",
+            "required": true,
+            "description": "Unique Standard Webhooks delivery id. Duplicate delivery ids are accepted idempotently.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-timestamp",
+            "in": "header",
+            "required": true,
+            "description": "Unix seconds timestamp used by the Standard Webhooks signature.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "webhook-signature",
+            "in": "header",
+            "required": true,
+            "description": "Standard Webhooks signature header. Supports v1,base64 signatures and multiple space-separated candidates.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "OpenAI webhook event id. Used as the local resource key when present."
+                  },
+                  "object": {
+                    "type": "string",
+                    "description": "OpenAI object type, typically event."
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "OpenAI webhook event type such as response.completed."
+                  },
+                  "data": {
+                    "type": "object",
+                    "description": "OpenAI event payload."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
       }
     }
   },

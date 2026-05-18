@@ -5,6 +5,7 @@
 关联任务：[TASK-20260501-024 真实 Realtime Provider WebSocket Adapter](../tasks/done/TASK-20260501-024-realtime-real-provider-websocket.md)
 当前增强任务：[TASK-20260506-011 Realtime 与 Media 生产硬化](../tasks/done/TASK-20260506-011-realtime-media-production-hardening.md)
 连接池增强任务：[TASK-20260506-019 Realtime 长连接池与专有 Media Adapter](../tasks/done/TASK-20260506-019-realtime-pool-media-adapters.md)
+OpenAI-compatible WebSocket 入口任务：[TASK-20260516-008](../tasks/done/TASK-20260516-008-openai-realtime-websocket-ingress-event-proxy.md)
 
 ## 实现范围
 
@@ -33,6 +34,17 @@
   - `connectionPoolActive`
   - `connectionPoolMaxPerTenant`
 
+## OpenAI-compatible WebSocket 入口
+
+- `/v1/realtime?model=...` 已映射为 WebSocket handler，默认 model 为 `gpt-realtime`。
+- WebSocket 握手复用 Distributed Key `Authorization` 鉴权；缺失或无效鉴权只返回 OpenAI-style `error` event，不创建 Live Session。
+- 握手成功后会创建并 connect `openai_realtime` Live Session，并把首个 outbound event 编码为 `session.created`。
+- JSON text client event 会保留原始 payload，按 `type` 转发给 `LiveSessionService#sendRuntimeEvent`；`input_audio_buffer.append` 这类事件会从 `audio` 或 `delta` base64 字段估算 `audioBytes`。
+- `session.update` 会返回 `session.updated`，并把客户端请求的 `session` 配置放入 `client_update`，方便调试本地代理接受了哪些字段。
+- `input_audio_buffer.commit` 返回 `input_audio_buffer.committed` 基线事件。
+- 非 JSON、缺少 `type` 或非文本帧返回 OpenAI-style `error` event，避免把内部异常、Authorization 或 key 信息泄露给客户端。
+- WebSocket close 会释放对应 Live Session。
+
 ## 事件映射
 
 - connect 输出 `websocket.connected`。
@@ -42,6 +54,7 @@
 - heartbeat 输出 `websocket.pong`。
 - close 输出 `websocket.closed`。
 - `audio.*` gateway event 会映射为 `{provider}.audio.*` provider event type，便于后续接真实二进制音频帧。
+- OpenAI-compatible WebSocket 入口对外只输出 `session.created`、`session.updated`、`input_audio_buffer.committed` 与错误事件基线；内部 `websocket.frame.*` 仍作为 Live Session 观测与 conformance 证据保存。
 
 ## Conformance
 
@@ -59,6 +72,7 @@
 ```powershell
 .\gradlew.bat test --rerun-tasks --tests "com.prodigalgal.xaigateway.admin.application.LiveSessionServiceTests"
 .\gradlew.bat test --tests "com.prodigalgal.xaigateway.admin.application.LiveSessionServiceTests" --tests "com.prodigalgal.xaigateway.gateway.core.resource.GatewayAsyncResourceServiceTests"
+.\gradlew.bat test --rerun-tasks --tests "com.prodigalgal.xaigateway.protocol.ingress.openai.OpenAiRealtimeWebSocketBridgeTests" --tests "com.prodigalgal.xaigateway.infra.config.OpenAiRealtimeWebSocketConfigurationTests" --tests "com.prodigalgal.xaigateway.protocol.ingress.openai.OpenAiRealtimeControllerTests"
 ```
 
 覆盖点：
@@ -72,8 +86,10 @@
 - 二进制音频帧计数进入 conformance 检查。
 - 连接池租户隔离、连接上限、释放、取消和过期清理。
 - connect/close 写入连接池 lease metadata。
+- OpenAI-compatible `/v1/realtime` WebSocket bridge 覆盖鉴权创建、`session.created`、`session.updated`、非法事件错误、base64 audioBytes 估算和 close 释放。
 
 ## 后续边界
 
 - 本轮新增单进程连接池 runtime 语义；多实例部署还需要 Redis/数据库租约或分布式锁。
 - 真实网络拨号、真实二进制帧透传和 provider SDK 级重连仍需在部署环境补 smoke。
+- WebRTC、SIP、Realtime calls、translation/transcription session 的完整官方入口仍按后续 OpenAI 资源族任务推进。

@@ -203,6 +203,109 @@ class GatewayChatExecutionServiceTests {
     }
 
     @Test
+    void shouldPreserveRawResponseWhenEnrichingGatewayResponse() throws Exception {
+        GatewayRouteSelectionService routeSelectionService = Mockito.mock(GatewayRouteSelectionService.class);
+        UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        CredentialCryptoService credentialCryptoService = Mockito.mock(CredentialCryptoService.class);
+        GatewayObservabilityService gatewayObservabilityService = Mockito.mock(GatewayObservabilityService.class);
+        GatewayRequestLifecycleService gatewayRequestLifecycleService = Mockito.mock(GatewayRequestLifecycleService.class);
+        DistributedKeyGovernanceService distributedKeyGovernanceService = Mockito.mock(DistributedKeyGovernanceService.class);
+        DistributedKeyQueryService distributedKeyQueryService = Mockito.mock(DistributedKeyQueryService.class);
+        AccountSelectionService accountSelectionService = Mockito.mock(AccountSelectionService.class);
+        CredentialMaterialResolver credentialMaterialResolver = Mockito.mock(CredentialMaterialResolver.class);
+        GatewayRequestFeatureService gatewayRequestFeatureService = Mockito.mock(GatewayRequestFeatureService.class);
+        TranslationExecutionPlanCompiler translationExecutionPlanCompiler = Mockito.mock(TranslationExecutionPlanCompiler.class);
+        GatewayProperties gatewayProperties = new GatewayProperties();
+        var rawResponse = objectMapper.readTree("""
+                {
+                  "id": "resp_raw_service_1",
+                  "object": "response",
+                  "model": "gpt-4.1-mini",
+                  "output_text": "raw ok",
+                  "output": [{"type": "message"}]
+                }
+                """);
+
+        GatewayChatRuntime runtime = new GatewayChatRuntime() {
+            @Override
+            public ExecutionBackend backend() {
+                return ExecutionBackend.NATIVE;
+            }
+
+            @Override
+            public boolean supports(com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView candidate) {
+                return true;
+            }
+
+            @Override
+            public CanonicalResponse execute(GatewayChatRuntimeContext context) {
+                return new CanonicalResponse(
+                        "resp_raw_service_1",
+                        context.selectionResult().publicModel(),
+                        "raw ok",
+                        null,
+                        List.of(),
+                        CanonicalUsage.empty(),
+                        com.prodigalgal.xaigateway.gateway.core.response.GatewayFinishReason.STOP,
+                        rawResponse
+                );
+            }
+
+            @Override
+            public reactor.core.publisher.Flux<CanonicalStreamEvent> executeStream(GatewayChatRuntimeContext context) {
+                return reactor.core.publisher.Flux.empty();
+            }
+        };
+
+        GatewayChatExecutionService service = service(
+                routeSelectionService,
+                upstreamCredentialRepository,
+                credentialCryptoService,
+                gatewayObservabilityService,
+                gatewayRequestLifecycleService,
+                distributedKeyGovernanceService,
+                distributedKeyQueryService,
+                accountSelectionService,
+                credentialMaterialResolver,
+                gatewayRequestFeatureService,
+                translationExecutionPlanCompiler,
+                List.of(runtime),
+                gatewayProperties
+        );
+
+        Mockito.when(gatewayObservabilityService.nextRequestId()).thenReturn("req-raw-service-1");
+        Mockito.when(routeSelectionService.select(Mockito.any())).thenReturn(selectionResultWithFallbackCandidates());
+        Mockito.when(translationExecutionPlanCompiler.compileSelected(Mockito.any(), Mockito.any(CanonicalRequest.class), Mockito.any(), Mockito.any()))
+                .thenReturn(canonicalCompilation("openai", "/v1/responses", "gpt-4o"));
+        Mockito.when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.any()))
+                .thenReturn(new GatewayRequestSemantics(
+                        TranslationResourceType.RESPONSE,
+                        TranslationOperation.RESPONSE_CREATE,
+                        List.of(InteropFeature.CHAT_TEXT),
+                        true
+                ));
+        Mockito.when(upstreamCredentialRepository.findById(101L)).thenReturn(Optional.of(credential(101L)));
+        Mockito.when(credentialMaterialResolver.resolve(Mockito.any(), Mockito.any())).thenAnswer(invocation ->
+                new com.prodigalgal.xaigateway.gateway.core.credential.ResolvedCredentialMaterial(
+                        ((UpstreamCredentialEntity) invocation.getArgument(1)).getId(),
+                        null,
+                        CredentialAuthKind.API_KEY,
+                        "api-key",
+                        null,
+                        java.util.Map.of(),
+                        null,
+                        "test"
+                )
+        );
+
+        var response = service.executeGatewayResponse(responsesRequest());
+
+        assertEquals("req-raw-service-1", response.response().requestId());
+        assertEquals("resp_raw_service_1", response.response().rawResponse().path("id").asText());
+        assertEquals("gpt-4.1-mini", response.response().rawResponse().path("model").asText());
+    }
+
+    @Test
     void shouldCapChatFallbackAttemptsFromRuntimePolicy() {
         GatewayRouteSelectionService routeSelectionService = Mockito.mock(GatewayRouteSelectionService.class);
         UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
@@ -579,6 +682,22 @@ class GatewayChatExecutionServiceTests {
                 null,
                 null,
                 null
+        );
+    }
+
+    private CanonicalRequest responsesRequest() throws Exception {
+        return new CanonicalRequest(
+                "sk-gw-test",
+                CanonicalIngressProtocol.RESPONSES,
+                "/v1/responses",
+                "writer-fast",
+                List.of(new CanonicalMessage(CanonicalMessageRole.USER, List.of(CanonicalContentPart.text("hello responses")))),
+                List.of(),
+                null,
+                null,
+                null,
+                null,
+                objectMapper.readTree("{\"model\":\"writer-fast\",\"input\":\"hello responses\",\"stream\":false}")
         );
     }
 

@@ -170,8 +170,9 @@ class CanonicalResourceMapperTests {
             case MODERATION_CREATE -> TranslationResourceType.MODERATION;
             case FILE_CREATE, FILE_LIST, FILE_GET, FILE_CONTENT_GET, FILE_DELETE -> TranslationResourceType.FILE;
             case UPLOAD_CREATE, UPLOAD_GET, UPLOAD_PART_ADD, UPLOAD_COMPLETE, UPLOAD_CANCEL -> TranslationResourceType.UPLOAD;
-            case BATCH_CREATE, BATCH_GET, BATCH_CANCEL -> TranslationResourceType.BATCH;
-            case TUNING_CREATE, TUNING_GET, TUNING_CANCEL -> TranslationResourceType.TUNING;
+            case BATCH_LIST, BATCH_CREATE, BATCH_GET, BATCH_CANCEL -> TranslationResourceType.BATCH;
+            case TUNING_CREATE, TUNING_GET, TUNING_CANCEL, TUNING_EVENTS_LIST, TUNING_CHECKPOINTS_LIST ->
+                    TranslationResourceType.TUNING;
             case REALTIME_CLIENT_SECRET_CREATE -> TranslationResourceType.REALTIME;
             default -> TranslationResourceType.UNKNOWN;
         };
@@ -185,8 +186,8 @@ class CanonicalResourceMapperTests {
             case MODERATION_CREATE -> "moderations";
             case FILE_CREATE, FILE_LIST, FILE_GET, FILE_CONTENT_GET, FILE_DELETE -> "files";
             case UPLOAD_CREATE, UPLOAD_GET, UPLOAD_PART_ADD, UPLOAD_COMPLETE, UPLOAD_CANCEL -> "uploads";
-            case BATCH_CREATE, BATCH_GET, BATCH_CANCEL -> "batches";
-            case TUNING_CREATE, TUNING_GET, TUNING_CANCEL -> "fine_tuning";
+            case BATCH_LIST, BATCH_CREATE, BATCH_GET, BATCH_CANCEL -> "batches";
+            case TUNING_CREATE, TUNING_GET, TUNING_CANCEL, TUNING_EVENTS_LIST, TUNING_CHECKPOINTS_LIST -> "fine_tuning";
             case REALTIME_CLIENT_SECRET_CREATE -> "realtime";
             default -> "unknown";
         };
@@ -208,12 +209,14 @@ class CanonicalResourceMapperTests {
             case UPLOAD_PART_ADD -> "/v1/uploads/upload_1/parts";
             case UPLOAD_COMPLETE -> "/v1/uploads/upload_1/complete";
             case UPLOAD_CANCEL -> "/v1/uploads/upload_1/cancel";
-            case BATCH_CREATE -> "/v1/batches";
+            case BATCH_LIST, BATCH_CREATE -> "/v1/batches";
             case BATCH_GET -> "/v1/batches/batch_1";
             case BATCH_CANCEL -> "/v1/batches/batch_1/cancel";
             case TUNING_CREATE -> "/v1/fine_tuning/jobs";
             case TUNING_GET -> "/v1/fine_tuning/jobs/ftjob_1";
             case TUNING_CANCEL -> "/v1/fine_tuning/jobs/ftjob_1/cancel";
+            case TUNING_EVENTS_LIST -> "/v1/fine_tuning/jobs/ftjob_1/events";
+            case TUNING_CHECKPOINTS_LIST -> "/v1/fine_tuning/jobs/ftjob_1/checkpoints";
             case REALTIME_CLIENT_SECRET_CREATE -> "/v1/realtime/client_secrets";
             default -> "/unknown";
         };
@@ -224,7 +227,7 @@ class CanonicalResourceMapperTests {
             case FILE_GET, FILE_DELETE, FILE_CONTENT_GET -> Map.of("fileId", "file_123");
             case UPLOAD_GET, UPLOAD_PART_ADD, UPLOAD_COMPLETE, UPLOAD_CANCEL -> Map.of("uploadId", "upload_1");
             case BATCH_GET, BATCH_CANCEL -> Map.of("batchId", "batch_1");
-            case TUNING_GET, TUNING_CANCEL -> Map.of("jobId", "ftjob_1");
+            case TUNING_GET, TUNING_CANCEL, TUNING_EVENTS_LIST, TUNING_CHECKPOINTS_LIST -> Map.of("jobId", "ftjob_1");
             default -> Map.of();
         };
     }

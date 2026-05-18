@@ -7,6 +7,7 @@ import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalMessageRole;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalReasoningConfig;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequestMetadata;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEventType;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolDefinition;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.credential.CredentialAuthKind;
@@ -274,6 +275,102 @@ class OpenAiNativeGatewayChatRuntimeTests {
             assertEquals(3, response.usage().cacheHitTokens());
             assertEquals(2, response.usage().reasoningTokens());
             assertNotNull(response.finishReason());
+            assertEquals("response", response.rawResponse().path("object").asText());
+            assertEquals("gpt-4.1-mini", response.rawResponse().path("model").asText());
+            assertEquals("native ok", response.rawResponse().path("output").get(1).path("content").get(0).path("text").asText());
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void shouldStreamOpenAiDirectResponsesThroughNativeSsePassthrough() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+        AtomicReference<String> upstreamPath = new AtomicReference<>();
+        AtomicReference<String> authorization = new AtomicReference<>();
+        AtomicReference<String> accept = new AtomicReference<>();
+        AtomicReference<String> organization = new AtomicReference<>();
+        AtomicReference<String> requestBody = new AtomicReference<>();
+        server.createContext("/v1/responses", exchange -> {
+            upstreamPath.set(exchange.getRequestURI().getPath());
+            authorization.set(exchange.getRequestHeaders().getFirst("authorization"));
+            accept.set(exchange.getRequestHeaders().getFirst("accept"));
+            organization.set(exchange.getRequestHeaders().getFirst("OpenAI-Organization"));
+            requestBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            sendSse(exchange, """
+                    event: response.created
+                    data: {"type":"response.created","sequence_number":42,"model":"gpt-4.1-mini","x_raw":true}
+
+                    event: response.output_text.delta
+                    data: {"type":"response.output_text.delta","sequence_number":43,"delta":"hi","obfuscation":"raw-obf","unknown":{"kept":true}}
+
+                    event: response.completed
+                    data: {"type":"response.completed","sequence_number":44,"response":{"id":"resp_stream_1"}}
+
+                    """);
+        });
+        server.start();
+        try {
+            var extensions = objectMapper.readTree("""
+                    {
+                      "model":"gpt-4.1-public",
+                      "input":"hello",
+                      "stream":true,
+                      "stream_options":{"include_obfuscation":true}
+                    }
+                    """);
+            var request = new CanonicalRequest(
+                    "sk-gw-test",
+                    CanonicalIngressProtocol.RESPONSES,
+                    "/v1/responses",
+                    "gpt-4.1-public",
+                    List.of(new CanonicalMessage(CanonicalMessageRole.USER, List.of(CanonicalContentPart.text("hello")))),
+                    List.of(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    extensions,
+                    new CanonicalRequestMetadata(
+                            "GENERIC_OPENAI",
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            "openai-java/2.0",
+                            "org-native-stream",
+                            null,
+                            null
+                    )
+            );
+            UpstreamCredentialEntity credential = new UpstreamCredentialEntity();
+            credential.setBaseUrl("http://127.0.0.1:" + server.getAddress().getPort() + "/v1");
+            var context = new GatewayChatRuntimeContext(
+                    openAiDirectSelection("gpt-4.1-public", "gpt-4.1-mini"),
+                    credential,
+                    new ResolvedCredentialMaterial(1L, 1L, CredentialAuthKind.API_KEY, "upstream-secret", null, Map.of(), null, "test"),
+                    request,
+                    null
+            );
+
+            var events = runtime.executeStream(context).collectList().block();
+            assertNotNull(events);
+            String joined = String.join("", events.stream().map(event -> event.rawSsePayload() == null ? "" : event.rawSsePayload()).toList());
+
+            assertEquals("/v1/responses", upstreamPath.get());
+            assertEquals("Bearer upstream-secret", authorization.get());
+            assertEquals("text/event-stream", accept.get());
+            assertEquals("org-native-stream", organization.get());
+            JsonNode sent = objectMapper.readTree(requestBody.get());
+            assertEquals("gpt-4.1-mini", sent.path("model").asText());
+            assertTrue(sent.path("stream").asBoolean());
+            assertTrue(events.stream().allMatch(event -> event.type() == CanonicalStreamEventType.RAW_SSE));
+            assertTrue(joined.contains("\"sequence_number\":42"));
+            assertTrue(joined.contains("\"obfuscation\":\"raw-obf\""));
+            assertTrue(joined.contains("\"unknown\":{\"kept\":true}"));
+            assertTrue(joined.contains("event: response.completed\n"));
         } finally {
             server.stop(0);
         }
@@ -513,6 +610,14 @@ class OpenAiNativeGatewayChatRuntimeTests {
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().add("content-type", "application/json");
         exchange.sendResponseHeaders(status, bytes.length);
+        exchange.getResponseBody().write(bytes);
+        exchange.close();
+    }
+
+    private static void sendSse(HttpExchange exchange, String body) throws IOException {
+        byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+        exchange.getResponseHeaders().add("content-type", "text/event-stream");
+        exchange.sendResponseHeaders(200, bytes.length);
         exchange.getResponseBody().write(bytes);
         exchange.close();
     }

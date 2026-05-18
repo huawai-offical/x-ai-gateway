@@ -95,5 +95,5 @@
 ## 遗留边界
 
 - 本切片只覆盖本地 stored Response lifecycle，不调用 OpenAI 远端 cancel。
-- `responses/input_tokens`、compact、count、streaming raw SSE passthrough 和原始 Responses 对象完整透传仍在 `TASK-20260514-018` 后续切片。
+- `responses/input_tokens` 本地基线已由 [TASK-20260515-020](TASK-20260515-020-openai-responses-input-tokens-compact-baseline.md) 闭环，native passthrough 已由 [TASK-20260516-002](TASK-20260516-002-openai-responses-input-tokens-native-passthrough.md) 闭环；streaming raw SSE passthrough、原始 Responses 对象完整透传、远端 lifecycle 与 native compact 也已由后续切片闭环。
 - `input_items` 的 `include` 参数当前保留为后续原生远端/完整对象透传切片，不在本地 list 中模拟额外输出字段。

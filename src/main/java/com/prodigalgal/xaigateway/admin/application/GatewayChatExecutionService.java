@@ -725,7 +725,8 @@ public class GatewayChatExecutionService {
                 result.reasoning(),
                 result.toolCalls(),
                 result.usage(),
-                result.finishReason()
+                result.finishReason(),
+                result.rawResponse()
         );
     }
 
@@ -920,6 +921,7 @@ public class GatewayChatExecutionService {
         return (event.textDelta() != null && !event.textDelta().isBlank())
                 || (event.reasoningDelta() != null && !event.reasoningDelta().isBlank())
                 || (event.toolCalls() != null && !event.toolCalls().isEmpty())
+                || (event.rawSsePayload() != null && !event.rawSsePayload().isBlank())
                 || event.terminal();
     }
 

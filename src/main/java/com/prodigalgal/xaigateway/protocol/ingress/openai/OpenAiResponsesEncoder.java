@@ -3,6 +3,7 @@ package com.prodigalgal.xaigateway.protocol.ingress.openai;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionResult;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionStreamResult;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResponse;
@@ -13,6 +14,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -32,11 +34,39 @@ public class OpenAiResponsesEncoder {
         return OpenAiResponsesResponse.fromCanonical(response.response());
     }
 
+    public JsonNode encodeJson(CanonicalExecutionResult response) {
+        JsonNode raw = response == null || response.response() == null ? null : response.response().rawResponse();
+        if (raw != null && raw.isObject()) {
+            ObjectNode copy = ((ObjectNode) raw).deepCopy();
+            String publicModel = response.routeSelection() == null ? response.response().publicModel() : response.routeSelection().publicModel();
+            if (publicModel != null && !publicModel.isBlank()) {
+                copy.put("model", publicModel);
+            }
+            return copy;
+        }
+        return objectMapper.valueToTree(encode(response));
+    }
+
     public Flux<String> encodeStream(CanonicalExecutionStreamResult response) {
         return encodeStream(response, null);
     }
 
     public Flux<String> encodeStream(CanonicalExecutionStreamResult response, JsonNode streamOptions) {
+        Flux<CanonicalStreamEvent> events = response.events() == null ? Flux.empty() : response.events();
+        return events.switchOnFirst((signal, stream) -> {
+            if (signal.hasValue() && isRawSseEvent(signal.get())) {
+                return stream
+                        .map(CanonicalStreamEvent::rawSsePayload)
+                        .filter(Objects::nonNull);
+            }
+            return encodeCanonicalStream(response, streamOptions, stream);
+        });
+    }
+
+    private Flux<String> encodeCanonicalStream(
+            CanonicalExecutionStreamResult response,
+            JsonNode streamOptions,
+            Flux<CanonicalStreamEvent> events) {
         String itemId = "msg_" + response.requestId();
         String reasoningItemId = "rs_" + response.requestId();
         AtomicBoolean reasoningStarted = new AtomicBoolean(false);
@@ -81,6 +111,12 @@ public class OpenAiResponsesEncoder {
                         includeObfuscation
                 ))
         );
+    }
+
+    private boolean isRawSseEvent(CanonicalStreamEvent event) {
+        return event != null
+                && event.type() == CanonicalStreamEventType.RAW_SSE
+                && event.rawSsePayload() != null;
     }
 
     private Map<String, Object> outputItemAddedEvent(String itemId) {

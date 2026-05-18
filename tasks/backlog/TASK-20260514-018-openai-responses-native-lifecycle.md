@@ -63,11 +63,19 @@
 - [TASK-20260515-014 OpenAI Streaming Event Usage 与 Sequence 基线](../done/TASK-20260515-014-openai-streaming-event-usage-sequence-baseline.md)：当前 canonical Responses stream 编码已补齐语义化 SSE event 的本地 `sequence_number`，并覆盖 text/reasoning/function call/completed 基线测试。
 - [TASK-20260515-017 OpenAI Responses Native HTTP Create 基线](../done/TASK-20260515-017-openai-responses-native-http-create-baseline.md)：OpenAI Direct 非流式 Responses create 已改走原生 `/v1/responses` HTTP JSON POST，保留 Responses 原始字段、官方 headers 和 usage 映射，不再通过 Spring AI `ChatCompletionRequest` 执行。
 - [TASK-20260515-018 OpenAI Responses 本地生命周期 cancel/input_items 基线](../done/TASK-20260515-018-openai-responses-local-lifecycle-cancel-input-items.md)：本地 stored Response 已支持 retrieve/delete/cancel 与 input_items list envelope，其中 cancel 限定 `background=true` 且未终态，input_items 支持 `after`、`limit`、`order`。
+- [TASK-20260515-019 OpenAI Responses Stream Obfuscation 字段基线](../done/TASK-20260515-019-openai-responses-stream-obfuscation-baseline.md)：Responses stream delta events 已支持 `stream_options.include_obfuscation`，默认输出非空 `obfuscation`，显式 `false` 时关闭，并覆盖 text/reasoning/function call arguments delta。
+- [TASK-20260515-020 OpenAI Responses input_tokens 与 compact 本地基线](../done/TASK-20260515-020-openai-responses-input-tokens-compact-baseline.md)：`POST /v1/responses/input_tokens` 与 `POST /v1/responses/compact` 已具备本地 deterministic estimate / emulation 入口、公开文档和 OpenAPI snapshot。
+- [TASK-20260515-021 OpenAI Responses include Query 参数基线](../done/TASK-20260515-021-openai-responses-include-query-baseline.md)：stored Response retrieve/input_items 已接收 `include` query 参数，并在公开 OpenAPI 中声明本地 no-op acceptance 边界。
+- [TASK-20260515-022 OpenAI Responses Native JSON 原始对象透传基线](../done/TASK-20260515-022-openai-responses-native-json-passthrough-baseline.md)：OpenAI Direct 非流式 Responses create 已保留上游原始 JSON，并在 controller 返回时只将 `model` 重写为 public model。
+- [TASK-20260515-023 OpenAI Responses Native Stream SSE 透明转发基线](../done/TASK-20260515-023-openai-responses-native-stream-sse-passthrough-baseline.md)：OpenAI Direct `stream=true` Responses create 已走原生 upstream SSE，并透明转发 event/data/sequence/unknown fields；非 native raw 路径继续使用 canonical Responses stream encoder。
+- [TASK-20260516-001 OpenAI Responses 远端生命周期 Passthrough 基线](../done/TASK-20260516-001-openai-responses-remote-lifecycle-passthrough-baseline.md)：OpenAI Direct native create + `store=true` 已记录 upstream lineage，并对带 lineage 的 stored Response 支持远端 retrieve/delete/cancel/input_items passthrough，返回前保持本地 `resp_...` id。
+- [TASK-20260516-002 OpenAI Responses input_tokens Native Passthrough](../done/TASK-20260516-002-openai-responses-input-tokens-native-passthrough.md)：OpenAI Direct `responses/input_tokens` 已优先走 native passthrough，route 不可用或非 OpenAI Direct 时回退本地 deterministic estimate，上游已执行后的错误状态不被吞掉。
+- [TASK-20260516-003 OpenAI Responses compact Native Passthrough](../done/TASK-20260516-003-openai-responses-compact-native-passthrough.md)：OpenAI Direct `responses/compact` 已优先走 native passthrough，route 不可用或非 OpenAI Direct 时回退本地 opaque marker emulation，上游已执行后的错误状态不被吞掉。
+- [TASK-20260517-002 OpenAI Responses 无 Lineage 远端 Lifecycle Route Hint](../done/TASK-20260517-002-openai-responses-untracked-remote-lifecycle-route-hints.md)：未知远端 `resp_...` id 在本地无 lineage 时，只有显式提供 `model` query 或 `X-AI-Gateway-OpenAI-Model` header 才会对 retrieve/delete/cancel/input_items 走 OpenAI Direct route-hint passthrough；无 hint 继续保持本地 not found。
 
 ## 剩余切片
 
-- 上游原始 SSE 透明转发、`stream_options.include_obfuscation` 和完整 lifecycle endpoints 仍未闭环。
-- `responses/input_tokens`、compact/count、远端 cancel passthrough、原始 Responses 对象完整透传到 public API 的双轨输出仍需独立设计，当前 controller create 仍保持 canonical encoder 兼容形态。
+- 任意未知远端 `resp_...` id 的无 hint 盲路由保持非目标；真实 OpenAI Direct Responses smoke 由 `TASK-20260514-031` 的受控 key/预算/record-replay 体系继续承接。
 
 ## 关联文档
 

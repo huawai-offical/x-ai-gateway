@@ -521,13 +521,6 @@ class EndpointConformanceMatrixTests {
                         List.of("/v1/files", "/v1/uploads", "/v1/batches", "/v1/fine_tuning/jobs", "/v1/realtime/client_secrets")
                 ),
                 new AcceptedExceptionRecord(
-                        "openai-unexposed-list-events-checkpoints",
-                        "not_exposed",
-                        "未公开的 OpenAI list / events / checkpoints endpoint 继续作为 accepted exceptions。",
-                        "当前仓库未暴露 GET /v1/batches、fine-tuning events / checkpoints，因此继续作为 accepted exceptions 记录。",
-                        List.of("/v1/batches [GET]", "/v1/fine_tuning/jobs/{jobId}/events", "/v1/fine_tuning/jobs/{jobId}/checkpoints")
-                ),
-                new AcceptedExceptionRecord(
                         "notion-mcp-auth-required",
                         "workflow",
                         "Notion MCP 当前 `Auth required`，最终回写依赖认证恢复。",
@@ -564,12 +557,15 @@ class EndpointConformanceMatrixTests {
         definitions.add(provider("openai", "POST", "/v1/uploads/{uploadId}/cancel", "/v1/uploads/upload_1/cancel", "upload_cancel", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiUploadsControllerTests.java", null, null, "openai-direct"));
 
         definitions.add(provider("openai", "POST", "/v1/batches", "/v1/batches", "batch_create", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiBatchesControllerTests.java", null, null, "openai-direct"));
+        definitions.add(provider("openai", "GET", "/v1/batches", "/v1/batches", "batch_list", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiBatchesControllerTests.java", null, null, "openai-direct"));
         definitions.add(provider("openai", "GET", "/v1/batches/{batchId}", "/v1/batches/batch_1", "batch_get", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiBatchesControllerTests.java", null, null, "openai-direct"));
         definitions.add(provider("openai", "POST", "/v1/batches/{batchId}/cancel", "/v1/batches/batch_1/cancel", "batch_cancel", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiBatchesControllerTests.java", null, null, "openai-direct"));
 
         definitions.add(provider("openai", "POST", "/v1/fine_tuning/jobs", "/v1/fine_tuning/jobs", "tuning_create", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiFineTuningJobsControllerTests.java", null, null, "openai-direct"));
         definitions.add(provider("openai", "GET", "/v1/fine_tuning/jobs", "/v1/fine_tuning/jobs", "tuning_list", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiFineTuningJobsControllerTests.java", null, null, "openai-direct"));
         definitions.add(provider("openai", "GET", "/v1/fine_tuning/jobs/{jobId}", "/v1/fine_tuning/jobs/ftjob_1", "tuning_get", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiFineTuningJobsControllerTests.java", null, null, "openai-direct"));
+        definitions.add(provider("openai", "GET", "/v1/fine_tuning/jobs/{jobId}/events", "/v1/fine_tuning/jobs/ftjob_1/events", "tuning_events_list", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiFineTuningJobsControllerTests.java", null, null, "openai-direct"));
+        definitions.add(provider("openai", "GET", "/v1/fine_tuning/jobs/{jobId}/checkpoints", "/v1/fine_tuning/jobs/ftjob_1/checkpoints", "tuning_checkpoints_list", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiFineTuningJobsControllerTests.java", null, null, "openai-direct"));
         definitions.add(provider("openai", "POST", "/v1/fine_tuning/jobs/{jobId}/cancel", "/v1/fine_tuning/jobs/ftjob_1/cancel", "tuning_cancel", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiFineTuningJobsControllerTests.java", null, null, "openai-direct"));
 
         definitions.add(provider("openai", "POST", "/v1/realtime/client_secrets", "/v1/realtime/client_secrets", "realtime_client_secret_create", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "gpt-4o-realtime-preview", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiRealtimeControllerTests.java", null, null, "openai-direct"));

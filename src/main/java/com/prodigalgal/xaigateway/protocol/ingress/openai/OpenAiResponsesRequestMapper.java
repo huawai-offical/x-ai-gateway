@@ -43,6 +43,7 @@ public class OpenAiResponsesRequestMapper {
 
         List<CanonicalMessage> messages = toMessages(requestBody.path("instructions"), requestBody.path("input"));
         ensureUserMessage(messages);
+        OpenAiResponsesToolRegistry.requireSupportedToolChoice(requestBody.path("tool_choice"));
 
         return new CanonicalRequest(
                 distributedKeyPrefix,
@@ -266,7 +267,9 @@ public class OpenAiResponsesRequestMapper {
         }
 
         List<CanonicalToolDefinition> tools = new ArrayList<>();
+        int index = 0;
         for (JsonNode tool : toolsNode) {
+            OpenAiResponsesToolRegistry.requireSupportedToolDefinition(tool, index);
             JsonNode definition = tool.path("function").isObject() ? tool.path("function") : tool;
             String type = tool.path("type").asText("function");
             if (!"function".equalsIgnoreCase(type)) {
@@ -274,7 +277,7 @@ public class OpenAiResponsesRequestMapper {
             }
             String name = definition.path("name").asText(null);
             if (name == null || name.isBlank()) {
-                continue;
+                throw new IllegalArgumentException("Responses function tool 缺少 name。");
             }
             tools.add(new CanonicalToolDefinition(
                     name,
@@ -284,6 +287,7 @@ public class OpenAiResponsesRequestMapper {
                             ? definition.get("strict").asBoolean()
                             : null
             ));
+            index++;
         }
         return List.copyOf(tools);
     }

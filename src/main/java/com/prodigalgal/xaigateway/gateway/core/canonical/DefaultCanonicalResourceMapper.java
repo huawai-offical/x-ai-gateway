@@ -74,7 +74,8 @@ public class DefaultCanonicalResourceMapper implements CanonicalResourceMapper {
 
     private String resolveJsonResponseKind(TranslationOperation operation, JsonNode rawBody) {
         return switch (operation == null ? TranslationOperation.UNKNOWN : operation) {
-            case EMBEDDING_CREATE, IMAGE_GENERATION, IMAGE_EDIT, IMAGE_VARIATION, FILE_LIST -> "list";
+            case EMBEDDING_CREATE, IMAGE_GENERATION, IMAGE_EDIT, IMAGE_VARIATION, FILE_LIST, BATCH_LIST,
+                    TUNING_EVENTS_LIST, TUNING_CHECKPOINTS_LIST -> "list";
             default -> rawBody != null && rawBody.path("data").isArray() ? "list" : "object";
         };
     }
@@ -92,10 +93,13 @@ public class DefaultCanonicalResourceMapper implements CanonicalResourceMapper {
             case MODERATION_CREATE -> "moderation";
             case FILE_CREATE, FILE_GET, FILE_DELETE, FILE_LIST, FILE_CONTENT_GET -> "file";
             case UPLOAD_CREATE, UPLOAD_GET, UPLOAD_PART_ADD, UPLOAD_COMPLETE, UPLOAD_CANCEL -> "upload";
+            case BATCH_LIST -> "list";
             case BATCH_CREATE, BATCH_GET, BATCH_CANCEL -> "batch";
             case ANTHROPIC_MESSAGE_BATCH_CREATE, ANTHROPIC_MESSAGE_BATCH_GET, ANTHROPIC_MESSAGE_BATCH_CANCEL -> "message_batch";
             case TUNING_LIST -> "list";
             case TUNING_CREATE, TUNING_GET, TUNING_CANCEL -> "fine_tuning.job";
+            case TUNING_EVENTS_LIST -> "fine_tuning.job.event";
+            case TUNING_CHECKPOINTS_LIST -> "fine_tuning.job.checkpoint";
             case REALTIME_CLIENT_SECRET_CREATE -> "realtime.client_secret";
             case RERANK_CREATE -> "rerank";
             case VIDEO_GENERATION_CREATE, VIDEO_GENERATION_GET, VIDEO_GENERATION_CANCEL -> "video.generation";
@@ -146,9 +150,9 @@ public class DefaultCanonicalResourceMapper implements CanonicalResourceMapper {
                     MUSIC_GENERATION_GET, MUSIC_GENERATION_CANCEL,
                     TASK_GET, TASK_CANCEL -> "in_progress";
             case AUDIO_TRANSCRIPTION, AUDIO_TRANSLATION, EMBEDDING_CREATE, IMAGE_GENERATION, IMAGE_EDIT, IMAGE_VARIATION, MODERATION_CREATE,
-                    FILE_CREATE, FILE_LIST, FILE_GET, FILE_DELETE, FILE_CONTENT_GET, REALTIME_CLIENT_SECRET_CREATE,
+                    FILE_CREATE, FILE_LIST, FILE_GET, FILE_DELETE, FILE_CONTENT_GET, BATCH_LIST, REALTIME_CLIENT_SECRET_CREATE,
                     RERANK_CREATE, WEB_SEARCH_CREATE -> "completed";
-            case TUNING_LIST -> "completed";
+            case TUNING_LIST, TUNING_EVENTS_LIST, TUNING_CHECKPOINTS_LIST -> "completed";
             default -> rawBody == null || rawBody.isMissingNode() || rawBody.isNull() ? null : "completed";
         };
     }

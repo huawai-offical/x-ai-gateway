@@ -54,7 +54,9 @@ public class AsyncLifecycleGatewayResourceExecutor implements GatewayResourceExe
             case "/v1/uploads/{uploadId}" -> gatewayAsyncResourceService.getUpload(requirePathParam(context, "uploadId"), context.distributedKeyId());
             case "/v1/uploads/{uploadId}/complete" -> gatewayAsyncResourceService.completeUpload(requirePathParam(context, "uploadId"), context.distributedKeyId());
             case "/v1/uploads/{uploadId}/cancel" -> gatewayAsyncResourceService.cancelUpload(requirePathParam(context, "uploadId"), context.distributedKeyId());
-            case "/v1/batches" -> gatewayAsyncResourceService.createBatch(context.distributedKeyId(), requestBody, preferredCredentialId);
+            case "/v1/batches" -> "GET".equals(context.httpMethod())
+                    ? gatewayAsyncResourceService.listBatches(context.distributedKeyId(), requestBody)
+                    : gatewayAsyncResourceService.createBatch(context.distributedKeyId(), requestBody, preferredCredentialId);
             case "/v1/batches/{batchId}" -> gatewayAsyncResourceService.getBatch(requirePathParam(context, "batchId"), context.distributedKeyId());
             case "/v1/batches/{batchId}/cancel" -> gatewayAsyncResourceService.cancelBatch(requirePathParam(context, "batchId"), context.distributedKeyId());
             case "/v1/messages/batches" -> gatewayAsyncResourceService.createAnthropicMessageBatch(context.distributedKeyId(), requestBody, preferredCredentialId);
@@ -64,6 +66,8 @@ public class AsyncLifecycleGatewayResourceExecutor implements GatewayResourceExe
                     ? gatewayAsyncResourceService.listTunings(context.distributedKeyId())
                     : gatewayAsyncResourceService.createTuning(context.distributedKeyId(), requestBody, preferredCredentialId);
             case "/v1/fine_tuning/jobs/{jobId}" -> gatewayAsyncResourceService.getTuning(requirePathParam(context, "jobId"), context.distributedKeyId());
+            case "/v1/fine_tuning/jobs/{jobId}/events" -> gatewayAsyncResourceService.listTuningEvents(requirePathParam(context, "jobId"), context.distributedKeyId(), requestBody);
+            case "/v1/fine_tuning/jobs/{jobId}/checkpoints" -> gatewayAsyncResourceService.listTuningCheckpoints(requirePathParam(context, "jobId"), context.distributedKeyId(), requestBody);
             case "/v1/fine_tuning/jobs/{jobId}/cancel" -> gatewayAsyncResourceService.cancelTuning(requirePathParam(context, "jobId"), context.distributedKeyId());
             case "/v1/realtime/client_secrets" -> gatewayAsyncResourceService.createRealtimeClientSecret(context.distributedKeyId(), requestBody, preferredCredentialId);
             default -> throw new IllegalArgumentException("当前生命周期对象路径不受支持。");

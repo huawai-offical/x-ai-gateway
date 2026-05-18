@@ -176,7 +176,10 @@ class GatewayRequestFeatureServiceTests {
         GatewayRequestSemantics fileGetSemantics = service.describe("GET", "/v1beta/files/file_abc123", null);
         GatewayRequestSemantics batchCreateSemantics = service.describe("POST", "/v1beta/models/gemini-2.5-pro:batchGenerateContent", null);
         GatewayRequestSemantics batchGetSemantics = service.describe("GET", "/v1beta/batches/batch_abc123", null);
+        GatewayRequestSemantics openAiBatchListSemantics = service.describe("GET", "/v1/batches", null);
         GatewayRequestSemantics tuningListSemantics = service.describe("GET", "/v1/fine_tuning/jobs", null);
+        GatewayRequestSemantics tuningEventsSemantics = service.describe("GET", "/v1/fine_tuning/jobs/ftjob_1/events", null);
+        GatewayRequestSemantics tuningCheckpointsSemantics = service.describe("GET", "/v1/fine_tuning/jobs/ftjob_1/checkpoints", null);
 
         assertEquals(TranslationOperation.EMBEDDING_CREATE, embedSemantics.operation());
         assertEquals(RouteSelectionMode.CATALOG_SELECTION, embedSemantics.routeSelectionMode());
@@ -194,8 +197,16 @@ class GatewayRequestFeatureServiceTests {
         assertEquals(RouteSelectionMode.CATALOG_SELECTION, batchCreateSemantics.routeSelectionMode());
         assertEquals(TranslationOperation.BATCH_GET, batchGetSemantics.operation());
         assertEquals(RouteSelectionMode.STORED_LINEAGE, batchGetSemantics.routeSelectionMode());
+        assertEquals(TranslationOperation.BATCH_LIST, openAiBatchListSemantics.operation());
+        assertEquals(RouteSelectionMode.LOCAL_CATALOG, openAiBatchListSemantics.routeSelectionMode());
         assertEquals(TranslationOperation.TUNING_LIST, tuningListSemantics.operation());
         assertEquals(RouteSelectionMode.LOCAL_CATALOG, tuningListSemantics.routeSelectionMode());
+        assertEquals(TranslationOperation.TUNING_EVENTS_LIST, tuningEventsSemantics.operation());
+        assertEquals("/v1/fine_tuning/jobs/{jobId}/events", tuningEventsSemantics.normalizedPath());
+        assertEquals(RouteSelectionMode.STORED_LINEAGE, tuningEventsSemantics.routeSelectionMode());
+        assertEquals(TranslationOperation.TUNING_CHECKPOINTS_LIST, tuningCheckpointsSemantics.operation());
+        assertEquals("/v1/fine_tuning/jobs/{jobId}/checkpoints", tuningCheckpointsSemantics.normalizedPath());
+        assertEquals(RouteSelectionMode.STORED_LINEAGE, tuningCheckpointsSemantics.routeSelectionMode());
     }
 
     @Test
@@ -204,6 +215,8 @@ class GatewayRequestFeatureServiceTests {
         assertEquals("/v1/uploads/{uploadId}/parts", service.normalizePath("/v1/uploads/upload_1/parts"));
         assertEquals("/v1/batches/{batchId}/cancel", service.normalizePath("/v1/batches/batch_1/cancel"));
         assertEquals("/v1/fine_tuning/jobs/{jobId}", service.normalizePath("/v1/fine_tuning/jobs/ftjob_1"));
+        assertEquals("/v1/fine_tuning/jobs/{jobId}/events", service.normalizePath("/v1/fine_tuning/jobs/ftjob_1/events"));
+        assertEquals("/v1/fine_tuning/jobs/{jobId}/checkpoints", service.normalizePath("/v1/fine_tuning/jobs/ftjob_1/checkpoints"));
         assertEquals(
                 "/v1beta/models/{model}:generateContent",
                 service.normalizePath("/v1beta/models/gemini-2.5-pro:streamGenerateContent")
@@ -219,6 +232,8 @@ class GatewayRequestFeatureServiceTests {
         assertEquals(java.util.Map.of("uploadId", "upload_1"), service.extractPathParams("/v1/uploads/upload_1/parts"));
         assertEquals(java.util.Map.of("batchId", "batch_1"), service.extractPathParams("/v1/batches/batch_1/cancel"));
         assertEquals(java.util.Map.of("jobId", "ftjob_1"), service.extractPathParams("/v1/fine_tuning/jobs/ftjob_1"));
+        assertEquals(java.util.Map.of("jobId", "ftjob_1"), service.extractPathParams("/v1/fine_tuning/jobs/ftjob_1/events"));
+        assertEquals(java.util.Map.of("jobId", "ftjob_1"), service.extractPathParams("/v1/fine_tuning/jobs/ftjob_1/checkpoints"));
         assertEquals(
                 java.util.Map.of("model", "gemini-2.5-pro"),
                 service.extractPathParams("/v1beta/models/gemini-2.5-pro:generateContent")

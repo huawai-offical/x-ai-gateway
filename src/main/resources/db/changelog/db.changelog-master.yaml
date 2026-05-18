@@ -97,3 +97,5 @@ databaseChangeLog:
       file: db/changelog/changes/db.changelog-0048-distributed-key-secret-export-grant.yaml
   - include:
       file: db/changelog/changes/db.changelog-0049-openai-idempotency-record.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0050-stored-chat-pagination-index.yaml

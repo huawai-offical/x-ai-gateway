@@ -194,8 +194,16 @@
 | [TASK-20260514-019 OpenAI Conversations、Webhooks 与 Responses 工具生态](backlog/TASK-20260514-019-openai-conversations-webhooks-tools.md) | Backlog | High | TASK-20260514-016 / 013 |
 | [TASK-20260514-020 OpenAI Audio、Images、Embeddings、Moderations 参数 parity](backlog/TASK-20260514-020-openai-audio-images-embeddings-moderations-parity.md) | Backlog | High | TASK-20260514-016 / 014 |
 | [TASK-20260514-021 OpenAI Files、Uploads、Batches、Models 对象生命周期](backlog/TASK-20260514-021-openai-files-uploads-batches-models-lifecycle.md) | Backlog | High | TASK-20260514-016 / 014 |
+| [TASK-20260516-012 OpenAI Models Delete 与 Fine-tuned Model 删除边界](done/TASK-20260516-012-openai-models-delete-finetuned-boundary.md) | Done | High | TASK-20260514-021 / 014 |
 | [TASK-20260514-022 OpenAI Fine-tuning 全生命周期](backlog/TASK-20260514-022-openai-fine-tuning-full-lifecycle.md) | Backlog | High | TASK-20260514-016 / 014 |
+| [TASK-20260516-013 OpenAI Fine-tuning Events/Checkpoints 本地 Lineage 列表](done/TASK-20260516-013-openai-fine-tuning-events-checkpoints-local-lineage.md) | Done | High | TASK-20260514-022 / 014 |
 | [TASK-20260514-023 OpenAI Vector Stores 全栈兼容](backlog/TASK-20260514-023-openai-vector-stores-full-stack.md) | Backlog | High | TASK-20260514-016 / 014 |
+| [TASK-20260517-003 OpenAI Vector Stores 本地 Lifecycle 基线](done/TASK-20260517-003-openai-vector-stores-local-lifecycle-baseline.md) | Done | High | TASK-20260514-023 |
+| [TASK-20260517-004 OpenAI Vector Store Files 本地 Attachment Lifecycle 基线](done/TASK-20260517-004-openai-vector-store-files-local-attachment-lifecycle.md) | Done | High | TASK-20260514-023 |
+| [TASK-20260517-005 OpenAI Vector Store File Batches 本地 Lifecycle 基线](done/TASK-20260517-005-openai-vector-store-file-batches-local-lifecycle.md) | Done | High | TASK-20260514-023 |
+| [TASK-20260518-001 OpenAI Vector Store File Content 本地读取基线](done/TASK-20260518-001-openai-vector-store-file-content-local-read-baseline.md) | Done | High | TASK-20260514-023 |
+| [TASK-20260518-002 OpenAI Vector Store Search 本地文本检索基线](done/TASK-20260518-002-openai-vector-store-search-local-text-baseline.md) | Done | High | TASK-20260514-023 |
+| [TASK-20260518-003 OpenAI Responses File Search 本地 Vector Store 绑定基线](done/TASK-20260518-003-openai-responses-file-search-local-vector-store-binding.md) | Done | High | TASK-20260514-023 |
 | [TASK-20260514-024 OpenAI Containers 与 Code Interpreter 文件](backlog/TASK-20260514-024-openai-containers-code-interpreter-files.md) | Backlog | High | TASK-20260514-016 / 014 |
 | [TASK-20260514-025 OpenAI Videos API 兼容面](backlog/TASK-20260514-025-openai-videos-api-parity.md) | Backlog | Medium | TASK-20260514-016 / 014 |
 | [TASK-20260514-026 OpenAI Evals、Graders 与 Runs API](backlog/TASK-20260514-026-openai-evals-graders-runs.md) | Backlog | Medium | TASK-20260514-016 / 014 |
@@ -222,7 +230,28 @@
 | [TASK-20260515-016 OpenAI/Codex Real Smoke 分类与预算阻断基线](done/TASK-20260515-016-openai-codex-real-smoke-classification-budget-guard.md) | Done | Critical | TASK-20260514-031 |
 | [TASK-20260515-017 OpenAI Responses Native HTTP Create 基线](done/TASK-20260515-017-openai-responses-native-http-create-baseline.md) | Done | Critical | TASK-20260514-018 |
 | [TASK-20260515-018 OpenAI Responses 本地生命周期 cancel/input_items 基线](done/TASK-20260515-018-openai-responses-local-lifecycle-cancel-input-items.md) | Done | Critical | TASK-20260514-018 |
-| [TASK-20260515-019 OpenAI Responses Stream Obfuscation 字段基线](in-progress/TASK-20260515-019-openai-responses-stream-obfuscation-baseline.md) | In Progress | Critical | TASK-20260514-018 |
+| [TASK-20260515-019 OpenAI Responses Stream Obfuscation 字段基线](done/TASK-20260515-019-openai-responses-stream-obfuscation-baseline.md) | Done | Critical | TASK-20260514-018 |
+| [TASK-20260515-020 OpenAI Responses input_tokens 与 compact 本地基线](done/TASK-20260515-020-openai-responses-input-tokens-compact-baseline.md) | Done | Critical | TASK-20260514-018 |
+| [TASK-20260515-021 OpenAI Responses include Query 参数基线](done/TASK-20260515-021-openai-responses-include-query-baseline.md) | Done | Critical | TASK-20260514-018 |
+| [TASK-20260515-022 OpenAI Responses Native JSON 原始对象透传基线](done/TASK-20260515-022-openai-responses-native-json-passthrough-baseline.md) | Done | Critical | TASK-20260514-018 |
+| [TASK-20260515-023 OpenAI Responses Native Stream SSE 透明转发基线](done/TASK-20260515-023-openai-responses-native-stream-sse-passthrough-baseline.md) | Done | Critical | TASK-20260514-018 |
+| [TASK-20260516-001 OpenAI Responses 远端生命周期 Passthrough 基线](done/TASK-20260516-001-openai-responses-remote-lifecycle-passthrough-baseline.md) | Done | Critical | TASK-20260514-018 |
+| [TASK-20260516-002 OpenAI Responses input_tokens Native Passthrough](done/TASK-20260516-002-openai-responses-input-tokens-native-passthrough.md) | Done | Critical | TASK-20260514-018 |
+| [TASK-20260516-003 OpenAI Responses compact Native Passthrough](done/TASK-20260516-003-openai-responses-compact-native-passthrough.md) | Done | Critical | TASK-20260514-018 |
+| [TASK-20260517-002 OpenAI Responses 无 Lineage 远端 Lifecycle Route Hint](done/TASK-20260517-002-openai-responses-untracked-remote-lifecycle-route-hints.md) | Done | Critical | TASK-20260514-018 |
+| [TASK-20260516-004 OpenAI Stored Chat 数据库游标分页与过滤硬化](done/TASK-20260516-004-openai-stored-chat-db-pagination-filter-hardening.md) | Done | Critical | TASK-20260514-017 / 030 |
+| [TASK-20260516-005 OpenAI Direct Key Vault 权限探测与 Secret 引用 Smoke](done/TASK-20260516-005-openai-direct-key-vault-permission-smoke.md) | Done | Critical | TASK-20260514-031 |
+| [TASK-20260516-006 OpenAI Direct 资源族 Smoke Runner 分类骨架](done/TASK-20260516-006-openai-direct-resource-family-smoke-runner.md) | Done | Critical | TASK-20260514-031 |
+| [TASK-20260516-007 OpenAI Direct Smoke Certification 与脱敏 Fixture 基线](done/TASK-20260516-007-openai-direct-smoke-certification-fixture.md) | Done | Critical | TASK-20260514-031 |
+| [TASK-20260516-008 OpenAI Realtime WebSocket 入口与事件代理基线](done/TASK-20260516-008-openai-realtime-websocket-ingress-event-proxy.md) | Done | Critical | TASK-20260514-030 |
+| [TASK-20260516-009 OpenAI Direct 显式 Billable/Write Smoke Probe](done/TASK-20260516-009-openai-direct-explicit-billable-write-smoke-probes.md) | Done | Critical | TASK-20260514-031 |
+| [TASK-20260516-010 OpenAI Provider Catalog 覆盖边界校准](done/TASK-20260516-010-openai-provider-catalog-coverage-boundary.md) | Done | High | TASK-20260514-015 / 029 |
+| [TASK-20260516-011 OpenAI Batches List Envelope 与本地游标分页](done/TASK-20260516-011-openai-batches-list-envelope.md) | Done | High | TASK-20260514-021 / 015 |
+| [TASK-20260516-014 OpenAI Responses Tools Registry 与非 function Tool 显式边界](done/TASK-20260516-014-openai-responses-tool-registry-boundary.md) | Done | High | TASK-20260514-019 / 013 |
+| [TASK-20260516-015 OpenAI Conversations 本地 Lifecycle](done/TASK-20260516-015-openai-conversations-local-lifecycle.md) | Done | High | TASK-20260514-019 |
+| [TASK-20260516-016 OpenAI Webhooks 接收入口与事件落库](done/TASK-20260516-016-openai-webhooks-ingress-event-persistence.md) | Done | High | TASK-20260514-019 |
+| [TASK-20260516-017 OpenAI Direct Smoke Record/Replay Fixture 固化](done/TASK-20260516-017-openai-direct-smoke-record-replay-fixture.md) | Done | Critical | TASK-20260514-031 |
+| [TASK-20260517-001 OpenAI Direct Smoke Record/Replay CI 校验器](done/TASK-20260517-001-openai-direct-smoke-record-replay-ci-verifier.md) | Done | Critical | TASK-20260514-031 |
 
 ## Portal/Admin 角色化界面任务体系
 

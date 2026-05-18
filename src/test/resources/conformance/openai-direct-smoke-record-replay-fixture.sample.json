@@ -1,0 +1,68 @@
+{
+  "schemaVersion": "2026-05-16.openai-direct-smoke-record-replay.v1",
+  "replayMode": "record_replay",
+  "providerType": "OPENAI_DIRECT",
+  "baseUrl": "https://api.openai.com",
+  "certificationStatus": "PARTIAL_CERTIFIED",
+  "dryRun": false,
+  "recordedAt": "2026-05-16T01:00:00Z",
+  "summary": {
+    "PASS": 1,
+    "FAIL": 0,
+    "SKIPPED": 0,
+    "UNSUPPORTED": 0,
+    "NO_PERMISSION": 0,
+    "BUDGET_BLOCKED": 1
+  },
+  "replayPolicy": {
+    "network": "disabled_by_default",
+    "billableOperations": "replay_only",
+    "writeOperations": "replay_only",
+    "secretMaterial": "redacted",
+    "dryRunEvidenceAccepted": false,
+    "fixtureSource": "openai_direct_resource_smoke_certification"
+  },
+  "fixtures": [
+    {
+      "resourceFamily": "FILES",
+      "status": "LIVE_SMOKE_OK",
+      "classification": "PASS",
+      "method": "GET",
+      "path": "/v1/files?limit=1",
+      "billable": false,
+      "writeOperation": false,
+      "httpStatus": 200,
+      "upstreamRequestId": "req_files",
+      "durationMs": 12,
+      "evidence": {
+        "firstId": "file_1"
+      },
+      "requestPreview": {
+        "headers": {
+          "authorization": "Bearer ***",
+          "OpenAI-Organization": "***"
+        }
+      }
+    },
+    {
+      "resourceFamily": "CHAT_COMPLETIONS",
+      "status": "BUDGET_GUARD_BLOCKED",
+      "classification": "BUDGET_BLOCKED",
+      "skippedReason": "BILLABLE_PROBE_BLOCKED",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "billable": true,
+      "writeOperation": false,
+      "failureMessage": "blocked Bearer *** for org-*** proj-***",
+      "evidence": {
+        "probeKind": "billable_generation"
+      },
+      "requestPreview": {
+        "headers": {
+          "authorization": "Bearer ***",
+          "OpenAI-Project": "***"
+        }
+      }
+    }
+  ]
+}

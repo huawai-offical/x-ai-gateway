@@ -12,14 +12,21 @@ import com.prodigalgal.xaigateway.admin.application.CredentialCryptoService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedCredentialBindingView;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyQueryService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyView;
+import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.catalog.FineTunedModelRegistrationService;
 import com.prodigalgal.xaigateway.gateway.core.credential.CredentialMaterialResolver;
 import com.prodigalgal.xaigateway.gateway.core.credential.ResolvedCredentialMaterial;
+import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
 import com.prodigalgal.xaigateway.gateway.core.interop.SiteCapabilityTruthService;
+import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateView;
+import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
+import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionSource;
 import com.prodigalgal.xaigateway.gateway.core.shared.AuthStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ErrorSchemaStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.PathStrategy;
+import com.prodigalgal.xaigateway.gateway.core.shared.ProviderFamily;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
+import com.prodigalgal.xaigateway.gateway.core.shared.ReasoningTransport;
 import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
 import com.prodigalgal.xaigateway.gateway.core.site.UpstreamSitePolicyService;
 import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayAsyncResourceEntity;
@@ -41,6 +48,7 @@ import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -445,7 +453,7 @@ class GatewayAsyncResourceServiceTests {
         storedEntity.setDistributedKeyId(1L);
         storedEntity.setResourceType(GatewayAsyncResourceType.RESPONSE);
         storedEntity.setStatus("completed");
-        storedEntity.setResponsePayloadJson("{\"id\":\"resp_test\",\"status\":\"completed\"}");
+        storedEntity.setResponsePayloadJson("{\"id\":\"resp_test\",\"object\":\"response\",\"status\":\"completed\"}");
         storedEntity.setMetadataJson("{\"object_mode\":\"gateway_response_object\",\"events\":[{\"type\":\"stored\",\"status\":\"completed\",\"at\":1712894400}]}");
         Mockito.when(gatewayAsyncResourceRepository.findByResourceKeyAndResourceTypeAndDeletedFalse("resp_test", GatewayAsyncResourceType.RESPONSE))
                 .thenReturn(Optional.of(storedEntity));
@@ -463,6 +471,142 @@ class GatewayAsyncResourceServiceTests {
         Mockito.verify(gatewayAsyncResourceRepository, Mockito.atLeast(2)).save(captor.capture());
         assertTrue(captor.getAllValues().get(0).getMetadataJson().contains("gateway_response_object"));
         assertTrue(captor.getAllValues().get(captor.getAllValues().size() - 1).getMetadataJson().contains("\"type\":\"deleted\""));
+    }
+
+    @Test
+    void shouldPersistOpenAiResponseLineageWhenStoredNativeResponseUsesOpenAiDirect() {
+        GatewayAsyncResourceRepository gatewayAsyncResourceRepository = Mockito.mock(GatewayAsyncResourceRepository.class);
+        SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        ObjectMapper objectMapper = new ObjectMapper();
+        GatewayAsyncResourceService service = new GatewayAsyncResourceService(
+                gatewayAsyncResourceRepository,
+                Mockito.mock(DistributedKeyQueryService.class),
+                Mockito.mock(UpstreamCredentialRepository.class),
+                Mockito.mock(UpstreamSiteProfileRepository.class),
+                snapshotRepository,
+                Mockito.mock(GatewayFileRepository.class),
+                Mockito.mock(GatewayFileBindingRepository.class),
+                Mockito.mock(CredentialCryptoService.class),
+                new SiteCapabilityTruthService(new UpstreamSitePolicyService(), snapshotRepository),
+                objectMapper,
+                Clock.fixed(Instant.parse("2026-04-12T04:00:00Z"), ZoneOffset.UTC),
+                WebClient.builder()
+        );
+        Mockito.when(gatewayAsyncResourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ObjectNode request = objectMapper.createObjectNode();
+        request.put("model", "writer-fast");
+        request.put("store", true);
+        ObjectNode upstreamResponse = objectMapper.createObjectNode();
+        upstreamResponse.put("id", "resp_upstream_1");
+        upstreamResponse.put("object", "response");
+        upstreamResponse.put("model", "gpt-4.1");
+        upstreamResponse.put("status", "in_progress");
+
+        JsonNode stored = service.storeResponse(
+                1L,
+                "writer-fast",
+                request,
+                upstreamResponse,
+                openAiDirectResponseSelection()
+        );
+
+        assertTrue(stored.path("id").asText().startsWith("resp_"));
+        assertFalse("resp_upstream_1".equals(stored.path("id").asText()));
+        ArgumentCaptor<GatewayAsyncResourceEntity> captor = ArgumentCaptor.forClass(GatewayAsyncResourceEntity.class);
+        Mockito.verify(gatewayAsyncResourceRepository).save(captor.capture());
+        GatewayAsyncResourceEntity entity = captor.getValue();
+        assertEquals("resp_upstream_1", entity.getUpstreamObjectId());
+        assertTrue(entity.getMetadataJson().contains("\"object_mode\":\"upstream_response_with_local_lineage\""));
+        assertTrue(entity.getMetadataJson().contains("\"upstream_object_id\":\"resp_upstream_1\""));
+        assertTrue(entity.getMetadataJson().contains("\"credential_id\":101"));
+        assertTrue(entity.getMetadataJson().contains("\"site_profile_id\":1"));
+        assertTrue(entity.getMetadataJson().contains("\"resolved_model_key\":\"gpt-4.1\""));
+    }
+
+    @Test
+    void shouldPassthroughRemoteResponseLifecycleUsingStoredLineage() {
+        GatewayAsyncResourceRepository gatewayAsyncResourceRepository = Mockito.mock(GatewayAsyncResourceRepository.class);
+        UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        UpstreamSiteProfileRepository upstreamSiteProfileRepository = Mockito.mock(UpstreamSiteProfileRepository.class);
+        SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        CredentialCryptoService credentialCryptoService = Mockito.mock(CredentialCryptoService.class);
+        List<String> calls = new ArrayList<>();
+        ExchangeFunction exchangeFunction = request -> {
+            String query = request.url().getRawQuery();
+            calls.add(request.method().name() + " " + request.url().getPath() + (query == null ? "" : "?" + query));
+            assertEquals("Bearer api-key", request.headers().getFirst(HttpHeaders.AUTHORIZATION));
+            String path = request.url().getPath();
+            String method = request.method().name();
+            String body = switch (method + " " + path) {
+                case "GET /v1/responses/resp_upstream_1" -> """
+                        {"id":"resp_upstream_1","object":"response","status":"completed","model":"gpt-4.1"}
+                        """;
+                case "POST /v1/responses/resp_upstream_1/cancel" -> """
+                        {"id":"resp_upstream_1","object":"response","status":"cancelled","model":"gpt-4.1"}
+                        """;
+                case "GET /v1/responses/resp_upstream_1/input_items" -> """
+                        {"object":"list","data":[{"id":"msg_item_1","type":"message","role":"user"}],"has_more":false,"first_id":"msg_item_1","last_id":"msg_item_1"}
+                        """;
+                case "DELETE /v1/responses/resp_upstream_1" -> """
+                        {"id":"resp_upstream_1","object":"response","deleted":true}
+                        """;
+                default -> throw new AssertionError("Unexpected upstream call: " + method + " " + path);
+            };
+            return Mono.just(ClientResponse.create(HttpStatus.OK)
+                    .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                    .body(body)
+                    .build());
+        };
+        ObjectMapper objectMapper = new ObjectMapper();
+        GatewayAsyncResourceService service = new GatewayAsyncResourceService(
+                gatewayAsyncResourceRepository,
+                Mockito.mock(DistributedKeyQueryService.class),
+                upstreamCredentialRepository,
+                upstreamSiteProfileRepository,
+                snapshotRepository,
+                Mockito.mock(GatewayFileRepository.class),
+                Mockito.mock(GatewayFileBindingRepository.class),
+                credentialCryptoService,
+                new SiteCapabilityTruthService(new UpstreamSitePolicyService(), snapshotRepository),
+                objectMapper,
+                Clock.fixed(Instant.parse("2026-04-12T04:00:00Z"), ZoneOffset.UTC),
+                WebClient.builder().exchangeFunction(exchangeFunction)
+        );
+        GatewayAsyncResourceEntity entity = upstreamResponseEntity();
+        Mockito.when(gatewayAsyncResourceRepository.findByResourceKeyAndResourceTypeAndDeletedFalse("resp_local_1", GatewayAsyncResourceType.RESPONSE))
+                .thenReturn(Optional.of(entity));
+        Mockito.when(gatewayAsyncResourceRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        Mockito.when(upstreamCredentialRepository.findById(101L))
+                .thenReturn(Optional.of(credential(101L, ProviderType.OPENAI_DIRECT, 1L, "https://api.openai.com")));
+        Mockito.when(upstreamSiteProfileRepository.findById(1L))
+                .thenReturn(Optional.of(siteProfile(1L, UpstreamSiteKind.OPENAI_DIRECT)));
+        Mockito.when(credentialCryptoService.decrypt("cipher")).thenReturn("api-key");
+
+        JsonNode retrieved = service.getResponse("resp_local_1", 1L, List.of("reasoning.encrypted_content"));
+        JsonNode cancelled = service.cancelResponse("resp_local_1", 1L);
+        JsonNode inputItems = service.listResponseInputItems(
+                "resp_local_1",
+                1L,
+                "msg_after",
+                List.of("message.input_image.image_url", "file_search_call.results"),
+                50,
+                "asc"
+        );
+        JsonNode deleted = service.deleteResponse("resp_local_1", 1L);
+
+        assertEquals("resp_local_1", retrieved.path("id").asText());
+        assertEquals("completed", retrieved.path("status").asText());
+        assertEquals("resp_local_1", cancelled.path("id").asText());
+        assertEquals("cancelled", cancelled.path("status").asText());
+        assertEquals("msg_item_1", inputItems.path("data").get(0).path("id").asText());
+        assertEquals("resp_local_1", deleted.path("id").asText());
+        assertTrue(deleted.path("deleted").asBoolean());
+        assertTrue(entity.isDeleted());
+        assertTrue(calls.contains("GET /v1/responses/resp_upstream_1?include=reasoning.encrypted_content"));
+        assertTrue(calls.contains("POST /v1/responses/resp_upstream_1/cancel"));
+        assertTrue(calls.contains("GET /v1/responses/resp_upstream_1/input_items?after=msg_after&include=message.input_image.image_url&include=file_search_call.results&limit=50&order=asc"));
+        assertTrue(calls.contains("DELETE /v1/responses/resp_upstream_1"));
     }
 
     @Test
@@ -1398,6 +1542,228 @@ class GatewayAsyncResourceServiceTests {
         assertFalse(response.path("has_more").asBoolean());
     }
 
+    @Test
+    void shouldListTuningEventsFromLocalLineageWithCursor() {
+        GatewayAsyncResourceRepository gatewayAsyncResourceRepository = Mockito.mock(GatewayAsyncResourceRepository.class);
+        GatewayAsyncResourceService service = minimalAsyncResourceService(gatewayAsyncResourceRepository);
+        GatewayAsyncResourceEntity entity = tuningEntity(
+                "ftjob_1",
+                "running",
+                "{\"id\":\"ftjob_1\",\"object\":\"fine_tuning.job\",\"status\":\"running\"}",
+                """
+                        {
+                          "events":[
+                            {"id":"evt_1","type":"created","status":"queued","at":1712894400},
+                            {"id":"evt_2","type":"status_changed","status":"running","at":1712894460}
+                          ]
+                        }
+                        """);
+        Mockito.when(gatewayAsyncResourceRepository.findByResourceKeyAndResourceTypeAndDeletedFalse(
+                        "ftjob_1",
+                        GatewayAsyncResourceType.TUNING))
+                .thenReturn(Optional.of(entity));
+
+        JsonNode response = service.listTuningEvents("ftjob_1", 1L, "evt_1", 1);
+
+        assertEquals("list", response.path("object").asText());
+        assertEquals("evt_2", response.path("data").get(0).path("id").asText());
+        assertEquals("fine_tuning.job.event", response.path("data").get(0).path("object").asText());
+        assertEquals("info", response.path("data").get(0).path("level").asText());
+        assertEquals("message", response.path("data").get(0).path("type").asText());
+        assertFalse(response.path("has_more").asBoolean());
+        assertTrue(response.path("first_id").isMissingNode());
+    }
+
+    @Test
+    void shouldListTuningCheckpointsFromCompletedLocalLineage() {
+        GatewayAsyncResourceRepository gatewayAsyncResourceRepository = Mockito.mock(GatewayAsyncResourceRepository.class);
+        GatewayAsyncResourceService service = minimalAsyncResourceService(gatewayAsyncResourceRepository);
+        GatewayAsyncResourceEntity entity = tuningEntity(
+                "ftjob_1",
+                "succeeded",
+                """
+                        {
+                          "id":"ftjob_1",
+                          "object":"fine_tuning.job",
+                          "status":"succeeded",
+                          "fine_tuned_model":"ft:gpt-4o-mini:test:demo",
+                          "metrics":{"train_loss":0.25}
+                        }
+                        """,
+                """
+                        {
+                          "registered_model_name":"ft:gpt-4o-mini:test:demo",
+                          "events":[{"id":"evt_1","type":"created","status":"queued","at":1712894400}]
+                        }
+                        """);
+        Mockito.when(gatewayAsyncResourceRepository.findByResourceKeyAndResourceTypeAndDeletedFalse(
+                        "ftjob_1",
+                        GatewayAsyncResourceType.TUNING))
+                .thenReturn(Optional.of(entity));
+
+        JsonNode response = service.listTuningCheckpoints("ftjob_1", 1L, null, 20);
+
+        assertEquals("list", response.path("object").asText());
+        assertEquals("fine_tuning.job.checkpoint", response.path("data").get(0).path("object").asText());
+        assertEquals("ft:gpt-4o-mini:test:demo", response.path("data").get(0).path("fine_tuned_model_checkpoint").asText());
+        assertEquals("ftjob_1", response.path("data").get(0).path("fine_tuning_job_id").asText());
+        assertEquals(0, response.path("data").get(0).path("step_number").asInt());
+        assertEquals(0.25, response.path("data").get(0).path("metrics").path("train_loss").asDouble());
+        assertEquals(response.path("data").get(0).path("id").asText(), response.path("first_id").asText());
+        assertFalse(response.path("has_more").asBoolean());
+    }
+
+    @Test
+    void shouldReturnEmptyTuningCheckpointsWithoutCompletedModelEvidence() {
+        GatewayAsyncResourceRepository gatewayAsyncResourceRepository = Mockito.mock(GatewayAsyncResourceRepository.class);
+        GatewayAsyncResourceService service = minimalAsyncResourceService(gatewayAsyncResourceRepository);
+        GatewayAsyncResourceEntity entity = tuningEntity(
+                "ftjob_1",
+                "running",
+                "{\"id\":\"ftjob_1\",\"object\":\"fine_tuning.job\",\"status\":\"running\"}",
+                "{\"events\":[{\"id\":\"evt_1\",\"type\":\"created\",\"status\":\"queued\",\"at\":1712894400}]}");
+        Mockito.when(gatewayAsyncResourceRepository.findByResourceKeyAndResourceTypeAndDeletedFalse(
+                        "ftjob_1",
+                        GatewayAsyncResourceType.TUNING))
+                .thenReturn(Optional.of(entity));
+
+        JsonNode response = service.listTuningCheckpoints("ftjob_1", 1L, null, 20);
+
+        assertEquals("list", response.path("object").asText());
+        assertEquals(0, response.path("data").size());
+        assertFalse(response.path("has_more").asBoolean());
+    }
+
+    @Test
+    void shouldListOpenAiBatchesWithCursorEnvelope() {
+        GatewayAsyncResourceRepository gatewayAsyncResourceRepository = Mockito.mock(GatewayAsyncResourceRepository.class);
+        GatewayAsyncResourceService service = new GatewayAsyncResourceService(
+                gatewayAsyncResourceRepository,
+                Mockito.mock(DistributedKeyQueryService.class),
+                Mockito.mock(UpstreamCredentialRepository.class),
+                Mockito.mock(UpstreamSiteProfileRepository.class),
+                Mockito.mock(SiteCapabilitySnapshotRepository.class),
+                Mockito.mock(GatewayFileRepository.class),
+                Mockito.mock(GatewayFileBindingRepository.class),
+                Mockito.mock(CredentialCryptoService.class),
+                new SiteCapabilityTruthService(new UpstreamSitePolicyService(), Mockito.mock(SiteCapabilitySnapshotRepository.class)),
+                new ObjectMapper(),
+                Clock.fixed(Instant.parse("2026-04-12T04:00:00Z"), ZoneOffset.UTC),
+                WebClient.builder()
+        );
+        GatewayAsyncResourceEntity newest = batchEntity(
+                3L,
+                "batch_new",
+                "2026-04-12T04:03:00Z",
+                "{\"id\":\"batch_new\",\"object\":\"batch\",\"status\":\"completed\"}",
+                "{\"events\":[]}");
+        GatewayAsyncResourceEntity older = batchEntity(
+                2L,
+                "batch_old",
+                "2026-04-12T04:02:00Z",
+                "{\"id\":\"batch_old\",\"object\":\"batch\",\"status\":\"in_progress\"}",
+                "{\"events\":[]}");
+        GatewayAsyncResourceEntity oldest = batchEntity(
+                1L,
+                "batch_older",
+                "2026-04-12T04:01:00Z",
+                "{\"id\":\"batch_older\",\"object\":\"batch\",\"status\":\"validating\"}",
+                "{\"events\":[]}");
+
+        Mockito.when(gatewayAsyncResourceRepository.findStoredResourcesAfterCursorDesc(
+                        1L,
+                        GatewayAsyncResourceType.BATCH,
+                        "batch_",
+                        null,
+                        null,
+                        null,
+                        PageRequest.of(0, 2)))
+                .thenReturn(List.of(newest, older));
+        Mockito.when(gatewayAsyncResourceRepository.findByResourceKeyAndResourceTypeAndDistributedKeyIdAndDeletedFalse(
+                        "batch_new",
+                        GatewayAsyncResourceType.BATCH,
+                        1L))
+                .thenReturn(Optional.of(newest));
+        Mockito.when(gatewayAsyncResourceRepository.findStoredResourcesAfterCursorDesc(
+                        1L,
+                        GatewayAsyncResourceType.BATCH,
+                        "batch_",
+                        null,
+                        newest.getCreatedAt(),
+                        newest.getId(),
+                        PageRequest.of(0, 2)))
+                .thenReturn(List.of(older, oldest));
+
+        JsonNode firstPage = service.listBatches(1L, null, 1);
+        JsonNode secondPage = service.listBatches(1L, "batch_new", 1);
+
+        assertEquals("list", firstPage.path("object").asText());
+        assertEquals("batch_new", firstPage.path("first_id").asText());
+        assertEquals("batch_new", firstPage.path("last_id").asText());
+        assertEquals("batch_new", firstPage.path("data").get(0).path("id").asText());
+        assertTrue(firstPage.path("has_more").asBoolean());
+        assertEquals("batch_old", secondPage.path("data").get(0).path("id").asText());
+        assertTrue(secondPage.path("has_more").asBoolean());
+    }
+
+    private RouteSelectionResult openAiDirectResponseSelection() {
+        CatalogCandidateView candidate = new CatalogCandidateView(
+                101L,
+                "openai",
+                ProviderType.OPENAI_DIRECT,
+                1L,
+                ProviderFamily.OPENAI,
+                UpstreamSiteKind.OPENAI_DIRECT,
+                AuthStrategy.BEARER,
+                PathStrategy.OPENAI_V1,
+                ErrorSchemaStrategy.OPENAI_ERROR,
+                "https://api.openai.com",
+                "gpt-4.1",
+                "gpt-4.1",
+                List.of("openai"),
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                ReasoningTransport.OPENAI_CHAT,
+                InteropCapabilityLevel.NATIVE
+        );
+        RouteCandidateView routeCandidate = new RouteCandidateView(candidate, 11L, 10, 100);
+        return new RouteSelectionResult(
+                1L,
+                "sk-gw-test",
+                "writer-fast",
+                "writer-fast",
+                "gpt-4.1",
+                "openai",
+                "prefix",
+                "fingerprint",
+                "default",
+                RouteSelectionSource.WEIGHTED_HASH,
+                routeCandidate,
+                List.of(routeCandidate)
+        );
+    }
+
+    private GatewayAsyncResourceEntity upstreamResponseEntity() {
+        GatewayAsyncResourceEntity entity = new GatewayAsyncResourceEntity();
+        entity.setResourceKey("resp_local_1");
+        entity.setDistributedKeyId(1L);
+        entity.setResourceType(GatewayAsyncResourceType.RESPONSE);
+        entity.setStatus("in_progress");
+        entity.setUpstreamObjectId("resp_upstream_1");
+        entity.setRequestPayloadJson("{\"model\":\"writer-fast\",\"store\":true}");
+        entity.setResponsePayloadJson("{\"id\":\"resp_local_1\",\"object\":\"response\",\"status\":\"in_progress\"}");
+        entity.setMetadataJson("""
+                {"object_mode":"upstream_response_with_local_lineage","upstream_object_id":"resp_upstream_1","credential_id":101,"site_profile_id":1,"events":[]}
+                """);
+        return entity;
+    }
+
     private DistributedKeyView distributedKey(ProviderType providerType, Long credentialId, String baseUrl) {
         return new DistributedKeyView(
                 1L,
@@ -1492,6 +1858,60 @@ class GatewayAsyncResourceServiceTests {
         binding.setProviderType(ProviderType.GEMINI_DIRECT);
         binding.setExternalFileId(externalFileId);
         return binding;
+    }
+
+    private GatewayAsyncResourceEntity batchEntity(
+            Long id,
+            String resourceKey,
+            String createdAt,
+            String responsePayloadJson,
+            String metadataJson) {
+        GatewayAsyncResourceEntity entity = new GatewayAsyncResourceEntity();
+        ReflectionTestUtils.setField(entity, "id", id);
+        ReflectionTestUtils.setField(entity, "createdAt", Instant.parse(createdAt));
+        entity.setResourceKey(resourceKey);
+        entity.setDistributedKeyId(1L);
+        entity.setResourceType(GatewayAsyncResourceType.BATCH);
+        entity.setStatus("completed");
+        entity.setResponsePayloadJson(responsePayloadJson);
+        entity.setMetadataJson(metadataJson);
+        return entity;
+    }
+
+    private GatewayAsyncResourceService minimalAsyncResourceService(GatewayAsyncResourceRepository gatewayAsyncResourceRepository) {
+        SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        return new GatewayAsyncResourceService(
+                gatewayAsyncResourceRepository,
+                Mockito.mock(DistributedKeyQueryService.class),
+                Mockito.mock(UpstreamCredentialRepository.class),
+                Mockito.mock(UpstreamSiteProfileRepository.class),
+                snapshotRepository,
+                Mockito.mock(GatewayFileRepository.class),
+                Mockito.mock(GatewayFileBindingRepository.class),
+                Mockito.mock(CredentialCryptoService.class),
+                new SiteCapabilityTruthService(new UpstreamSitePolicyService(), snapshotRepository),
+                new ObjectMapper(),
+                Clock.fixed(Instant.parse("2026-04-12T04:00:00Z"), ZoneOffset.UTC),
+                WebClient.builder()
+        );
+    }
+
+    private GatewayAsyncResourceEntity tuningEntity(
+            String resourceKey,
+            String status,
+            String responsePayloadJson,
+            String metadataJson) {
+        GatewayAsyncResourceEntity entity = new GatewayAsyncResourceEntity();
+        ReflectionTestUtils.setField(entity, "id", 17L);
+        ReflectionTestUtils.setField(entity, "createdAt", Instant.parse("2026-04-12T04:00:00Z"));
+        ReflectionTestUtils.setField(entity, "updatedAt", Instant.parse("2026-04-12T04:05:00Z"));
+        entity.setResourceKey(resourceKey);
+        entity.setDistributedKeyId(1L);
+        entity.setResourceType(GatewayAsyncResourceType.TUNING);
+        entity.setStatus(status);
+        entity.setResponsePayloadJson(responsePayloadJson);
+        entity.setMetadataJson(metadataJson);
+        return entity;
     }
 
     private Client geminiClient(com.google.genai.Batches batchesFacade, com.google.genai.Tunings tuningsFacade) {

@@ -8,11 +8,11 @@
 
 ## 背景
 
-当前 Fine-tuning 只覆盖 create/list/get/cancel，缺 events、checkpoints、pause/resume、permissions、grader 相关能力和真实状态同步。
+当前 Fine-tuning 已覆盖 create/list/get/cancel，events/checkpoints 已由 `TASK-20260516-013` 以 gateway local lineage 方式补齐；仍缺 pause/resume、checkpoint permissions、grader/integrations 相关能力和真实上游事件/检查点同步。
 
 ## 目标
 
-- 补齐 fine-tuning jobs events/checkpoints/pause/resume/cancel。
+- 补齐 fine-tuning jobs pause/resume、checkpoint permissions 与 grader/integrations；events/checkpoints 本地 lineage 已由 `TASK-20260516-013` 完成。
 - 支持 checkpoint permissions 的 create/list/delete。
 - 校准 fine-tuning request 参数、method、hyperparameters、integrations、seed、suffix 等。
 - 和 Files、Models lifecycle 打通 lineage。
@@ -49,7 +49,7 @@
 
 ## 验收标准
 
-- Fine-tuning events/checkpoints 不再是 accepted exception。
+- Fine-tuning events/checkpoints 不再是 accepted exception，并已由 `TASK-20260516-013` 暴露本地 lineage list。
 - pause/resume/cancel 状态迁移可测试。
 - 真实 smoke 可在预算不足时 skipped，并记录原因。
 
@@ -64,3 +64,6 @@
 - [REQ-20260514-009](../../docs/requirements/REQ-20260514-009-openai-full-api-coverage-task-system.md)
 - [REP-20260514 OpenAI 全量覆盖任务拆解](../../docs/reports/REP-20260514-openai-full-api-coverage-task-breakdown.md)
 
+## 已完成切片
+
+- [TASK-20260516-013 OpenAI Fine-tuning Events/Checkpoints 本地 Lineage 列表](../done/TASK-20260516-013-openai-fine-tuning-events-checkpoints-local-lineage.md)：`GET /v1/fine_tuning/jobs/{jobId}/events` 与 `GET /v1/fine_tuning/jobs/{jobId}/checkpoints` 已返回当前 DistributedKey 下 gateway-tracked tuning job 的本地 lineage list。

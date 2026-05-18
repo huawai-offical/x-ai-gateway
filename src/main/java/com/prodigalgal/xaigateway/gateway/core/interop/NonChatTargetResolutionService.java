@@ -108,7 +108,8 @@ public class NonChatTargetResolutionService {
             case BATCH_GET, BATCH_CANCEL -> resolveAsyncTarget(distributedKeyId, pathParams.get("batchId"), GatewayAsyncResourceType.BATCH);
             case ANTHROPIC_MESSAGE_BATCH_GET, ANTHROPIC_MESSAGE_BATCH_CANCEL ->
                     resolveAsyncTarget(distributedKeyId, pathParams.get("messageBatchId"), GatewayAsyncResourceType.BATCH);
-            case TUNING_GET, TUNING_CANCEL -> resolveAsyncTarget(distributedKeyId, pathParams.get("jobId"), GatewayAsyncResourceType.TUNING);
+            case TUNING_GET, TUNING_CANCEL, TUNING_EVENTS_LIST, TUNING_CHECKPOINTS_LIST ->
+                    resolveAsyncTarget(distributedKeyId, pathParams.get("jobId"), GatewayAsyncResourceType.TUNING);
             default -> new NonChatTargetResolution(
                     RouteSelectionMode.STORED_LINEAGE,
                     null,

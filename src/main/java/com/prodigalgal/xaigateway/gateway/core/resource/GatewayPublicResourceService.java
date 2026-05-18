@@ -409,6 +409,9 @@ public class GatewayPublicResourceService {
     private GatewayAsyncResourceType toAsyncResourceType(String resourceType) {
         return switch (resourceType) {
             case "response", "responses" -> GatewayAsyncResourceType.RESPONSE;
+            case "vector_store", "vector_stores" -> GatewayAsyncResourceType.VECTOR_STORE;
+            case "vector_store_file", "vector_store_files" -> GatewayAsyncResourceType.VECTOR_STORE_FILE;
+            case "vector_store_file_batch", "vector_store_file_batches" -> GatewayAsyncResourceType.VECTOR_STORE_FILE_BATCH;
             case "upload", "uploads" -> GatewayAsyncResourceType.UPLOAD;
             case "batch", "batches" -> GatewayAsyncResourceType.BATCH;
             case "tuning", "tunings", "fine_tuning", "fine_tuning.jobs" -> GatewayAsyncResourceType.TUNING;

@@ -20,6 +20,7 @@ import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEvent;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEventType;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolCall;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalUsage;
+import com.prodigalgal.xaigateway.gateway.core.execution.GatewayOpenAiPassthroughService;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayToolCall;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayFinishReason;
 import com.prodigalgal.xaigateway.gateway.core.resource.GatewayAsyncResourceService;
@@ -44,13 +45,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webflux.test.autoconfigure.WebFluxTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Flux;
 
 @WebFluxTest(controllers = OpenAiResponsesController.class)
-@Import({PermitAllSecurityTestConfig.class, OpenAiResponsesRequestMapper.class, GatewayClientFamilyResolver.class})
+@Import({PermitAllSecurityTestConfig.class, OpenAiResponsesRequestMapper.class, OpenAiResponsesFileSearchBindingService.class, GatewayClientFamilyResolver.class})
 class OpenAiResponsesControllerTests {
 
     @Autowired
@@ -64,6 +67,9 @@ class OpenAiResponsesControllerTests {
 
     @MockitoBean
     private GatewayAsyncResourceService gatewayAsyncResourceService;
+
+    @MockitoBean
+    private GatewayOpenAiPassthroughService gatewayOpenAiPassthroughService;
 
     @MockitoBean
     private OpenAiIdempotencyReplayService openAiIdempotencyReplayService;
@@ -87,6 +93,20 @@ class OpenAiResponsesControllerTests {
                         Mockito.any(tools.jackson.databind.JsonNode.class)
                 ))
                 .thenAnswer(invocation -> invocation.getArgument(4));
+        Mockito.when(gatewayOpenAiPassthroughService.executeOpenAiDirectJson(
+                        Mockito.anyString(),
+                        Mockito.eq("/v1/responses/input_tokens"),
+                        Mockito.any(tools.jackson.databind.JsonNode.class),
+                        Mockito.<String>nullable(String.class)
+                ))
+                .thenThrow(new IllegalArgumentException("native input_tokens unavailable"));
+        Mockito.when(gatewayOpenAiPassthroughService.executeOpenAiDirectJson(
+                        Mockito.anyString(),
+                        Mockito.eq("/v1/responses/compact"),
+                        Mockito.any(tools.jackson.databind.JsonNode.class),
+                        Mockito.<String>nullable(String.class)
+                ))
+                .thenThrow(new IllegalArgumentException("native compact unavailable"));
     }
 
     @Test
@@ -135,6 +155,64 @@ class OpenAiResponsesControllerTests {
                 .jsonPath("$.output[1].type").isEqualTo("message")
                 .jsonPath("$.output[1].content[0].type").isEqualTo("output_text")
                 .jsonPath("$.usage.input_tokens_details.cached_tokens").isEqualTo(60);
+    }
+
+    @Test
+    void shouldReturnNativeRawResponsesJsonWhenAvailable() throws Exception {
+        Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<CanonicalRequest>argThat(request ->
+                        request != null
+                                && request.ingressProtocol() == CanonicalIngressProtocol.RESPONSES
+                                && "/v1/responses".equals(request.requestPath())
+                )))
+                .thenReturn(gatewayResponseRaw(
+                        "req-responses-raw-1",
+                        "raw text",
+                        objectMapper.readTree("""
+                                {
+                                  "id":"resp_native_raw_1",
+                                  "object":"response",
+                                  "status":"completed",
+                                  "model":"gpt-4.1-mini",
+                                  "output":[
+                                    {
+                                      "id":"msg_raw_1",
+                                      "type":"message",
+                                      "role":"assistant",
+                                      "content":[
+                                        {
+                                          "type":"output_text",
+                                          "text":"raw text",
+                                          "annotations":[{"type":"url_citation","url":"https://example.com"}]
+                                        }
+                                      ]
+                                    }
+                                  ],
+                                  "output_text":"raw text",
+                                  "incomplete_details":{"reason":"max_output_tokens"}
+                                }
+                                """)
+                ));
+
+        webTestClient.post()
+                .uri("/v1/responses")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "model":"writer-fast",
+                          "input":"hello raw"
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.id").isEqualTo("resp_native_raw_1")
+                .jsonPath("$.model").isEqualTo("writer-fast")
+                .jsonPath("$.output[0].content[0].annotations[0].type").isEqualTo("url_citation")
+                .jsonPath("$.incomplete_details.reason").isEqualTo("max_output_tokens")
+                .jsonPath("$.output_text").isEqualTo("raw text");
     }
 
     @Test
@@ -235,6 +313,150 @@ class OpenAiResponsesControllerTests {
                 .jsonPath("$.output[0].type").isEqualTo("function_call")
                 .jsonPath("$.output[0].name").isEqualTo("lookup_weather")
                 .jsonPath("$.output[0].arguments").isEqualTo("{\"city\":\"Shanghai\"}");
+    }
+
+    @Test
+    void shouldBindResponsesFileSearchToLocalVectorStoreContext() {
+        Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayAsyncResourceService.searchVectorStore(
+                Mockito.eq("vs_1"),
+                Mockito.eq(1L),
+                Mockito.argThat(request -> request.path("query").asText().contains("refund policy")
+                        && request.path("max_num_results").asInt() == 2)
+        )).thenReturn(fileSearchPage());
+        Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<CanonicalRequest>argThat(request ->
+                        request != null
+                                && request.tools().isEmpty()
+                                && request.providerExtensions().path("instructions").asText().contains("Local file_search context")
+                                && request.providerExtensions().path("instructions").asText().contains("refund policy allows quarterly credits")
+                                && !request.providerExtensions().toString().contains("\"type\":\"file_search\"")
+                )))
+                .thenReturn(gatewayResponse(
+                        "req-file-search-local-1",
+                        "退款政策允许季度抵扣。",
+                        GatewayUsage.empty(),
+                        List.of(),
+                        null,
+                        GatewayFinishReason.STOP
+                ));
+
+        webTestClient.post()
+                .uri("/v1/responses")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "model":"writer-fast",
+                          "input":"What is the refund policy?",
+                          "tools":[
+                            {
+                              "type":"file_search",
+                              "vector_store_ids":["vs_1"],
+                              "max_num_results":2
+                            }
+                          ]
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.output_text").isEqualTo("退款政策允许季度抵扣。");
+    }
+
+    @Test
+    void shouldRejectUnsupportedResponsesToolInsteadOfSilentlyDroppingIt() {
+        Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+
+        webTestClient.post()
+                .uri("/v1/responses")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "model":"writer-fast",
+                          "input":"请搜索最新公告",
+                          "tools":[
+                            {
+                              "type":"web_search_preview",
+                              "search_context_size":"low"
+                            }
+                          ]
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.error.type").isEqualTo("invalid_request_error")
+                .jsonPath("$.error.code").isEqualTo("invalid_argument")
+                .jsonPath("$.error.message").value(message ->
+                        org.junit.jupiter.api.Assertions.assertTrue(message.toString().contains("web_search_preview")));
+
+        Mockito.verifyNoInteractions(gatewayChatExecutionService);
+    }
+
+    @Test
+    void shouldRejectUnsupportedResponsesToolChoiceInsteadOfSilentlyDroppingIt() {
+        Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+
+        webTestClient.post()
+                .uri("/v1/responses")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "model":"writer-fast",
+                          "input":"调用 MCP 工具",
+                          "tool_choice":{
+                            "type":"mcp",
+                            "server_label":"deepwiki"
+                          }
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.error.type").isEqualTo("invalid_request_error")
+                .jsonPath("$.error.code").isEqualTo("invalid_argument")
+                .jsonPath("$.error.message").value(message ->
+                        org.junit.jupiter.api.Assertions.assertTrue(message.toString().contains("tool_choice type 'mcp'")));
+
+        Mockito.verifyNoInteractions(gatewayChatExecutionService);
+    }
+
+    @Test
+    void shouldRejectUnsupportedAllowedToolsChoiceInsteadOfSilentlyDroppingIt() {
+        Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+
+        webTestClient.post()
+                .uri("/v1/responses")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "model":"writer-fast",
+                          "input":"请执行代码",
+                          "tool_choice":{
+                            "type":"allowed_tools",
+                            "mode":"required",
+                            "tools":[
+                              {"type":"code_interpreter"}
+                            ]
+                          }
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.error.type").isEqualTo("invalid_request_error")
+                .jsonPath("$.error.code").isEqualTo("invalid_argument")
+                .jsonPath("$.error.message").value(message ->
+                        org.junit.jupiter.api.Assertions.assertTrue(message.toString().contains("code_interpreter")));
+
+        Mockito.verifyNoInteractions(gatewayChatExecutionService);
     }
 
     @Test
@@ -450,6 +672,56 @@ class OpenAiResponsesControllerTests {
     }
 
     @Test
+    void shouldPassThroughNativeRawResponsesSseWhenRuntimeProvidesRawEvents() {
+        Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayChatExecutionService.executeGatewayStream(Mockito.<CanonicalRequest>argThat(request ->
+                        request != null
+                                && request.ingressProtocol() == CanonicalIngressProtocol.RESPONSES
+                                && "/v1/responses".equals(request.requestPath())
+                                && "writer-fast".equals(request.requestedModel())
+                )))
+                .thenReturn(new CanonicalExecutionStreamResult(
+                        "req-responses-native-raw-stream-1",
+                        selectionResult(),
+                        plan(),
+                        Flux.just(
+                                CanonicalStreamEvent.rawSse("event: response.created\n"),
+                                CanonicalStreamEvent.rawSse("data: {\"type\":\"response.created\",\"sequence_number\":42,\"x_raw\":true}\n"),
+                                CanonicalStreamEvent.rawSse("\n"),
+                                CanonicalStreamEvent.rawSse("event: response.output_text.delta\n"),
+                                CanonicalStreamEvent.rawSse("data: {\"type\":\"response.output_text.delta\",\"sequence_number\":43,\"delta\":\"hi\",\"obfuscation\":\"raw-obf\",\"unknown\":{\"kept\":true}}\n"),
+                                CanonicalStreamEvent.rawSse("\n")
+                        )
+                ));
+
+        var result = webTestClient.post()
+                .uri("/v1/responses")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "model":"writer-fast",
+                          "input":"hello",
+                          "stream":true
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM)
+                .returnResult(String.class);
+
+        var body = result.getResponseBody().collectList().block();
+        assert body != null;
+        String joined = String.join("", body);
+        org.junit.jupiter.api.Assertions.assertTrue(joined.contains("\"sequence_number\":42"));
+        org.junit.jupiter.api.Assertions.assertTrue(joined.contains("\"obfuscation\":\"raw-obf\""));
+        org.junit.jupiter.api.Assertions.assertTrue(joined.contains("\"unknown\":{\"kept\":true}"));
+        org.junit.jupiter.api.Assertions.assertFalse(joined.contains("\"sequence_number\":0"));
+        org.junit.jupiter.api.Assertions.assertFalse(joined.contains("response.output_item.added"));
+    }
+
+    @Test
     void shouldStreamResponsesEvents() throws Exception {
         Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
@@ -496,10 +768,54 @@ class OpenAiResponsesControllerTests {
         for (int index = 0; index < events.size(); index++) {
             org.junit.jupiter.api.Assertions.assertEquals(index, events.get(index).path("sequence_number").asInt());
         }
+        assertObfuscationEnabled(firstEvent(events, "response.output_text.delta"));
     }
 
     @Test
-    void shouldStreamResponsesReasoningEvents() {
+    void shouldDisableResponsesStreamObfuscationWhenRequestedFalse() throws Exception {
+        Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayChatExecutionService.executeGatewayStream(Mockito.<CanonicalRequest>argThat(request ->
+                        request != null
+                                && request.ingressProtocol() == CanonicalIngressProtocol.RESPONSES
+                                && "/v1/responses".equals(request.requestPath())
+                                && "writer-fast".equals(request.requestedModel())
+                )))
+                .thenReturn(new CanonicalExecutionStreamResult(
+                        "req-responses-stream-obfuscation-off-1",
+                        selectionResult(),
+                        plan(),
+                        Flux.just(
+                                textEvent("hello"),
+                                completedEvent(GatewayFinishReason.STOP, "hello", null, GatewayUsage.empty())
+                        )
+                ));
+
+        var result = webTestClient.post()
+                .uri("/v1/responses")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "model":"writer-fast",
+                          "input":"hello",
+                          "stream":true,
+                          "stream_options":{"include_obfuscation":false}
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM)
+                .returnResult(String.class);
+
+        var body = result.getResponseBody().collectList().block();
+        assert body != null;
+        JsonNode deltaEvent = firstEvent(dataEvents(body), "response.output_text.delta");
+        org.junit.jupiter.api.Assertions.assertNull(deltaEvent.get("obfuscation"));
+    }
+
+    @Test
+    void shouldStreamResponsesReasoningEvents() throws Exception {
         Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
         Mockito.when(gatewayChatExecutionService.executeGatewayStream(Mockito.<CanonicalRequest>argThat(request ->
@@ -540,10 +856,11 @@ class OpenAiResponsesControllerTests {
         org.junit.jupiter.api.Assertions.assertTrue(joined.contains("event: response.reasoning_summary_text.delta"));
         org.junit.jupiter.api.Assertions.assertTrue(joined.contains("event: response.reasoning_summary_text.done"));
         org.junit.jupiter.api.Assertions.assertTrue(joined.contains("\"text\":\"step 1\""));
+        assertObfuscationEnabled(firstEvent(dataEvents(body), "response.reasoning_summary_text.delta"));
     }
 
     @Test
-    void shouldStreamResponsesFunctionCallEvents() {
+    void shouldStreamResponsesFunctionCallEvents() throws Exception {
         Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
         Mockito.when(gatewayChatExecutionService.executeGatewayStream(Mockito.<CanonicalRequest>argThat(request ->
@@ -598,25 +915,74 @@ class OpenAiResponsesControllerTests {
         org.junit.jupiter.api.Assertions.assertTrue(joined.contains("event: response.function_call_arguments.done"));
         org.junit.jupiter.api.Assertions.assertTrue(joined.contains("\"name\":\"lookup_weather\""));
         org.junit.jupiter.api.Assertions.assertTrue(joined.contains("{\\\"city\\\":\\\"Shanghai\\\"}"));
+        assertObfuscationEnabled(firstEvent(dataEvents(body), "response.function_call_arguments.delta"));
     }
 
     @Test
     void shouldGetStoredResponse() {
         Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayAsyncResourceService.getResponse("resp_stored_1", 1L))
+        Mockito.when(gatewayAsyncResourceService.getResponse("resp_stored_1", 1L, List.of("reasoning.encrypted_content")))
                 .thenReturn(new ObjectMapper().createObjectNode()
                         .put("id", "resp_stored_1")
                         .put("object", "response")
                         .put("status", "completed"));
 
         webTestClient.get()
-                .uri("/v1/responses/resp_stored_1")
+                .uri("/v1/responses/resp_stored_1?include=reasoning.encrypted_content")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.id").isEqualTo("resp_stored_1")
+                .jsonPath("$.status").isEqualTo("completed");
+    }
+
+    @Test
+    void shouldNotPassthroughUntrackedRemoteResponseWithoutRouteHint() {
+        Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayAsyncResourceService.getResponse("resp_remote_1", 1L, null))
+                .thenThrow(new IllegalArgumentException("未找到指定的异步资源对象。"));
+
+        webTestClient.get()
+                .uri("/v1/responses/resp_remote_1")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.error.type").isEqualTo("invalid_request_error")
+                .jsonPath("$.error.message").isEqualTo("未找到指定的异步资源对象。");
+
+        Mockito.verifyNoMoreInteractions(gatewayOpenAiPassthroughService);
+    }
+
+    @Test
+    void shouldRetrieveUntrackedRemoteResponseWithModelRouteHint() {
+        Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayAsyncResourceService.getResponse(
+                        "resp_remote_1",
+                        1L,
+                        List.of("reasoning.encrypted_content")))
+                .thenThrow(new IllegalArgumentException("未找到指定的异步资源对象。"));
+        Mockito.when(gatewayOpenAiPassthroughService.executeOpenAiDirectLifecycleJson(
+                        "sk-gw-test",
+                        "GET",
+                        "/v1/responses/resp_remote_1?include=reasoning.encrypted_content",
+                        "gpt-4o-mini"))
+                .thenReturn(ResponseEntity.ok(objectMapper.createObjectNode()
+                        .put("id", "resp_remote_1")
+                        .put("object", "response")
+                        .put("status", "completed")));
+
+        webTestClient.get()
+                .uri("/v1/responses/resp_remote_1?model=gpt-4o-mini&include=reasoning.encrypted_content")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.id").isEqualTo("resp_remote_1")
                 .jsonPath("$.status").isEqualTo("completed");
     }
 
@@ -641,6 +1007,35 @@ class OpenAiResponsesControllerTests {
     }
 
     @Test
+    void shouldDeleteUntrackedRemoteResponseWithHeaderRouteHintAndPreserveUpstreamError() {
+        Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayAsyncResourceService.deleteResponse("resp_missing_remote", 1L))
+                .thenThrow(new IllegalArgumentException("未找到指定的异步资源对象。"));
+        var error = objectMapper.createObjectNode();
+        error.putObject("error")
+                .put("type", "invalid_request_error")
+                .put("code", "response_not_found")
+                .put("message", "No response found");
+        Mockito.when(gatewayOpenAiPassthroughService.executeOpenAiDirectLifecycleJson(
+                        "sk-gw-test",
+                        "DELETE",
+                        "/v1/responses/resp_missing_remote",
+                        "gpt-4.1-mini"))
+                .thenReturn(ResponseEntity.status(HttpStatus.NOT_FOUND).body(error));
+
+        webTestClient.delete()
+                .uri("/v1/responses/resp_missing_remote")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .header("X-AI-Gateway-OpenAI-Model", "gpt-4.1-mini")
+                .exchange()
+                .expectStatus().isNotFound()
+                .expectBody()
+                .jsonPath("$.error.code").isEqualTo("response_not_found")
+                .jsonPath("$.error.message").isEqualTo("No response found");
+    }
+
+    @Test
     void shouldCancelStoredResponse() {
         Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
@@ -661,6 +1056,31 @@ class OpenAiResponsesControllerTests {
     }
 
     @Test
+    void shouldCancelUntrackedRemoteResponseWithRouteHint() {
+        Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayAsyncResourceService.cancelResponse("resp_remote_background", 1L))
+                .thenThrow(new IllegalArgumentException("未找到指定的异步资源对象。"));
+        Mockito.when(gatewayOpenAiPassthroughService.executeOpenAiDirectLifecycleJson(
+                        "sk-gw-test",
+                        "POST",
+                        "/v1/responses/resp_remote_background/cancel",
+                        "gpt-4o-mini"))
+                .thenReturn(ResponseEntity.ok(objectMapper.createObjectNode()
+                        .put("id", "resp_remote_background")
+                        .put("object", "response")
+                        .put("status", "cancelled")));
+
+        webTestClient.post()
+                .uri("/v1/responses/resp_remote_background/cancel?model=gpt-4o-mini")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.status").isEqualTo("cancelled");
+    }
+
+    @Test
     void shouldListResponseInputItems() {
         Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
@@ -675,11 +1095,17 @@ class OpenAiResponsesControllerTests {
         list.put("has_more", false);
         list.put("first_id", "msg_resp_stored_1_0");
         list.put("last_id", "msg_resp_stored_1_0");
-        Mockito.when(gatewayAsyncResourceService.listResponseInputItems("resp_stored_1", 1L, null, 20, "asc"))
+        Mockito.when(gatewayAsyncResourceService.listResponseInputItems(
+                        "resp_stored_1",
+                        1L,
+                        null,
+                        List.of("message.input_image.image_url", "file_search_call.results"),
+                        20,
+                        "asc"))
                 .thenReturn(list);
 
         webTestClient.get()
-                .uri("/v1/responses/resp_stored_1/input_items?limit=20&order=asc")
+                .uri("/v1/responses/resp_stored_1/input_items?limit=20&order=asc&include=message.input_image.image_url&include=file_search_call.results")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
                 .exchange()
                 .expectStatus().isOk()
@@ -687,6 +1113,261 @@ class OpenAiResponsesControllerTests {
                 .jsonPath("$.object").isEqualTo("list")
                 .jsonPath("$.data[0].id").isEqualTo("msg_resp_stored_1_0")
                 .jsonPath("$.has_more").isEqualTo(false);
+    }
+
+    @Test
+    void shouldListUntrackedRemoteResponseInputItemsWithRouteHintAndQuery() {
+        Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayAsyncResourceService.listResponseInputItems(
+                        "resp_remote_2",
+                        1L,
+                        "msg_1",
+                        List.of("file_search_call.results", "message.input_image.image_url"),
+                        10,
+                        "desc"))
+                .thenThrow(new IllegalArgumentException("未找到指定的异步资源对象。"));
+        var data = objectMapper.createArrayNode();
+        data.add(objectMapper.createObjectNode().put("id", "msg_2").put("type", "message"));
+        var list = objectMapper.createObjectNode();
+        list.put("object", "list");
+        list.set("data", data);
+        list.put("has_more", false);
+        Mockito.when(gatewayOpenAiPassthroughService.executeOpenAiDirectLifecycleJson(
+                        "sk-gw-test",
+                        "GET",
+                        "/v1/responses/resp_remote_2/input_items?include=file_search_call.results&include=message.input_image.image_url&after=msg_1&limit=10&order=desc",
+                        "gpt-4o-mini"))
+                .thenReturn(ResponseEntity.ok(list));
+
+        webTestClient.get()
+                .uri("/v1/responses/resp_remote_2/input_items?model=gpt-4o-mini&include=file_search_call.results&include=message.input_image.image_url&after=msg_1&limit=10&order=desc")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.data[0].id").isEqualTo("msg_2")
+                .jsonPath("$.has_more").isEqualTo(false);
+    }
+
+    @Test
+    void shouldCountResponseInputTokensWithStableLocalEstimate() throws Exception {
+        Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+
+        JsonNode shortResult = readJson(webTestClient.post()
+                .uri("/v1/responses/input_tokens")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "model":"writer-fast",
+                          "input":"hello"
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .returnResult()
+                .getResponseBody());
+        JsonNode longResult = readJson(webTestClient.post()
+                .uri("/v1/responses/input_tokens")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "model":"writer-fast",
+                          "instructions":"You are concise.",
+                          "input":"hello, please write a longer answer with extra context"
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .returnResult()
+                .getResponseBody());
+
+        org.junit.jupiter.api.Assertions.assertEquals("response.input_tokens", shortResult.path("object").asText());
+        org.junit.jupiter.api.Assertions.assertTrue(shortResult.path("input_tokens").asInt() > 0);
+        org.junit.jupiter.api.Assertions.assertTrue(longResult.path("input_tokens").asInt() >= shortResult.path("input_tokens").asInt());
+    }
+
+    @Test
+    void shouldUseNativeInputTokensWhenOpenAiDirectPassthroughIsAvailable() {
+        Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayOpenAiPassthroughService.executeOpenAiDirectJson(
+                        Mockito.eq("sk-gw-test"),
+                        Mockito.eq("/v1/responses/input_tokens"),
+                        Mockito.any(tools.jackson.databind.JsonNode.class),
+                        Mockito.<String>nullable(String.class)
+                ))
+                .thenReturn(ResponseEntity.ok(new ObjectMapper().createObjectNode()
+                        .put("object", "response.input_tokens")
+                        .put("input_tokens", 17)));
+
+        webTestClient.post()
+                .uri("/v1/responses/input_tokens")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "model":"writer-fast",
+                          "input":"hello"
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.object").isEqualTo("response.input_tokens")
+                .jsonPath("$.input_tokens").isEqualTo(17);
+    }
+
+    @Test
+    void shouldPreserveNativeInputTokensUpstreamErrorStatus() {
+        Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        var error = new ObjectMapper().createObjectNode();
+        error.putObject("error")
+                .put("type", "invalid_request_error")
+                .put("code", "invalid_model")
+                .put("message", "Unknown model");
+        Mockito.when(gatewayOpenAiPassthroughService.executeOpenAiDirectJson(
+                        Mockito.eq("sk-gw-test"),
+                        Mockito.eq("/v1/responses/input_tokens"),
+                        Mockito.any(tools.jackson.databind.JsonNode.class),
+                        Mockito.<String>nullable(String.class)
+                ))
+                .thenReturn(ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error));
+
+        webTestClient.post()
+                .uri("/v1/responses/input_tokens")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "model":"missing-model",
+                          "input":"hello"
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.error.code").isEqualTo("invalid_model")
+                .jsonPath("$.error.message").isEqualTo("Unknown model");
+    }
+
+    @Test
+    void shouldUseNativeCompactWhenOpenAiDirectPassthroughIsAvailable() throws Exception {
+        Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayOpenAiPassthroughService.executeOpenAiDirectJson(
+                        Mockito.eq("sk-gw-test"),
+                        Mockito.eq("/v1/responses/compact"),
+                        Mockito.any(tools.jackson.databind.JsonNode.class),
+                        Mockito.<String>nullable(String.class)
+                ))
+                .thenReturn(ResponseEntity.ok(objectMapper.readTree("""
+                        {
+                          "id":"resp_compact_native_1",
+                          "object":"response.compaction",
+                          "created_at":1764967971,
+                          "output":[
+                            {
+                              "id":"cmp_native_1",
+                              "type":"compaction",
+                              "encrypted_content":"gAAAAABnative"
+                            }
+                          ],
+                          "usage":{"input_tokens":139,"output_tokens":438,"total_tokens":577}
+                        }
+                        """)));
+
+        webTestClient.post()
+                .uri("/v1/responses/compact")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "model":"writer-fast",
+                          "input":"hello compact"
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.id").isEqualTo("resp_compact_native_1")
+                .jsonPath("$.object").isEqualTo("response.compaction")
+                .jsonPath("$.output[0].type").isEqualTo("compaction")
+                .jsonPath("$.output[0].encrypted_content").isEqualTo("gAAAAABnative")
+                .jsonPath("$.usage.total_tokens").isEqualTo(577);
+    }
+
+    @Test
+    void shouldPreserveNativeCompactUpstreamErrorStatus() {
+        Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        var error = new ObjectMapper().createObjectNode();
+        error.putObject("error")
+                .put("type", "invalid_request_error")
+                .put("code", "invalid_model")
+                .put("message", "Unknown model");
+        Mockito.when(gatewayOpenAiPassthroughService.executeOpenAiDirectJson(
+                        Mockito.eq("sk-gw-test"),
+                        Mockito.eq("/v1/responses/compact"),
+                        Mockito.any(tools.jackson.databind.JsonNode.class),
+                        Mockito.<String>nullable(String.class)
+                ))
+                .thenReturn(ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error));
+
+        webTestClient.post()
+                .uri("/v1/responses/compact")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "model":"missing-model",
+                          "input":"hello"
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.error.code").isEqualTo("invalid_model")
+                .jsonPath("$.error.message").isEqualTo("Unknown model");
+    }
+
+    @Test
+    void shouldCompactResponsesWithLocalCompactionShape() {
+        Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+
+        webTestClient.post()
+                .uri("/v1/responses/compact")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "model":"writer-fast",
+                          "input":[
+                            {
+                              "role":"user",
+                              "content":"Summarize our launch checklist."
+                            }
+                          ]
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.object").isEqualTo("response.compaction")
+                .jsonPath("$.id").exists()
+                .jsonPath("$.created_at").exists()
+                .jsonPath("$.output[0].role").isEqualTo("user")
+                .jsonPath("$.output[1].type").isEqualTo("compaction")
+                .jsonPath("$.output[1].encrypted_content").exists()
+                .jsonPath("$.usage.input_tokens").isNumber()
+                .jsonPath("$.usage.total_tokens").isNumber();
     }
 
     @Test
@@ -770,6 +1451,24 @@ class OpenAiResponsesControllerTests {
                         toCanonicalToolCalls(toolCalls),
                         toCanonicalUsage(usage),
                         finishReason
+                )
+        );
+    }
+
+    private CanonicalExecutionResult gatewayResponseRaw(String requestId, String text, JsonNode rawResponse) {
+        return new CanonicalExecutionResult(
+                requestId,
+                selectionResult(),
+                plan(),
+                new CanonicalResponse(
+                        requestId,
+                        selectionResult().publicModel(),
+                        text,
+                        null,
+                        List.of(),
+                        CanonicalUsage.empty(),
+                        GatewayFinishReason.STOP,
+                        rawResponse
                 )
         );
     }
@@ -865,6 +1564,40 @@ class OpenAiResponsesControllerTests {
             }
         }
         return events;
+    }
+
+    private JsonNode readJson(String body) throws Exception {
+        return objectMapper.readTree(body);
+    }
+
+    private JsonNode fileSearchPage() {
+        var page = objectMapper.createObjectNode();
+        page.put("object", "vector_store.search_results.page");
+        page.putArray("data")
+                .addObject()
+                .put("file_id", "file_finance")
+                .put("filename", "finance.txt")
+                .put("score", 1.0d)
+                .putArray("content")
+                .addObject()
+                .put("type", "text")
+                .put("text", "The refund policy allows quarterly credits.");
+        page.put("has_more", false);
+        page.putNull("next_page");
+        return page;
+    }
+
+    private JsonNode firstEvent(List<JsonNode> events, String type) {
+        return events.stream()
+                .filter(event -> type.equals(event.path("type").asText()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("未找到 SSE data event: " + type));
+    }
+
+    private void assertObfuscationEnabled(JsonNode event) {
+        JsonNode obfuscation = event.get("obfuscation");
+        org.junit.jupiter.api.Assertions.assertNotNull(obfuscation);
+        org.junit.jupiter.api.Assertions.assertFalse(obfuscation.asText("").isBlank());
     }
 
     private List<CanonicalToolCall> toCanonicalToolCalls(List<GatewayToolCall> toolCalls) {

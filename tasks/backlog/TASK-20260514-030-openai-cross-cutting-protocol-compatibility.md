@@ -70,10 +70,12 @@
 - [TASK-20260515-013 OpenAI Webhook Signature 与 Replay 防护基线](../done/TASK-20260515-013-openai-webhook-signature-replay-baseline.md)：按 Standard Webhooks 形态校验 `webhook-id`、`webhook-timestamp`、`webhook-signature`，支持 `whsec_` 与 raw secret，并用 `RateLimitStore` 提供 24 小时 replay marker。
 - [TASK-20260515-014 OpenAI Streaming Event Usage 与 Sequence 基线](../done/TASK-20260515-014-openai-streaming-event-usage-sequence-baseline.md)：Chat stream 支持 `stream_options.include_usage` usage chunk 并稳定 chunk id/created，Responses stream event 增加本地递增 `sequence_number`。
 - [TASK-20260515-015 OpenAI Protocol Path Matcher 覆盖防遗漏基线](../done/TASK-20260515-015-openai-protocol-path-matcher-coverage-baseline.md)：提取 `OpenAiProtocolPathMatcher` 并增加 OpenAI/non-OpenAI path matrix，防止新增 endpoint 漏掉 OpenAI-style error envelope 和 429 headers。
+- [TASK-20260516-004 OpenAI Stored Chat 数据库游标分页与过滤硬化](../done/TASK-20260516-004-openai-stored-chat-db-pagination-filter-hardening.md)：stored Chat list 已从固定 scan window 改为数据库游标分页，使用 `createdAt + id` 稳定排序，并保留 OpenAI list envelope 与 metadata 精确过滤。
+- [TASK-20260516-008 OpenAI Realtime WebSocket 入口与事件代理基线](../done/TASK-20260516-008-openai-realtime-websocket-ingress-event-proxy.md)：`/v1/realtime?model=...` 已提供 WebSocket handler，复用 Distributed Key 鉴权与 `openai_realtime` Live Session，输出 `session.created/session.updated/error` 等 OpenAI-style 事件基线，并把客户端 JSON event 转发到 Live Session 事件流。
 
 ## 剩余切片
 
-- Realtime WebSocket event 代理与 Responses 原生上游 SSE 透明转发仍待按独立子任务继续闭环。
+- WebRTC、SIP、Realtime calls、Realtime translation/transcription session、真实上游二进制音频帧透传仍需按 OpenAI 资源族任务继续拆分；不再归入本横切基线的默认完成范围。
 - 新增 OpenAI endpoint 时需要同步更新 `OpenAiProtocolPathMatcherTests` 的 path matrix。
 
 ## 关联文档

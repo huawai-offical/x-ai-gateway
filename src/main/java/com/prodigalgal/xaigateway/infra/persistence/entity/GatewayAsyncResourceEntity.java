@@ -26,7 +26,8 @@ import java.time.Instant;
         indexes = {
                 @Index(name = "idx_gateway_async_resource_scope", columnList = "distributed_key_id,resource_type,created_at"),
                 @Index(name = "idx_gateway_async_resource_status_created", columnList = "status,created_at"),
-                @Index(name = "idx_gateway_async_resource_upstream_object", columnList = "distributed_key_id,resource_type,upstream_object_id")
+                @Index(name = "idx_gateway_async_resource_upstream_object", columnList = "distributed_key_id,resource_type,upstream_object_id"),
+                @Index(name = "idx_gateway_async_resource_chat_list", columnList = "distributed_key_id,resource_type,resource_key,request_model,created_at,id")
         }
 )
 @Comment("网关异步资源与会话对象表。")

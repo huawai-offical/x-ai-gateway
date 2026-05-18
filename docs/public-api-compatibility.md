@@ -28,6 +28,8 @@ GET /public/docs/openapi.json
 - `pricingMetadata`
 - `unsupportedFeatures`
 
+OpenAI Direct preset 使用 `openai-native` / `native-first` 口径：Chat、Responses、Conversations local lineage、Webhooks ingress event persistence、Files、Uploads、Batches create/get/cancel/list、Models list/get、gateway-registered fine-tuned model delete、Fine-tuning 基础面、Fine-tuning events/checkpoints 本地 lineage、Vector Stores local lifecycle / file attachment / file content read / local text search / file batch、Responses file_search 本地 Vector Store 绑定、Realtime client secret 与 Realtime WebSocket ingress 已分批闭环，但它不再声明官方 API 全量覆盖。`unsupportedFeatures` 会明确列出 Vector Stores real vector ingestion/semantic search/hosted file_search_call lifecycle、Fine-tuning pause/resume/checkpoint permissions/graders、Models upstream owner-role delete passthrough、Containers/Code Interpreter、Evals/Graders/Runs、Administration API 以及 Realtime full calls/WebRTC/SIP/translation/transcription 等未完成边界。`GET /v1/batches` 当前返回经本 gateway 创建并持久化的 Batch lineage 本地列表，不主动同步上游组织内所有历史 Batch；`DELETE /v1/models/{model}` 当前只删除经本 gateway fine-tuning/import 登记并归属当前 Distributed Key 的本地 fine-tuned model registry，不删除公共模型，也不主动调用上游组织级 Owner 删除；`GET /v1/fine_tuning/jobs/{jobId}/events` 与 `GET /v1/fine_tuning/jobs/{jobId}/checkpoints` 当前返回当前 Distributed Key 下 gateway-tracked tuning job 的本地 lineage，不声明同步上游完整事件历史或 checkpoint permissions。
+
 ## OpenAI-compatible 示例
 
 ```powershell
@@ -76,7 +78,21 @@ Advanced JavaScript 示例位于 [chat-advanced-parameters.mjs](sdk-examples/jav
 - Chat Completions stream 使用 `chat.completion.chunk`，同一次 stream 内本地编码的 chunk 会保持同一个 `id` 与 `created`。
 - 当请求设置 `stream_options.include_usage=true` 时，系统会在 `data: [DONE]` 前输出一个 `choices=[]` 且带 `usage` 的 chunk；如果 canonical completed event 没有 usage，则不会伪造 token 数。
 - Responses stream 使用语义化 SSE event，payload 会携带从 0 开始本地递增的 `sequence_number`，用于客户端按序处理 `response.created`、`response.output_text.delta`、`response.completed` 等事件。
-- 当前 `sequence_number` 是 gateway 本地编码顺序，不代表 OpenAI 上游原始 SSE 序号；完整 Realtime WebSocket 事件代理仍以 provider capability matrix 和后续 Realtime 任务为准。
+- Responses stream delta events 默认包含非空 `obfuscation` 字段；当请求设置 `stream_options.include_obfuscation=false` 时，`response.output_text.delta`、`response.reasoning_summary_text.delta` 与 `response.function_call_arguments.delta` 不输出该字段。
+- 当前 `sequence_number` 是 gateway 本地编码顺序，不代表 OpenAI 上游原始 SSE 序号；Realtime WebSocket 入口见下一节，真实上游二进制音频帧透传仍以后续 Realtime smoke 为准。
+
+## OpenAI Realtime WebSocket
+
+`/v1/realtime?model=...` 已提供 OpenAI-compatible WebSocket 入口，面向 server-to-server 或受控客户端代理场景。连接要求：
+
+- 使用 `Authorization: Bearer <x-ai-gateway-key>` 完成 Distributed Key 鉴权。
+- `model` query 参数为空时默认使用 `gpt-realtime`。
+- 握手成功后创建并 connect `openai_realtime` Live Session，首个 outbound JSON event 为 `session.created`。
+- 客户端发送 JSON text events；`type` 会作为 runtime event type，原始 payload 会写入 Live Session 事件流。
+- `session.update` 会返回 `session.updated`，非法 JSON、缺失 `type` 或非文本帧会返回 OpenAI-style `error` event。
+- `input_audio_buffer.append` 会从 `audio` 或 `delta` base64 字段估算 `audioBytes`，用于本地观测和 conformance。
+
+当前边界：本入口不在本地生成真实模型音频/文本输出，不实现 WebRTC/SIP/Realtime calls，也不直接拨号 OpenAI 上游 WebSocket；真实 provider 网络拨号、二进制帧透传和完整 server event 语义仍需后续任务继续推进。
 
 ## OpenAI Idempotency-Key
 
@@ -88,13 +104,52 @@ Advanced JavaScript 示例位于 [chat-advanced-parameters.mjs](sdk-examples/jav
 
 `GET /v1/chat/completions` 与 `GET /v1/chat/completions/{completionId}/messages` 使用 OpenAI-compatible list envelope：`object: "list"`、`data`、`has_more`，非空页会返回 `first_id` 与 `last_id`。分页参数为 `after`、`limit` 和 `order`；`limit` 默认 20，合法范围 1 到 100；`order` 仅支持 `asc` 或 `desc`，默认 `asc`。Chat Completion list 额外支持 `model` 与 `metadata[key]` 过滤。
 
-## OpenAI Responses 本地生命周期
+Stored Chat Completion list 已使用专用数据库游标查询下推 `distributedKeyId`、`resourceType`、`chatcmpl_` resource key 前缀、`requestModel`、`createdAt/id` cursor 与排序；`metadata[key]` 继续在候选批次上做 JSON 精确过滤，并会跨批次扫描直到凑满当前页或数据库无更多候选，避免固定 scan window 导致窗口外匹配项漏页。
+
+## OpenAI Responses 生命周期
 
 Stored Responses 支持 `GET /v1/responses/{responseId}`、`DELETE /v1/responses/{responseId}`、`POST /v1/responses/{responseId}/cancel` 与 `GET /v1/responses/{responseId}/input_items`。
 
 - `cancel` 仅对 `background=true` 且未进入终态的本地 stored Response 生效，成功后返回 `object=response`、`status=cancelled` 并记录 `cancelled_at`。
 - `input_items` 从创建 Response 时的原始 `input` 生成 OpenAI-compatible list envelope，支持 `after`、`limit`、`order`，默认 `limit=20`、`order=desc`，`limit` 范围为 1 到 100。
+- OpenAI Direct native create + `store=true` 会为本地 `resp_...` 记录上游 Response id、credential 与 site profile lineage；后续 retrieve/delete/cancel/input_items 会用原凭证同步真实上游对象，再把返回对象 id 重写为本地 id。
+- 如果客户端只持有未知远端 `resp_...` id 且本地没有 lineage，retrieve/delete/cancel/input_items 只有在提供 `model` query 或 `X-AI-Gateway-OpenAI-Model` header 时才会走 OpenAI Direct route-hint passthrough；无 hint 时保持本地 not found，不猜测 credential。
+- retrieve 与 input_items 已接收 OpenAI Responses `include` query 参数；本地 stored baseline 对 `include` 做 no-op acceptance，带 OpenAI Direct upstream lineage 或显式 route hint 的对象会原样转发 `include` 到上游。
+- Responses tools 当前执行 `function` tools；`file_search` 可校验当前 Distributed Key 下的本地 `vector_store_ids`，复用本地 Vector Store Search 结果注入上下文，并移除 hosted tool，避免本地 `vs_...` 透传给上游。`web_search_preview`、`mcp`、`custom`、`computer_use_preview`、`code_interpreter`、`image_generation`、`shell`、`apply_patch` 等其它非 function tools 会返回 OpenAI-style `invalid_request_error`，不会再被静默跳过。详细矩阵见 [openai-responses-tools-compatibility.md](openai-responses-tools-compatibility.md)。
+- `POST /v1/responses/input_tokens` 在 OpenAI Direct native route 可用时优先转发到上游并保留上游 HTTP 状态；route 不可用或不是 OpenAI Direct 时返回本地 deterministic token estimate。只有本地 estimate 用于兼容和预估，不作为 OpenAI 官方 tokenizer 或账单精确依据。
+- `POST /v1/responses/compact` 在 OpenAI Direct native route 可用时优先转发到上游并保留上游 HTTP 状态；route 不可用或不是 OpenAI Direct 时返回本地 emulation，使用 opaque compaction marker 表示本地兼容结果。本地 marker 不等价于 OpenAI 官方 encrypted compaction item，不作为真实模型压缩结果。
 - 本地 lifecycle 继续按 Distributed Key 隔离，不能读取、删除或取消其他 key 的 Response。
+
+## OpenAI Conversations 生命周期
+
+Conversations 采用 gateway local lineage，面向 OpenAI-compatible 客户端提供本地对象生命周期：
+
+- `POST /v1/conversations`：创建 `conv_...` 本地 conversation，支持 optional `metadata` 与最多 20 条初始 `items`。
+- `GET /v1/conversations/{conversationId}`、`POST /v1/conversations/{conversationId}`、`DELETE /v1/conversations/{conversationId}`：分别用于读取、更新 metadata 和软删除 conversation；删除返回 `object=conversation.deleted`。
+- `POST /v1/conversations/{conversationId}/items`：一次最多追加 20 条 item，返回 OpenAI-compatible list envelope。
+- `GET /v1/conversations/{conversationId}/items`：支持 `after`、`include`、`limit`、`order`，默认 `limit=20`、`order=desc`，`limit` 范围 1 到 100。
+- `GET /v1/conversations/{conversationId}/items/{itemId}` 与 `DELETE /v1/conversations/{conversationId}/items/{itemId}`：按当前 Distributed Key 与 parent conversation 双重校验，避免跨租户或跨 conversation 读取。
+
+本地 item 作为独立 `gateway_async_resource` 保存，`upstreamObjectId` 记录 parent conversation id。删除 conversation 不级联删除 item lineage；但公开 item endpoint 仍要求 conversation id 可定位。本轮不声明 OpenAI Direct Conversations 上游 passthrough，`include` 作为 no-op 兼容参数被接受。
+
+## OpenAI Vector Stores 本地 Lifecycle
+
+Vector Stores 先建立 gateway local lifecycle 基线，面向 OpenAI-compatible 客户端提供本地对象生命周期：
+
+- `POST /v1/vector_stores`：创建 `vs_...` 本地 vector store，支持 optional `name`、`metadata`、`file_ids`、`expires_after` 与 `expires_at`。
+- `GET /v1/vector_stores`：返回 OpenAI-compatible list envelope，支持 `after`、`limit`、`order`，默认 `limit=20`、`order=desc`，`limit` 范围 1 到 100。
+- `GET /v1/vector_stores/{vectorStoreId}`、`POST /v1/vector_stores/{vectorStoreId}`、`DELETE /v1/vector_stores/{vectorStoreId}`：分别用于读取、更新和软删除当前 Distributed Key 下的本地 vector store；删除返回 `object=vector_store.deleted`。
+- `POST /v1/vector_stores/{vectorStoreId}/files`：把 `file_id` 作为本地 attachment 关联到 vector store，返回 `object=vector_store.file`；支持 `attributes` 与 `chunking_strategy` 的本地保真保存。
+- `GET /v1/vector_stores/{vectorStoreId}/files`：返回当前 vector store 的本地 attachment list envelope，支持 `after`、`limit`、`order`、`filter`。
+- `GET /v1/vector_stores/{vectorStoreId}/files/{fileId}` 与 `DELETE /v1/vector_stores/{vectorStoreId}/files/{fileId}`：按当前 Distributed Key 与 parent vector store 双重校验；删除返回 `object=vector_store.file.deleted`，并同步更新 parent `file_counts`。
+- `GET /v1/vector_stores/{vectorStoreId}/files/{fileId}/content`：读取当前 Distributed Key 下指定 attachment 对应的 gateway file，本地返回 `object=vector_store.file_content.page`、`data/content` 文本页、`has_more=false` 与 `next_page=null`；该能力不等价于 OpenAI 托管解析、embedding 或真实向量索引。
+- `POST /v1/vector_stores/{vectorStoreId}/search`：对当前 vector store 内可读取的本地 gateway file attachment 执行 UTF-8 词法检索，返回 `object=vector_store.search_results.page`、`search_query`、`data[].file_id`、`score`、`attributes` 与文本片段；支持 `query`、attributes `filters`、`max_num_results` 和 `ranking_options.score_threshold`，但不等价于 OpenAI 托管 semantic vector ingestion、rerank 或 query rewrite。
+- `POST /v1/vector_stores/{vectorStoreId}/file_batches`：批量创建本地 `vector_store.file_batch`，支持 `file_ids` 或 `files` 两种输入；会先完成非空、去重和已存在 attachment 校验，再一次性创建 batch 与 file attachment，避免部分批次落库。
+- `GET /v1/vector_stores/{vectorStoreId}/file_batches/{batchId}`：读取当前 Distributed Key 和 parent vector store 下的本地 file batch。
+- `POST /v1/vector_stores/{vectorStoreId}/file_batches/{batchId}/cancel`：本地同步完成的 batch 返回清晰错误，不把已创建 attachment 伪装成可取消；后续真实异步 ingestion 接入后再扩展 `in_progress` 状态迁移。
+- `GET /v1/vector_stores/{vectorStoreId}/file_batches/{batchId}/files`：按 batch metadata 记录的 `file_ids` 返回 active attachment list envelope，支持 `after`、`limit`、`order`、`filter`。
+
+当前实现只声明 vector store lifecycle、本地 file attachment lifecycle、本地 file content read、本地文本 search、本地 file batch lifecycle 与 Responses `file_search` 本地 Vector Store 绑定。真实向量索引、语义检索、hosted `file_search_call` lifecycle 和 OpenAI Direct 上游同步仍归属 `TASK-20260514-023` 后续切片。
 
 ## OpenAI Rate Limit Headers
 
@@ -103,6 +158,8 @@ OpenAI path 本地限流命中会返回 HTTP 429，错误体为 `rate_limit_erro
 ## OpenAI Webhook Signature
 
 OpenAI webhook verifier 按 Standard Webhooks 规范校验 `webhook-id`、`webhook-timestamp` 与 `webhook-signature`。签名内容必须使用原始 request body 拼接为 `webhook-id.webhook-timestamp.raw_body`，签名算法为 HMAC-SHA256，`webhook-signature` 支持 `v1,base64` 和多签名空格分隔。`gateway.openai.webhook.secret` 可配置默认 `whsec_` secret，也可以在后续 endpoint 中按 endpoint secret 显式传入。timestamp tolerance 默认 5 分钟，`webhook-id` replay marker 默认保留 24 小时。
+
+`POST /v1/webhooks/openai` 已作为 OpenAI Webhooks 接收入口。Controller 以 raw body 完成验签，合法 event 会保存为 `gateway_async_resource` 的 `WEBHOOK_EVENT` 记录，`resourceKey` 优先使用 event `id`，`metadata_json` 记录 `webhook_id`、`webhook_timestamp`、`event_type`、`source=openai` 与 `received_at`。同一 `webhook-id` 重复投递或同一 event id 以新 delivery 再次到达时，接口返回 `received=true`、`duplicate=true`，不重复落库。
 
 ## Codex CLI 示例
 
@@ -115,7 +172,7 @@ $env:OPENAI_BASE_URL="https://gateway.example.com/v1"
 
 - 运行时入口：`GET /public/docs/openapi.json`
 - 本地维护文件：[openapi/public-openapi.json](openapi/public-openapi.json)
-- 范围：公开 docs、OpenAI-compatible Chat/Responses、Web Search、Claude Messages、Gemini generateContent、Video/Music async task、Media provider matrix。
+- 范围：公开 docs、OpenAI-compatible Chat/Responses/Conversations/Vector Stores/Webhooks、Web Search、Claude Messages、Gemini generateContent、Video/Music async task、Media provider matrix。
 - 非范围：内部 Admin 全量接口、真实 provider 私有字段、未公开的运营接口。
 
 ## i18n 策略
@@ -127,6 +184,9 @@ $env:OPENAI_BASE_URL="https://gateway.example.com/v1"
 ## 主流 API parity 说明
 
 - OpenAI-compatible 与 xAI/Grok：`/v1/responses` 会保留原始 Responses 字段；Native runtime 已下发 `service_tier`、`parallel_tool_calls`、`prompt_cache_key`、`top_logprobs`、`safety_identifier`、`verbosity` 与 metadata。Responses-only 字段如 `truncation`、`text`、`prompt_cache_retention`、`include`、`previous_response_id` 会进入 provider extra body；Grok prompt cache affinity 使用 `prompt_cache_key` 派生 `x-grok-conv-id`。
+- OpenAI Direct 非流式 Responses create 优先返回上游原始 Responses JSON，并将 `model` 重写为 public model；OpenAI Direct `stream=true` 会透明转发上游原始 SSE 事件，保留 upstream event name、data、sequence 与未知字段；没有 native raw 能力的本地/兼容路径继续使用 canonical Responses encoder。
+- 带 OpenAI Direct upstream lineage 的 stored Response 支持远端 retrieve/delete/cancel/input_items passthrough；任意未知远端 `resp_...` id 不做无模型盲路由。
+- OpenAI Direct `responses/input_tokens` 支持 native passthrough；上游已执行后的错误状态不回退成本地估算，避免掩盖真实请求错误。
 - Anthropic Messages：支持 `service_tier`、`container`、`metadata`、`context_management` 与受控 `mcp_servers` 下发。`mcp_servers` 默认需要 `x_ai_gateway_mcp_allowlist` 或 `x_ai_gateway_allow_mcp_servers=true`，并会自动合并 `anthropic-beta: mcp-client-2025-04-04`。
 - Gemini generateContent：支持保留 `generationConfig.thinkingConfig`、`toolConfig.functionCallingConfig`、`googleSearch`、`urlContext` 与标准 function declarations。`googleMaps` grounding 默认需要 `x_ai_gateway_allow_google_maps=true`，避免未授权计费或外部访问。
 

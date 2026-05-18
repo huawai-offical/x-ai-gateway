@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.springframework.data.domain.Pageable;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.reactive.function.client.WebClient;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -69,17 +70,31 @@ class GatewayAsyncResourceStoredChatTests {
     void shouldListStoredChatCompletionsWithModelMetadataCursorAndLimit() throws Exception {
         GatewayAsyncResourceRepository repository = Mockito.mock(GatewayAsyncResourceRepository.class);
         GatewayAsyncResourceService service = service(repository);
-        Mockito.when(repository.search(
+        GatewayAsyncResourceEntity chat2 = entity("chatcmpl_2", "gpt-4o", "chat.completion", Map.of("purpose", "qa"));
+        GatewayAsyncResourceEntity chat1 = entity("chatcmpl_1", "gpt-4o", "chat.completion", Map.of("purpose", "qa"));
+        Mockito.when(repository.findStoredResourcesAfterCursorAsc(
                 Mockito.eq(1L),
                 Mockito.eq(GatewayAsyncResourceType.RESPONSE),
-                Mockito.isNull(),
+                Mockito.eq("chatcmpl_"),
+                Mockito.eq("gpt-4o"),
+                Mockito.<Instant>nullable(Instant.class),
+                Mockito.<Long>nullable(Long.class),
                 Mockito.any(Pageable.class)
-        )).thenReturn(List.of(
-                entity("chatcmpl_2", "gpt-4o", "chat.completion", Map.of("purpose", "qa")),
-                entity("resp_1", "gpt-4o", "response", Map.of("purpose", "qa")),
-                entity("chatcmpl_1", "gpt-4o", "chat.completion", Map.of("purpose", "qa")),
-                entity("chatcmpl_other", "gpt-4o-mini", "chat.completion", Map.of("purpose", "qa"))
-        ));
+        )).thenReturn(List.of(chat1, chat2), List.of(chat2));
+        Mockito.when(repository.findByResourceKeyAndResourceTypeAndDistributedKeyIdAndDeletedFalse(
+                "chatcmpl_1",
+                GatewayAsyncResourceType.RESPONSE,
+                1L
+        )).thenReturn(Optional.of(chat1));
+        Mockito.when(repository.findStoredResourcesAfterCursorDesc(
+                Mockito.eq(1L),
+                Mockito.eq(GatewayAsyncResourceType.RESPONSE),
+                Mockito.eq("chatcmpl_"),
+                Mockito.eq("gpt-4o"),
+                Mockito.<Instant>nullable(Instant.class),
+                Mockito.<Long>nullable(Long.class),
+                Mockito.any(Pageable.class)
+        )).thenReturn(List.of(chat2, chat1));
 
         JsonNode firstPage = service.listChatCompletions(1L, null, 1, "gpt-4o", null, Map.of("purpose", "qa"));
 
@@ -99,6 +114,69 @@ class GatewayAsyncResourceStoredChatTests {
 
         assertEquals("chatcmpl_2", descending.path("data").path(0).path("id").asText());
         assertTrue(descending.path("has_more").asBoolean());
+        Mockito.verify(repository, Mockito.never()).search(
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(Pageable.class));
+    }
+
+    @Test
+    void shouldContinueDatabaseCursorScanUntilMetadataFilterMatches() throws Exception {
+        GatewayAsyncResourceRepository repository = Mockito.mock(GatewayAsyncResourceRepository.class);
+        GatewayAsyncResourceService service = service(repository);
+        GatewayAsyncResourceEntity other1 = entity("chatcmpl_1", "gpt-4o", "chat.completion", Map.of("purpose", "other"));
+        GatewayAsyncResourceEntity other2 = entity("chatcmpl_2", "gpt-4o", "chat.completion", Map.of("purpose", "other"));
+        GatewayAsyncResourceEntity match = entity("chatcmpl_3", "gpt-4o", "chat.completion", Map.of("purpose", "qa"));
+        Mockito.when(repository.findStoredResourcesAfterCursorAsc(
+                Mockito.eq(1L),
+                Mockito.eq(GatewayAsyncResourceType.RESPONSE),
+                Mockito.eq("chatcmpl_"),
+                Mockito.eq("gpt-4o"),
+                Mockito.<Instant>nullable(Instant.class),
+                Mockito.<Long>nullable(Long.class),
+                Mockito.any(Pageable.class)
+        )).thenReturn(List.of(other1, other2), List.of(match));
+
+        JsonNode result = service.listChatCompletions(1L, null, 1, "gpt-4o", null, Map.of("purpose", "qa"));
+
+        assertEquals(1, result.path("data").size());
+        assertEquals("chatcmpl_3", result.path("data").path(0).path("id").asText());
+        assertFalse(result.path("has_more").asBoolean());
+        Mockito.verify(repository, Mockito.times(2)).findStoredResourcesAfterCursorAsc(
+                Mockito.eq(1L),
+                Mockito.eq(GatewayAsyncResourceType.RESPONSE),
+                Mockito.eq("chatcmpl_"),
+                Mockito.eq("gpt-4o"),
+                Mockito.<Instant>nullable(Instant.class),
+                Mockito.<Long>nullable(Long.class),
+                Mockito.any(Pageable.class));
+    }
+
+    @Test
+    void shouldReturnEmptyStoredChatListWhenCursorDoesNotMatchCurrentFilter() throws Exception {
+        GatewayAsyncResourceRepository repository = Mockito.mock(GatewayAsyncResourceRepository.class);
+        GatewayAsyncResourceService service = service(repository);
+        GatewayAsyncResourceEntity cursor = entity("chatcmpl_1", "gpt-4o", "chat.completion", Map.of("purpose", "other"));
+        Mockito.when(repository.findByResourceKeyAndResourceTypeAndDistributedKeyIdAndDeletedFalse(
+                "chatcmpl_1",
+                GatewayAsyncResourceType.RESPONSE,
+                1L
+        )).thenReturn(Optional.of(cursor));
+
+        JsonNode result = service.listChatCompletions(1L, "chatcmpl_1", 10, "gpt-4o", null, Map.of("purpose", "qa"));
+
+        assertEquals("list", result.path("object").asText());
+        assertEquals(0, result.path("data").size());
+        assertFalse(result.path("has_more").asBoolean());
+        Mockito.verify(repository, Mockito.never()).findStoredResourcesAfterCursorAsc(
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(Pageable.class));
     }
 
     @Test
@@ -257,6 +335,9 @@ class GatewayAsyncResourceStoredChatTests {
 
     private GatewayAsyncResourceEntity entity(String id, String model, String object, Map<String, String> metadata) throws Exception {
         GatewayAsyncResourceEntity entity = new GatewayAsyncResourceEntity();
+        long sequence = Math.abs(id.hashCode() % 1000L) + 1L;
+        ReflectionTestUtils.setField(entity, "id", sequence);
+        ReflectionTestUtils.setField(entity, "createdAt", Instant.parse("2026-05-15T00:00:00Z").plusSeconds(sequence));
         entity.setResourceKey(id);
         entity.setDistributedKeyId(1L);
         entity.setResourceType(GatewayAsyncResourceType.RESPONSE);

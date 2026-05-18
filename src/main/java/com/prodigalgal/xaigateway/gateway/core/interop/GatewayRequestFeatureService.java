@@ -286,6 +286,9 @@ public class GatewayRequestFeatureService {
         if ("POST".equals(method) && "/v1/batches".equals(normalizedPath)) {
             return semantics("batches", normalizedPath, TranslationResourceType.BATCH, TranslationOperation.BATCH_CREATE, List.of(InteropFeature.BATCH_CREATE, InteropFeature.FILE_OBJECT), RouteSelectionMode.CATALOG_SELECTION);
         }
+        if ("GET".equals(method) && "/v1/batches".equals(normalizedPath)) {
+            return semantics("batches", normalizedPath, TranslationResourceType.BATCH, TranslationOperation.BATCH_LIST, List.of(InteropFeature.BATCH_CREATE), RouteSelectionMode.LOCAL_CATALOG);
+        }
         if ("GET".equals(method) && "/v1/batches/{batchId}".equals(normalizedPath)) {
             return semantics("batches", normalizedPath, TranslationResourceType.BATCH, TranslationOperation.BATCH_GET, List.of(InteropFeature.BATCH_CREATE), RouteSelectionMode.STORED_LINEAGE);
         }
@@ -300,6 +303,12 @@ public class GatewayRequestFeatureService {
         }
         if ("GET".equals(method) && "/v1/fine_tuning/jobs/{jobId}".equals(normalizedPath)) {
             return semantics("fine_tuning", normalizedPath, TranslationResourceType.TUNING, TranslationOperation.TUNING_GET, List.of(InteropFeature.TUNING_CREATE), RouteSelectionMode.STORED_LINEAGE);
+        }
+        if ("GET".equals(method) && "/v1/fine_tuning/jobs/{jobId}/events".equals(normalizedPath)) {
+            return semantics("fine_tuning", normalizedPath, TranslationResourceType.TUNING, TranslationOperation.TUNING_EVENTS_LIST, List.of(InteropFeature.TUNING_CREATE), RouteSelectionMode.STORED_LINEAGE);
+        }
+        if ("GET".equals(method) && "/v1/fine_tuning/jobs/{jobId}/checkpoints".equals(normalizedPath)) {
+            return semantics("fine_tuning", normalizedPath, TranslationResourceType.TUNING, TranslationOperation.TUNING_CHECKPOINTS_LIST, List.of(InteropFeature.TUNING_CREATE), RouteSelectionMode.STORED_LINEAGE);
         }
         if ("POST".equals(method) && "/v1/fine_tuning/jobs/{jobId}/cancel".equals(normalizedPath)) {
             return semantics("fine_tuning", normalizedPath, TranslationResourceType.TUNING, TranslationOperation.TUNING_CANCEL, List.of(InteropFeature.TUNING_CREATE), RouteSelectionMode.STORED_LINEAGE);
@@ -367,6 +376,12 @@ public class GatewayRequestFeatureService {
         }
         if (requestPath.matches("^/v1/batches/[^/]+$")) {
             return "/v1/batches/{batchId}";
+        }
+        if (requestPath.matches("^/v1/fine_tuning/jobs/[^/]+/events$")) {
+            return "/v1/fine_tuning/jobs/{jobId}/events";
+        }
+        if (requestPath.matches("^/v1/fine_tuning/jobs/[^/]+/checkpoints$")) {
+            return "/v1/fine_tuning/jobs/{jobId}/checkpoints";
         }
         if (requestPath.matches("^/v1/fine_tuning/jobs/[^/]+/cancel$")) {
             return "/v1/fine_tuning/jobs/{jobId}/cancel";
@@ -449,6 +464,10 @@ public class GatewayRequestFeatureService {
         matcher = java.util.regex.Pattern.compile("^/v1/batches/([^/]+)(?:/cancel)?$").matcher(requestPath);
         if (matcher.matches()) {
             return java.util.Map.of("batchId", matcher.group(1));
+        }
+        matcher = java.util.regex.Pattern.compile("^/v1/fine_tuning/jobs/([^/]+)/(?:events|checkpoints)$").matcher(requestPath);
+        if (matcher.matches()) {
+            return java.util.Map.of("jobId", matcher.group(1));
         }
         matcher = java.util.regex.Pattern.compile("^/v1/fine_tuning/jobs/([^/]+)(?:/cancel)?$").matcher(requestPath);
         if (matcher.matches()) {

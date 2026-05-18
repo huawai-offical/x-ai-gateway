@@ -69,9 +69,13 @@
 ## 已完成切片
 
 - [TASK-20260515-016 OpenAI/Codex Real Smoke 分类与预算阻断基线](../done/TASK-20260515-016-openai-codex-real-smoke-classification-budget-guard.md)：Codex App API responses smoke 已输出标准 `classification` 与 `skippedReason`；usage probe 在额度、速率、权限阻断时不继续发起真实 responses POST；账号池详情页已展示标准分类。
+- [TASK-20260516-005 OpenAI Direct Key Vault 权限探测与 Secret 引用 Smoke](../done/TASK-20260516-005-openai-direct-key-vault-permission-smoke.md)：后台 credential smoke 已可按 `credentialId` 引用 `OPENAI_DIRECT` 加密凭证；dry-run 不解密、不访问上游；live probe 仅执行低成本 `GET /v1/models`，并对权限、rate limit、非 OpenAI Direct、脱敏错误摘要做标准分类。
+- [TASK-20260516-006 OpenAI Direct 资源族 Smoke Runner 分类骨架](../done/TASK-20260516-006-openai-direct-resource-family-smoke-runner.md)：资源族 smoke 已覆盖 Chat、Responses、Files、Batches、Vector Stores、Realtime client secret 六类分类项；live 模式只对 Files/Batches/Vector Stores 执行只读 list probe，生成与写操作类资源默认按预算/写操作保护阻断。
+- [TASK-20260516-007 OpenAI Direct Smoke Certification 与脱敏 Fixture 基线](../done/TASK-20260516-007-openai-direct-smoke-certification-fixture.md)：资源族 smoke 已可生成 certification report 与脱敏 fixture snapshot；live certification 会把安全摘要写入 `credentialMetadataJson.openai_direct_smoke_certification`，dry-run 不写入 metadata。
+- [TASK-20260516-009 OpenAI Direct 显式 Billable/Write Smoke Probe](../done/TASK-20260516-009-openai-direct-explicit-billable-write-smoke-probes.md)：Chat/Responses billable generation 与 Realtime client secret 写操作已支持显式 allow flag；默认仍保护阻断，显式开启时使用最小 token、短 TTL、text-only payload，并保留脱敏 preview/evidence。
+- [TASK-20260516-017 OpenAI Direct Smoke Record/Replay Fixture 固化](../done/TASK-20260516-017-openai-direct-smoke-record-replay-fixture.md)：Certification response 与 live metadata 已包含版本化 `recordReplayFixture`，仓库内新增脱敏 sample fixture，明确 network disabled、billable/write replay-only 策略。
+- [TASK-20260517-001 OpenAI Direct Smoke Record/Replay CI 校验器](../done/TASK-20260517-001-openai-direct-smoke-record-replay-ci-verifier.md)：新增离线 fixture verifier，CI 可校验 schema、replay-only policy、summary 计数、fixture 必填字段和未脱敏 secret，默认不访问真实 OpenAI。
 
 ## 剩余切片
 
-- OpenAI Direct key vault、权限探测与 secret 引用。
-- Chat、Responses、Files、Batches、Vector Stores、Realtime client secret 的资源族 smoke runner。
-- record/replay fixture 脱敏保存与 certification report。
+- 真实线上 OpenAI Direct smoke 仍需由受控环境提供真实 key、预算和手工/CI 开关；仓库默认测试继续使用本地 mock server 与离线 record/replay verifier。
