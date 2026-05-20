@@ -6,8 +6,6 @@ import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyQueryService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyView;
 import com.prodigalgal.xaigateway.gateway.core.catalog.GatewayPublicModelView;
 import com.prodigalgal.xaigateway.gateway.core.catalog.ModelCatalogQueryService;
-import com.prodigalgal.xaigateway.gateway.core.catalog.OpenAiFineTunedModelDeletionService;
-import com.prodigalgal.xaigateway.infra.config.web.ApiResourceNotFoundException;
 import com.prodigalgal.xaigateway.testsupport.PermitAllSecurityTestConfig;
 import java.util.List;
 import java.util.Optional;
@@ -35,9 +33,6 @@ class OpenAiModelsControllerTests {
 
     @MockitoBean
     private ModelCatalogQueryService modelCatalogQueryService;
-
-    @MockitoBean
-    private OpenAiFineTunedModelDeletionService openAiFineTunedModelDeletionService;
 
     @Test
     void shouldListAccessibleModels() {
@@ -131,65 +126,4 @@ class OpenAiModelsControllerTests {
                 .jsonPath("$.error.message").isEqualTo("未找到指定模型。");
     }
 
-    @Test
-    void shouldDeleteRegisteredFineTunedModel() {
-        DistributedKeyView distributedKeyView = new DistributedKeyView(
-                1L,
-                "test-key",
-                "sk-gw-test",
-                "masked",
-                List.of("openai"),
-                List.of(),
-                List.of()
-        );
-        Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
-                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(distributedKeyQueryService.findActiveByKeyPrefix("sk-gw-test"))
-                .thenReturn(Optional.of(distributedKeyView));
-        Mockito.when(openAiFineTunedModelDeletionService.deleteRegisteredFineTunedModel(distributedKeyView, "ft:gpt-4o-mini:org:suffix:abc123"))
-                .thenReturn(new OpenAiFineTunedModelDeletionService.DeletedFineTunedModelView(
-                        "ft:gpt-4o-mini:org:suffix:abc123",
-                        "ftjob_1",
-                        1,
-                        1
-                ));
-
-        webTestClient.delete()
-                .uri("/v1/models/ft:gpt-4o-mini:org:suffix:abc123")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
-                .exchange()
-                .expectStatus().isOk()
-                .expectBody()
-                .jsonPath("$.id").isEqualTo("ft:gpt-4o-mini:org:suffix:abc123")
-                .jsonPath("$.object").isEqualTo("model")
-                .jsonPath("$.deleted").isEqualTo(true);
-    }
-
-    @Test
-    void shouldReturn404WhenDeletingUnknownFineTunedModel() {
-        DistributedKeyView distributedKeyView = new DistributedKeyView(
-                1L,
-                "test-key",
-                "sk-gw-test",
-                "masked",
-                List.of("openai"),
-                List.of(),
-                List.of()
-        );
-        Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
-                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(distributedKeyQueryService.findActiveByKeyPrefix("sk-gw-test"))
-                .thenReturn(Optional.of(distributedKeyView));
-        Mockito.when(openAiFineTunedModelDeletionService.deleteRegisteredFineTunedModel(distributedKeyView, "ft:missing"))
-                .thenThrow(new ApiResourceNotFoundException("未找到可删除的 fine-tuned model。"));
-
-        webTestClient.delete()
-                .uri("/v1/models/ft:missing")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
-                .exchange()
-                .expectStatus().isNotFound()
-                .expectBody()
-                .jsonPath("$.error.code").isEqualTo("not_found")
-                .jsonPath("$.error.message").isEqualTo("未找到可删除的 fine-tuned model。");
-    }
 }

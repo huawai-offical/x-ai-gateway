@@ -47,8 +47,6 @@ public record CapabilityMatrixRowResponse(
         boolean supportsModeration,
         boolean supportsFiles,
         boolean supportsUploads,
-        boolean supportsBatches,
-        boolean supportsTuning,
         boolean supportsRealtime
 ) {
     public CapabilityMatrixRowResponse(
@@ -83,8 +81,6 @@ public record CapabilityMatrixRowResponse(
             boolean supportsModeration,
             boolean supportsFiles,
             boolean supportsUploads,
-            boolean supportsBatches,
-            boolean supportsTuning,
             boolean supportsRealtime
     ) {
         this(
@@ -121,8 +117,6 @@ public record CapabilityMatrixRowResponse(
                 supportsModeration,
                 supportsFiles,
                 supportsUploads,
-                supportsBatches,
-                supportsTuning,
                 supportsRealtime
         );
     }

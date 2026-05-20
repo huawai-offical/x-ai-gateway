@@ -1,58 +1,66 @@
-# TASK-20260514-016 OpenAI API 全量覆盖总控父任务
+# TASK-20260514-016 对话与 Tools 功能性 API 覆盖总控父任务
 
 状态：Backlog  
 优先级：Critical  
 类型：父任务  
-上游来源：[REQ-20260514-009](../../docs/requirements/REQ-20260514-009-openai-full-api-coverage-task-system.md)、[REP-20260514 OpenAI 全量覆盖任务拆解](../../docs/reports/REP-20260514-openai-full-api-coverage-task-breakdown.md)
+上游来源：[REQ-20260514-009](../../docs/requirements/REQ-20260514-009-openai-full-api-coverage-task-system.md)、[REQ-20260518-005](../../docs/requirements/REQ-20260518-005-functional-service-api-scope.md)、[ADR-0010](../../docs/decisions/ADR-0010-functional-service-api-scope.md)
 
 ## 背景
 
-当前项目只达到 OpenAI-compatible 核心能力和部分 OpenAI 官方资源生命周期兼容。要达到“完全彻底覆盖 OpenAI API”，需要以官方 API Reference 为基线，把 endpoint、参数、对象生命周期、streaming/realtime/webhook 事件、错误模型、认证 headers、公开文档和真实 smoke 一起纳入总控。
+本父任务最初承接 OpenAI API 全量覆盖目标。2026-05-18 用户已明确收窄产品范围：OpenAI、Anthropic、Gemini、Vertex、Codex 等主流 provider 不再追求全量官方 API，而是统一按 OpenAI 标准功能区做对话、streaming、tools/function calling 以及必要的 RAG/file_search 支撑。Fine-tuning、Batches、Evals、Administration 等非核心官方 API 已不再作为 backlog 目标。
+
+2026-05-19 用户要求先不做测试、全速推进项目任务，并将 Codex 相关任务提升为最高优先。Codex 后续执行顺序以 [TASK-20260519-002](../done/TASK-20260519-002-codex-priority-functional-service-api.md) 为当前 P0 队列；该父任务已完成队列重排并归档。
 
 ## 目标
 
-- 维护 OpenAI API 全量覆盖的任务树和验收基线。
-- 统一资源族 coverage matrix、参数 parity matrix、conformance matrix 与 public docs。
-- 确保每个子任务完成后都能回写 coverage 状态。
-- 给后续分批推进提供优先级顺序和依赖关系。
+- 维护对话与 tools 功能性 API 的任务树和验收基线。
+- 统一 Chat/Responses/Conversations/Webhooks/tools/file_search/Models/Files 最小支撑面的 coverage matrix、conformance matrix 与 public docs。
+- 统一 Anthropic Messages、Gemini/Vertex GenerateContent、Codex Responses smoke 与 OpenAI 标准功能区之间的边界说明。
+- 确保任务完成后都能回写支持状态，并明确非核心官方 API 不再推进。
+- 给后续真实 smoke 和 provider 兼容验证提供优先级顺序。
 
 ## 非目标
 
 - 不在父任务里直接实现具体 API。
-- 不把 OpenAI Direct 全量能力强行推广到所有 OpenAI-compatible provider。
+- 不追求 OpenAI Direct 或其它 provider 的官方 API 全量 parity。
+- 不实现 Fine-tuning、Batches、Evals/Graders/Runs、官方 Administration API、官方 Videos parity、Skills 分发 API、官方 Containers 全量 lifecycle。
+- 不实现 Anthropic message batches、Gemini/Vertex batch prediction、Vertex pipeline/job/admin 或非 Responses 的 Codex 内部 API。
 
 ## 输入
 
 - 官方 OpenAI API Reference。
 - [REP-20260514 OpenAI API 完整兼容性深度审计](../../docs/reports/REP-20260514-openai-api-compatibility-deep-audit.md)。
+- [REQ-20260518-005 对话与 Tools 功能性服务 API 范围收窄](../../docs/requirements/REQ-20260518-005-functional-service-api-scope.md)。
 - 既有 `TASK-20260514-013`、`014`、`015`。
+- [REP-20260518 对话与 Tools 功能性 API Backlog 重规划](../../docs/reports/REP-20260518-functional-service-api-backlog-replan.md)。
 
 ## 输出
 
-- 子任务 `TASK-20260514-017` 至 `031`。
-- 覆盖矩阵、验收证据、真实 smoke 分类。
+- 保留和收窄后的对话/tools 子任务。
+- 删除或范围外记录后的非核心官方 API 任务。
+- 对话/tools coverage matrix、验收证据、真实 smoke 分类。
 - 每批完成后的 docs/tasks 回写。
 
 ## 影响范围
 
-- OpenAI ingress controllers、runtime executors、resource executors、provider catalog、public OpenAPI、conformance fixtures、admin/portal 展示。
+- OpenAI/Anthropic/Gemini/Vertex/Codex ingress、runtime executors、resource executors、provider catalog、public OpenAPI、conformance fixtures、admin/portal 展示。
 
 ## 依赖
 
 - 官方文档刷新机制。
-- 真实 OpenAI key、组织权限和成本预算。
+- 真实 OpenAI/Gemini/Anthropic key 和成本预算，优先用于低成本对话/tools smoke。
 
 ## 风险
 
-- 官方 API 更新频繁，任务执行时需要二次校准。
-- Administration API 权限敏感，不能直接对普通用户暴露。
-- 全量实现范围大，必须分批关闭，避免长期大任务失控。
+- 旧任务、docs 或 provider catalog 仍可能残留“全量 API”口径。
+- `batch` 一词也用于 Vector Store File Batches，清理时不能误删 file_search ingestion 支撑能力。
+- 内部 `/admin/*` 是平台管理后台，不等同于官方 provider Administration API，不能误删。
 
 ## 验收标准
 
-- 所有官方资源族均有子任务、状态和验收口径。
+- 当前 backlog 只保留对话、tools 和直接支撑能力任务。
+- 非核心官方 API 不再作为未来必做项出现在 backlog、provider catalog 支持面或 public docs 支持面。
 - 子任务完成后 coverage matrix 和 public docs 同步更新。
-- 未实现项必须显式标为 Backlog、Out of scope 或 Accepted exception，不允许“沉默缺失”。
 
 ## 测试边界
 
@@ -62,6 +70,8 @@
 ## 关联任务
 
 - [TASK-20260514-013](TASK-20260514-013-openai-chat-responses-native-parity.md)
-- [TASK-20260514-014](TASK-20260514-014-openai-resource-family-coverage-gap.md)
-- [TASK-20260514-015](TASK-20260514-015-openai-openapi-conformance-truth-source-hardening.md)
-
+- [TASK-20260514-014](../done/TASK-20260514-014-openai-resource-family-coverage-gap.md)
+- [TASK-20260514-015](../done/TASK-20260514-015-openai-openapi-conformance-truth-source-hardening.md)
+- [TASK-20260518-005](../done/TASK-20260518-005-functional-service-api-scope-pruning.md)
+- [TASK-20260518-006](../done/TASK-20260518-006-non-core-api-code-eradication.md)
+- [TASK-20260519-002](../done/TASK-20260519-002-codex-priority-functional-service-api.md)

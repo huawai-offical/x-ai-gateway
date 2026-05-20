@@ -1,5 +1,9 @@
 # x-ai-gateway 本地文档索引
 
+## 核心理念
+
+x-ai-gateway 不以 OpenAI、Anthropic、Gemini、Vertex、Codex 等官方 API 全量覆盖为目标；项目主线是对话、streaming、tools/function calling、多模态输入输出，以及直接支撑这些能力的认证、模型发现、RAG/file_search、限流、审计、usage 和真实 smoke。范围决策以 [ADR-0010](decisions/ADR-0010-functional-service-api-scope.md) 为准。
+
 ## 需求
 
 - [REQ-20260501-001 本地化协作流程迁移](requirements/REQ-20260501-001-local-workflow-migration.md)
@@ -65,6 +69,11 @@
 - [REQ-20260518-001 OpenAI Vector Store File Content 本地读取基线](requirements/REQ-20260518-001-openai-vector-store-file-content-local-read-baseline.md)
 - [REQ-20260518-002 OpenAI Vector Store Search 本地文本检索基线](requirements/REQ-20260518-002-openai-vector-store-search-local-text-baseline.md)
 - [REQ-20260518-003 OpenAI Responses File Search 本地 Vector Store 绑定基线](requirements/REQ-20260518-003-openai-responses-file-search-local-vector-store-binding.md)
+- [REQ-20260518-004 OpenAI Vector Store 本地 Ingestion 产物基线](requirements/REQ-20260518-004-openai-vector-store-local-ingestion-artifact-baseline.md)
+- [REQ-20260518-005 对话与 Tools 功能性服务 API 范围收窄](requirements/REQ-20260518-005-functional-service-api-scope.md)
+- [REQ-20260518-006 非核心 API 兼容代码彻底清理](requirements/REQ-20260518-006-non-core-api-code-eradication.md)
+- [REQ-20260519-001 Gemini 与 MiMo 功能性服务 API 真实 Smoke](requirements/REQ-20260519-001-functional-real-smoke-gemini-mimo.md)
+- [REQ-20260519-002 Codex 功能性服务 API 最高优先推进](requirements/REQ-20260519-002-codex-priority-functional-service-api.md)
 
 ## 决策
 
@@ -77,6 +86,7 @@
 - [ADR-0007 第六批任务采用“先校准差距，再补生产运行态与账号入口”闭环](decisions/ADR-0007-sixth-batch-runtime-and-oauth-scope.md)
 - [ADR-0008 云端代理优先的 CLI 接入架构](decisions/ADR-0008-cloud-cli-access-without-local-proxy.md)
 - [ADR-0009 Desktop Companion 不进入服务端主线](decisions/ADR-0009-desktop-companion-out-of-mainline.md)
+- [ADR-0010 对话与 Tools 功能性服务 API 作为产品范围](decisions/ADR-0010-functional-service-api-scope.md)
 
 ## 报告
 
@@ -95,6 +105,8 @@
 - [REP-20260514 主流厂商 API/changelog 复核](reports/REP-20260514-mainstream-api-changelog-refresh.md)
 - [REP-20260514 OpenAI API 完整兼容性深度审计](reports/REP-20260514-openai-api-compatibility-deep-audit.md)
 - [REP-20260514 OpenAI API 全量覆盖任务拆解](reports/REP-20260514-openai-full-api-coverage-task-breakdown.md)
+- [REP-20260518 对话与 Tools 功能性 API Backlog 重规划](reports/REP-20260518-functional-service-api-backlog-replan.md)
+- [REP-20260519 Codex 最高优先级重排](reports/REP-20260519-codex-priority-replan.md)
 
 ## 迁移记录
 
@@ -105,6 +117,8 @@
 ## 既有文档
 
 - [client-onboarding-pack](client-onboarding-pack.md)
+- [codex-functional-service-api-facts](codex-functional-service-api-facts.md)
+- [functional-service-api-coverage-matrix](functional-service-api-coverage-matrix.md)
 - [client-instance-plugin-deeplink](client-instance-plugin-deeplink.md)
 - [cloud-cli-request-filter](cloud-cli-request-filter.md)
 - [operations-drill-evidence](operations-drill-evidence.md)

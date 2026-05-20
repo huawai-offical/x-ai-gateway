@@ -22,21 +22,13 @@ class OpenAiProtocolPathMatcherTests {
                 "/v1/audio/transcriptions",
                 "/v1/audio/speech",
                 "/v1/images/generations",
-                "/v1/videos",
                 "/v1/moderations",
                 "/v1/files",
                 "/v1/files/file_1",
                 "/v1/uploads",
-                "/v1/batches",
                 "/v1/models",
-                "/v1/fine_tuning/jobs",
                 "/v1/vector_stores",
-                "/v1/containers",
-                "/v1/evals",
-                "/v1/skills",
-                "/v1/realtime/client_secrets",
-                "/v1/assistants",
-                "/v1/threads/thread_1/runs"
+                "/v1/realtime/client_secrets"
         ).forEach(path -> assertTrue(OpenAiProtocolPathMatcher.isOpenAiProtocolPath(path), path));
     }
 
@@ -50,6 +42,12 @@ class OpenAiProtocolPathMatcherTests {
                 "/google/v1beta/models/gemini:generateContent",
                 "/public/docs/openapi.json",
                 "/api/v1/media/provider-matrix",
+                "/v1/videos",
+                "/v1/containers",
+                "/v1/evals",
+                "/v1/skills",
+                "/v1/assistants",
+                "/v1/threads/thread_1/runs",
                 "/v1/web_search"
         ).forEach(path -> assertFalse(OpenAiProtocolPathMatcher.isOpenAiProtocolPath(path), path));
     }

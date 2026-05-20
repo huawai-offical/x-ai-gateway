@@ -422,7 +422,7 @@ class GatewayEndToEndSmokeTests {
                         {
                           "model":"claude-sonnet-4",
                           "messages":[{"role":"user","content":"%s"}],
-                          "maxTokens":128
+                          "max_tokens":128
                         }
                         """.formatted(content))
                 .exchange()
@@ -549,8 +549,6 @@ class GatewayEndToEndSmokeTests {
         entity.setSupportsModeration(false);
         entity.setSupportsFiles(false);
         entity.setSupportsUploads(false);
-        entity.setSupportsBatches(false);
-        entity.setSupportsTuning(false);
         entity.setSupportsRealtime(false);
         entity.setAuthStrategy(siteProfile.getAuthStrategy());
         entity.setPathStrategy(siteProfile.getPathStrategy());

@@ -1,14 +1,14 @@
 # TASK-20260514-013 OpenAI Chat/Responses 参数全量保真与原生 Responses 边界
 
-状态：Backlog  
-优先级：High  
-类型：子任务  
-父任务：[REQ-20260514-008](../../docs/requirements/REQ-20260514-008-openai-api-compatibility-deep-audit.md)  
-上游来源：[REP-20260514 OpenAI API 完整兼容性深度审计](../../docs/reports/REP-20260514-openai-api-compatibility-deep-audit.md)
+状态：Backlog
+优先级：High
+类型：子任务
+父任务：[TASK-20260514-016](TASK-20260514-016-openai-full-api-coverage-parent.md)
+上游来源：[REP-20260514 OpenAI API 完整兼容性深度审计](../../docs/reports/REP-20260514-openai-api-compatibility-deep-audit.md)、[REP-20260518 对话与 Tools 功能性 API Backlog 重规划](../../docs/reports/REP-20260518-functional-service-api-backlog-replan.md)
 
 ## 背景
 
-当前 `/v1/chat/completions` 使用强 DTO，参数面只覆盖核心字段；`/v1/responses` 虽保留原始 body，但 OpenAI Direct 执行仍主要经由 Chat Completions runtime，非 function tools 与 Responses 对象语义不完整。
+当前 `/v1/chat/completions` 使用强 DTO，参数面只覆盖核心字段；`/v1/responses` 虽保留原始 body，但 OpenAI Direct 执行仍主要经由 Chat Completions runtime，非 function tools 与 Responses 对象语义不完整。2026-05-18 后，本任务只覆盖对话、streaming、tools/function calling 与 file_search/RAG 直接相关的 Chat/Responses 行为，不扩展到 Fine-tuning、Batches、Evals、Administration 等官方非核心 API。
 
 ## 目标
 
@@ -21,6 +21,7 @@
 
 - 不实现 Vector Stores、Evals、Containers 等资源族。
 - 不要求所有第三方 OpenAI-compatible provider 具备 OpenAI Direct 同等能力。
+- 不实现 Fine-tuning、OpenAI `/v1/batches`、Evals、Administration、Videos、Skills 或 Containers 全量 lifecycle。
 
 ## 输入
 
@@ -69,7 +70,9 @@
 ## 关联文档
 
 - [REQ-20260514-008](../../docs/requirements/REQ-20260514-008-openai-api-compatibility-deep-audit.md)
+- [REQ-20260518-005](../../docs/requirements/REQ-20260518-005-functional-service-api-scope.md)
 - [REP-20260514 OpenAI API 完整兼容性深度审计](../../docs/reports/REP-20260514-openai-api-compatibility-deep-audit.md)
+- [REP-20260518 对话与 Tools 功能性 API Backlog 重规划](../../docs/reports/REP-20260518-functional-service-api-backlog-replan.md)
 - [TASK-20260514-009](../done/TASK-20260514-009-openai-xai-responses-field-parity.md)
 
 ## 下游细分任务

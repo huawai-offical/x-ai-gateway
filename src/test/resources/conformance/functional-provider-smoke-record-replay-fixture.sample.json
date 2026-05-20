@@ -1,0 +1,107 @@
+{
+  "schemaVersion": "2026-05-19.functional-provider-smoke-record-replay.v1",
+  "replayMode": "record_replay",
+  "providerType": "OPENAI_COMPATIBLE",
+  "protocol": "OPENAI_COMPATIBLE",
+  "baseUrl": "https://api.mimo-v2.com",
+  "baseUrlHost": "api.mimo-v2.com",
+  "certificationStatus": "PARTIAL_CERTIFIED",
+  "dryRun": false,
+  "recordedAt": "2026-05-19T01:00:00Z",
+  "summary": {
+    "PASS": 1,
+    "FAIL": 0,
+    "SKIPPED": 0,
+    "UNSUPPORTED": 0,
+    "NO_PERMISSION": 0,
+    "BUDGET_BLOCKED": 1
+  },
+  "replayPolicy": {
+    "network": "disabled_by_default",
+    "billableOperations": "replay_only",
+    "writeOperations": "replay_only",
+    "secretMaterial": "redacted",
+    "dryRunEvidenceAccepted": false,
+    "fixtureSource": "functional_provider_smoke_certification",
+    "liveExecutionRequiresAllowLive": true,
+    "billableExecutionRequiresAllowBillableProbes": true
+  },
+  "fixtures": [
+    {
+      "providerType": "OPENAI_COMPATIBLE",
+      "protocol": "OPENAI_COMPATIBLE",
+      "resourceFamily": "CHAT_COMPLETIONS",
+      "status": "LIVE_SMOKE_OK",
+      "classification": "PASS",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "model": "mimo-v2-pro",
+      "billable": true,
+      "writeOperation": false,
+      "httpStatus": 200,
+      "upstreamRequestId": "req_mimo_chat",
+      "durationMs": 18,
+      "evidence": {
+        "object": "chat.completion",
+        "model": "mimo-v2-pro",
+        "choicesSeen": 1,
+        "usageFields": [
+          "completion_tokens"
+        ]
+      },
+      "requestPreview": {
+        "providerType": "OPENAI_COMPATIBLE",
+        "protocol": "OPENAI_COMPATIBLE",
+        "method": "POST",
+        "baseUrl": "https://api.mimo-v2.com",
+        "path": "/v1/chat/completions",
+        "model": "mimo-v2-pro",
+        "headers": {
+          "accept": "application/json",
+          "content-type": "application/json",
+          "api-key": "***"
+        },
+        "body": {
+          "model": "mimo-v2-pro",
+          "max_tokens": 1,
+          "stream": false
+        }
+      }
+    },
+    {
+      "providerType": "OPENAI_COMPATIBLE",
+      "protocol": "OPENAI_COMPATIBLE",
+      "resourceFamily": "CHAT_TOOLS",
+      "status": "BUDGET_GUARD_BLOCKED",
+      "classification": "BUDGET_BLOCKED",
+      "skippedReason": "BILLABLE_PROBE_BLOCKED",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "model": "mimo-v2-pro",
+      "billable": true,
+      "writeOperation": false,
+      "failureMessage": "blocked api-key=*** for functional provider smoke",
+      "evidence": {
+        "probeKind": "openai_compatible_chat_tools",
+        "guard": "BILLABLE_PROBE_BLOCKED"
+      },
+      "requestPreview": {
+        "providerType": "OPENAI_COMPATIBLE",
+        "protocol": "OPENAI_COMPATIBLE",
+        "method": "POST",
+        "baseUrl": "https://api.mimo-v2.com",
+        "path": "/v1/chat/completions",
+        "model": "mimo-v2-pro",
+        "headers": {
+          "accept": "application/json",
+          "content-type": "application/json",
+          "api-key": "***"
+        },
+        "body": {
+          "model": "mimo-v2-pro",
+          "max_tokens": 1
+        }
+      }
+    }
+  ]
+}

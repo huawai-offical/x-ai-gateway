@@ -20,24 +20,14 @@ public final class OpenAiProtocolPathMatcher {
                 || path.equals("/v1/embeddings")
                 || path.startsWith("/v1/audio/")
                 || path.startsWith("/v1/images/")
-                || path.equals("/v1/videos")
-                || path.startsWith("/v1/videos/")
                 || path.equals("/v1/moderations")
                 || path.equals("/v1/files")
                 || path.startsWith("/v1/files/")
                 || path.equals("/v1/uploads")
                 || path.startsWith("/v1/uploads/")
-                || path.equals("/v1/batches")
-                || path.startsWith("/v1/batches/")
                 || path.equals("/v1/models")
                 || path.startsWith("/v1/models/")
-                || path.startsWith("/v1/fine_tuning/")
                 || path.startsWith("/v1/vector_stores")
-                || path.startsWith("/v1/containers")
-                || path.startsWith("/v1/evals")
-                || path.startsWith("/v1/skills")
-                || path.startsWith("/v1/realtime")
-                || path.startsWith("/v1/assistants")
-                || path.startsWith("/v1/threads");
+                || path.startsWith("/v1/realtime");
     }
 }

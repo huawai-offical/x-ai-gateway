@@ -28,7 +28,14 @@ GET /public/docs/openapi.json
 - `pricingMetadata`
 - `unsupportedFeatures`
 
-OpenAI Direct preset 使用 `openai-native` / `native-first` 口径：Chat、Responses、Conversations local lineage、Webhooks ingress event persistence、Files、Uploads、Batches create/get/cancel/list、Models list/get、gateway-registered fine-tuned model delete、Fine-tuning 基础面、Fine-tuning events/checkpoints 本地 lineage、Vector Stores local lifecycle / file attachment / file content read / local text search / file batch、Responses file_search 本地 Vector Store 绑定、Realtime client secret 与 Realtime WebSocket ingress 已分批闭环，但它不再声明官方 API 全量覆盖。`unsupportedFeatures` 会明确列出 Vector Stores real vector ingestion/semantic search/hosted file_search_call lifecycle、Fine-tuning pause/resume/checkpoint permissions/graders、Models upstream owner-role delete passthrough、Containers/Code Interpreter、Evals/Graders/Runs、Administration API 以及 Realtime full calls/WebRTC/SIP/translation/transcription 等未完成边界。`GET /v1/batches` 当前返回经本 gateway 创建并持久化的 Batch lineage 本地列表，不主动同步上游组织内所有历史 Batch；`DELETE /v1/models/{model}` 当前只删除经本 gateway fine-tuning/import 登记并归属当前 Distributed Key 的本地 fine-tuned model registry，不删除公共模型，也不主动调用上游组织级 Owner 删除；`GET /v1/fine_tuning/jobs/{jobId}/events` 与 `GET /v1/fine_tuning/jobs/{jobId}/checkpoints` 当前返回当前 Distributed Key 下 gateway-tracked tuning job 的本地 lineage，不声明同步上游完整事件历史或 checkpoint permissions。
+OpenAI Direct preset 使用 `openai-native` / `native-first` 口径：Chat、Responses、Conversations local lineage、Webhooks ingress event persistence、Files、Uploads、Models list/get、Vector Stores local lifecycle / file attachment / local chunk ingestion / file content read / local text search / file batch、Responses file_search 本地 Vector Store 绑定、Realtime client secret 与 Realtime WebSocket ingress 已分批闭环，但它不再声明官方 API 全量覆盖。`unsupportedFeatures` 会明确列出 Vector Stores real embedding/vector index ingestion/semantic search/hosted file_search_call lifecycle、非核心官方 API out-of-scope、Realtime full calls/WebRTC/SIP/translation/transcription 等边界。OpenAI `/v1/batches`、`/v1/fine_tuning/jobs*`、`DELETE /v1/models/{model}` 的 fine-tuned owner-role delete 语义不属于当前公开功能性服务 API。
+
+Anthropic、Gemini、Vertex 与 Codex 同步按 OpenAI 标准功能区收紧：
+
+- Anthropic 只保留 Messages、tools、thinking 等对话功能区，`message_batches`、provider admin、evals 等官方非核心 API 不纳入兼容面。
+- Gemini 只保留 generateContent、embeddings、files 等可映射支撑面；`batchGenerateContent`、tuning、eval-style 和 provider admin API 不纳入兼容面。
+- Vertex 只把 project/location 作为 Google Cloud 寻址和凭证边界，功能上仍限定在 Gemini 标准区；pipeline/job/admin、batch prediction、tuning 不纳入兼容面。
+- Codex 单独限定为 ChatGPT 官方账号的 Responses smoke/反代边界，不作为通用 provider catalog preset，不把非 Responses 的 Codex 内部 API 暴露为产品面。
 
 ## OpenAI-compatible 示例
 
@@ -139,17 +146,17 @@ Vector Stores 先建立 gateway local lifecycle 基线，面向 OpenAI-compatibl
 - `POST /v1/vector_stores`：创建 `vs_...` 本地 vector store，支持 optional `name`、`metadata`、`file_ids`、`expires_after` 与 `expires_at`。
 - `GET /v1/vector_stores`：返回 OpenAI-compatible list envelope，支持 `after`、`limit`、`order`，默认 `limit=20`、`order=desc`，`limit` 范围 1 到 100。
 - `GET /v1/vector_stores/{vectorStoreId}`、`POST /v1/vector_stores/{vectorStoreId}`、`DELETE /v1/vector_stores/{vectorStoreId}`：分别用于读取、更新和软删除当前 Distributed Key 下的本地 vector store；删除返回 `object=vector_store.deleted`。
-- `POST /v1/vector_stores/{vectorStoreId}/files`：把 `file_id` 作为本地 attachment 关联到 vector store，返回 `object=vector_store.file`；支持 `attributes` 与 `chunking_strategy` 的本地保真保存。
+- `POST /v1/vector_stores/{vectorStoreId}/files`：把 `file_id` 作为本地 attachment 关联到 vector store，返回 `object=vector_store.file`；支持 `attributes` 与 `chunking_strategy`，创建时读取当前 Distributed Key 下的 gateway file，写入本地 chunk ingestion metadata，并把 `usage_bytes` 设置为真实文件字节数。
 - `GET /v1/vector_stores/{vectorStoreId}/files`：返回当前 vector store 的本地 attachment list envelope，支持 `after`、`limit`、`order`、`filter`。
 - `GET /v1/vector_stores/{vectorStoreId}/files/{fileId}` 与 `DELETE /v1/vector_stores/{vectorStoreId}/files/{fileId}`：按当前 Distributed Key 与 parent vector store 双重校验；删除返回 `object=vector_store.file.deleted`，并同步更新 parent `file_counts`。
 - `GET /v1/vector_stores/{vectorStoreId}/files/{fileId}/content`：读取当前 Distributed Key 下指定 attachment 对应的 gateway file，本地返回 `object=vector_store.file_content.page`、`data/content` 文本页、`has_more=false` 与 `next_page=null`；该能力不等价于 OpenAI 托管解析、embedding 或真实向量索引。
-- `POST /v1/vector_stores/{vectorStoreId}/search`：对当前 vector store 内可读取的本地 gateway file attachment 执行 UTF-8 词法检索，返回 `object=vector_store.search_results.page`、`search_query`、`data[].file_id`、`score`、`attributes` 与文本片段；支持 `query`、attributes `filters`、`max_num_results` 和 `ranking_options.score_threshold`，但不等价于 OpenAI 托管 semantic vector ingestion、rerank 或 query rewrite。
-- `POST /v1/vector_stores/{vectorStoreId}/file_batches`：批量创建本地 `vector_store.file_batch`，支持 `file_ids` 或 `files` 两种输入；会先完成非空、去重和已存在 attachment 校验，再一次性创建 batch 与 file attachment，避免部分批次落库。
+- `POST /v1/vector_stores/{vectorStoreId}/search`：优先检索 attachment metadata 中已固化的本地 ingestion chunks；历史 attachment 没有 ingestion metadata 时回退读取原始 gateway file 文本。返回 `object=vector_store.search_results.page`、`search_query`、`data[].file_id`、`score`、`attributes` 与文本片段；支持 `query`、attributes `filters`、`max_num_results` 和 `ranking_options.score_threshold`，但不等价于 OpenAI 托管 semantic vector retrieval、rerank 或 query rewrite。
+- `POST /v1/vector_stores/{vectorStoreId}/file_batches`：批量创建本地 `vector_store.file_batch`，支持 `file_ids` 或 `files` 两种输入；会先完成非空、去重和已存在 attachment 校验，再一次性创建 batch 与 file attachment，并为每个 attachment 固化本地 chunk ingestion metadata。
 - `GET /v1/vector_stores/{vectorStoreId}/file_batches/{batchId}`：读取当前 Distributed Key 和 parent vector store 下的本地 file batch。
 - `POST /v1/vector_stores/{vectorStoreId}/file_batches/{batchId}/cancel`：本地同步完成的 batch 返回清晰错误，不把已创建 attachment 伪装成可取消；后续真实异步 ingestion 接入后再扩展 `in_progress` 状态迁移。
 - `GET /v1/vector_stores/{vectorStoreId}/file_batches/{batchId}/files`：按 batch metadata 记录的 `file_ids` 返回 active attachment list envelope，支持 `after`、`limit`、`order`、`filter`。
 
-当前实现只声明 vector store lifecycle、本地 file attachment lifecycle、本地 file content read、本地文本 search、本地 file batch lifecycle 与 Responses `file_search` 本地 Vector Store 绑定。真实向量索引、语义检索、hosted `file_search_call` lifecycle 和 OpenAI Direct 上游同步仍归属 `TASK-20260514-023` 后续切片。
+当前实现只声明 vector store lifecycle、本地 file attachment lifecycle、本地 chunk ingestion metadata、本地 file content read、本地文本 search、本地 file batch lifecycle 与 Responses `file_search` 本地 Vector Store 绑定。本地 ingestion metadata 使用字符近似 token 切 chunk，记录 `content_sha256`、`chunk_count` 与 chunk 文本，仍不等价于 OpenAI 托管 embedding、真实向量索引或语义检索；真实 embedding/vector index ingestion、语义检索、hosted `file_search_call` lifecycle 和 OpenAI Direct 上游同步仍归属 `TASK-20260514-023` 后续切片。
 
 ## OpenAI Rate Limit Headers
 
@@ -172,7 +179,7 @@ $env:OPENAI_BASE_URL="https://gateway.example.com/v1"
 
 - 运行时入口：`GET /public/docs/openapi.json`
 - 本地维护文件：[openapi/public-openapi.json](openapi/public-openapi.json)
-- 范围：公开 docs、OpenAI-compatible Chat/Responses/Conversations/Vector Stores/Webhooks、Web Search、Claude Messages、Gemini generateContent、Video/Music async task、Media provider matrix。
+- 范围：公开 docs、OpenAI-compatible Chat/Responses/Conversations/Vector Stores/Webhooks、Web Search、Claude Messages、Gemini/Vertex generateContent 标准区、Codex Responses smoke 边界、Video/Music async task、Media provider matrix。
 - 非范围：内部 Admin 全量接口、真实 provider 私有字段、未公开的运营接口。
 
 ## i18n 策略
@@ -189,6 +196,8 @@ $env:OPENAI_BASE_URL="https://gateway.example.com/v1"
 - OpenAI Direct `responses/input_tokens` 支持 native passthrough；上游已执行后的错误状态不回退成本地估算，避免掩盖真实请求错误。
 - Anthropic Messages：支持 `service_tier`、`container`、`metadata`、`context_management` 与受控 `mcp_servers` 下发。`mcp_servers` 默认需要 `x_ai_gateway_mcp_allowlist` 或 `x_ai_gateway_allow_mcp_servers=true`，并会自动合并 `anthropic-beta: mcp-client-2025-04-04`。
 - Gemini generateContent：支持保留 `generationConfig.thinkingConfig`、`toolConfig.functionCallingConfig`、`googleSearch`、`urlContext` 与标准 function declarations。`googleMaps` grounding 默认需要 `x_ai_gateway_allow_google_maps=true`，避免未授权计费或外部访问。
+- Vertex：仅在 provider catalog 和 compatibility matrix 中声明 project/location 寻址、凭证与 Gemini 标准区映射，不把 Vertex AI Platform 的 pipeline/job/admin/tuning/batch prediction 扩展为公开 API。
+- Codex：官方账号 smoke 只调用 `/backend-api/codex/responses`，并沿用 Responses request body、streaming、reasoning effort 和 usage budget guard；其它 Codex 内部接口不进入产品兼容面。
 
 ## 错误码说明
 

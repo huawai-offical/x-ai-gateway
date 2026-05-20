@@ -12,6 +12,8 @@ import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountPoolEn
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountPoolRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountRepository;
 import java.nio.charset.StandardCharsets;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
@@ -36,6 +38,7 @@ public class OfficialAccountAdminService {
 
     private static final String IMPORT_REFRESH_ADAPTER = "official-account-quota-local";
     private static final String CODEX_AUTH_JSON_ADAPTER = "codex-auth-json-local-inspection";
+    private static final String CODEX_RECORD_REPLAY_SCHEMA_VERSION = "2026-05-19.codex-responses-smoke-record-replay.v1";
 
     private final UpstreamAccountRepository upstreamAccountRepository;
     private final UpstreamAccountPoolRepository upstreamAccountPoolRepository;
@@ -224,6 +227,24 @@ public class OfficialAccountAdminService {
         String credentialFingerprint = routeEligible
                 ? credentialFingerprint(entity)
                 : credentialCiphertextFingerprint(entity);
+        Map<String, Integer> summary = smokeSummary(classification);
+        Map<String, Object> recordReplayFixture = codexRecordReplayFixture(
+                status,
+                classification,
+                skippedReason,
+                path,
+                baseUrl,
+                codexAppApi,
+                model,
+                dryRun,
+                routeEligible,
+                routeBlockReason,
+                credentialFingerprint,
+                requestPreview,
+                liveResult,
+                now,
+                summary
+        );
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("status", status);
         result.put("classification", classification);
@@ -253,6 +274,7 @@ public class OfficialAccountAdminService {
                 result.put("keepalive", liveResult.usageProbe().toSafeMap());
             }
         }
+        result.put("recordReplayFixture", recordReplayFixture);
         result.put("checkedAt", now.toString());
         entity.setLastRefreshResultJson(writeJson(result));
         upstreamAccountRepository.save(entity);
@@ -277,6 +299,7 @@ public class OfficialAccountAdminService {
                 liveResult == null ? null : liveResult.failureType(),
                 liveResult == null ? null : liveResult.failureMessage(),
                 liveResult == null || liveResult.usageProbe() == null ? null : liveResult.usageProbe().toSafeMap(),
+                recordReplayFixture,
                 now,
                 message,
                 requestPreview
@@ -348,6 +371,104 @@ public class OfficialAccountAdminService {
         };
     }
 
+    private Map<String, Integer> smokeSummary(String classification) {
+        Map<String, Integer> summary = new LinkedHashMap<>();
+        for (String key : List.of("PASS", "FAIL", "SKIPPED", "UNSUPPORTED", "NO_PERMISSION", "BUDGET_BLOCKED")) {
+            summary.put(key, key.equals(classification) ? 1 : 0);
+        }
+        return summary;
+    }
+
+    private Map<String, Object> codexRecordReplayFixture(
+            String status,
+            String classification,
+            String skippedReason,
+            String path,
+            String baseUrl,
+            boolean codexAppApi,
+            String model,
+            boolean dryRun,
+            boolean routeEligible,
+            String routeBlockReason,
+            String credentialFingerprint,
+            Map<String, Object> requestPreview,
+            CodexResponsesSmokeHttpClient.CodexResponsesSmokeResult liveResult,
+            Instant recordedAt,
+            Map<String, Integer> summary) {
+        Map<String, Object> replayPolicy = new LinkedHashMap<>();
+        replayPolicy.put("network", "disabled_by_default");
+        replayPolicy.put("billableOperations", "replay_only");
+        replayPolicy.put("writeOperations", "replay_only");
+        replayPolicy.put("secretMaterial", "redacted");
+        replayPolicy.put("fixtureSource", "codex_responses_smoke");
+        replayPolicy.put("dryRunEvidenceAccepted", dryRun);
+        replayPolicy.put("liveExecutionRequiresDryRunFalse", true);
+        replayPolicy.put("liveExecutionRequiresRouteEligible", true);
+        replayPolicy.put("liveExecutionRequiresBudgetAvailable", true);
+
+        Map<String, Object> fixture = new LinkedHashMap<>();
+        fixture.put("resourceFamily", "codex_responses");
+        fixture.put("status", status);
+        fixture.put("classification", classification);
+        if (skippedReason != null) {
+            fixture.put("skippedReason", skippedReason);
+        }
+        fixture.put("method", "POST");
+        fixture.put("path", path);
+        fixture.put("model", model);
+        fixture.put("billable", !dryRun && routeEligible);
+        fixture.put("writeOperation", !dryRun && routeEligible);
+        if (liveResult != null) {
+            putIfPresent(fixture, "httpStatus", liveResult.httpStatus());
+            putIfPresent(fixture, "upstreamRequestId", liveResult.upstreamRequestId());
+            putIfPresent(fixture, "upstreamResponseId", liveResult.upstreamResponseId());
+            fixture.put("durationMs", liveResult.durationMs());
+            putIfPresent(fixture, "failureType", liveResult.failureType());
+            putIfPresent(fixture, "failureMessage", liveResult.failureMessage());
+        }
+        Map<String, Object> evidence = new LinkedHashMap<>();
+        evidence.put("codexAppApi", codexAppApi);
+        evidence.put("routeEligible", routeEligible);
+        evidence.put("credentialFingerprint", credentialFingerprint);
+        if (routeBlockReason != null) {
+            evidence.put("routeBlockReason", routeBlockReason);
+        }
+        if (liveResult != null && liveResult.usageProbe() != null) {
+            evidence.put("keepalive", liveResult.usageProbe().toSafeMap());
+        }
+        fixture.put("evidence", sanitizeMap(evidence));
+        fixture.put("requestPreview", sanitizeMap(requestPreview));
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("schemaVersion", CODEX_RECORD_REPLAY_SCHEMA_VERSION);
+        result.put("replayMode", "record_replay");
+        result.put("providerType", "CODEX_OAUTH");
+        result.put("protocol", "codex-responses");
+        result.put("baseUrl", sanitizeText(baseUrl));
+        result.put("baseUrlHost", baseUrlHost(baseUrl));
+        result.put("certificationStatus", codexCertificationStatus(classification, dryRun));
+        result.put("dryRun", dryRun);
+        result.put("recordedAt", recordedAt.toString());
+        result.put("summary", summary);
+        result.put("replayPolicy", replayPolicy);
+        result.put("fixtures", List.of(sanitizeMap(fixture)));
+        return sanitizeMap(result);
+    }
+
+    private String codexCertificationStatus(String classification, boolean dryRun) {
+        if (dryRun) {
+            return "DRY_RUN";
+        }
+        return switch (classification) {
+            case "PASS" -> "CERTIFIED";
+            case "BUDGET_BLOCKED" -> "BUDGET_BLOCKED";
+            case "NO_PERMISSION" -> "NO_PERMISSION";
+            case "UNSUPPORTED" -> "UNSUPPORTED";
+            case "FAIL" -> "FAILED";
+            default -> "SKIPPED";
+        };
+    }
+
     private boolean isUnsupportedFailure(CodexResponsesSmokeHttpClient.CodexResponsesSmokeResult liveResult) {
         String failureType = upper(liveResult.failureType());
         return failureType.contains("UNSUPPORTED")
@@ -387,6 +508,49 @@ public class OfficialAccountAdminService {
                 || Boolean.FALSE.equals(usageProbe.allowed())
                 || (usageProbe.httpStatus() != null && usageProbe.httpStatus() == 429)
                 || isBudgetBlockReason(usageProbe.failureType());
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> sanitizeMap(Map<String, Object> value) {
+        if (value == null || value.isEmpty()) {
+            return Map.of();
+        }
+        Object sanitized = sensitiveJsonSanitizer.sanitizeValue("", value);
+        if (sanitized instanceof Map<?, ?> map) {
+            Map<String, Object> result = new LinkedHashMap<>();
+            map.forEach((key, item) -> {
+                if (key != null) {
+                    result.put(String.valueOf(key), item);
+                }
+            });
+            return result;
+        }
+        return Map.of();
+    }
+
+    private String sanitizeText(String value) {
+        if (value == null) {
+            return null;
+        }
+        Object sanitized = sensitiveJsonSanitizer.sanitizeValue("", value);
+        return sanitized == null ? null : truncate(String.valueOf(sanitized), 512);
+    }
+
+    private String baseUrlHost(String baseUrl) {
+        if (baseUrl == null || baseUrl.isBlank()) {
+            return null;
+        }
+        try {
+            return sanitizeText(new URI(baseUrl).getHost());
+        } catch (URISyntaxException exception) {
+            return null;
+        }
+    }
+
+    private void putIfPresent(Map<String, Object> target, String key, Object value) {
+        if (value != null) {
+            target.put(key, value);
+        }
     }
 
     private boolean isBudgetBlockReason(String value) {

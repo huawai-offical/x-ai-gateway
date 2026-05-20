@@ -6,6 +6,20 @@
 - In Progress：进行中，位于 `tasks/in-progress/`
 - Done：已完成，位于 `tasks/done/`
 
+## 当前最高优先级：Codex 功能性服务 API
+
+用户已要求先不做测试、全速推进项目任务，并将 Codex 相关任务提升到最高优先。当前 Codex 队列只围绕对话、streaming、tools、Responses、多模态与必要支撑能力推进，不恢复 Fine-tuning、Batches、Evals、Admin 或非 Responses Codex 内部 API。
+
+| 排期 | 任务 | 状态 | 执行定位 |
+| --- | --- | --- | --- |
+| P0-CODEX-01 | [TASK-20260519-002 Codex 功能性服务 API 最高优先推进](done/TASK-20260519-002-codex-priority-functional-service-api.md) | Done | Codex-first 父任务与执行队列已归档 |
+| P0-CODEX-02 | [TASK-20260519-002-01 Codex 功能性服务 API 事实源优先收紧](done/TASK-20260519-002-01-codex-functional-truth-source-priority.md) | Done | 第一执行切片已归档；测试按用户当前策略延后 |
+| P0-CODEX-03 | [TASK-20260514-029 对话与 Tools OpenAPI、Catalog、Conformance 与 SDK 事实源统一](in-progress/TASK-20260514-029-openai-openapi-catalog-conformance-sdk.md) | In Progress | `TASK-20260514-029-01` 已归档，后续派生 OpenAPI/catalog/docs |
+| P0-CODEX-03a | [TASK-20260514-029-02 Codex OpenAPI, Catalog & Conformance 深度融合](done/TASK-20260514-029-02-codex-openapi-catalog-conformance.md) | Done | Codex OpenAPI/Catalog 收敛与本地配置最佳实践 |
+| P0-CODEX-03b | [TASK-20260514-029-03 Codex 运营控制台体验对标与 Session 恢复桥接](done/TASK-20260514-029-03-codex-console-session-recovery.md) | Done | 终端 CLI 恢复指令 API 及前端审计/详情面板与运行态专区 UI 闭环 |
+| P0-CODEX-04 | [TASK-20260519-002-02 Codex Smoke、Record/Replay 与成本防护复核](done/TASK-20260519-002-02-codex-smoke-record-replay-priority.md) | Done | 第二执行切片已归档；测试按用户当前策略延后 |
+| P0-CODEX-05 | [TASK-20260514-031 OpenAI 真实 Smoke 与认证成本防护](backlog/TASK-20260514-031-openai-real-smoke-certification-harness.md) | Backlog | Critical；承接 Codex/OpenAI-compatible smoke 机制 |
+
 ## 当前 Backlog 优先级队列
 
 | 排期 | 任务 | 状态 | 执行定位 |
@@ -180,38 +194,43 @@
 | [TASK-20260514-010 Anthropic MCP/service tier/container/context management 字段下发](done/TASK-20260514-010-anthropic-mcp-service-tier-field-parity.md) | Done | High | REP-20260514 API/changelog |
 | [TASK-20260514-011 Gemini thinkingConfig/toolConfig/URL context/Grounding 参数 parity](done/TASK-20260514-011-gemini-thinking-toolconfig-grounding-parity.md) | Done | High | REP-20260514 API/changelog |
 | [TASK-20260514-012 OpenAI API 完整兼容性深度审计](done/TASK-20260514-012-openai-api-compatibility-deep-audit.md) | Done | High | REQ-20260514-008 |
-| [TASK-20260514-013 OpenAI Chat/Responses 参数全量保真与原生 Responses 边界](backlog/TASK-20260514-013-openai-chat-responses-native-parity.md) | Backlog | High | REP-20260514 OpenAI API 审计 |
-| [TASK-20260514-014 OpenAI 官方资源族覆盖差距补齐](backlog/TASK-20260514-014-openai-resource-family-coverage-gap.md) | Backlog | High | REP-20260514 OpenAI API 审计 |
-| [TASK-20260514-015 OpenAI 公开 OpenAPI、catalog 与 conformance 事实源校准](backlog/TASK-20260514-015-openai-openapi-conformance-truth-source-hardening.md) | Backlog | Medium | REP-20260514 OpenAI API 审计 |
+| [TASK-20260514-014 OpenAI 对话与 Tools 支撑资源族覆盖差距补齐](done/TASK-20260514-014-openai-resource-family-coverage-gap.md) | Done | High | REP-20260514 OpenAI API 审计 / REQ-20260518-005 |
+| [TASK-20260514-015 OpenAI 公开 OpenAPI、catalog 与 conformance 事实源校准](done/TASK-20260514-015-openai-openapi-conformance-truth-source-hardening.md) | Done | Medium | REP-20260514 OpenAI API 审计 / REQ-20260518-005 |
 
-## OpenAI API 全量覆盖任务体系
+## 对话与 Tools 功能性 API 任务体系
 
 | 任务 | 状态 | 优先级 | 来源 |
 | --- | --- | --- | --- |
-| [TASK-20260514-016 OpenAI API 全量覆盖总控父任务](backlog/TASK-20260514-016-openai-full-api-coverage-parent.md) | Backlog | Critical | REQ-20260514-009 |
+| [TASK-20260518-005 对话与 Tools 功能性服务 API 范围清理](done/TASK-20260518-005-functional-service-api-scope-pruning.md) | Done | Critical | REQ-20260518-005 |
+| [TASK-20260518-006 非核心 API 兼容代码彻底清理](done/TASK-20260518-006-non-core-api-code-eradication.md) | Done | Critical | REQ-20260518-006 |
+| [TASK-20260519-001 Gemini 与 MiMo 功能性服务 API 真实 Smoke](done/TASK-20260519-001-functional-real-smoke-gemini-mimo.md) | Done | Critical | REQ-20260519-001 / TASK-20260514-031 |
+| [TASK-20260519-002 Codex 功能性服务 API 最高优先推进](done/TASK-20260519-002-codex-priority-functional-service-api.md) | Done | Critical | REQ-20260519-002 |
+| [TASK-20260519-002-01 Codex 功能性服务 API 事实源优先收紧](done/TASK-20260519-002-01-codex-functional-truth-source-priority.md) | Done | Critical | TASK-20260519-002 / TASK-20260514-029 |
+| [TASK-20260519-002-02 Codex Smoke、Record/Replay 与成本防护复核](done/TASK-20260519-002-02-codex-smoke-record-replay-priority.md) | Done | Critical | TASK-20260519-002 / TASK-20260514-031 |
+| [TASK-20260514-016 对话与 Tools 功能性 API 覆盖总控父任务](backlog/TASK-20260514-016-openai-full-api-coverage-parent.md) | Backlog | Critical | REQ-20260514-009 / REQ-20260518-005 |
+| [TASK-20260514-013 OpenAI Chat/Responses 参数全量保真与原生 Responses 边界](backlog/TASK-20260514-013-openai-chat-responses-native-parity.md) | Backlog | High | TASK-20260514-016 / REP-20260518 |
 | [TASK-20260514-017 OpenAI Chat Completions 全参数与对象生命周期](backlog/TASK-20260514-017-openai-chat-completions-full-parity.md) | Backlog | Critical | TASK-20260514-016 / 013 |
 | [TASK-20260514-018 OpenAI Responses 原生执行器与生命周期](backlog/TASK-20260514-018-openai-responses-native-lifecycle.md) | Backlog | Critical | TASK-20260514-016 / 013 |
 | [TASK-20260514-019 OpenAI Conversations、Webhooks 与 Responses 工具生态](backlog/TASK-20260514-019-openai-conversations-webhooks-tools.md) | Backlog | High | TASK-20260514-016 / 013 |
 | [TASK-20260514-020 OpenAI Audio、Images、Embeddings、Moderations 参数 parity](backlog/TASK-20260514-020-openai-audio-images-embeddings-moderations-parity.md) | Backlog | High | TASK-20260514-016 / 014 |
-| [TASK-20260514-021 OpenAI Files、Uploads、Batches、Models 对象生命周期](backlog/TASK-20260514-021-openai-files-uploads-batches-models-lifecycle.md) | Backlog | High | TASK-20260514-016 / 014 |
-| [TASK-20260516-012 OpenAI Models Delete 与 Fine-tuned Model 删除边界](done/TASK-20260516-012-openai-models-delete-finetuned-boundary.md) | Done | High | TASK-20260514-021 / 014 |
-| [TASK-20260514-022 OpenAI Fine-tuning 全生命周期](backlog/TASK-20260514-022-openai-fine-tuning-full-lifecycle.md) | Backlog | High | TASK-20260514-016 / 014 |
-| [TASK-20260516-013 OpenAI Fine-tuning Events/Checkpoints 本地 Lineage 列表](done/TASK-20260516-013-openai-fine-tuning-events-checkpoints-local-lineage.md) | Done | High | TASK-20260514-022 / 014 |
-| [TASK-20260514-023 OpenAI Vector Stores 全栈兼容](backlog/TASK-20260514-023-openai-vector-stores-full-stack.md) | Backlog | High | TASK-20260514-016 / 014 |
+| [TASK-20260514-021 OpenAI Files、Uploads、Models 对话支撑最小生命周期](backlog/TASK-20260514-021-openai-files-uploads-batches-models-lifecycle.md) | Backlog | High | TASK-20260514-016 / 014 |
+| [TASK-20260514-023 OpenAI Vector Stores 对话 RAG 支撑面](backlog/TASK-20260514-023-openai-vector-stores-full-stack.md) | Backlog | High | TASK-20260514-016 / 014 |
 | [TASK-20260517-003 OpenAI Vector Stores 本地 Lifecycle 基线](done/TASK-20260517-003-openai-vector-stores-local-lifecycle-baseline.md) | Done | High | TASK-20260514-023 |
 | [TASK-20260517-004 OpenAI Vector Store Files 本地 Attachment Lifecycle 基线](done/TASK-20260517-004-openai-vector-store-files-local-attachment-lifecycle.md) | Done | High | TASK-20260514-023 |
 | [TASK-20260517-005 OpenAI Vector Store File Batches 本地 Lifecycle 基线](done/TASK-20260517-005-openai-vector-store-file-batches-local-lifecycle.md) | Done | High | TASK-20260514-023 |
 | [TASK-20260518-001 OpenAI Vector Store File Content 本地读取基线](done/TASK-20260518-001-openai-vector-store-file-content-local-read-baseline.md) | Done | High | TASK-20260514-023 |
 | [TASK-20260518-002 OpenAI Vector Store Search 本地文本检索基线](done/TASK-20260518-002-openai-vector-store-search-local-text-baseline.md) | Done | High | TASK-20260514-023 |
 | [TASK-20260518-003 OpenAI Responses File Search 本地 Vector Store 绑定基线](done/TASK-20260518-003-openai-responses-file-search-local-vector-store-binding.md) | Done | High | TASK-20260514-023 |
-| [TASK-20260514-024 OpenAI Containers 与 Code Interpreter 文件](backlog/TASK-20260514-024-openai-containers-code-interpreter-files.md) | Backlog | High | TASK-20260514-016 / 014 |
-| [TASK-20260514-025 OpenAI Videos API 兼容面](backlog/TASK-20260514-025-openai-videos-api-parity.md) | Backlog | Medium | TASK-20260514-016 / 014 |
-| [TASK-20260514-026 OpenAI Evals、Graders 与 Runs API](backlog/TASK-20260514-026-openai-evals-graders-runs.md) | Backlog | Medium | TASK-20260514-016 / 014 |
-| [TASK-20260514-027 OpenAI Skills API 与工具分发](backlog/TASK-20260514-027-openai-skills-api-tool-distribution.md) | Backlog | Medium | TASK-20260514-016 / 014 |
-| [TASK-20260514-028 OpenAI Administration API 权限隔离与只读优先](backlog/TASK-20260514-028-openai-administration-api-boundary.md) | Backlog | Medium | TASK-20260514-016 / 014 |
-| [TASK-20260514-029 OpenAI OpenAPI、Catalog、Conformance 与 SDK 事实源统一](backlog/TASK-20260514-029-openai-openapi-catalog-conformance-sdk.md) | Backlog | Medium | TASK-20260514-016 / 015 |
+| [TASK-20260518-004 OpenAI Vector Store 本地 Ingestion 产物基线](done/TASK-20260518-004-openai-vector-store-local-ingestion-artifact-baseline.md) | Done | High | TASK-20260514-023 |
+| [TASK-20260514-029 对话与 Tools OpenAPI、Catalog、Conformance 与 SDK 事实源统一](in-progress/TASK-20260514-029-openai-openapi-catalog-conformance-sdk.md) | In Progress | Critical | TASK-20260514-016 / 015 / TASK-20260519-002 |
+| [TASK-20260514-029-01 功能性服务 API Coverage Matrix Source](done/TASK-20260514-029-01-functional-service-api-coverage-matrix-source.md) | Done | Critical | TASK-20260514-029 |
+| [TASK-20260514-029-02 Codex OpenAPI, Catalog & Conformance 深度融合](done/TASK-20260514-029-02-codex-openapi-catalog-conformance.md) | Done | Critical | TASK-20260514-029 |
+| [TASK-20260514-029-03 Codex 运营控制台体验对标与 Session 恢复桥接](done/TASK-20260514-029-03-codex-console-session-recovery.md) | Done | Critical | TASK-20260514-029 |
 | [TASK-20260514-030 OpenAI 横切协议兼容](backlog/TASK-20260514-030-openai-cross-cutting-protocol-compatibility.md) | Backlog | Critical | TASK-20260514-016 |
 | [TASK-20260514-031 OpenAI 真实 Smoke 与认证成本防护](backlog/TASK-20260514-031-openai-real-smoke-certification-harness.md) | Backlog | Critical | TASK-20260514-016 / 015 |
+| [TASK-20260519-001-01 Smoke 范围矩阵与 Provider Auth 设计](done/TASK-20260519-001-01-smoke-scope-provider-auth-design.md) | Done | Critical | TASK-20260519-001 |
+| [TASK-20260519-001-02 Gemini/MiMo Provider-aware Smoke Runner](done/TASK-20260519-001-02-gemini-mimo-provider-aware-smoke-runner.md) | Done | Critical | TASK-20260519-001 |
+| [TASK-20260519-001-03 Record/Replay、脱敏与成本防护验证](done/TASK-20260519-001-03-smoke-record-replay-redaction-budget.md) | Done | High | TASK-20260519-001 |
 | [TASK-20260515-001 OpenAI 错误 Envelope 与 Request Id 基线](done/TASK-20260515-001-openai-error-request-id-foundation.md) | Done | Critical | TASK-20260514-030 |
 | [TASK-20260515-002 OpenAI 官方 Headers 与 Idempotency-Key 下发基线](done/TASK-20260515-002-openai-official-headers-idempotency-foundation.md) | Done | Critical | TASK-20260514-030 |
 | [TASK-20260515-003 OpenAI Chat Completions Create 参数保真基线](done/TASK-20260515-003-openai-chat-create-parameter-parity-foundation.md) | Done | Critical | TASK-20260514-017 |
@@ -246,7 +265,6 @@
 | [TASK-20260516-008 OpenAI Realtime WebSocket 入口与事件代理基线](done/TASK-20260516-008-openai-realtime-websocket-ingress-event-proxy.md) | Done | Critical | TASK-20260514-030 |
 | [TASK-20260516-009 OpenAI Direct 显式 Billable/Write Smoke Probe](done/TASK-20260516-009-openai-direct-explicit-billable-write-smoke-probes.md) | Done | Critical | TASK-20260514-031 |
 | [TASK-20260516-010 OpenAI Provider Catalog 覆盖边界校准](done/TASK-20260516-010-openai-provider-catalog-coverage-boundary.md) | Done | High | TASK-20260514-015 / 029 |
-| [TASK-20260516-011 OpenAI Batches List Envelope 与本地游标分页](done/TASK-20260516-011-openai-batches-list-envelope.md) | Done | High | TASK-20260514-021 / 015 |
 | [TASK-20260516-014 OpenAI Responses Tools Registry 与非 function Tool 显式边界](done/TASK-20260516-014-openai-responses-tool-registry-boundary.md) | Done | High | TASK-20260514-019 / 013 |
 | [TASK-20260516-015 OpenAI Conversations 本地 Lifecycle](done/TASK-20260516-015-openai-conversations-local-lifecycle.md) | Done | High | TASK-20260514-019 |
 | [TASK-20260516-016 OpenAI Webhooks 接收入口与事件落库](done/TASK-20260516-016-openai-webhooks-ingress-event-persistence.md) | Done | High | TASK-20260514-019 |

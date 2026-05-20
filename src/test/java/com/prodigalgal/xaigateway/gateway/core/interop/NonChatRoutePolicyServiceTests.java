@@ -181,49 +181,6 @@ class NonChatRoutePolicyServiceTests {
         assertTrue(decision.policyReason().contains("selection_mode=distributed_target"));
     }
 
-    @Test
-    void shouldExposeAnthropicNativeMessageBatchAsOrchestrationWrappedNativeSurface() {
-        GatewayRequestSemantics semantics = new GatewayRequestSemantics(
-                TranslationResourceType.BATCH,
-                TranslationOperation.ANTHROPIC_MESSAGE_BATCH_CREATE,
-                List.of(InteropFeature.ANTHROPIC_MESSAGE_BATCH),
-                RouteSelectionMode.CATALOG_SELECTION
-        );
-        CatalogCandidateView candidate = new CatalogCandidateView(
-                401L,
-                "anthropic-direct",
-                ProviderType.ANTHROPIC_DIRECT,
-                "https://api.anthropic.com",
-                "claude-sonnet-4",
-                "claude-sonnet-4",
-                List.of("anthropic_native"),
-                true,
-                false,
-                false,
-                true,
-                false,
-                false,
-                ReasoningTransport.ANTHROPIC
-        );
-
-        Mockito.when(siteCapabilityTruthService.resolve(Mockito.eq(candidate), Mockito.eq(semantics)))
-                .thenReturn(report(InteropFeature.ANTHROPIC_MESSAGE_BATCH, InteropCapabilityLevel.NATIVE, List.of()));
-
-        NonChatRoutePolicyDecision decision = service.evaluateCandidate(
-                "anthropic_native",
-                "/v1/messages/batches",
-                semantics,
-                candidate,
-                canonicalRequest("/v1/messages/batches", "claude-sonnet-4"),
-                null
-        );
-
-        assertEquals(ExecutionBackend.ORCHESTRATION, decision.preferredBackend());
-        assertEquals(SupportStatus.ORCHESTRATION, decision.supportStatus());
-        assertEquals(InteropCapabilityLevel.NATIVE, decision.overallCapabilityLevel());
-        assertTrue(decision.policyReason().contains("selection_mode=catalog_selection"));
-    }
-
     private CapabilityResolutionReport report(
             InteropFeature feature,
             InteropCapabilityLevel effectiveLevel,

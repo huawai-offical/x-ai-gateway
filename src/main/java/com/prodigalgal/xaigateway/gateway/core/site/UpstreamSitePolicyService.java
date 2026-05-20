@@ -95,8 +95,6 @@ public class UpstreamSitePolicyService {
                     true,
                     true,
                     true,
-                    true,
-                    true,
                     "sse",
                     "provider-native",
                     null
@@ -110,8 +108,6 @@ public class UpstreamSitePolicyService {
                     List.of("openai", "responses"),
                     true,
                     true,
-                    false,
-                    false,
                     false,
                     false,
                     false,
@@ -138,8 +134,6 @@ public class UpstreamSitePolicyService {
                     false,
                     false,
                     false,
-                    false,
-                    false,
                     "sse",
                     "provider-specific-fallback",
                     null
@@ -151,8 +145,6 @@ public class UpstreamSitePolicyService {
                     ModelAddressingStrategy.MODEL_NAME,
                     ErrorSchemaStrategy.OPENAI_ERROR,
                     List.of("openai"),
-                    false,
-                    false,
                     false,
                     false,
                     false,
@@ -180,8 +172,6 @@ public class UpstreamSitePolicyService {
                     false,
                     false,
                     false,
-                    false,
-                    false,
                     "sse",
                     "workflow-openai-compatible",
                     null
@@ -195,8 +185,6 @@ public class UpstreamSitePolicyService {
                     List.of("openai", "responses"),
                     true,
                     true,
-                    false,
-                    false,
                     false,
                     false,
                     false,
@@ -220,8 +208,6 @@ public class UpstreamSitePolicyService {
                     false,
                     false,
                     false,
-                    true,
-                    true,
                     false,
                     false,
                     "sse",
@@ -242,8 +228,6 @@ public class UpstreamSitePolicyService {
                     true,
                     true,
                     false,
-                    true,
-                    true,
                     false,
                     "sse",
                     "translation-layer",
@@ -256,8 +240,6 @@ public class UpstreamSitePolicyService {
                     ModelAddressingStrategy.OLLAMA_MODEL_TAG,
                     ErrorSchemaStrategy.OLLAMA_ERROR,
                     List.of("openai", "responses", "anthropic_native", "google_native"),
-                    false,
-                    false,
                     false,
                     false,
                     false,
@@ -285,8 +267,6 @@ public class UpstreamSitePolicyService {
                     false,
                     false,
                     false,
-                    false,
-                    false,
                     "sse",
                     "compatibility-api",
                     null
@@ -300,8 +280,6 @@ public class UpstreamSitePolicyService {
                     List.of("openai"),
                     false,
                     true,
-                    false,
-                    false,
                     false,
                     false,
                     false,
@@ -326,8 +304,6 @@ public class UpstreamSitePolicyService {
                     true,
                     true,
                     false,
-                    true,
-                    true,
                     false,
                     "sse",
                     "vertex-google-native",
@@ -380,17 +356,6 @@ public class UpstreamSitePolicyService {
             case UPLOAD_CREATE -> policy.supportsUploads()
                     ? InteropCapabilityLevel.NATIVE
                     : InteropCapabilityLevel.UNSUPPORTED;
-            case BATCH_CREATE -> siteKind == UpstreamSiteKind.ANTHROPIC_DIRECT
-                    ? InteropCapabilityLevel.UNSUPPORTED
-                    : policy.supportsBatches()
-                    ? InteropCapabilityLevel.NATIVE
-                    : InteropCapabilityLevel.UNSUPPORTED;
-            case ANTHROPIC_MESSAGE_BATCH -> siteKind == UpstreamSiteKind.ANTHROPIC_DIRECT && policy.supportsBatches()
-                    ? InteropCapabilityLevel.NATIVE
-                    : InteropCapabilityLevel.UNSUPPORTED;
-            case TUNING_CREATE -> policy.supportsTuning()
-                    ? InteropCapabilityLevel.NATIVE
-                    : InteropCapabilityLevel.UNSUPPORTED;
             case REALTIME_CLIENT_SECRET -> policy.supportsRealtime()
                     ? InteropCapabilityLevel.NATIVE
                     : InteropCapabilityLevel.UNSUPPORTED;
@@ -418,8 +383,6 @@ public class UpstreamSitePolicyService {
             boolean supportsModeration,
             boolean supportsFiles,
             boolean supportsUploads,
-            boolean supportsBatches,
-            boolean supportsTuning,
             boolean supportsRealtime,
             String streamTransport,
             String fallbackStrategy,

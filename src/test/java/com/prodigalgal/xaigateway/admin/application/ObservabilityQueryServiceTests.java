@@ -153,7 +153,7 @@ class ObservabilityQueryServiceTests {
         entity.setSupportStatus("DEGRADED");
         entity.setDegradationLevel("LOSSY");
         entity.setObjectMode("resource-orchestration");
-        entity.setGatewayResourceKey("batch_1");
+        entity.setGatewayResourceKey("upload_1");
         entity.setResponseKind("binary");
         entity.setResponseObjectType("file.content");
         entity.setResponseObjectId("file_123");
@@ -175,7 +175,7 @@ class ObservabilityQueryServiceTests {
         assertEquals(1, logs.size());
         assertEquals("DEGRADED", logs.get(0).supportStatus());
         assertEquals("LOSSY", logs.get(0).degradationLevel());
-        assertEquals("batch_1", logs.get(0).gatewayResourceKey());
+        assertEquals("upload_1", logs.get(0).gatewayResourceKey());
         assertEquals("binary", logs.get(0).responseKind());
         assertEquals("file.content", logs.get(0).responseObjectType());
         verify(requestLogRepository).search(eq(7L), eq(ProviderType.OPENAI_DIRECT), ArgumentMatchers.any(Pageable.class));
@@ -189,7 +189,7 @@ class ObservabilityQueryServiceTests {
         UpstreamCacheReferenceRepository upstreamCacheReferenceRepository = Mockito.mock(UpstreamCacheReferenceRepository.class);
         UsageRecordRepository usageRecordRepository = Mockito.mock(UsageRecordRepository.class);
 
-        RequestLogEntity entity = requestLog("req-1", "batch_1");
+        RequestLogEntity entity = requestLog("req-1", "upload_1");
         when(requestLogRepository.findByRequestId("req-1")).thenReturn(Optional.of(entity));
 
         ObservabilityQueryService service = new ObservabilityQueryService(
@@ -214,10 +214,10 @@ class ObservabilityQueryServiceTests {
         UpstreamCacheReferenceRepository upstreamCacheReferenceRepository = Mockito.mock(UpstreamCacheReferenceRepository.class);
         UsageRecordRepository usageRecordRepository = Mockito.mock(UsageRecordRepository.class);
 
-        when(requestLogRepository.findTop100ByGatewayResourceKeyOrderByCreatedAtDesc("batch_1"))
-                .thenReturn(List.of(requestLog("req-1", "batch_1")));
+        when(requestLogRepository.findTop100ByGatewayResourceKeyOrderByCreatedAtDesc("upload_1"))
+                .thenReturn(List.of(requestLog("req-1", "upload_1")));
         when(requestLogRepository.findByRequestId("req-1"))
-                .thenReturn(Optional.of(requestLog("req-1", "batch_1")));
+                .thenReturn(Optional.of(requestLog("req-1", "upload_1")));
 
         ObservabilityQueryService service = new ObservabilityQueryService(
                 routeDecisionLogRepository,
@@ -227,10 +227,10 @@ class ObservabilityQueryServiceTests {
                 usageRecordRepository
         );
 
-        var logs = service.listRequestLogs(null, null, null, null, null, "batch_1", null);
+        var logs = service.listRequestLogs(null, null, null, null, null, "upload_1", null);
         assertEquals(1, logs.size());
-        assertEquals("batch_1", logs.get(0).gatewayResourceKey());
-        verify(requestLogRepository).findTop100ByGatewayResourceKeyOrderByCreatedAtDesc("batch_1");
+        assertEquals("upload_1", logs.get(0).gatewayResourceKey());
+        verify(requestLogRepository).findTop100ByGatewayResourceKeyOrderByCreatedAtDesc("upload_1");
     }
 
     @Test
@@ -244,8 +244,8 @@ class ObservabilityQueryServiceTests {
 
         when(asyncResourceAdminService.findAsyncResourcesByUpstreamObjectId("upstream-1"))
                 .thenReturn(List.of(new AsyncResourceSummaryResponse(
-                        "batch_1",
-                        GatewayAsyncResourceType.BATCH,
+                        "upload_1",
+                        GatewayAsyncResourceType.UPLOAD,
                         "in_progress",
                         "IN_PROGRESS",
                         false,
@@ -259,10 +259,10 @@ class ObservabilityQueryServiceTests {
                         Instant.parse("2026-04-07T08:00:00Z"),
                         Instant.parse("2026-04-07T08:01:00Z")
                 )));
-        when(requestLogRepository.findTop100ByGatewayResourceKeyOrderByCreatedAtDesc("batch_1"))
-                .thenReturn(List.of(requestLog("req-1", "batch_1")));
+        when(requestLogRepository.findTop100ByGatewayResourceKeyOrderByCreatedAtDesc("upload_1"))
+                .thenReturn(List.of(requestLog("req-1", "upload_1")));
         when(requestLogRepository.findByRequestId("req-1"))
-                .thenReturn(Optional.of(requestLog("req-1", "batch_1")));
+                .thenReturn(Optional.of(requestLog("req-1", "upload_1")));
 
         ObservabilityQueryService service = new ObservabilityQueryService(
                 routeDecisionLogRepository,
@@ -288,7 +288,7 @@ class ObservabilityQueryServiceTests {
         UsageRecordRepository usageRecordRepository = Mockito.mock(UsageRecordRepository.class);
         AsyncResourceAdminService asyncResourceAdminService = Mockito.mock(AsyncResourceAdminService.class);
 
-        RequestLogEntity requestLog = requestLog("req-1", "batch_1");
+        RequestLogEntity requestLog = requestLog("req-1", "upload_1");
         requestLog.setDistributedKeyId(7L);
         requestLog.setProviderType(ProviderType.OPENAI_DIRECT);
         when(requestLogRepository.findByRequestId("req-1")).thenReturn(Optional.of(requestLog));
@@ -325,10 +325,10 @@ class ObservabilityQueryServiceTests {
                 "prefix"
         )).thenReturn(Optional.of(upstreamReference));
 
-        when(asyncResourceAdminService.findAsyncResourceSummary("batch_1"))
+        when(asyncResourceAdminService.findAsyncResourceSummary("upload_1"))
                 .thenReturn(Optional.of(new AsyncResourceSummaryResponse(
-                        "batch_1",
-                        GatewayAsyncResourceType.BATCH,
+                        "upload_1",
+                        GatewayAsyncResourceType.UPLOAD,
                         "in_progress",
                         "IN_PROGRESS",
                         false,
@@ -342,7 +342,7 @@ class ObservabilityQueryServiceTests {
                         Instant.parse("2026-04-07T08:00:00Z"),
                         Instant.parse("2026-04-07T08:01:00Z")
                 )));
-        when(asyncResourceAdminService.findAsyncResourceDetail("batch_1"))
+        when(asyncResourceAdminService.findAsyncResourceDetail("upload_1"))
                 .thenReturn(Optional.of(new AsyncResourceDetailResponse(
                         null,
                         List.of(),
@@ -469,9 +469,9 @@ class ObservabilityQueryServiceTests {
         entity.setRequestId(requestId);
         entity.setDistributedKeyId(7L);
         entity.setProtocol("openai");
-        entity.setRequestPath("/v1/batches/" + gatewayResourceKey);
-        entity.setResourceType("batch");
-        entity.setOperation("batch_get");
+        entity.setRequestPath("/v1/uploads/" + gatewayResourceKey);
+        entity.setResourceType("upload");
+        entity.setOperation("upload_get");
         entity.setRequestedModel("gpt-4o");
         entity.setPublicModel("gpt-4o");
         entity.setResolvedModelKey("gpt-4o");
@@ -481,7 +481,7 @@ class ObservabilityQueryServiceTests {
         entity.setObjectMode("gateway-object-lineage");
         entity.setGatewayResourceKey(gatewayResourceKey);
         entity.setResponseKind("object");
-        entity.setResponseObjectType("batch");
+        entity.setResponseObjectType("upload");
         entity.setResponseObjectId(gatewayResourceKey);
         entity.setResponseStatus("in_progress");
         entity.setCanonicalEventCount(1);

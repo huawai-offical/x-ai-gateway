@@ -53,19 +53,19 @@ class AsyncResourceAdminServiceTests {
         );
         AsyncResourceAdminService service = new AsyncResourceAdminService(gatewayAsyncResourceRepository, canonicalizer);
 
-        GatewayAsyncResourceEntity entity = entity("batch_1", GatewayAsyncResourceType.BATCH, "validating");
+        GatewayAsyncResourceEntity entity = entity("upload_1", GatewayAsyncResourceType.UPLOAD, "in_progress");
         entity.setMetadataJson("""
-                {"object_mode":"upstream_object_with_local_lineage","upstream_object_id":"batch-upstream-1","events":[{"type":"created","status":"queued","at":1713150000}]}
+                {"object_mode":"upstream_object_with_local_lineage","upstream_object_id":"upload-upstream-1","events":[{"type":"created","status":"queued","at":1713150000}]}
                 """);
         entity.setRequestPayloadJson("{\"input_file_id\":\"file-upstream-1\"}");
-        when(gatewayAsyncResourceRepository.findByResourceKeyAndDeletedFalse("batch_1")).thenReturn(Optional.of(entity));
+        when(gatewayAsyncResourceRepository.findByResourceKeyAndDeletedFalse("upload_1")).thenReturn(Optional.of(entity));
 
-        var detail = service.getAsyncResource("batch_1");
+        var detail = service.getAsyncResource("upload_1");
 
         assertEquals("in_progress", detail.lifecycle().normalizedStatus());
         assertEquals(1, detail.transitions().size());
         assertEquals("upstream_object_with_local_lineage", detail.lineage().objectMode());
-        assertEquals("batch-upstream-1", detail.lineage().upstreamObjectId());
+        assertEquals("upload-upstream-1", detail.lineage().upstreamObjectId());
     }
 
     private GatewayAsyncResourceEntity entity(String resourceKey, GatewayAsyncResourceType type, String status) {

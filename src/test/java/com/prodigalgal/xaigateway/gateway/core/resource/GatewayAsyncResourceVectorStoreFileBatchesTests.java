@@ -5,12 +5,16 @@ import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyQueryService;
 import com.prodigalgal.xaigateway.gateway.core.interop.SiteCapabilityTruthService;
 import com.prodigalgal.xaigateway.gateway.core.site.UpstreamSitePolicyService;
 import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayAsyncResourceEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayFileEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayAsyncResourceRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayFileBindingRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayFileRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.SiteCapabilitySnapshotRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamSiteProfileRepository;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -37,8 +41,9 @@ class GatewayAsyncResourceVectorStoreFileBatchesTests {
     @Test
     void shouldCreateCompletedFileBatchAndAttachFilesAtomicallyAfterValidation() throws Exception {
         GatewayAsyncResourceRepository repository = Mockito.mock(GatewayAsyncResourceRepository.class);
+        GatewayFileRepository fileRepository = Mockito.mock(GatewayFileRepository.class);
         Mockito.when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        GatewayAsyncResourceService service = service(repository);
+        GatewayAsyncResourceService service = service(repository, fileRepository);
         GatewayAsyncResourceEntity vectorStore = vectorStore("vs_1", 0);
         Mockito.when(repository.findByResourceKeyAndResourceTypeAndDeletedFalse(
                 "vs_1",
@@ -46,6 +51,8 @@ class GatewayAsyncResourceVectorStoreFileBatchesTests {
         )).thenReturn(Optional.of(vectorStore));
         Mockito.when(repository.findAllByDistributedKeyIdAndUpstreamObjectIdAndDeletedFalse(1L, "vs_1"))
                 .thenReturn(List.of());
+        stubGatewayFile(fileRepository, "file_1", "first.txt", "first batch file");
+        stubGatewayFile(fileRepository, "file_2", "second.txt", "second batch file");
 
         JsonNode created = service.createVectorStoreFileBatch("vs_1", 1L, objectMapper.readTree("""
                 {
@@ -67,6 +74,8 @@ class GatewayAsyncResourceVectorStoreFileBatchesTests {
         assertEquals(GatewayAsyncResourceType.VECTOR_STORE_FILE, captor.getAllValues().get(1).getResourceType());
         assertEquals(GatewayAsyncResourceType.VECTOR_STORE_FILE, captor.getAllValues().get(2).getResourceType());
         assertTrue(captor.getAllValues().get(0).getMetadataJson().contains("file_1"));
+        assertTrue(captor.getAllValues().get(1).getMetadataJson().contains("gateway_vector_store_file_ingestion"));
+        assertTrue(captor.getAllValues().get(2).getMetadataJson().contains("gateway_vector_store_file_ingestion"));
         assertTrue(vectorStore.getMetadataJson().contains("file_batch_completed"));
     }
 
@@ -146,6 +155,12 @@ class GatewayAsyncResourceVectorStoreFileBatchesTests {
     }
 
     private GatewayAsyncResourceService service(GatewayAsyncResourceRepository repository) {
+        return service(repository, Mockito.mock(GatewayFileRepository.class));
+    }
+
+    private GatewayAsyncResourceService service(
+            GatewayAsyncResourceRepository repository,
+            GatewayFileRepository fileRepository) {
         SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
         return new GatewayAsyncResourceService(
                 repository,
@@ -153,7 +168,7 @@ class GatewayAsyncResourceVectorStoreFileBatchesTests {
                 Mockito.mock(UpstreamCredentialRepository.class),
                 Mockito.mock(UpstreamSiteProfileRepository.class),
                 snapshotRepository,
-                Mockito.mock(GatewayFileRepository.class),
+                fileRepository,
                 Mockito.mock(GatewayFileBindingRepository.class),
                 Mockito.mock(CredentialCryptoService.class),
                 new SiteCapabilityTruthService(new UpstreamSitePolicyService(), snapshotRepository),
@@ -161,6 +176,37 @@ class GatewayAsyncResourceVectorStoreFileBatchesTests {
                 Clock.fixed(Instant.parse("2026-05-15T00:00:00Z"), ZoneOffset.UTC),
                 WebClient.builder()
         );
+    }
+
+    private void stubGatewayFile(
+            GatewayFileRepository fileRepository,
+            String fileKey,
+            String filename,
+            String content) throws Exception {
+        Path contentPath = Files.createTempFile("vector-store-batch-", ".txt");
+        Files.writeString(contentPath, content, StandardCharsets.UTF_8);
+        Mockito.when(fileRepository.findByFileKeyAndDeletedFalse(fileKey))
+                .thenReturn(Optional.of(gatewayFile(fileKey, 1L, filename, contentPath)));
+    }
+
+    private GatewayFileEntity gatewayFile(
+            String fileKey,
+            Long distributedKeyId,
+            String filename,
+            Path storagePath) throws Exception {
+        GatewayFileEntity entity = new GatewayFileEntity();
+        ReflectionTestUtils.setField(entity, "id", 200L);
+        ReflectionTestUtils.setField(entity, "createdAt", Instant.parse("2026-05-15T00:00:00Z"));
+        entity.setFileKey(fileKey);
+        entity.setDistributedKeyId(distributedKeyId);
+        entity.setFilename(filename);
+        entity.setMimeType("text/plain");
+        entity.setPurpose("assistants");
+        entity.setSizeBytes(Files.size(storagePath));
+        entity.setSha256("0".repeat(64));
+        entity.setStoragePath(storagePath.toString());
+        entity.setStatus("processed");
+        return entity;
     }
 
     private GatewayAsyncResourceEntity vectorStore(String id, int fileCount) throws Exception {

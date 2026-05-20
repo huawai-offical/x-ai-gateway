@@ -1,6 +1,7 @@
 package com.prodigalgal.xaigateway.admin.application;
 
 import com.prodigalgal.xaigateway.admin.api.OpenAiDirectSmokeRequest;
+import com.prodigalgal.xaigateway.admin.api.FunctionalProviderSmokeRequest;
 import com.prodigalgal.xaigateway.admin.api.OpenAiDirectResourceSmokeRequest;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CredentialModelDiscoveryService;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
@@ -170,8 +171,8 @@ class CredentialAdminServiceTests {
         assertEquals("DRY_RUN_READY", response.status());
         assertEquals("SKIPPED", response.classification());
         assertEquals("DRY_RUN", response.skippedReason());
-        assertEquals(6, response.items().size());
-        assertEquals(6, response.summary().get("SKIPPED"));
+        assertEquals(5, response.items().size());
+        assertEquals(5, response.summary().get("SKIPPED"));
         assertTrue(response.items().stream().anyMatch(item -> "CHAT_COMPLETIONS".equals(item.resourceFamily()) && item.billable()));
         assertTrue(response.items().stream().anyMatch(item -> "REALTIME_CLIENT_SECRET".equals(item.resourceFamily()) && item.writeOperation()));
         assertFalse(response.toString().contains("org-real"));
@@ -185,9 +186,6 @@ class CredentialAdminServiceTests {
         HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
         server.createContext("/v1/files", exchange -> sendJson(exchange, 200, """
                 {"object":"list","data":[{"id":"file_1","object":"file"}]}
-                """));
-        server.createContext("/v1/batches", exchange -> sendJson(exchange, 429, """
-                {"error":{"type":"rate_limit_error","message":"limited Bearer sk-live-secret"}}
                 """));
         server.createContext("/v1/vector_stores", exchange -> sendJson(exchange, 403, """
                 {"error":{"type":"permission_denied","message":"missing vector permission"}}
@@ -215,10 +213,9 @@ class CredentialAdminServiceTests {
             assertEquals("LIVE_SMOKE_COMPLETED", response.status());
             assertEquals("NO_PERMISSION", response.classification());
             assertEquals(1, response.summary().get("PASS"));
-            assertEquals(4, response.summary().get("BUDGET_BLOCKED"));
+            assertEquals(3, response.summary().get("BUDGET_BLOCKED"));
             assertEquals(1, response.summary().get("NO_PERMISSION"));
             assertTrue(response.items().stream().anyMatch(item -> "FILES".equals(item.resourceFamily()) && "PASS".equals(item.classification())));
-            assertTrue(response.items().stream().anyMatch(item -> "BATCHES".equals(item.resourceFamily()) && "BUDGET_BLOCKED".equals(item.classification())));
             assertTrue(response.items().stream().anyMatch(item -> "VECTOR_STORES".equals(item.resourceFamily()) && "NO_PERMISSION".equals(item.classification())));
             assertFalse(response.toString().contains("sk-live-secret"));
             assertFalse(credential.getLastErrorMessage().contains("sk-live-secret"));
@@ -350,6 +347,188 @@ class CredentialAdminServiceTests {
         assertEquals(null, credential.getCredentialMetadataJson());
         Mockito.verify(credentialRepository, Mockito.never()).save(Mockito.any());
         Mockito.verify(cryptoService, Mockito.never()).decrypt(Mockito.anyString());
+    }
+
+    @Test
+    void shouldBuildFunctionalProviderSmokeDryRunWithoutDecryptingSecret() {
+        UpstreamCredentialRepository credentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        CredentialCryptoService cryptoService = Mockito.mock(CredentialCryptoService.class);
+        CredentialAdminService service = service(credentialRepository, cryptoService);
+        UpstreamCredentialEntity credential = credential(17L, ProviderType.OPENAI_COMPATIBLE);
+        credential.setBaseUrl("https://api.mimo-v2.com/v1");
+        Mockito.when(credentialRepository.findById(17L)).thenReturn(Optional.of(credential));
+
+        var response = service.functionalProviderSmoke(17L, new FunctionalProviderSmokeRequest(
+                true,
+                null,
+                "mimo_openai",
+                null,
+                null,
+                null,
+                null,
+                null
+        ));
+
+        assertEquals("DRY_RUN_READY", response.status());
+        assertEquals("SKIPPED", response.classification());
+        assertEquals("DRY_RUN", response.skippedReason());
+        assertEquals("OPENAI_COMPATIBLE", response.protocol());
+        assertEquals(3, response.items().size());
+        assertEquals(3, response.summary().get("SKIPPED"));
+        assertTrue(response.items().stream().anyMatch(item -> "CHAT_TOOLS".equals(item.resourceFamily())));
+        assertTrue(response.toString().contains("api-key=***"));
+        assertFalse(response.toString().contains("Bearer ***"));
+        Mockito.verify(cryptoService, Mockito.never()).decrypt(Mockito.anyString());
+        Mockito.verify(credentialRepository, Mockito.never()).save(Mockito.any());
+    }
+
+    @Test
+    void shouldBlockFunctionalProviderLiveWithoutAllowLive() {
+        UpstreamCredentialRepository credentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        CredentialCryptoService cryptoService = Mockito.mock(CredentialCryptoService.class);
+        CredentialAdminService service = service(credentialRepository, cryptoService);
+        UpstreamCredentialEntity credential = credential(18L, ProviderType.GEMINI_DIRECT);
+        credential.setBaseUrl("https://generativelanguage.googleapis.com");
+        Mockito.when(credentialRepository.findById(18L)).thenReturn(Optional.of(credential));
+
+        var response = service.functionalProviderSmoke(18L, new FunctionalProviderSmokeRequest(
+                false,
+                false,
+                null,
+                null,
+                3,
+                null,
+                List.of("generate_content"),
+                true
+        ));
+
+        assertEquals("LIVE_GUARD_BLOCKED", response.status());
+        assertEquals("SKIPPED", response.classification());
+        assertEquals("LIVE_NOT_ALLOWED", response.skippedReason());
+        assertEquals(1, response.summary().get("SKIPPED"));
+        Mockito.verify(cryptoService, Mockito.never()).decrypt(Mockito.anyString());
+        Mockito.verify(credentialRepository, Mockito.never()).save(Mockito.any());
+    }
+
+    @Test
+    void shouldRejectOpenAiDirectForFunctionalProviderSmokeWithoutDecryptingSecret() {
+        UpstreamCredentialRepository credentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        CredentialCryptoService cryptoService = Mockito.mock(CredentialCryptoService.class);
+        CredentialAdminService service = service(credentialRepository, cryptoService);
+        UpstreamCredentialEntity credential = credential(19L, ProviderType.OPENAI_DIRECT);
+        Mockito.when(credentialRepository.findById(19L)).thenReturn(Optional.of(credential));
+
+        var response = service.functionalProviderSmoke(19L, new FunctionalProviderSmokeRequest(
+                false,
+                true,
+                null,
+                null,
+                3,
+                null,
+                null,
+                true
+        ));
+
+        assertEquals("ROUTE_BLOCKED", response.status());
+        assertEquals("UNSUPPORTED", response.classification());
+        assertEquals("PROVIDER_NOT_FUNCTIONAL_SMOKE_COMPATIBLE", response.skippedReason());
+        Mockito.verify(cryptoService, Mockito.never()).decrypt(Mockito.anyString());
+        Mockito.verify(credentialRepository, Mockito.never()).save(Mockito.any());
+    }
+
+    @Test
+    void shouldExecuteFunctionalProviderSmokeWhenLiveAndBillableAreExplicitlyAllowed() throws IOException {
+        HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+        AtomicReference<String> apiKey = new AtomicReference<>();
+        server.createContext("/v1/chat/completions", exchange -> {
+            apiKey.set(exchange.getRequestHeaders().getFirst("api-key"));
+            exchange.getResponseHeaders().add("x-request-id", "req-functional-provider");
+            sendJson(exchange, 200, """
+                    {"id":"chatcmpl_1","object":"chat.completion","model":"mimo-v2-pro","usage":{"completion_tokens":1},"choices":[{"index":0}]}
+                    """);
+        });
+        server.start();
+        try {
+            UpstreamCredentialRepository credentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+            CredentialCryptoService cryptoService = Mockito.mock(CredentialCryptoService.class);
+            CredentialAdminService service = service(credentialRepository, cryptoService);
+            UpstreamCredentialEntity credential = credential(20L, ProviderType.OPENAI_COMPATIBLE);
+            credential.setBaseUrl("http://127.0.0.1:" + server.getAddress().getPort() + "/v1");
+            Mockito.when(credentialRepository.findById(20L)).thenReturn(Optional.of(credential));
+            Mockito.when(credentialRepository.save(Mockito.any())).thenAnswer(invocation -> invocation.getArgument(0));
+            Mockito.when(cryptoService.decrypt("cipher-openai")).thenReturn("mimo-secret");
+
+            var response = service.functionalProviderSmoke(20L, new FunctionalProviderSmokeRequest(
+                    false,
+                    true,
+                    "mimo_openai",
+                    null,
+                    3,
+                    null,
+                    List.of("chat_completions"),
+                    true
+            ));
+
+            assertEquals("LIVE_SMOKE_COMPLETED", response.status());
+            assertEquals("PASS", response.classification());
+            assertEquals(1, response.summary().get("PASS"));
+            assertEquals("req-functional-provider", response.items().getFirst().upstreamRequestId());
+            assertEquals("mimo-secret", apiKey.get());
+            assertNotNull(credential.getLastUsedAt());
+            assertEquals(null, credential.getLastErrorCode());
+            assertFalse(response.toString().contains("mimo-secret"));
+            Mockito.verify(cryptoService).decrypt("cipher-openai");
+            Mockito.verify(credentialRepository).save(credential);
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void shouldPersistFunctionalProviderSmokeCertificationMetadataForAllowedLiveRun() throws IOException {
+        HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+        server.createContext("/v1/chat/completions", exchange -> {
+            exchange.getResponseHeaders().add("x-request-id", "req-functional-certification");
+            sendJson(exchange, 200, """
+                    {"id":"chatcmpl_1","object":"chat.completion","model":"mimo-v2-pro","usage":{"completion_tokens":1},"choices":[{"index":0}]}
+                    """);
+        });
+        server.start();
+        try {
+            UpstreamCredentialRepository credentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+            CredentialCryptoService cryptoService = Mockito.mock(CredentialCryptoService.class);
+            CredentialAdminService service = service(credentialRepository, cryptoService);
+            UpstreamCredentialEntity credential = credential(21L, ProviderType.OPENAI_COMPATIBLE);
+            credential.setBaseUrl("http://127.0.0.1:" + server.getAddress().getPort() + "/v1");
+            Mockito.when(credentialRepository.findById(21L)).thenReturn(Optional.of(credential));
+            Mockito.when(credentialRepository.save(Mockito.any())).thenAnswer(invocation -> invocation.getArgument(0));
+            Mockito.when(cryptoService.decrypt("cipher-openai")).thenReturn("mimo-secret");
+
+            var response = service.functionalProviderSmokeCertification(21L, new FunctionalProviderSmokeRequest(
+                    false,
+                    true,
+                    "mimo_openai",
+                    null,
+                    3,
+                    null,
+                    List.of("chat_completions"),
+                    true
+            ));
+
+            assertEquals("CERTIFIED", response.certificationStatus());
+            assertEquals(FunctionalProviderSmokeCertificationService.RECORD_REPLAY_SCHEMA_VERSION,
+                    response.recordReplayFixture().schemaVersion());
+            assertEquals("functional_provider_smoke_certification",
+                    response.recordReplayFixture().replayPolicy().get("fixtureSource"));
+            assertTrue(credential.getCredentialMetadataJson().contains("functional_provider_smoke_certification"));
+            assertTrue(credential.getCredentialMetadataJson().contains("recordReplayFixture"));
+            assertTrue(credential.getCredentialMetadataJson().contains("OPENAI_COMPATIBLE"));
+            assertFalse(credential.getCredentialMetadataJson().contains("mimo-secret"));
+            Mockito.verify(cryptoService).decrypt("cipher-openai");
+            Mockito.verify(credentialRepository, Mockito.atLeastOnce()).save(credential);
+        } finally {
+            server.stop(0);
+        }
     }
 
     private CredentialAdminService service(

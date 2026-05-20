@@ -1010,6 +1010,33 @@ public class ObservabilityQueryService {
         }
     }
 
+    public String generateCodexRecoveryCommand(String requestId) {
+        RequestLogEntity requestLog = requestLogRepository.findByRequestId(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("未找到对应的 requestId。"));
+
+        String sessionAffinityKey = requestLog.getSessionAffinityKey();
+        if (sessionAffinityKey == null || sessionAffinityKey.isBlank()) {
+            sessionAffinityKey = "default-session";
+        }
+
+        String parentMessageId = requestLog.getResponseObjectId();
+        if (parentMessageId == null || parentMessageId.isBlank()) {
+            parentMessageId = "msg-" + requestId;
+        }
+
+        String keyPlaceholder = "YOUR_API_KEY";
+        if (requestLog.getDistributedKeyPrefix() != null && !requestLog.getDistributedKeyPrefix().isBlank()) {
+            keyPlaceholder = requestLog.getDistributedKeyPrefix() + "...";
+        }
+
+        return String.format(
+                "export OPENAI_BASE_URL=\"https://gateway.example.com/v1\" && " +
+                "export OPENAI_API_KEY=\"%s\" && " +
+                "codex resume --session-id %s --parent-message-id %s",
+                keyPlaceholder, sessionAffinityKey, parentMessageId
+        );
+    }
+
     private record TimeWindow(Instant from, Instant to) {
     }
 }

@@ -100,4 +100,18 @@ public class CredentialAdminController {
             @RequestBody(required = false) OpenAiDirectResourceSmokeRequest request) {
         return credentialAdminService.openAiDirectResourceSmokeCertification(id, request);
     }
+
+    @PostMapping("/{id}/functional-provider/smoke")
+    public FunctionalProviderSmokeResponse functionalProviderSmoke(
+            @PathVariable Long id,
+            @RequestBody(required = false) FunctionalProviderSmokeRequest request) {
+        return credentialAdminService.functionalProviderSmoke(id, request);
+    }
+
+    @PostMapping("/{id}/functional-provider/smoke/certification")
+    public FunctionalProviderSmokeCertificationResponse functionalProviderSmokeCertification(
+            @PathVariable Long id,
+            @RequestBody(required = false) FunctionalProviderSmokeRequest request) {
+        return credentialAdminService.functionalProviderSmokeCertification(id, request);
+    }
 }

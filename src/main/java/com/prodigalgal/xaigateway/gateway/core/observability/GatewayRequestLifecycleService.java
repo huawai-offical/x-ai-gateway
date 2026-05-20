@@ -819,8 +819,6 @@ public class GatewayRequestLifecycleService {
         }
         return resourceType == TranslationResourceType.RESPONSE
                 || resourceType == TranslationResourceType.UPLOAD
-                || resourceType == TranslationResourceType.BATCH
-                || resourceType == TranslationResourceType.TUNING
                 || resourceType == TranslationResourceType.REALTIME;
     }
 

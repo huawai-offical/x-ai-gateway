@@ -166,7 +166,7 @@ class ObservabilityAdminControllerTests {
                         "DEGRADED",
                         "LOSSY",
                         "resource-orchestration",
-                        "batch_1",
+                        "upload_1",
                         "binary",
                         "file.content",
                         "file_123",
@@ -193,7 +193,7 @@ class ObservabilityAdminControllerTests {
                 .expectBody()
                 .jsonPath("$[0].requestId").isEqualTo("req-1")
                 .jsonPath("$[0].supportStatus").isEqualTo("DEGRADED")
-                .jsonPath("$[0].gatewayResourceKey").isEqualTo("batch_1")
+                .jsonPath("$[0].gatewayResourceKey").isEqualTo("upload_1")
                 .jsonPath("$[0].responseObjectType").isEqualTo("file.content")
                 .jsonPath("$[0].canonicalEventCount").isEqualTo(2);
     }
@@ -252,9 +252,9 @@ class ObservabilityAdminControllerTests {
                                 1L,
                                 "sk-gw-test",
                                 "openai",
-                                "/v1/batches/batch_1",
-                                "batch",
-                                "batch_get",
+                                "/v1/uploads/upload_1",
+                                "upload",
+                                "upload_get",
                                 "gpt-4o",
                                 "gpt-4o",
                                 "gpt-4o",
@@ -266,10 +266,10 @@ class ObservabilityAdminControllerTests {
                                 "NATIVE",
                                 "NATIVE",
                                 "gateway-object-lineage",
-                                "batch_1",
+                                "upload_1",
                                 "object",
-                                "batch",
-                                "batch_1",
+                                "upload",
+                                "upload_1",
                                 "in_progress",
                                 1,
                                 com.prodigalgal.xaigateway.gateway.core.observability.GatewayRequestStatus.COMPLETED,
@@ -289,9 +289,9 @@ class ObservabilityAdminControllerTests {
                                 "gpt-4o",
                                 "gpt-4o",
                                 "openai",
-                                "/v1/batches/batch_1",
-                                "batch",
-                                "batch_get",
+                                "/v1/uploads/upload_1",
+                                "upload",
+                                "upload_get",
                                 "gpt-4o",
                                 "PREFIX_AFFINITY",
                                 "ORCHESTRATION",
@@ -310,14 +310,14 @@ class ObservabilityAdminControllerTests {
                         List.of(),
                         List.of(),
                         new AsyncResourceSummaryResponse(
-                                "batch_1",
-                                GatewayAsyncResourceType.BATCH,
+                                "upload_1",
+                                GatewayAsyncResourceType.UPLOAD,
                                 "in_progress",
                                 "IN_PROGRESS",
                                 false,
                                 false,
                                 "gateway-object-lineage",
-                                "batch_1",
+                                "upload_1",
                                 1,
                                 null,
                                 null,
@@ -335,7 +335,7 @@ class ObservabilityAdminControllerTests {
                 .expectBody()
                 .jsonPath("$.requestLog.requestId").isEqualTo("req-1")
                 .jsonPath("$.routeDecision.selectionSource").isEqualTo("PREFIX_AFFINITY")
-                .jsonPath("$.asyncResourceSummary.resourceKey").isEqualTo("batch_1");
+                .jsonPath("$.asyncResourceSummary.resourceKey").isEqualTo("upload_1");
     }
 
     @Test

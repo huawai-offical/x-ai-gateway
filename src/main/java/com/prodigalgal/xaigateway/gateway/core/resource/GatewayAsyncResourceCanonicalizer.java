@@ -157,8 +157,6 @@ public class GatewayAsyncResourceCanonicalizer {
         }
         List<CanonicalResourceArtifact> artifacts = new ArrayList<>();
         collectFileArtifacts(artifacts, credentialId, requestPayload, "input_file_id");
-        collectFileArtifacts(artifacts, credentialId, requestPayload, "training_file");
-        collectFileArtifacts(artifacts, credentialId, requestPayload, "validation_file");
         collectFileArtifacts(artifacts, credentialId, responsePayload, "output_file_id");
         collectFileArtifacts(artifacts, credentialId, responsePayload, "error_file_id");
         collectFileArtifacts(artifacts, credentialId, responsePayload, "result_files");

@@ -7,8 +7,8 @@
       "displayName": "OpenAI",
       "siteKind": "OPENAI_DIRECT",
       "defaultBaseUrl": "https://api.openai.com",
-      "description": "OpenAI 官方 API，覆盖 Chat、Responses、Responses file_search 本地绑定、Conversations、Vector Stores 本地 lifecycle、文件 attachment、本地文本 search 与 file batch、Webhooks、Embeddings、Audio、Images、Moderation、Files、Uploads、Batches、Fine-tuning 与 Realtime 基础面。",
-      "capabilityTags": ["chat", "responses", "conversations", "vector_stores", "webhooks", "embeddings", "audio", "images", "moderation", "files", "batches", "fine_tuning", "realtime"],
+      "description": "OpenAI 对话与 tools 功能性服务 API，覆盖 Chat、Responses、Responses file_search 本地绑定、Conversations、Vector Stores 本地 lifecycle、文件 attachment、本地 chunk ingestion、本地文本 search 与 file batch、Webhooks、Embeddings、Audio、Images、Moderation、Files、Uploads 与 Realtime 基础面；不再声明官方非核心 API。",
+      "capabilityTags": ["chat", "responses", "conversations", "vector_stores", "webhooks", "embeddings", "audio", "images", "moderation", "files", "realtime"],
       "costProfile": "openai-public-pricing",
       "errorMode": "openai_error",
       "deprecated": false,
@@ -26,14 +26,12 @@
         "openai.conversations-local-lifecycle",
         "openai.vector-stores-local-lifecycle",
         "openai.vector-store-files-local-attachment",
+        "openai.vector-store-files-local-ingestion-artifact",
         "openai.vector-store-file-content-local-read",
         "openai.vector-store-search-local-text",
         "openai.vector-store-file-batches-local-lifecycle",
         "openai.webhooks-ingress-event-persistence",
         "files.native",
-        "openai.batches-list-local-catalog",
-        "openai.models-delete-local-registry",
-        "openai.fine-tuning-events-checkpoints-local-lineage",
         "openai.realtime-websocket-ingress",
         "openai.direct-smoke-certification",
         "openai.direct-smoke-record-replay-fixture",
@@ -45,14 +43,11 @@
       "modelFamilies": ["gpt-4.1", "gpt-4o", "o-series", "text-embedding", "gpt-image", "realtime"],
       "pricingMetadata": "public-list-price-openai",
       "unsupportedFeatures": [
-        "responses_non_function_tools: Responses function tools are supported; file_search can bind gateway-local vector_store_ids and inject local search context; other hosted/MCP/custom/code_interpreter/computer_use/image_generation/shell/apply_patch tools are explicitly rejected instead of silently skipped until TASK-20260514-019/024 implement their execution boundary.",
-        "vector_stores_child_resources: Vector Stores local lifecycle create/list/retrieve/update/delete, local file attachments, file content read, local text search, Responses file_search local binding and local file_batches create/retrieve/cancel/list files are available; real vector ingestion, semantic search and hosted file_search_call lifecycle remain TASK-20260514-023.",
-        "fine_tuning_pause_resume_permissions: Fine-tuning events/checkpoints expose gateway local lineage; pause/resume, checkpoint permissions and graders remain TASK-20260514-022.",
-        "models_delete_upstream_owner_passthrough: DELETE /v1/models is exposed for gateway-registered fine-tuned model registry deletion; direct upstream owner-role deletion remains TASK-20260514-021.",
-        "containers_code_interpreter: Containers and code interpreter files remain TASK-20260514-024.",
-        "evals_graders_runs: Evals, graders and runs remain TASK-20260514-026.",
-        "administration_api: organization/project/users/keys/usage/costs/audit/certificates remain TASK-20260514-028.",
-        "realtime_full_calls_webrtc_sip: current gateway exposes client secrets and a WebSocket ingress baseline, but full calls/WebRTC/SIP/translation/transcription sessions are not complete."
+        "responses_non_function_tools: Responses function tools are supported; file_search can bind gateway-local vector_store_ids and inject local search context; other hosted/MCP/custom/code_interpreter/computer_use/image_generation/shell/apply_patch tools are explicitly rejected instead of silently skipped.",
+        "vector_stores_child_resources: Vector Stores local lifecycle create/list/retrieve/update/delete, local file attachments, local chunk ingestion artifacts, file content read, local text search, Responses file_search local binding and local file_batches create/retrieve/cancel/list files are available; real embedding/vector index ingestion and semantic search remain TASK-20260514-023.",
+        "non_core_official_apis_out_of_scope: official non-core APIs are outside the current conversation/tools product scope per REQ-20260518-005.",
+        "realtime_full_calls_webrtc_sip: current gateway exposes client secrets and a WebSocket ingress baseline, but full calls/WebRTC/SIP/translation/transcription sessions are not complete.",
+        "codex_non_responses_apis_out_of_scope: OpenAI Codex is designated as a Responses Smoke/Proxy boundary for ChatGPT official accounts. All non-responses Codex internal endpoints, including Fine-tuning, Batches, Evals, and administrative tasks, are strictly unsupported and rejected."
       ]
     },
     {
@@ -375,53 +370,60 @@
       "displayName": "Anthropic",
       "siteKind": "ANTHROPIC_DIRECT",
       "defaultBaseUrl": "https://api.anthropic.com",
-      "description": "Anthropic Messages API，通过 translation layer 提供 OpenAI-style 入口与 anthropic_native surface。",
-      "capabilityTags": ["chat", "tools", "thinking", "anthropic_native", "message_batches"],
+      "description": "Anthropic Messages API，仅按 OpenAI 标准功能区收紧为 chat/tools/thinking 入口，不追求 Anthropic 全量官方 API。",
+      "capabilityTags": ["chat", "tools", "thinking", "anthropic_native"],
       "costProfile": "anthropic-public-pricing",
       "errorMode": "anthropic_error",
       "deprecated": false,
-      "conformanceChecks": ["messages.native", "message-batches.native"],
+      "conformanceChecks": ["messages.native"],
       "compatibilitySurface": "anthropic-native",
       "supportStrategy": "translation-layer",
       "modelFamilies": ["claude-sonnet", "claude-opus"],
       "pricingMetadata": "public-list-price-anthropic",
-      "unsupportedFeatures": ["embeddings: Anthropic stable embeddings API is not exposed in current gateway."]
+      "unsupportedFeatures": [
+        "embeddings: Anthropic stable embeddings API is not exposed in current gateway.",
+        "non_core_provider_apis_out_of_scope: Anthropic provider-specific async/admin/eval APIs are outside REQ-20260518-005."
+      ]
     },
     {
       "code": "gemini",
       "displayName": "Gemini",
       "siteKind": "GEMINI_DIRECT",
       "defaultBaseUrl": "https://generativelanguage.googleapis.com",
-      "description": "Google Gemini API，通过 translation layer 提供 OpenAI-style 入口与 google_native surface。",
-      "capabilityTags": ["chat", "embeddings", "files", "batches", "google_native"],
+      "description": "Google Gemini API，仅按 OpenAI 标准功能区收紧为 generateContent、embeddings 与 files 支撑面，不追求 Gemini 全量官方 API。",
+      "capabilityTags": ["chat", "embeddings", "files", "google_native"],
       "costProfile": "gemini-public-pricing",
       "errorMode": "gemini_error",
       "deprecated": false,
-      "conformanceChecks": ["generate-content.native", "files.orchestrated", "batches.orchestrated"],
+      "conformanceChecks": ["generate-content.native", "files.orchestrated"],
       "compatibilitySurface": "google-native",
       "supportStrategy": "translation-layer",
       "modelFamilies": ["gemini-2.5-pro", "gemini-2.5-flash", "text-embedding"],
       "pricingMetadata": "public-list-price-gemini",
-      "unsupportedFeatures": ["realtime_client_secret: Gemini live token is not equivalent to OpenAI realtime client_secret."]
+      "unsupportedFeatures": [
+        "realtime_client_secret: Gemini live token is not equivalent to OpenAI realtime client_secret.",
+        "non_core_provider_apis_out_of_scope: Gemini provider-specific async/admin/eval APIs are outside REQ-20260518-005."
+      ]
     },
     {
       "code": "vertex",
       "displayName": "Vertex AI",
       "siteKind": "VERTEX_AI",
       "defaultBaseUrl": "https://{location}-aiplatform.googleapis.com",
-      "description": "Google Vertex AI Gemini API，使用 project/location 与 Google Cloud bearer/service account 凭证，不等价于 AI Studio API key surface。",
-      "capabilityTags": ["chat", "embeddings", "files", "batches", "google_native", "vertex", "project_location"],
+      "description": "Google Vertex AI Gemini API，仅按 OpenAI 标准功能区收紧为 generateContent、embeddings 与 files 支撑面；project/location 只作为寻址和凭证边界，不扩展到 Vertex 全量 AI Platform API。",
+      "capabilityTags": ["chat", "embeddings", "files", "google_native", "vertex", "project_location"],
       "costProfile": "vertex-ai-public-pricing",
       "errorMode": "gemini_error",
       "deprecated": false,
-      "conformanceChecks": ["generate-content.native", "vertex.project-location", "files.orchestrated", "batches.orchestrated"],
+      "conformanceChecks": ["generate-content.native", "vertex.project-location", "files.orchestrated"],
       "compatibilitySurface": "google-native",
       "supportStrategy": "vertex-google-native",
       "modelFamilies": ["gemini-2.5-pro", "gemini-2.5-flash", "text-embedding", "veo"],
       "pricingMetadata": "public-list-price-vertex-ai",
       "unsupportedFeatures": [
         "ai_studio_key: Vertex requires Google Cloud project/location bearer credentials instead of AI Studio API keys.",
-        "realtime_client_secret: Vertex live token is not equivalent to OpenAI realtime client_secret."
+        "realtime_client_secret: Vertex live token is not equivalent to OpenAI realtime client_secret.",
+        "non_core_provider_apis_out_of_scope: Vertex provider-specific async/admin/eval APIs are outside REQ-20260518-005."
       ]
     }
   ]

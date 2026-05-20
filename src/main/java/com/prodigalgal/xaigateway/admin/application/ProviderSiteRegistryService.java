@@ -101,8 +101,6 @@ public class ProviderSiteRegistryService {
         snapshot.setSupportsModeration(policy.supportsModeration());
         snapshot.setSupportsFiles(policy.supportsFiles());
         snapshot.setSupportsUploads(policy.supportsUploads());
-        snapshot.setSupportsBatches(policy.supportsBatches());
-        snapshot.setSupportsTuning(policy.supportsTuning());
         snapshot.setSupportsRealtime(policy.supportsRealtime());
         snapshot.setAuthStrategy(siteProfile.getAuthStrategy());
         snapshot.setPathStrategy(siteProfile.getPathStrategy());

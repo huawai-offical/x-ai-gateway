@@ -402,7 +402,14 @@ class OfficialAccountAdminServiceTests {
         assertTrue(preview.contains("responses=experimental"));
         assertTrue(preview.contains("prompt_cache_key"));
         assertFalse(preview.contains("codex-access-secret"));
+        assertEquals("2026-05-19.codex-responses-smoke-record-replay.v1",
+                response.recordReplayFixture().get("schemaVersion"));
+        assertEquals("record_replay", response.recordReplayFixture().get("replayMode"));
+        assertEquals("DRY_RUN", response.recordReplayFixture().get("certificationStatus"));
+        assertTrue(response.recordReplayFixture().toString().contains("codex_responses"));
+        assertTrue(response.recordReplayFixture().toString().contains("disabled_by_default"));
         assertFalse(entity.getLastRefreshResultJson().contains("codex-access-secret"));
+        assertTrue(entity.getLastRefreshResultJson().contains("\"recordReplayFixture\""));
         assertTrue(entity.getLastRefreshResultJson().contains("\"classification\":\"SKIPPED\""));
         assertTrue(entity.getLastRefreshResultJson().contains("\"skippedReason\":\"DRY_RUN\""));
     }
@@ -437,7 +444,10 @@ class OfficialAccountAdminServiceTests {
         assertEquals("QUOTA_REQUESTS_EXHAUSTED", response.skippedReason());
         assertEquals("QUOTA_REQUESTS_EXHAUSTED", response.routeBlockReason());
         assertEquals(null, response.httpStatus());
+        assertEquals("BUDGET_BLOCKED", response.recordReplayFixture().get("certificationStatus"));
+        assertTrue(response.recordReplayFixture().toString().contains("QUOTA_REQUESTS_EXHAUSTED"));
         Mockito.verify(cryptoService, Mockito.never()).decrypt(Mockito.anyString());
+        assertTrue(entity.getLastRefreshResultJson().contains("\"recordReplayFixture\""));
         assertTrue(entity.getLastRefreshResultJson().contains("\"classification\":\"BUDGET_BLOCKED\""));
         assertTrue(entity.getLastRefreshResultJson().contains("\"skippedReason\":\"QUOTA_REQUESTS_EXHAUSTED\""));
     }

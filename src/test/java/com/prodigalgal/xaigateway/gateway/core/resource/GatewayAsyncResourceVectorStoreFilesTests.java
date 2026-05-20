@@ -43,15 +43,19 @@ class GatewayAsyncResourceVectorStoreFilesTests {
     @Test
     void shouldAttachVectorStoreFileAndUpdateParentCounts() throws Exception {
         GatewayAsyncResourceRepository repository = Mockito.mock(GatewayAsyncResourceRepository.class);
+        GatewayFileRepository fileRepository = Mockito.mock(GatewayFileRepository.class);
         Mockito.when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        GatewayAsyncResourceService service = service(repository);
+        GatewayAsyncResourceService service = service(repository, fileRepository);
         GatewayAsyncResourceEntity vectorStore = vectorStore("vs_1", 0);
+        Path contentPath = writeTempContent("refund policy renewal credits");
         Mockito.when(repository.findByResourceKeyAndResourceTypeAndDeletedFalse(
                 "vs_1",
                 GatewayAsyncResourceType.VECTOR_STORE
         )).thenReturn(Optional.of(vectorStore));
         Mockito.when(repository.findAllByDistributedKeyIdAndUpstreamObjectIdAndDeletedFalse(1L, "vs_1"))
                 .thenReturn(List.of());
+        Mockito.when(fileRepository.findByFileKeyAndDeletedFalse("file_1"))
+                .thenReturn(Optional.of(gatewayFile("file_1", 1L, "finance.txt", contentPath, "text/plain")));
 
         JsonNode created = service.createVectorStoreFile("vs_1", 1L, objectMapper.readTree("""
                 {
@@ -68,13 +72,44 @@ class GatewayAsyncResourceVectorStoreFilesTests {
         assertEquals("finance", created.path("attributes").path("category").asText());
         assertTrue(created.path("attributes").path("enabled").asBoolean());
         assertEquals("static", created.path("chunking_strategy").path("type").asText());
+        assertEquals(Files.size(contentPath), created.path("usage_bytes").asLong());
 
         ArgumentCaptor<GatewayAsyncResourceEntity> captor = ArgumentCaptor.forClass(GatewayAsyncResourceEntity.class);
         Mockito.verify(repository, Mockito.times(2)).save(captor.capture());
-        assertEquals(GatewayAsyncResourceType.VECTOR_STORE_FILE, captor.getAllValues().getFirst().getResourceType());
-        assertTrue(captor.getAllValues().getFirst().getResourceKey().startsWith("vsf_"));
+        GatewayAsyncResourceEntity savedAttachment = captor.getAllValues().getFirst();
+        assertEquals(GatewayAsyncResourceType.VECTOR_STORE_FILE, savedAttachment.getResourceType());
+        assertTrue(savedAttachment.getResourceKey().startsWith("vsf_"));
+        JsonNode ingestion = objectMapper.readTree(savedAttachment.getMetadataJson()).path("ingestion");
+        assertEquals("gateway_vector_store_file_ingestion", ingestion.path("object_mode").asText());
+        assertEquals("local-chunk-v1", ingestion.path("index_version").asText());
+        assertEquals("finance.txt", ingestion.path("filename").asText());
+        assertEquals(Files.size(contentPath), ingestion.path("bytes").asLong());
+        assertEquals(1, ingestion.path("chunk_count").asInt());
+        assertEquals("refund policy renewal credits", ingestion.path("chunks").path(0).path("text").asText());
         assertEquals(1, objectMapper.readTree(vectorStore.getResponsePayloadJson()).path("file_counts").path("total").asInt());
         assertTrue(vectorStore.getMetadataJson().contains("file_attached"));
+    }
+
+    @Test
+    void shouldRejectAttachmentWhenGatewayFileIsUnavailable() throws Exception {
+        GatewayAsyncResourceRepository repository = Mockito.mock(GatewayAsyncResourceRepository.class);
+        GatewayFileRepository fileRepository = Mockito.mock(GatewayFileRepository.class);
+        GatewayAsyncResourceService service = service(repository, fileRepository);
+        GatewayAsyncResourceEntity vectorStore = vectorStore("vs_1", 0);
+        Mockito.when(repository.findByResourceKeyAndResourceTypeAndDeletedFalse(
+                "vs_1",
+                GatewayAsyncResourceType.VECTOR_STORE
+        )).thenReturn(Optional.of(vectorStore));
+        Mockito.when(repository.findAllByDistributedKeyIdAndUpstreamObjectIdAndDeletedFalse(1L, "vs_1"))
+                .thenReturn(List.of());
+        Mockito.when(fileRepository.findByFileKeyAndDeletedFalse("file_missing")).thenReturn(Optional.empty());
+
+        IllegalArgumentException error = assertThrows(
+                IllegalArgumentException.class,
+                () -> service.createVectorStoreFile("vs_1", 1L, objectMapper.readTree("{\"file_id\":\"file_missing\"}")));
+
+        assertEquals("未找到指定的网关文件对象。", error.getMessage());
+        Mockito.verify(repository, Mockito.never()).save(any());
     }
 
     @Test
@@ -332,5 +367,11 @@ class GatewayAsyncResourceVectorStoreFilesTests {
         entity.setStoragePath(storagePath.toString());
         entity.setStatus("processed");
         return entity;
+    }
+
+    private Path writeTempContent(String content) throws Exception {
+        Path path = Files.createTempFile("vector-store-file-", ".txt");
+        Files.writeString(path, content, StandardCharsets.UTF_8);
+        return path;
     }
 }

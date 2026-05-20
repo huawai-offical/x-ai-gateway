@@ -82,14 +82,6 @@ public class SiteCapabilitySnapshotEntity {
     @Comment("是否支持 uploads。")
     private boolean supportsUploads;
 
-    @Column(name = "supports_batches", nullable = false)
-    @Comment("是否支持 batches。")
-    private boolean supportsBatches;
-
-    @Column(name = "supports_tuning", nullable = false)
-    @Comment("是否支持 tuning。")
-    private boolean supportsTuning;
-
     @Column(name = "supports_realtime", nullable = false)
     @Comment("是否支持 realtime。")
     private boolean supportsRealtime;
@@ -213,22 +205,6 @@ public class SiteCapabilitySnapshotEntity {
 
     public void setSupportsUploads(boolean supportsUploads) {
         this.supportsUploads = supportsUploads;
-    }
-
-    public boolean isSupportsBatches() {
-        return supportsBatches;
-    }
-
-    public void setSupportsBatches(boolean supportsBatches) {
-        this.supportsBatches = supportsBatches;
-    }
-
-    public boolean isSupportsTuning() {
-        return supportsTuning;
-    }
-
-    public void setSupportsTuning(boolean supportsTuning) {
-        this.supportsTuning = supportsTuning;
     }
 
     public boolean isSupportsRealtime() {

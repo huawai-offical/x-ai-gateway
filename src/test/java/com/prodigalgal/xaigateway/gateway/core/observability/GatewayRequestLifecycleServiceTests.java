@@ -167,12 +167,12 @@ class GatewayRequestLifecycleServiceTests {
                 "sk-gw-test",
                 CanonicalIngressProtocol.OPENAI,
                 "GET",
-                "/v1/batches/batch_1",
-                "/v1/batches/{batchId}",
-                Map.of("batchId", "batch_1"),
-                "resource-orchestration",
-                TranslationResourceType.BATCH,
-                TranslationOperation.BATCH_GET,
+                "/v1/uploads/upload_1",
+                "/v1/uploads/{uploadId}",
+                Map.of("uploadId", "upload_1"),
+                "file-support",
+                TranslationResourceType.UPLOAD,
+                TranslationOperation.UPLOAD_GET,
                 null,
                 Map.of(),
                 List.of(),
@@ -182,14 +182,14 @@ class GatewayRequestLifecycleServiceTests {
         CanonicalExecutionPlan plan = new CanonicalExecutionPlan(
                 true,
                 CanonicalIngressProtocol.OPENAI,
-                "/v1/batches/batch_1",
-                "/v1/batches/{batchId}",
-                "batches",
-                "resource-orchestration",
-                "resource-orchestration",
-                "resource-orchestration",
-                TranslationResourceType.BATCH,
-                TranslationOperation.BATCH_GET,
+                "/v1/uploads/upload_1",
+                "/v1/uploads/{uploadId}",
+                "uploads",
+                "file-support",
+                "file-support",
+                "file-support",
+                TranslationResourceType.UPLOAD,
+                TranslationOperation.UPLOAD_GET,
                 ExecutionKind.NATIVE,
                 ExecutionBackend.ORCHESTRATION,
                 SupportStatus.NATIVE,
@@ -207,11 +207,11 @@ class GatewayRequestLifecycleServiceTests {
                 List.of()
         );
         CanonicalResourceResponse canonicalResponse = new CanonicalResourceResponse(
-                TranslationResourceType.BATCH,
-                TranslationOperation.BATCH_GET,
+                TranslationResourceType.UPLOAD,
+                TranslationOperation.UPLOAD_GET,
                 "object",
-                "batch",
-                "batch_1",
+                "upload",
+                "upload_1",
                 "in_progress",
                 List.of(),
                 List.of(),
@@ -223,7 +223,7 @@ class GatewayRequestLifecycleServiceTests {
         service.startRequest("req-async", selectionResult, request, plan, false, Instant.now());
         service.completeRequest("req-async", selectionResult, request, plan, false, GatewayUsageView.empty(), canonicalResponse, Instant.now());
 
-        assertEquals("batch_1", stored.get().getGatewayResourceKey());
+        assertEquals("upload_1", stored.get().getGatewayResourceKey());
     }
 
     @Test

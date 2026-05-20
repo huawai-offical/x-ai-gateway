@@ -21,7 +21,6 @@ class OpenAiDirectResourceSmokeHttpClient {
     static final String CHAT_COMPLETIONS = "CHAT_COMPLETIONS";
     static final String RESPONSES = "RESPONSES";
     static final String FILES = "FILES";
-    static final String BATCHES = "BATCHES";
     static final String VECTOR_STORES = "VECTOR_STORES";
     static final String REALTIME_CLIENT_SECRET = "REALTIME_CLIENT_SECRET";
 
@@ -32,7 +31,6 @@ class OpenAiDirectResourceSmokeHttpClient {
             CHAT_COMPLETIONS,
             RESPONSES,
             FILES,
-            BATCHES,
             VECTOR_STORES,
             REALTIME_CLIENT_SECRET
     );
@@ -221,7 +219,6 @@ class OpenAiDirectResourceSmokeHttpClient {
             case CHAT_COMPLETIONS -> plan(normalizedBase, "POST", "/v1/chat/completions", "chat_billable_generation", true, false);
             case RESPONSES -> plan(normalizedBase, "POST", "/v1/responses", "responses_billable_generation", true, false);
             case FILES -> plan(normalizedBase, "GET", "/v1/files?limit=1", "read_only_list", false, false);
-            case BATCHES -> plan(normalizedBase, "GET", "/v1/batches?limit=1", "read_only_list", false, false);
             case VECTOR_STORES -> plan(normalizedBase, "GET", "/v1/vector_stores?limit=1", "read_only_list", false, false);
             case REALTIME_CLIENT_SECRET -> plan(normalizedBase, "POST", "/v1/realtime/client_secrets", "write_client_secret", false, true);
             default -> throw new IllegalArgumentException("未知 OpenAI resource smoke family：" + family);

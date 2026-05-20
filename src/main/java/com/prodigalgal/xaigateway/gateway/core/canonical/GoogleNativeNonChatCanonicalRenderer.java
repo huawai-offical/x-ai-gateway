@@ -5,8 +5,6 @@ import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileService;
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation;
-import com.prodigalgal.xaigateway.gateway.core.resource.GatewayAsyncResourceService;
-import com.prodigalgal.xaigateway.protocol.ingress.google.GeminiBatchesEncoder;
 import com.prodigalgal.xaigateway.protocol.ingress.google.GeminiEmbeddingsEncoder;
 import com.prodigalgal.xaigateway.protocol.ingress.google.GeminiFilesEncoder;
 import com.prodigalgal.xaigateway.protocol.ingress.google.GeminiGenerateContentResourceEncoder;
@@ -23,19 +21,16 @@ public class GoogleNativeNonChatCanonicalRenderer implements NonChatCanonicalRen
     private final GeminiEmbeddingsEncoder geminiEmbeddingsEncoder;
     private final GeminiGenerateContentResourceEncoder geminiGenerateContentResourceEncoder;
     private final GeminiFilesEncoder geminiFilesEncoder;
-    private final GeminiBatchesEncoder geminiBatchesEncoder;
 
     public GoogleNativeNonChatCanonicalRenderer(
             ObjectMapper objectMapper,
             GeminiEmbeddingsEncoder geminiEmbeddingsEncoder,
             GeminiGenerateContentResourceEncoder geminiGenerateContentResourceEncoder,
-            GeminiFilesEncoder geminiFilesEncoder,
-            GeminiBatchesEncoder geminiBatchesEncoder) {
+            GeminiFilesEncoder geminiFilesEncoder) {
         this.objectMapper = objectMapper;
         this.geminiEmbeddingsEncoder = geminiEmbeddingsEncoder;
         this.geminiGenerateContentResourceEncoder = geminiGenerateContentResourceEncoder;
         this.geminiFilesEncoder = geminiFilesEncoder;
-        this.geminiBatchesEncoder = geminiBatchesEncoder;
     }
 
     @Override
@@ -54,10 +49,7 @@ public class GoogleNativeNonChatCanonicalRenderer implements NonChatCanonicalRen
                     FILE_CREATE,
                     FILE_LIST,
                     FILE_GET,
-                    FILE_DELETE,
-                    BATCH_CREATE,
-                    BATCH_GET,
-                    BATCH_CANCEL -> true;
+                    FILE_DELETE -> true;
             default -> false;
         };
     }
@@ -90,7 +82,6 @@ public class GoogleNativeNonChatCanonicalRenderer implements NonChatCanonicalRen
             return false;
         }
         return nativeView instanceof GatewayFileService.GoogleNativeFileView
-                || nativeView instanceof GatewayAsyncResourceService.GoogleNativeBatchView
                 || isGoogleFileList(semantics, nativeView);
     }
 
@@ -107,8 +98,6 @@ public class GoogleNativeNonChatCanonicalRenderer implements NonChatCanonicalRen
             @SuppressWarnings("unchecked")
             List<GatewayFileService.GoogleNativeFileView> views = (List<GatewayFileService.GoogleNativeFileView>) nativeView;
             renderedBody = geminiFilesEncoder.encodeList(views);
-        } else if (nativeView instanceof GatewayAsyncResourceService.GoogleNativeBatchView batchView) {
-            renderedBody = geminiBatchesEncoder.encode(batchView);
         } else {
             throw new IllegalArgumentException("当前 Google native view 无法渲染。");
         }

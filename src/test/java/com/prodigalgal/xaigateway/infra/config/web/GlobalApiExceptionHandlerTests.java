@@ -11,11 +11,12 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@WebFluxTest(controllers = GlobalApiExceptionHandlerProbeController.class)
+@WebFluxTest(controllers = GlobalApiExceptionHandlerTests.GlobalApiExceptionHandlerProbeController.class)
 @Import({
         PermitAllSecurityTestConfig.class,
         GlobalApiExceptionHandler.class,
-        TraceIdWebFilter.class
+        TraceIdWebFilter.class,
+        GlobalApiExceptionHandlerTests.GlobalApiExceptionHandlerProbeController.class
 })
 class GlobalApiExceptionHandlerTests {
 
@@ -86,28 +87,27 @@ class GlobalApiExceptionHandlerTests {
                 .jsonPath("$.error.code").isEqualTo("rate_limit_exceeded");
     }
 
-}
+    @RestController
+    public static class GlobalApiExceptionHandlerProbeController {
 
-@RestController
-class GlobalApiExceptionHandlerProbeController {
+        @PostMapping("/v1/chat/completions")
+        String openAiChat() {
+            throw new IllegalArgumentException("model 不能为空。");
+        }
 
-    @PostMapping("/v1/chat/completions")
-    String openAiChat() {
-        throw new IllegalArgumentException("model 不能为空。");
-    }
+        @PostMapping("/v1/chat/completions/rate-limit")
+        String openAiRateLimit() {
+            throw new IllegalArgumentException("当前 DistributedKey 已超过 RPM 限制。");
+        }
 
-    @PostMapping("/v1/chat/completions/rate-limit")
-    String openAiRateLimit() {
-        throw new IllegalArgumentException("当前 DistributedKey 已超过 RPM 限制。");
-    }
+        @PostMapping("/v1/responses/rule-rate-limit")
+        String openAiRuleMatchedRateLimit() {
+            throw new GatewayRuleMatchedException(429, "rate_limit_exceeded", "route policy rate limited");
+        }
 
-    @PostMapping("/v1/responses/rule-rate-limit")
-    String openAiRuleMatchedRateLimit() {
-        throw new GatewayRuleMatchedException(429, "rate_limit_exceeded", "route policy rate limited");
-    }
-
-    @PostMapping("/v1/messages")
-    String anthropicMessages() {
-        throw new IllegalArgumentException("messages 请求体不能为空。");
+        @PostMapping("/v1/messages")
+        String anthropicMessages() {
+            throw new IllegalArgumentException("messages 请求体不能为空。");
+        }
     }
 }

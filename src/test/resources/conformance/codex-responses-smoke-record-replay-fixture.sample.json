@@ -1,0 +1,75 @@
+{
+  "schemaVersion": "2026-05-19.codex-responses-smoke-record-replay.v1",
+  "replayMode": "record_replay",
+  "providerType": "CODEX_OAUTH",
+  "protocol": "codex-responses",
+  "baseUrl": "https://chatgpt.com/backend-api/codex",
+  "baseUrlHost": "chatgpt.com",
+  "certificationStatus": "DRY_RUN",
+  "dryRun": true,
+  "recordedAt": "2026-05-19T00:00:00Z",
+  "summary": {
+    "PASS": 0,
+    "FAIL": 0,
+    "SKIPPED": 1,
+    "UNSUPPORTED": 0,
+    "NO_PERMISSION": 0,
+    "BUDGET_BLOCKED": 0
+  },
+  "replayPolicy": {
+    "network": "disabled_by_default",
+    "billableOperations": "replay_only",
+    "writeOperations": "replay_only",
+    "secretMaterial": "redacted",
+    "fixtureSource": "codex_responses_smoke",
+    "dryRunEvidenceAccepted": true,
+    "liveExecutionRequiresDryRunFalse": true,
+    "liveExecutionRequiresRouteEligible": true,
+    "liveExecutionRequiresBudgetAvailable": true
+  },
+  "fixtures": [
+    {
+      "resourceFamily": "codex_responses",
+      "status": "DRY_RUN_READY",
+      "classification": "SKIPPED",
+      "skippedReason": "DRY_RUN",
+      "method": "POST",
+      "path": "/backend-api/codex/responses",
+      "model": "gpt-5.4@low",
+      "billable": false,
+      "writeOperation": false,
+      "evidence": {
+        "codexAppApi": true,
+        "routeEligible": true,
+        "credentialFingerprint": "sha256:sample"
+      },
+      "requestPreview": {
+        "method": "POST",
+        "baseUrl": "https://chatgpt.com/backend-api/codex",
+        "path": "/backend-api/codex/responses",
+        "codexAppApi": true,
+        "headers": {
+          "authorization": "Bearer ***",
+          "content-type": "application/json",
+          "accept": "text/event-stream",
+          "openai-beta": "responses=experimental"
+        },
+        "body": {
+          "model": "gpt-5.4",
+          "store": false,
+          "stream": true,
+          "tools": [],
+          "tool_choice": "auto",
+          "reasoning": {
+            "effort": "low"
+          }
+        },
+        "keepalive": {
+          "method": "GET",
+          "path": "/backend-api/wham/usage",
+          "baseUrl": "https://chatgpt.com/backend-api"
+        }
+      }
+    }
+  ]
+}

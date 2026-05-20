@@ -13,22 +13,21 @@ public class NativeCompatibilityService {
         return new NativeCompatibilityResponse(List.of(
                 new NativeCompatibilityRoute("ollama", "/ollama/api", "GET", "/ollama/api/tags", "SUPPORTED", true, "AUTH_GOVERNED", "列出当前 key 可访问模型，复用分发 Key 鉴权与模型目录。"),
                 new NativeCompatibilityRoute("ollama", "/ollama/api", "POST", "/ollama/api/chat", "SUPPORTED", true, "AUTH_GOVERNED", "Ollama chat 请求转换为 canonical chat，响应转回 Ollama message 结构。"),
-                new NativeCompatibilityRoute("anthropic", "/anthropic/v1", "POST", "/anthropic/v1/messages", "ALIAS", true, "AUTH_GOVERNED", "命名空间别名复用现有 `/v1/messages` 实现。"),
-                new NativeCompatibilityRoute("anthropic", "/anthropic/v1", "*", "/anthropic/v1/**", "EXPLICIT_UNSUPPORTED", true, "AUTH_GOVERNED", "非显式支持路径返回兼容矩阵，不做未治理透明代理。"),
-                new NativeCompatibilityRoute("google", "/google/v1beta", "POST", "/google/v1beta/models/{model}:generateContent", "ALIAS", true, "AUTH_GOVERNED", "命名空间别名复用现有 Gemini generateContent 实现。"),
-                new NativeCompatibilityRoute("google", "/google/v1beta", "POST", "/google/v1beta/models/{model}:embedContent", "ALIAS", true, "AUTH_GOVERNED", "命名空间别名复用现有 Gemini embedding 实现。"),
-                new NativeCompatibilityRoute("google", "/google/v1beta", "POST", "/google/v1beta/models/{model}:batchEmbedContents", "ALIAS", true, "AUTH_GOVERNED", "命名空间别名复用现有 Gemini batch embedding 实现。"),
-                new NativeCompatibilityRoute("google", "/google/v1beta", "POST", "/google/v1beta/models/{model}:batchGenerateContent", "ALIAS", true, "AUTH_GOVERNED", "命名空间别名复用现有 Gemini batch lifecycle 实现。"),
+                new NativeCompatibilityRoute("anthropic", "/anthropic/v1", "POST", "/anthropic/v1/messages", "ALIAS", true, "AUTH_GOVERNED", "命名空间别名复用现有 `/v1/messages` 实现，仅保留 OpenAI 标准功能区内的 chat/tools/thinking。"),
+                new NativeCompatibilityRoute("anthropic", "/anthropic/v1", "*", "/anthropic/v1/**", "EXPLICIT_UNSUPPORTED", true, "AUTH_GOVERNED", "非标准功能区路径返回兼容矩阵，不做未治理透明代理。"),
+                new NativeCompatibilityRoute("google", "/google/v1beta", "POST", "/google/v1beta/models/{model}:generateContent", "ALIAS", true, "AUTH_GOVERNED", "命名空间别名复用现有 Gemini generateContent，实现 OpenAI 标准功能区的 chat/tools 映射。"),
+                new NativeCompatibilityRoute("google", "/google/v1beta", "POST", "/google/v1beta/models/{model}:embedContent", "ALIAS", true, "AUTH_GOVERNED", "命名空间别名复用现有 Gemini embedding，实现 OpenAI 标准功能区的 embeddings 映射。"),
+                new NativeCompatibilityRoute("google", "/google/v1beta", "POST", "/google/v1beta/models/{model}:batchEmbedContents", "ALIAS", true, "AUTH_GOVERNED", "同步批量 embeddings 仅作为 OpenAI embeddings 多输入等价面，不等同于 provider batch job。"),
                 new NativeCompatibilityRoute("google", "/google/v1beta", "GET", "/google/v1beta/files", "ALIAS", true, "AUTH_GOVERNED", "命名空间别名复用现有 Google native file list，实现本地目录治理。"),
                 new NativeCompatibilityRoute("google", "/google/v1beta", "GET", "/google/v1beta/files/{fileName}", "ALIAS", true, "AUTH_GOVERNED", "命名空间别名复用现有 Google native file get，并保持 lineage 校验。"),
                 new NativeCompatibilityRoute("google", "/google/v1beta", "DELETE", "/google/v1beta/files/{fileName}", "ALIAS", true, "AUTH_GOVERNED", "命名空间别名复用现有 Google native file delete，并保持 lineage 校验。"),
-                new NativeCompatibilityRoute("google", "/google/v1beta", "GET", "/google/v1beta/batches/{batchName}", "ALIAS", true, "AUTH_GOVERNED", "命名空间别名复用现有 Gemini batch get，并保持 lineage 校验。"),
-                new NativeCompatibilityRoute("google", "/google/v1beta", "POST", "/google/v1beta/batches/{batchName}:cancel", "ALIAS", true, "AUTH_GOVERNED", "命名空间别名复用现有 Gemini batch cancel，并保持 lineage 校验。"),
                 new NativeCompatibilityRoute("google", "/google/upload/v1beta", "POST", "/google/upload/v1beta/files", "ALIAS", true, "AUTH_GOVERNED", "Google upload namespace 复用现有 `/upload/v1beta/files` 文件上传实现。"),
                 new NativeCompatibilityRoute("google", "/upload/v1beta", "POST", "/upload/v1beta/files", "SUPPORTED", true, "AUTH_GOVERNED", "通用 Google upload namespace 原生支持文件上传。"),
-                new NativeCompatibilityRoute("google", "/v1beta", "*", "/v1beta/**", "SUPPORTED_GOVERNED", true, "AUTH_GOVERNED", "通用 Gemini `/v1beta` 已支持 models/files/batches 已建模路径，未知路径显式拒绝。"),
-                new NativeCompatibilityRoute("google", "/google/v1beta", "*", "/google/v1beta/**", "EXPLICIT_UNSUPPORTED", true, "AUTH_GOVERNED", "非显式支持路径返回兼容矩阵，不做未治理透明代理。"),
-                new NativeCompatibilityRoute("google", "/google/upload/v1beta", "*", "/google/upload/v1beta/**", "EXPLICIT_UNSUPPORTED", true, "AUTH_GOVERNED", "非显式支持 upload path 返回兼容矩阵，不做未治理透明代理。")
+                new NativeCompatibilityRoute("google", "/v1beta", "*", "/v1beta/**", "SUPPORTED_GOVERNED", true, "AUTH_GOVERNED", "通用 Gemini `/v1beta` 仅支持 models/files 已建模标准区路径，未知路径显式拒绝。"),
+                new NativeCompatibilityRoute("google", "/google/v1beta", "*", "/google/v1beta/**", "EXPLICIT_UNSUPPORTED", true, "AUTH_GOVERNED", "非标准功能区路径返回兼容矩阵，不做未治理透明代理。"),
+                new NativeCompatibilityRoute("google", "/google/upload/v1beta", "*", "/google/upload/v1beta/**", "EXPLICIT_UNSUPPORTED", true, "AUTH_GOVERNED", "非显式支持 upload path 返回兼容矩阵，不做未治理透明代理。"),
+                new NativeCompatibilityRoute("vertex", "provider-catalog:vertex", "*", "project/location generateContent + embeddings + files", "CATALOG_GOVERNED", true, "AUTH_GOVERNED", "Vertex 只按 Gemini 标准功能区建模；其它平台级能力不进入兼容面。"),
+                new NativeCompatibilityRoute("codex", "chatgpt:/backend-api/codex", "POST", "/backend-api/codex/responses", "SMOKE_ONLY", true, "ADMIN_GOVERNED", "Codex App API 只按 OpenAI Responses 标准区做官方账号 smoke/反代校验，不扩展其它 Codex 内部接口。")
         ), translationConformance());
     }
 
@@ -63,7 +62,7 @@ public class NativeCompatibilityService {
                         "lossy",
                         List.of("text", "image", "document", "tool_result", "system", "usage"),
                         List.of("streaming tool_use deltas", "thinking deltas", "tool schema passthrough"),
-                        List.of("message batches native passthrough in chat runtime"),
+                        List.of("provider non-standard async APIs", "Anthropic admin/evals style APIs"),
                         "AnthropicMessagesControllerTests + AnthropicNativeGatewayChatRuntimeTests",
                         "Messages 可运行，但 streaming tool/reasoning 的事件级保真仍需硬化。"
                 ),
@@ -74,7 +73,7 @@ public class NativeCompatibilityService {
                         "lossy",
                         List.of("text", "fileData", "functionResponse", "functionDeclarations", "streaming", "usage"),
                         List.of("thinkingConfig", "toolChoice", "safety block normalization"),
-                        List.of("Vertex project/location native path"),
+                        List.of("provider non-standard async APIs", "Vertex pipeline/job/admin APIs"),
                         "GeminiGenerateContentControllerTests + GeminiNativeGatewayChatRuntimeTests",
                         "Gemini 主入口已支持，Vertex 与 thinking/toolChoice 差异需要后续补齐。"
                 ),
@@ -101,15 +100,37 @@ public class NativeCompatibilityService {
                         "需要用 deployment 与 api-version 维度继续完善真实 conformance。"
                 ),
                 new NativeTranslationConformanceRow(
-                        "xAI / Perplexity / Vertex",
+                        "xAI / Perplexity",
                         "provider-specific",
                         "provider native endpoints",
                         "partial",
-                        List.of("xAI OpenAI-compatible chat", "Perplexity search-augmented chat", "Vertex generateContent project/location path"),
+                        List.of("xAI OpenAI-compatible chat", "Perplexity search-augmented chat"),
                         List.of("provider-specific request/response extensions", "service-account smoke", "citation normalization"),
                         List.of("Bedrock/Baidu/Zhipu/Tencent native adapters", "provider-specific media lifecycle"),
                         "ProviderCatalogLoaderTests + SiteConformanceHarnessTests + ProviderReferenceGapServiceTests",
-                        "xAI、Perplexity、Vertex 已从笼统缺口收敛为可建模兼容面；仍不能宣称所有长尾 provider 全自动无损翻译。"
+                        "xAI、Perplexity 已从笼统缺口收敛为 OpenAI-compatible 或 search-augmented Chat 兼容面；仍不能宣称所有长尾 provider 全自动无损翻译。"
+                ),
+                new NativeTranslationConformanceRow(
+                        "Vertex AI",
+                        "vertex",
+                        "project/location Gemini standard zone",
+                        "catalog-governed",
+                        List.of("generateContent", "embeddings", "files support surface"),
+                        List.of("Google Cloud credential and location routing"),
+                        List.of("provider non-standard async APIs", "pipeline/job/admin APIs"),
+                        "ProviderCatalogLoaderTests + ProviderReferenceGapServiceTests",
+                        "Vertex 只按 OpenAI 标准功能区映射 Gemini 对话、tools、embeddings 和文件支撑；不追 Vertex AI Platform 全量 API。"
+                ),
+                new NativeTranslationConformanceRow(
+                        "Codex App API",
+                        "codex",
+                        "/backend-api/codex/responses",
+                        "smoke-only",
+                        List.of("Responses request body", "streaming", "reasoning effort", "usage budget guard", "dry-run preview"),
+                        List.of("ChatGPT account model entitlement", "record/replay fixture hardening"),
+                        List.of("non-Responses Codex internal APIs", "admin/session/internal lifecycle APIs"),
+                        "CodexResponsesSmokeHttpClientTests + OfficialAccountAdminServiceTests",
+                        "Codex 只作为官方账号 Responses smoke/反代边界，不作为全量 provider catalog preset。"
                 )
         );
     }

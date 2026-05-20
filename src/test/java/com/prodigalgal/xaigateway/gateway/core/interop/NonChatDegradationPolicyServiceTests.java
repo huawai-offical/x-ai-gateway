@@ -49,9 +49,9 @@ class NonChatDegradationPolicyServiceTests {
     @Test
     void shouldDisableFallbackForStoredLineageEvenWhenCapabilityIsNative() {
         GatewayRequestSemantics semantics = new GatewayRequestSemantics(
-                TranslationResourceType.BATCH,
-                TranslationOperation.BATCH_GET,
-                List.of(InteropFeature.BATCH_CREATE),
+                TranslationResourceType.UPLOAD,
+                TranslationOperation.UPLOAD_GET,
+                List.of(InteropFeature.UPLOAD_CREATE),
                 RouteSelectionMode.STORED_LINEAGE
         );
         NonChatRoutePolicyDecision policyDecision = new NonChatRoutePolicyDecision(

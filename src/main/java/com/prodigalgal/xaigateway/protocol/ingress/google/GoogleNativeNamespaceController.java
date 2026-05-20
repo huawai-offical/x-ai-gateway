@@ -10,17 +10,14 @@ public class GoogleNativeNamespaceController {
 
     private final GeminiGenerateContentController generateContentController;
     private final GeminiEmbeddingsController embeddingsController;
-    private final GeminiBatchesController batchesController;
     private final GeminiFilesController filesController;
 
     public GoogleNativeNamespaceController(
             GeminiGenerateContentController generateContentController,
             GeminiEmbeddingsController embeddingsController,
-            GeminiBatchesController batchesController,
             GeminiFilesController filesController) {
         this.generateContentController = generateContentController;
         this.embeddingsController = embeddingsController;
-        this.batchesController = batchesController;
         this.filesController = filesController;
     }
 
@@ -64,15 +61,6 @@ public class GoogleNativeNamespaceController {
         return embeddingsController.batchEmbedContents(model, headerApiKey, queryApiKey, request);
     }
 
-    @PostMapping("/models/{model}:batchGenerateContent")
-    public JsonNode createBatch(
-            @PathVariable String model,
-            @RequestHeader(value = "x-goog-api-key", required = false) String headerApiKey,
-            @RequestParam(value = "key", required = false) String queryApiKey,
-            @RequestBody JsonNode request) {
-        return batchesController.createBatch(model, headerApiKey, queryApiKey, request);
-    }
-
     @GetMapping("/files")
     public JsonNode listFiles(
             @RequestHeader(value = "x-goog-api-key", required = false) String headerApiKey,
@@ -96,27 +84,11 @@ public class GoogleNativeNamespaceController {
         return filesController.delete(headerApiKey, queryApiKey, fileName);
     }
 
-    @GetMapping({"/batches/{batchName}", "/batches/batches/{batchName}"})
-    public JsonNode getBatch(
-            @RequestHeader(value = "x-goog-api-key", required = false) String headerApiKey,
-            @RequestParam(value = "key", required = false) String queryApiKey,
-            @PathVariable String batchName) {
-        return batchesController.getBatch(headerApiKey, queryApiKey, batchName);
-    }
-
-    @PostMapping({"/batches/{batchName}:cancel", "/batches/batches/{batchName}:cancel"})
-    public JsonNode cancelBatch(
-            @RequestHeader(value = "x-goog-api-key", required = false) String headerApiKey,
-            @RequestParam(value = "key", required = false) String queryApiKey,
-            @PathVariable String batchName) {
-        return batchesController.cancelBatch(headerApiKey, queryApiKey, batchName);
-    }
-
     @RequestMapping("/**")
     public ResponseEntity<?> unsupported() {
         return ResponseEntity.status(501).body(java.util.Map.of(
                 "error", "NATIVE_PATH_UNSUPPORTED",
-                "message", "该 Google native path 尚未显式兼容；请使用 /google/v1beta/models/{model}:generateContent、/google/v1beta/files、/google/v1beta/batches 或查看 /admin/native-compatibility/matrix。"
+                "message", "该 Google native path 不属于当前 OpenAI 标准功能区；请使用 /google/v1beta/models/{model}:generateContent、embeddings、files，或查看 /admin/native-compatibility/matrix。"
         ));
     }
 }

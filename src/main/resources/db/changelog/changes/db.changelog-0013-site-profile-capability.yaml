@@ -45,8 +45,6 @@ databaseChangeLog:
               - column: { name: supports_moderation, type: BOOLEAN, defaultValueBoolean: false, constraints: { nullable: false } }
               - column: { name: supports_files, type: BOOLEAN, defaultValueBoolean: false, constraints: { nullable: false } }
               - column: { name: supports_uploads, type: BOOLEAN, defaultValueBoolean: false, constraints: { nullable: false } }
-              - column: { name: supports_batches, type: BOOLEAN, defaultValueBoolean: false, constraints: { nullable: false } }
-              - column: { name: supports_tuning, type: BOOLEAN, defaultValueBoolean: false, constraints: { nullable: false } }
               - column: { name: supports_realtime, type: BOOLEAN, defaultValueBoolean: false, constraints: { nullable: false } }
               - column: { name: auth_strategy, type: VARCHAR(32), constraints: { nullable: false } }
               - column: { name: path_strategy, type: VARCHAR(32), constraints: { nullable: false } }

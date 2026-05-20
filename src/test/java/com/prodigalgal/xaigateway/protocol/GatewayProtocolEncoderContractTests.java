@@ -16,8 +16,6 @@ import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
-import com.prodigalgal.xaigateway.gateway.core.resource.GatewayAsyncResourceService;
-import com.prodigalgal.xaigateway.gateway.core.resource.GatewayAsyncResourceType;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayFinishReason;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
@@ -25,11 +23,8 @@ import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionSource;
 import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.shared.ReasoningTransport;
-import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayAsyncResourceEntity;
 import com.prodigalgal.xaigateway.protocol.ingress.anthropic.AnthropicMessagesEncoder;
 import com.prodigalgal.xaigateway.protocol.ingress.anthropic.AnthropicMessagesResponse;
-import com.prodigalgal.xaigateway.protocol.ingress.anthropic.AnthropicMessageBatchesEncoder;
-import com.prodigalgal.xaigateway.protocol.ingress.google.GeminiBatchesEncoder;
 import com.prodigalgal.xaigateway.protocol.ingress.google.GeminiEmbeddingsEncoder;
 import com.prodigalgal.xaigateway.protocol.ingress.google.GeminiFilesEncoder;
 import com.prodigalgal.xaigateway.protocol.ingress.google.GeminiGenerateContentEncoder;
@@ -38,7 +33,6 @@ import com.prodigalgal.xaigateway.protocol.ingress.openai.OpenAiChatCompletionEn
 import com.prodigalgal.xaigateway.protocol.ingress.openai.OpenAiChatCompletionResponse;
 import com.prodigalgal.xaigateway.protocol.ingress.openai.OpenAiResponsesEncoder;
 import com.prodigalgal.xaigateway.protocol.ingress.openai.OpenAiResponsesResponse;
-import java.lang.reflect.Field;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -186,45 +180,6 @@ class GatewayProtocolEncoderContractTests {
         assertEquals(1, listEncoded.path("files").size());
     }
 
-    @Test
-    void shouldEncodeGeminiBatchesContract() {
-        GeminiBatchesEncoder encoder = new GeminiBatchesEncoder(objectMapper);
-        GatewayAsyncResourceEntity entity = new GatewayAsyncResourceEntity();
-        entity.setResourceKey("batch_local_1");
-        entity.setResourceType(GatewayAsyncResourceType.BATCH);
-        entity.setRequestModel("gemini-2.5-pro");
-        entity.setStatus("completed");
-        entity.setUpstreamObjectId("batches/abc123");
-        setField(entity, "createdAt", Instant.parse("2026-04-17T00:00:00Z"));
-        setField(entity, "updatedAt", Instant.parse("2026-04-17T01:00:00Z"));
-
-        ObjectNode payload = objectMapper.createObjectNode();
-        payload.put("model", "gemini-2.5-pro");
-        payload.put("status", "completed");
-        payload.put("input_file_id", "file_123");
-        ObjectNode metadata = objectMapper.createObjectNode();
-        metadata.put("upstream_object_id", "batches/abc123");
-
-        JsonNode encoded = encoder.encode(new GatewayAsyncResourceService.GoogleNativeBatchView(entity, payload, metadata));
-
-        assertEquals("batches/abc123", encoded.path("name").asText());
-        assertEquals("JOB_STATE_SUCCEEDED", encoded.path("state").asText());
-        assertEquals("file_123", encoded.path("inputFile").asText());
-    }
-
-    @Test
-    void shouldEncodeAnthropicMessageBatchesContract() {
-        AnthropicMessageBatchesEncoder encoder = new AnthropicMessageBatchesEncoder(objectMapper);
-        ObjectNode response = objectMapper.createObjectNode();
-        response.put("id", "msgbatch_123");
-        response.put("status", "running");
-
-        JsonNode encoded = encoder.encode(response);
-
-        assertEquals("msgbatch_123", encoded.path("id").asText());
-        assertEquals("running", encoded.path("status").asText());
-    }
-
     private CanonicalExecutionResult canonicalResult(
             String requestId,
             ProviderType providerType,
@@ -325,13 +280,4 @@ class GatewayProtocolEncoderContractTests {
         );
     }
 
-    private void setField(Object target, String fieldName, Object value) {
-        try {
-            Field field = target.getClass().getDeclaredField(fieldName);
-            field.setAccessible(true);
-            field.set(target, value);
-        } catch (ReflectiveOperationException exception) {
-            throw new IllegalStateException(exception);
-        }
-    }
 }

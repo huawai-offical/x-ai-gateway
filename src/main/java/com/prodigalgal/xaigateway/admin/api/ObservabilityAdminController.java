@@ -165,4 +165,9 @@ public class ObservabilityAdminController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to) {
         return monitoringBillingRollupService.exportCsv(period, distributedKeyId, providerType, from, to);
     }
+
+    @GetMapping("/codex-requests/{requestId}/recovery-command")
+    public String getCodexRecoveryCommand(@PathVariable String requestId) {
+        return observabilityQueryService.generateCodexRecoveryCommand(requestId);
+    }
 }

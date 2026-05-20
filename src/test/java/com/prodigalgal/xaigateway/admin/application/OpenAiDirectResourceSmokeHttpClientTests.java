@@ -25,7 +25,7 @@ class OpenAiDirectResourceSmokeHttpClientTests {
         List<String> families = client.normalizeFamilies(null);
         var item = client.dryRunItem(families.getFirst(), "https://api.openai.com/v1", "org-real", "proj-real");
 
-        assertEquals(6, families.size());
+        assertEquals(5, families.size());
         assertEquals("CHAT_COMPLETIONS", item.resourceFamily());
         assertEquals("SKIPPED", item.classification());
         assertEquals("DRY_RUN", item.skippedReason());

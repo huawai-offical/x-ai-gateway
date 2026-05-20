@@ -9,8 +9,6 @@ public enum TranslationResourceType {
     MODERATION("moderation"),
     FILE("file"),
     UPLOAD("upload"),
-    BATCH("batch"),
-    TUNING("tuning"),
     REALTIME("realtime"),
     RERANK("rerank"),
     VIDEO("video"),

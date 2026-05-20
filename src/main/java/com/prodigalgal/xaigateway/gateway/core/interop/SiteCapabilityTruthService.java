@@ -466,18 +466,6 @@ public class SiteCapabilityTruthService {
                     && supportsUpstreamUploads(siteKind)
                     ? InteropCapabilityLevel.NATIVE
                     : InteropCapabilityLevel.UNSUPPORTED;
-            case BATCH_CREATE -> hasSnapshotCapability(snapshot, SiteCapabilitySnapshotEntity::isSupportsBatches)
-                    && supportsUpstreamBatches(siteKind)
-                    ? InteropCapabilityLevel.NATIVE
-                    : InteropCapabilityLevel.UNSUPPORTED;
-            case ANTHROPIC_MESSAGE_BATCH -> hasSnapshotCapability(snapshot, SiteCapabilitySnapshotEntity::isSupportsBatches)
-                    && supportsUpstreamAnthropicMessageBatches(siteKind)
-                    ? InteropCapabilityLevel.NATIVE
-                    : InteropCapabilityLevel.UNSUPPORTED;
-            case TUNING_CREATE -> hasSnapshotCapability(snapshot, SiteCapabilitySnapshotEntity::isSupportsTuning)
-                    && supportsUpstreamTunings(siteKind)
-                    ? InteropCapabilityLevel.NATIVE
-                    : InteropCapabilityLevel.UNSUPPORTED;
             case REALTIME_CLIENT_SECRET -> hasSnapshotCapability(snapshot, SiteCapabilitySnapshotEntity::isSupportsRealtime)
                     && supportsUpstreamRealtime(siteKind)
                     ? InteropCapabilityLevel.NATIVE
@@ -546,18 +534,6 @@ public class SiteCapabilityTruthService {
         return siteKind == UpstreamSiteKind.OPENAI_DIRECT;
     }
 
-    private boolean supportsUpstreamBatches(UpstreamSiteKind siteKind) {
-        return siteKind == UpstreamSiteKind.OPENAI_DIRECT || supportsGoogleGenAiSite(siteKind);
-    }
-
-    private boolean supportsUpstreamAnthropicMessageBatches(UpstreamSiteKind siteKind) {
-        return siteKind == UpstreamSiteKind.ANTHROPIC_DIRECT;
-    }
-
-    private boolean supportsUpstreamTunings(UpstreamSiteKind siteKind) {
-        return siteKind == UpstreamSiteKind.OPENAI_DIRECT || supportsGoogleGenAiSite(siteKind);
-    }
-
     private boolean supportsUpstreamRealtime(UpstreamSiteKind siteKind) {
         return siteKind == UpstreamSiteKind.OPENAI_DIRECT;
     }
@@ -622,13 +598,8 @@ public class SiteCapabilityTruthService {
         }
         return switch (siteProfile.getSiteKind()) {
             case GEMINI_DIRECT, VERTEX_AI -> semantics.resourceType() == TranslationResourceType.FILE
-                    || semantics.resourceType() == TranslationResourceType.UPLOAD
-                    || semantics.resourceType() == TranslationResourceType.BATCH
-                    || semantics.resourceType() == TranslationResourceType.TUNING;
-            case ANTHROPIC_DIRECT -> semantics.resourceType() == TranslationResourceType.FILE
-                    || semantics.operation() == TranslationOperation.ANTHROPIC_MESSAGE_BATCH_CREATE
-                    || semantics.operation() == TranslationOperation.ANTHROPIC_MESSAGE_BATCH_GET
-                    || semantics.operation() == TranslationOperation.ANTHROPIC_MESSAGE_BATCH_CANCEL;
+                    || semantics.resourceType() == TranslationResourceType.UPLOAD;
+            case ANTHROPIC_DIRECT -> semantics.resourceType() == TranslationResourceType.FILE;
             default -> false;
         };
     }
@@ -653,10 +624,6 @@ public class SiteCapabilityTruthService {
                         "Anthropic 当前没有稳定的原生 moderation API，因此当前不开放。";
                 case UPLOAD_CREATE ->
                         "Anthropic Files API beta 不等价于 OpenAI /v1/uploads 的 create/parts/complete/cancel contract，因此当前不开放。";
-                case BATCH_CREATE ->
-                        "Anthropic Message Batches 是原生 messages request array 语义，不等价于当前 file-driven /v1/batches contract，因此当前不开放。";
-                case TUNING_CREATE ->
-                        "Anthropic 当前没有稳定的原生 tuning API，因此当前不开放。";
                 case REALTIME_CLIENT_SECRET ->
                         "Anthropic 当前没有与 OpenAI realtime client_secret 等价的稳定原生对象，因此当前不开放。";
                 default -> null;
@@ -666,10 +633,6 @@ public class SiteCapabilityTruthService {
                         "Dify 的 OpenAI-compatible surface 只视作 workflow/chat 入口，不把 file object lifecycle 视为稳定上游契约。";
                 case UPLOAD_CREATE ->
                         "Dify 不暴露与 OpenAI /v1/uploads 等价的稳定对象生命周期，因此当前不开放。";
-                case BATCH_CREATE ->
-                        "Dify 不暴露与 OpenAI /v1/batches 等价的稳定对象生命周期，因此当前不开放。";
-                case TUNING_CREATE ->
-                        "Dify 不暴露与 OpenAI fine-tuning 等价的稳定对象生命周期，因此当前不开放。";
                 case REALTIME_CLIENT_SECRET ->
                         "Dify 不暴露与 OpenAI realtime client_secret 等价的稳定对象生命周期，因此当前不开放。";
                 case RERANK ->
@@ -682,10 +645,6 @@ public class SiteCapabilityTruthService {
                         "OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；files 仍作为 accepted exception，不在当前实现面内。";
                 case UPLOAD_CREATE ->
                         "OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；uploads 仍作为 accepted exception，不在当前实现面内。";
-                case BATCH_CREATE ->
-                        "OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；batches 仍作为 accepted exception，不在当前实现面内。";
-                case TUNING_CREATE ->
-                        "OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；fine-tuning 仍作为 accepted exception，不在当前实现面内。";
                 case REALTIME_CLIENT_SECRET ->
                         "OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；realtime client secrets 仍作为 accepted exception，不在当前实现面内。";
                 default -> null;
@@ -695,10 +654,6 @@ public class SiteCapabilityTruthService {
                         "Jina 当前仅在本仓库中冻结为 embeddings/rerank provider，不把 file object lifecycle 视作稳定契约。";
                 case UPLOAD_CREATE ->
                         "Jina 当前仅在本仓库中冻结为 embeddings/rerank provider，不开放 uploads object lifecycle。";
-                case BATCH_CREATE ->
-                        "Jina 当前仅在本仓库中冻结为 embeddings/rerank provider，不开放 batches object lifecycle。";
-                case TUNING_CREATE ->
-                        "Jina 当前仅在本仓库中冻结为 embeddings/rerank provider，不开放 tuning lifecycle。";
                 case REALTIME_CLIENT_SECRET ->
                         "Jina 当前不提供与 OpenAI realtime client_secret 等价的稳定能力。";
                 default -> null;
@@ -712,7 +667,7 @@ public class SiteCapabilityTruthService {
             return "blocked";
         }
         return switch (resourceType) {
-            case FILE, UPLOAD, BATCH, TUNING, REALTIME, RESPONSE, VIDEO, MUSIC, TASK -> "upstream_object_with_local_lineage";
+            case FILE, UPLOAD, REALTIME, RESPONSE, VIDEO, MUSIC, TASK -> "upstream_object_with_local_lineage";
             case CHAT, EMBEDDING, AUDIO, IMAGE, MODERATION, RERANK, WEB_SEARCH -> executionKind == ExecutionKind.NATIVE
                     ? "direct_upstream_execution"
                     : "translated_execution";

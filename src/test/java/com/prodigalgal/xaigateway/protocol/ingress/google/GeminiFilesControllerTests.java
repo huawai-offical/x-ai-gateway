@@ -29,7 +29,6 @@ import reactor.core.publisher.Mono;
         GeminiEmbeddingsEncoder.class,
         GeminiGenerateContentResourceEncoder.class,
         GeminiFilesEncoder.class,
-        GeminiBatchesEncoder.class,
         GoogleNativeNonChatCanonicalRenderer.class,
         NonChatCanonicalRenderService.class
 })

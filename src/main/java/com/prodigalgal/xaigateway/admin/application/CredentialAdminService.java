@@ -5,6 +5,10 @@ import com.prodigalgal.xaigateway.admin.api.CredentialConnectivityResponse;
 import com.prodigalgal.xaigateway.admin.api.CredentialModelRefreshResponse;
 import com.prodigalgal.xaigateway.admin.api.CredentialRequest;
 import com.prodigalgal.xaigateway.admin.api.CredentialResponse;
+import com.prodigalgal.xaigateway.admin.api.FunctionalProviderSmokeCertificationResponse;
+import com.prodigalgal.xaigateway.admin.api.FunctionalProviderSmokeItemResponse;
+import com.prodigalgal.xaigateway.admin.api.FunctionalProviderSmokeRequest;
+import com.prodigalgal.xaigateway.admin.api.FunctionalProviderSmokeResponse;
 import com.prodigalgal.xaigateway.admin.api.OpenAiDirectResourceSmokeItemResponse;
 import com.prodigalgal.xaigateway.admin.api.OpenAiDirectResourceSmokeRequest;
 import com.prodigalgal.xaigateway.admin.api.OpenAiDirectResourceSmokeResponse;
@@ -42,7 +46,9 @@ public class CredentialAdminService {
     private final SupportedModelCatalogService supportedModelCatalogService;
     private final OpenAiDirectSmokeHttpClient openAiDirectSmokeHttpClient;
     private final OpenAiDirectResourceSmokeHttpClient openAiDirectResourceSmokeHttpClient;
+    private final FunctionalProviderSmokeHttpClient functionalProviderSmokeHttpClient;
     private final OpenAiDirectSmokeCertificationService openAiDirectSmokeCertificationService;
+    private final FunctionalProviderSmokeCertificationService functionalProviderSmokeCertificationService;
 
     public CredentialAdminService(
             UpstreamCredentialRepository upstreamCredentialRepository,
@@ -61,7 +67,9 @@ public class CredentialAdminService {
         this.supportedModelCatalogService = supportedModelCatalogService;
         this.openAiDirectSmokeHttpClient = new OpenAiDirectSmokeHttpClient(objectMapper);
         this.openAiDirectResourceSmokeHttpClient = new OpenAiDirectResourceSmokeHttpClient(objectMapper);
+        this.functionalProviderSmokeHttpClient = new FunctionalProviderSmokeHttpClient(objectMapper);
         this.openAiDirectSmokeCertificationService = new OpenAiDirectSmokeCertificationService();
+        this.functionalProviderSmokeCertificationService = new FunctionalProviderSmokeCertificationService();
     }
 
     @Transactional(readOnly = true)
@@ -325,6 +333,138 @@ public class CredentialAdminService {
         return certification;
     }
 
+    public FunctionalProviderSmokeResponse functionalProviderSmoke(
+            Long credentialId,
+            FunctionalProviderSmokeRequest request) {
+        UpstreamCredentialEntity entity = getRequired(credentialId);
+        Instant now = Instant.now();
+        boolean dryRun = request == null || request.dryRun() == null || request.dryRun();
+        boolean liveRequested = request != null && Boolean.FALSE.equals(request.dryRun());
+        boolean liveAllowed = request != null && Boolean.TRUE.equals(request.allowLive());
+        boolean allowBillableProbes = request != null && Boolean.TRUE.equals(request.allowBillableProbes());
+        String requestedBaseUrl = firstNonBlank(
+                request == null ? null : request.baseUrl(),
+                entity.getBaseUrl()
+        );
+        String protocol = functionalProviderSmokeHttpClient.resolveProtocol(
+                entity.getProviderType(),
+                request == null ? null : request.protocol(),
+                requestedBaseUrl
+        );
+        String requestedModel = normalizeBlank(request == null ? null : request.model());
+        Integer timeoutSeconds = request == null ? null : request.timeoutSeconds();
+        List<String> families = functionalProviderSmokeHttpClient.normalizeFamilies(
+                entity.getProviderType(),
+                protocol,
+                request == null ? null : request.resourceFamilies()
+        );
+        String routeBlockReason = functionalProviderSmokeRouteBlockReason(entity, now);
+        boolean routeEligible = routeBlockReason == null;
+        List<FunctionalProviderSmokeItemResponse> items;
+        if (!routeEligible) {
+            items = families.stream()
+                    .map(family -> functionalProviderSmokeHttpClient.routeBlockedItem(
+                            entity.getProviderType(),
+                            protocol,
+                            family,
+                            requestedBaseUrl,
+                            requestedModel,
+                            routeBlockReason
+                    ))
+                    .toList();
+        } else if (dryRun) {
+            items = families.stream()
+                    .map(family -> functionalProviderSmokeHttpClient.dryRunItem(
+                            entity.getProviderType(),
+                            protocol,
+                            family,
+                            requestedBaseUrl,
+                            requestedModel
+                    ))
+                    .toList();
+        } else if (liveRequested && !liveAllowed) {
+            items = families.stream()
+                    .map(family -> functionalProviderSmokeHttpClient.liveGuardItem(
+                            entity.getProviderType(),
+                            protocol,
+                            family,
+                            requestedBaseUrl,
+                            requestedModel
+                    ))
+                    .toList();
+        } else {
+            String secret = credentialCryptoService.decrypt(entity.getApiKeyCiphertext());
+            items = families.stream()
+                    .map(family -> functionalProviderSmokeHttpClient.executeProbe(
+                            entity.getProviderType(),
+                            protocol,
+                            family,
+                            secret,
+                            requestedBaseUrl,
+                            requestedModel,
+                            timeoutSeconds,
+                            allowBillableProbes
+                    ))
+                    .toList();
+            applyFunctionalProviderSmokeResult(entity, items, now);
+            upstreamCredentialRepository.save(entity);
+        }
+        Map<String, Integer> summary = functionalProviderSmokeSummary(items);
+        String classification = aggregateFunctionalProviderSmokeClassification(
+                summary,
+                routeEligible,
+                dryRun,
+                liveRequested,
+                liveAllowed
+        );
+        String skippedReason = aggregateFunctionalProviderSmokeSkippedReason(
+                classification,
+                routeEligible,
+                dryRun,
+                liveRequested,
+                liveAllowed,
+                routeBlockReason,
+                items
+        );
+        String status = functionalProviderSmokeStatus(routeEligible, dryRun, liveRequested, liveAllowed);
+        String message = functionalProviderSmokeMessage(classification, routeEligible, dryRun, liveRequested, liveAllowed);
+        String baseUrl = items.isEmpty() ? requestedBaseUrl : text(items.getFirst().requestPreview().get("baseUrl"));
+        return new FunctionalProviderSmokeResponse(
+                entity.getId(),
+                status,
+                classification,
+                skippedReason,
+                baseUrl,
+                entity.getProviderType(),
+                protocol,
+                dryRun,
+                liveAllowed,
+                routeEligible,
+                routeBlockReason,
+                entity.getApiKeyFingerprint(),
+                now,
+                message,
+                summary,
+                items
+        );
+    }
+
+    public FunctionalProviderSmokeCertificationResponse functionalProviderSmokeCertification(
+            Long credentialId,
+            FunctionalProviderSmokeRequest request) {
+        FunctionalProviderSmokeResponse smoke = functionalProviderSmoke(credentialId, request);
+        FunctionalProviderSmokeCertificationResponse certification =
+                functionalProviderSmokeCertificationService.certify(smoke, Instant.now());
+        if (!certification.dryRun() && certification.smoke().liveAllowed()) {
+            UpstreamCredentialEntity entity = getRequired(credentialId);
+            Map<String, Object> metadata = new java.util.LinkedHashMap<>(readMetadata(entity.getCredentialMetadataJson()));
+            metadata.put("functional_provider_smoke_certification", functionalProviderSmokeCertificationService.metadata(certification));
+            entity.setCredentialMetadataJson(writeMetadata(metadata));
+            upstreamCredentialRepository.save(entity);
+        }
+        return certification;
+    }
+
     public CredentialModelRefreshResponse refreshModels(Long credentialId) {
         CredentialModelDiscoveryService.CredentialRefreshResult result =
                 credentialModelDiscoveryService.refreshCredential(credentialId);
@@ -347,6 +487,169 @@ public class CredentialAdminService {
             return "CREDENTIAL_COOLDOWN";
         }
         return null;
+    }
+
+    private String functionalProviderSmokeRouteBlockReason(UpstreamCredentialEntity entity, Instant now) {
+        if (entity.getProviderType() != ProviderType.GEMINI_DIRECT
+                && entity.getProviderType() != ProviderType.OPENAI_COMPATIBLE
+                && entity.getProviderType() != ProviderType.ANTHROPIC_DIRECT) {
+            return "PROVIDER_NOT_FUNCTIONAL_SMOKE_COMPATIBLE";
+        }
+        if (!entity.isActive()) {
+            return "CREDENTIAL_INACTIVE";
+        }
+        if (entity.getCooldownUntil() != null && entity.getCooldownUntil().isAfter(now)) {
+            return "CREDENTIAL_COOLDOWN";
+        }
+        return null;
+    }
+
+    private Map<String, Integer> functionalProviderSmokeSummary(List<FunctionalProviderSmokeItemResponse> items) {
+        Map<String, Integer> summary = new java.util.LinkedHashMap<>();
+        for (String classification : List.of("PASS", "FAIL", "SKIPPED", "UNSUPPORTED", "NO_PERMISSION", "BUDGET_BLOCKED")) {
+            summary.put(classification, 0);
+        }
+        for (FunctionalProviderSmokeItemResponse item : items) {
+            summary.computeIfPresent(item.classification(), (key, value) -> value + 1);
+        }
+        return summary;
+    }
+
+    private String aggregateFunctionalProviderSmokeClassification(
+            Map<String, Integer> summary,
+            boolean routeEligible,
+            boolean dryRun,
+            boolean liveRequested,
+            boolean liveAllowed) {
+        if (!routeEligible) {
+            if (summary.getOrDefault("UNSUPPORTED", 0) > 0) {
+                return "UNSUPPORTED";
+            }
+            if (summary.getOrDefault("BUDGET_BLOCKED", 0) > 0) {
+                return "BUDGET_BLOCKED";
+            }
+            return "SKIPPED";
+        }
+        if (summary.getOrDefault("UNSUPPORTED", 0) > 0
+                && summary.getOrDefault("PASS", 0) == 0
+                && summary.getOrDefault("SKIPPED", 0) == 0
+                && summary.getOrDefault("BUDGET_BLOCKED", 0) == 0) {
+            return "UNSUPPORTED";
+        }
+        if (dryRun || liveRequested && !liveAllowed) {
+            return "SKIPPED";
+        }
+        if (summary.getOrDefault("FAIL", 0) > 0) {
+            return "FAIL";
+        }
+        if (summary.getOrDefault("NO_PERMISSION", 0) > 0) {
+            return "NO_PERMISSION";
+        }
+        if (summary.getOrDefault("PASS", 0) > 0) {
+            return "PASS";
+        }
+        if (summary.getOrDefault("BUDGET_BLOCKED", 0) > 0) {
+            return "BUDGET_BLOCKED";
+        }
+        if (summary.getOrDefault("UNSUPPORTED", 0) > 0) {
+            return "UNSUPPORTED";
+        }
+        return "SKIPPED";
+    }
+
+    private String aggregateFunctionalProviderSmokeSkippedReason(
+            String classification,
+            boolean routeEligible,
+            boolean dryRun,
+            boolean liveRequested,
+            boolean liveAllowed,
+            String routeBlockReason,
+            List<FunctionalProviderSmokeItemResponse> items) {
+        if ("PASS".equals(classification) || "FAIL".equals(classification)) {
+            return null;
+        }
+        if (!routeEligible) {
+            return routeBlockReason;
+        }
+        if (dryRun) {
+            return "DRY_RUN";
+        }
+        if (liveRequested && !liveAllowed) {
+            return "LIVE_NOT_ALLOWED";
+        }
+        return items.stream()
+                .map(FunctionalProviderSmokeItemResponse::skippedReason)
+                .filter(reason -> reason != null && !reason.isBlank())
+                .findFirst()
+                .orElse(classification);
+    }
+
+    private String functionalProviderSmokeStatus(
+            boolean routeEligible,
+            boolean dryRun,
+            boolean liveRequested,
+            boolean liveAllowed) {
+        if (!routeEligible) {
+            return "ROUTE_BLOCKED";
+        }
+        if (dryRun) {
+            return "DRY_RUN_READY";
+        }
+        if (liveRequested && !liveAllowed) {
+            return "LIVE_GUARD_BLOCKED";
+        }
+        return "LIVE_SMOKE_COMPLETED";
+    }
+
+    private String functionalProviderSmokeMessage(
+            String classification,
+            boolean routeEligible,
+            boolean dryRun,
+            boolean liveRequested,
+            boolean liveAllowed) {
+        if (!routeEligible) {
+            return "功能性 provider smoke 当前不满足凭证前置条件。";
+        }
+        if (dryRun) {
+            return "功能性 provider smoke dry-run 已生成 Gemini/MiMo 对话协议预览，未访问真实上游。";
+        }
+        if (liveRequested && !liveAllowed) {
+            return "功能性 provider smoke 已按 live guard 阻断；需要显式 allowLive=true 才会访问真实上游。";
+        }
+        return switch (classification) {
+            case "PASS" -> "功能性 provider smoke 已完成，至少一个对话协议 family 通过。";
+            case "NO_PERMISSION" -> "功能性 provider smoke 发现认证或权限不足。";
+            case "BUDGET_BLOCKED" -> "功能性 provider smoke 已按成本保护阻断 billable generation。";
+            case "UNSUPPORTED" -> "功能性 provider smoke 请求了范围外或 provider 不支持的 family。";
+            case "FAIL" -> "功能性 provider smoke 存在未归类失败。";
+            default -> "功能性 provider smoke 已完成。";
+        };
+    }
+
+    private void applyFunctionalProviderSmokeResult(
+            UpstreamCredentialEntity entity,
+            List<FunctionalProviderSmokeItemResponse> items,
+            Instant now) {
+        Optional<FunctionalProviderSmokeItemResponse> failure = items.stream()
+                .filter(item -> "FAIL".equals(item.classification())
+                        || "NO_PERMISSION".equals(item.classification())
+                        || "BUDGET_BLOCKED".equals(item.classification()))
+                .filter(item -> item.failureType() != null)
+                .findFirst();
+        if (failure.isPresent()) {
+            FunctionalProviderSmokeItemResponse item = failure.get();
+            entity.setLastErrorCode(truncate(firstNonBlank(item.failureType(), item.skippedReason()), 64));
+            entity.setLastErrorMessage(truncate(item.failureMessage(), 512));
+            entity.setLastErrorAt(now);
+            return;
+        }
+        boolean passed = items.stream().anyMatch(item -> "PASS".equals(item.classification()));
+        if (passed) {
+            entity.setLastErrorCode(null);
+            entity.setLastErrorMessage(null);
+            entity.setLastErrorAt(null);
+            entity.setLastUsedAt(now);
+        }
     }
 
     private OpenAiDirectResourceSmokeItemResponse blockedRouteResourceSmokeItem(

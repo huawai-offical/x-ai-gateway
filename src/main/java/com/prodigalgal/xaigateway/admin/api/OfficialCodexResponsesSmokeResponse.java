@@ -24,6 +24,7 @@ public record OfficialCodexResponsesSmokeResponse(
         String failureType,
         String failureMessage,
         Map<String, Object> keepalive,
+        Map<String, Object> recordReplayFixture,
         Instant checkedAt,
         String message,
         Map<String, Object> requestPreview

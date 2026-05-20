@@ -541,7 +541,7 @@ class SiteCapabilityTruthServiceTests {
     }
 
     @Test
-    void shouldTreatAnthropicFilesAndNativeMessageBatchSeparatelyFromGenericBatch() {
+    void shouldTreatAnthropicFilesAsSupportedSurface() {
         SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
         Mockito.when(repository.findBySiteProfile_Id(12L)).thenReturn(Optional.of(snapshot(false, false, false, false, false, true, false, true, false, false)));
         SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
@@ -549,12 +549,10 @@ class SiteCapabilityTruthServiceTests {
         CatalogCandidateView candidate = anthropicCandidate(12L);
 
         assertEquals(InteropCapabilityLevel.NATIVE, service.capabilityLevel(candidate, InteropFeature.FILE_OBJECT));
-        assertEquals(InteropCapabilityLevel.UNSUPPORTED, service.capabilityLevel(candidate, InteropFeature.BATCH_CREATE));
-        assertEquals(InteropCapabilityLevel.NATIVE, service.capabilityLevel(candidate, InteropFeature.ANTHROPIC_MESSAGE_BATCH));
     }
 
     @Test
-    void shouldExposeAnthropicFileAndNativeBatchSurfaceTruth() {
+    void shouldExposeAnthropicFileSurfaceTruth() {
         SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
         SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
 
@@ -573,41 +571,8 @@ class SiteCapabilityTruthServiceTests {
                         "test"
                 )
         );
-        SurfaceCompatibilityReport batchReport = service.evaluateSurface(
-                siteProfile(UpstreamSiteKind.ANTHROPIC_DIRECT),
-                snapshot(false, false, false, false, false, true, false, true, false, false),
-                new GatewayRequestSemantics(
-                        TranslationResourceType.BATCH,
-                        TranslationOperation.ANTHROPIC_MESSAGE_BATCH_CREATE,
-                        List.of(InteropFeature.ANTHROPIC_MESSAGE_BATCH),
-                        true
-                ),
-                new com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendDecision(
-                        ExecutionBackend.ORCHESTRATION,
-                        List.of(ExecutionBackend.ORCHESTRATION),
-                        "test"
-                )
-        );
-        SurfaceCompatibilityReport genericBatchReport = service.evaluateSurface(
-                siteProfile(UpstreamSiteKind.ANTHROPIC_DIRECT),
-                snapshot(false, false, false, false, false, true, false, true, false, false),
-                new GatewayRequestSemantics(
-                        TranslationResourceType.BATCH,
-                        TranslationOperation.BATCH_CREATE,
-                        List.of(InteropFeature.BATCH_CREATE),
-                        true
-                ),
-                new com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendDecision(
-                        ExecutionBackend.ORCHESTRATION,
-                        List.of(ExecutionBackend.ORCHESTRATION),
-                        "test"
-                )
-        );
 
         assertEquals(InteropCapabilityLevel.NATIVE, fileReport.executionCapabilityLevel());
-        assertEquals(InteropCapabilityLevel.NATIVE, batchReport.executionCapabilityLevel());
-        assertEquals(InteropCapabilityLevel.UNSUPPORTED, genericBatchReport.executionCapabilityLevel());
-        assertTrue(genericBatchReport.blockedReasons().stream().anyMatch(reason -> reason.contains("Message Batches")));
     }
 
     @Test
@@ -807,8 +772,8 @@ class SiteCapabilityTruthServiceTests {
             boolean moderation,
             boolean files,
             boolean uploads,
-            boolean batches,
-            boolean tuning,
+            boolean ignoredLegacyFlag1,
+            boolean ignoredLegacyFlag2,
             boolean realtime) {
         SiteCapabilitySnapshotEntity entity = new SiteCapabilitySnapshotEntity();
         entity.setSupportsResponses(responses);
@@ -818,8 +783,6 @@ class SiteCapabilityTruthServiceTests {
         entity.setSupportsModeration(moderation);
         entity.setSupportsFiles(files);
         entity.setSupportsUploads(uploads);
-        entity.setSupportsBatches(batches);
-        entity.setSupportsTuning(tuning);
         entity.setSupportsRealtime(realtime);
         entity.setSupportedProtocols(List.of("openai", "responses"));
         entity.setAuthStrategy(AuthStrategy.BEARER);

@@ -280,8 +280,6 @@ public class NonChatRoutePolicyService {
                 || candidate.providerType() == ProviderType.GEMINI_DIRECT);
         snapshot.setSupportsFiles(true);
         snapshot.setSupportsUploads(true);
-        snapshot.setSupportsBatches(true);
-        snapshot.setSupportsTuning(true);
         snapshot.setSupportsRealtime(true);
         snapshot.setAuthStrategy(candidate.authStrategy());
         snapshot.setPathStrategy(candidate.pathStrategy());
@@ -380,13 +378,8 @@ public class NonChatRoutePolicyService {
         boolean orchestrationSurface = backendDecision.preferredBackend() == ExecutionBackend.ORCHESTRATION
                 && switch (siteKind) {
                     case GEMINI_DIRECT, VERTEX_AI -> semantics.resourceType() == TranslationResourceType.FILE
-                            || semantics.resourceType() == TranslationResourceType.UPLOAD
-                            || semantics.resourceType() == TranslationResourceType.BATCH
-                            || semantics.resourceType() == TranslationResourceType.TUNING;
-                    case ANTHROPIC_DIRECT -> semantics.resourceType() == TranslationResourceType.FILE
-                            || semantics.operation() == TranslationOperation.ANTHROPIC_MESSAGE_BATCH_CREATE
-                            || semantics.operation() == TranslationOperation.ANTHROPIC_MESSAGE_BATCH_GET
-                            || semantics.operation() == TranslationOperation.ANTHROPIC_MESSAGE_BATCH_CANCEL;
+                            || semantics.resourceType() == TranslationResourceType.UPLOAD;
+                    case ANTHROPIC_DIRECT -> semantics.resourceType() == TranslationResourceType.FILE;
                     default -> false;
                 };
         return orchestrationSurface

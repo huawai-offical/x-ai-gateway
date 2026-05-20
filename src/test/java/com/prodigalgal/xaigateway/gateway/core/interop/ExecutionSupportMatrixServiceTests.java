@@ -86,12 +86,6 @@ class ExecutionSupportMatrixServiceTests {
                 List.of(InteropFeature.AUDIO_SPEECH),
                 true
         );
-        GatewayRequestSemantics batchSemantics = new GatewayRequestSemantics(
-                TranslationResourceType.BATCH,
-                TranslationOperation.BATCH_CREATE,
-                List.of(InteropFeature.BATCH_CREATE),
-                true
-        );
         GatewayRequestSemantics fileSemantics = new GatewayRequestSemantics(
                 TranslationResourceType.FILE,
                 TranslationOperation.FILE_CREATE,
@@ -102,12 +96,6 @@ class ExecutionSupportMatrixServiceTests {
                 TranslationResourceType.UPLOAD,
                 TranslationOperation.UPLOAD_CREATE,
                 List.of(InteropFeature.UPLOAD_CREATE),
-                true
-        );
-        GatewayRequestSemantics tuningSemantics = new GatewayRequestSemantics(
-                TranslationResourceType.TUNING,
-                TranslationOperation.TUNING_CREATE,
-                List.of(InteropFeature.TUNING_CREATE),
                 true
         );
         GatewayRequestSemantics realtimeSemantics = new GatewayRequestSemantics(
@@ -192,28 +180,12 @@ class ExecutionSupportMatrixServiceTests {
                 service.implementedLevel(geminiCandidate(UpstreamSiteKind.GEMINI_DIRECT), uploadSemantics, InteropFeature.UPLOAD_CREATE)
         );
         assertEquals(
-                InteropCapabilityLevel.NATIVE,
-                service.implementedLevel(geminiCandidate(UpstreamSiteKind.GEMINI_DIRECT), batchSemantics, InteropFeature.BATCH_CREATE)
-        );
-        assertEquals(
-                InteropCapabilityLevel.NATIVE,
-                service.implementedLevel(geminiCandidate(UpstreamSiteKind.GEMINI_DIRECT), tuningSemantics, InteropFeature.TUNING_CREATE)
-        );
-        assertEquals(
                 InteropCapabilityLevel.UNSUPPORTED,
                 service.implementedLevel(geminiCandidate(UpstreamSiteKind.GEMINI_DIRECT), realtimeSemantics, InteropFeature.REALTIME_CLIENT_SECRET)
         );
         assertEquals(
                 InteropCapabilityLevel.NATIVE,
-                service.implementedLevel(geminiCandidate(UpstreamSiteKind.VERTEX_AI), batchSemantics, InteropFeature.BATCH_CREATE)
-        );
-        assertEquals(
-                InteropCapabilityLevel.NATIVE,
                 service.implementedLevel(geminiCandidate(UpstreamSiteKind.VERTEX_AI), fileSemantics, InteropFeature.FILE_OBJECT)
-        );
-        assertEquals(
-                InteropCapabilityLevel.NATIVE,
-                service.implementedLevel(geminiCandidate(UpstreamSiteKind.VERTEX_AI), tuningSemantics, InteropFeature.TUNING_CREATE)
         );
         assertEquals(
                 InteropCapabilityLevel.UNSUPPORTED,
@@ -222,37 +194,17 @@ class ExecutionSupportMatrixServiceTests {
     }
 
     @Test
-    void shouldFreezeAnthropicFilesAndNativeMessageBatchMatrix() {
+    void shouldFreezeAnthropicFilesMatrix() {
         GatewayRequestSemantics fileSemantics = new GatewayRequestSemantics(
                 TranslationResourceType.FILE,
                 TranslationOperation.FILE_CREATE,
                 List.of(InteropFeature.FILE_OBJECT),
                 true
         );
-        GatewayRequestSemantics genericBatchSemantics = new GatewayRequestSemantics(
-                TranslationResourceType.BATCH,
-                TranslationOperation.BATCH_CREATE,
-                List.of(InteropFeature.BATCH_CREATE),
-                true
-        );
-        GatewayRequestSemantics anthropicBatchSemantics = new GatewayRequestSemantics(
-                TranslationResourceType.BATCH,
-                TranslationOperation.ANTHROPIC_MESSAGE_BATCH_CREATE,
-                List.of(InteropFeature.ANTHROPIC_MESSAGE_BATCH),
-                true
-        );
 
         assertEquals(
                 InteropCapabilityLevel.NATIVE,
                 service.implementedLevel(anthropicCandidate(), fileSemantics, InteropFeature.FILE_OBJECT)
-        );
-        assertEquals(
-                InteropCapabilityLevel.UNSUPPORTED,
-                service.implementedLevel(anthropicCandidate(), genericBatchSemantics, InteropFeature.BATCH_CREATE)
-        );
-        assertEquals(
-                InteropCapabilityLevel.NATIVE,
-                service.implementedLevel(anthropicCandidate(), anthropicBatchSemantics, InteropFeature.ANTHROPIC_MESSAGE_BATCH)
         );
     }
 
@@ -268,18 +220,6 @@ class ExecutionSupportMatrixServiceTests {
                 TranslationResourceType.UPLOAD,
                 TranslationOperation.UPLOAD_CREATE,
                 List.of(InteropFeature.UPLOAD_CREATE),
-                true
-        );
-        GatewayRequestSemantics batchSemantics = new GatewayRequestSemantics(
-                TranslationResourceType.BATCH,
-                TranslationOperation.BATCH_CREATE,
-                List.of(InteropFeature.BATCH_CREATE),
-                true
-        );
-        GatewayRequestSemantics tuningSemantics = new GatewayRequestSemantics(
-                TranslationResourceType.TUNING,
-                TranslationOperation.TUNING_CREATE,
-                List.of(InteropFeature.TUNING_CREATE),
                 true
         );
         GatewayRequestSemantics realtimeSemantics = new GatewayRequestSemantics(
@@ -299,14 +239,6 @@ class ExecutionSupportMatrixServiceTests {
         );
         assertEquals(
                 InteropCapabilityLevel.NATIVE,
-                service.implementedLevel(openAiCandidate(ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT), batchSemantics, InteropFeature.BATCH_CREATE)
-        );
-        assertEquals(
-                InteropCapabilityLevel.NATIVE,
-                service.implementedLevel(openAiCandidate(ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT), tuningSemantics, InteropFeature.TUNING_CREATE)
-        );
-        assertEquals(
-                InteropCapabilityLevel.NATIVE,
                 service.implementedLevel(openAiCandidate(ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT), realtimeSemantics, InteropFeature.REALTIME_CLIENT_SECRET)
         );
 
@@ -317,14 +249,6 @@ class ExecutionSupportMatrixServiceTests {
         assertEquals(
                 InteropCapabilityLevel.UNSUPPORTED,
                 service.implementedLevel(openAiCandidate(ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC), uploadSemantics, InteropFeature.UPLOAD_CREATE)
-        );
-        assertEquals(
-                InteropCapabilityLevel.UNSUPPORTED,
-                service.implementedLevel(openAiCandidate(ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC), batchSemantics, InteropFeature.BATCH_CREATE)
-        );
-        assertEquals(
-                InteropCapabilityLevel.UNSUPPORTED,
-                service.implementedLevel(openAiCandidate(ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC), tuningSemantics, InteropFeature.TUNING_CREATE)
         );
         assertEquals(
                 InteropCapabilityLevel.UNSUPPORTED,

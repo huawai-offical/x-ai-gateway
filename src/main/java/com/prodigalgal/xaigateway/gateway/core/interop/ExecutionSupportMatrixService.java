@@ -68,14 +68,6 @@ public class ExecutionSupportMatrixService {
                     : InteropCapabilityLevel.UNSUPPORTED;
             case UPLOAD_CREATE, REALTIME_CLIENT_SECRET ->
                     siteKind == UpstreamSiteKind.OPENAI_DIRECT ? InteropCapabilityLevel.NATIVE : InteropCapabilityLevel.UNSUPPORTED;
-            case BATCH_CREATE, TUNING_CREATE ->
-                    (siteKind == UpstreamSiteKind.OPENAI_DIRECT || supportsGoogleGenAiSite(siteKind))
-                            ? InteropCapabilityLevel.NATIVE
-                            : InteropCapabilityLevel.UNSUPPORTED;
-            case ANTHROPIC_MESSAGE_BATCH ->
-                    siteKind == UpstreamSiteKind.ANTHROPIC_DIRECT
-                            ? InteropCapabilityLevel.NATIVE
-                            : InteropCapabilityLevel.UNSUPPORTED;
             case RERANK ->
                     (siteKind == UpstreamSiteKind.COHERE || siteKind == UpstreamSiteKind.JINA)
                             ? InteropCapabilityLevel.NATIVE

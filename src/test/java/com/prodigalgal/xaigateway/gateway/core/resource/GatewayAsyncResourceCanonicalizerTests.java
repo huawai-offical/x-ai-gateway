@@ -36,10 +36,10 @@ class GatewayAsyncResourceCanonicalizerTests {
                 entity(GatewayAsyncResourceType.UPLOAD, "upload_1", "created", """
                         {"object_mode":"upstream_object_with_local_lineage","events":[{"type":"created","status":"created","at":1713150000}]}
                         """),
-                entity(GatewayAsyncResourceType.BATCH, "batch_1", "validating", """
+                entity(GatewayAsyncResourceType.VIDEO, "video_1", "validating", """
                         {"object_mode":"upstream_object_with_local_lineage","events":[{"type":"synced","status":"validating","at":1713150000}]}
                         """),
-                entity(GatewayAsyncResourceType.TUNING, "ftjob_1", "cancelled", """
+                entity(GatewayAsyncResourceType.MUSIC, "music_1", "cancelled", """
                         {"object_mode":"upstream_object_with_local_lineage","events":[{"type":"status_changed","status":"cancelled","at":1713150000}]}
                         """),
                 entity(GatewayAsyncResourceType.REALTIME_SESSION, "sess_1", "failed", """
@@ -122,7 +122,7 @@ class GatewayAsyncResourceCanonicalizerTests {
     }
 
     @Test
-    void shouldResolveGatewayFileBindingArtifactsForBatchAndTuningRequests() {
+    void shouldResolveGatewayFileBindingArtifactsForCoreFileReferences() {
         GatewayFileBindingRepository gatewayFileBindingRepository = Mockito.mock(GatewayFileBindingRepository.class);
         GatewayFileRepository gatewayFileRepository = Mockito.mock(GatewayFileRepository.class);
         GatewayAsyncResourceCanonicalizer canonicalizer = new GatewayAsyncResourceCanonicalizer(
@@ -137,18 +137,6 @@ class GatewayAsyncResourceCanonicalizerTests {
         inputBinding.setExternalFileId("file-upstream-1");
         inputBinding.setExternalFilename("input.jsonl");
         inputBinding.setStatus("ACTIVE");
-        GatewayFileBindingEntity trainingBinding = new GatewayFileBindingEntity();
-        trainingBinding.setGatewayFileId(2L);
-        trainingBinding.setCredentialId(101L);
-        trainingBinding.setExternalFileId("file-upstream-2");
-        trainingBinding.setExternalFilename("training.jsonl");
-        trainingBinding.setStatus("ACTIVE");
-        GatewayFileBindingEntity validationBinding = new GatewayFileBindingEntity();
-        validationBinding.setGatewayFileId(3L);
-        validationBinding.setCredentialId(101L);
-        validationBinding.setExternalFileId("file-upstream-3");
-        validationBinding.setExternalFilename("validation.jsonl");
-        validationBinding.setStatus("ACTIVE");
         GatewayFileBindingEntity outputBinding = new GatewayFileBindingEntity();
         outputBinding.setGatewayFileId(4L);
         outputBinding.setCredentialId(101L);
@@ -169,18 +157,12 @@ class GatewayAsyncResourceCanonicalizerTests {
         resultBinding.setStatus("ACTIVE");
 
         GatewayFileEntity inputFile = gatewayFile(1L, "file-local-1", "input.jsonl");
-        GatewayFileEntity trainingFile = gatewayFile(2L, "file-local-2", "training.jsonl");
-        GatewayFileEntity validationFile = gatewayFile(3L, "file-local-3", "validation.jsonl");
         GatewayFileEntity outputFile = gatewayFile(4L, "file-local-4", "output.jsonl");
         GatewayFileEntity errorFile = gatewayFile(5L, "file-local-5", "error.jsonl");
         GatewayFileEntity resultFile = gatewayFile(6L, "file-local-6", "result.jsonl");
 
         Mockito.when(gatewayFileBindingRepository.findAllByCredentialIdAndExternalFileIdOrderByCreatedAtDesc(101L, "file-upstream-1"))
                 .thenReturn(List.of(inputBinding));
-        Mockito.when(gatewayFileBindingRepository.findAllByCredentialIdAndExternalFileIdOrderByCreatedAtDesc(101L, "file-upstream-2"))
-                .thenReturn(List.of(trainingBinding));
-        Mockito.when(gatewayFileBindingRepository.findAllByCredentialIdAndExternalFileIdOrderByCreatedAtDesc(101L, "file-upstream-3"))
-                .thenReturn(List.of(validationBinding));
         Mockito.when(gatewayFileBindingRepository.findAllByCredentialIdAndExternalFileIdOrderByCreatedAtDesc(101L, "file-upstream-4"))
                 .thenReturn(List.of(outputBinding));
         Mockito.when(gatewayFileBindingRepository.findAllByCredentialIdAndExternalFileIdOrderByCreatedAtDesc(101L, "file-upstream-5"))
@@ -188,21 +170,19 @@ class GatewayAsyncResourceCanonicalizerTests {
         Mockito.when(gatewayFileBindingRepository.findAllByCredentialIdAndExternalFileIdOrderByCreatedAtDesc(101L, "file-upstream-6"))
                 .thenReturn(List.of(resultBinding));
         Mockito.when(gatewayFileRepository.findById(1L)).thenReturn(Optional.of(inputFile));
-        Mockito.when(gatewayFileRepository.findById(2L)).thenReturn(Optional.of(trainingFile));
-        Mockito.when(gatewayFileRepository.findById(3L)).thenReturn(Optional.of(validationFile));
         Mockito.when(gatewayFileRepository.findById(4L)).thenReturn(Optional.of(outputFile));
         Mockito.when(gatewayFileRepository.findById(5L)).thenReturn(Optional.of(errorFile));
         Mockito.when(gatewayFileRepository.findById(6L)).thenReturn(Optional.of(resultFile));
 
         GatewayAsyncResourceEntity entity = entityWithRequest(
-                GatewayAsyncResourceType.BATCH,
-                "batch_1",
+                GatewayAsyncResourceType.RESPONSE,
+                "resp_1",
                 "queued",
                 """
                         {"credential_id":101,"object_mode":"upstream_object_with_local_lineage","events":[{"type":"created","status":"queued","at":1713150000}]}
                         """,
                 """
-                        {"input_file_id":"file-upstream-1","training_file":"file-upstream-2","validation_file":"file-upstream-3"}
+                        {"input_file_id":"file-upstream-1"}
                         """
         );
         entity.setResponsePayloadJson("""
@@ -210,15 +190,13 @@ class GatewayAsyncResourceCanonicalizerTests {
                 """);
 
         var artifacts = canonicalizer.toArtifacts(entity);
-        assertEquals(6, artifacts.size());
+        assertEquals(4, artifacts.size());
         assertTrue(artifacts.stream().allMatch(item -> item.artifactKind().equals("gateway_file_binding")));
         assertEquals("file-local-1", artifacts.get(0).artifactId());
-        assertEquals("file-local-2", artifacts.get(1).artifactId());
-        assertEquals("file-local-3", artifacts.get(2).artifactId());
-        assertEquals("file-local-4", artifacts.get(3).artifactId());
-        assertEquals("file-local-5", artifacts.get(4).artifactId());
-        assertEquals("file-local-6", artifacts.get(5).artifactId());
-        assertNotNull(artifacts.get(5).attributes().get("sourceIndex"));
+        assertEquals("file-local-4", artifacts.get(1).artifactId());
+        assertEquals("file-local-5", artifacts.get(2).artifactId());
+        assertEquals("file-local-6", artifacts.get(3).artifactId());
+        assertNotNull(artifacts.get(3).attributes().get("sourceIndex"));
     }
 
     private GatewayAsyncResourceEntity entity(

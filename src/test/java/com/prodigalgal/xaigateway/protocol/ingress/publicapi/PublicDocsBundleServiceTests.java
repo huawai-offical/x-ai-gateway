@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PublicDocsBundleServiceTests {
@@ -22,7 +23,16 @@ class PublicDocsBundleServiceTests {
         assertTrue(response.providerPresets().stream().anyMatch(item -> "qwen".equals(item.code())));
         assertTrue(response.providerPresets().stream().anyMatch(item ->
                 "openai".equals(item.code())
-                        && item.unsupportedFeatures().stream().anyMatch(feature -> feature.contains("administration_api"))));
+                        && item.unsupportedFeatures().stream().anyMatch(feature -> feature.contains("non_core_official_apis_out_of_scope"))));
+        assertTrue(response.providerPresets().stream().anyMatch(item ->
+                "anthropic".equals(item.code())
+                        && item.unsupportedFeatures().stream().anyMatch(feature -> feature.contains("non_core_provider_apis_out_of_scope"))));
+        assertTrue(response.providerPresets().stream().anyMatch(item ->
+                "gemini".equals(item.code())
+                        && item.unsupportedFeatures().stream().anyMatch(feature -> feature.contains("non_core_provider_apis_out_of_scope"))));
+        assertTrue(response.providerPresets().stream().anyMatch(item ->
+                "vertex".equals(item.code())
+                        && item.unsupportedFeatures().stream().anyMatch(feature -> feature.contains("non_core_provider_apis_out_of_scope"))));
         assertTrue(response.providerPresets().stream().anyMatch(item -> "jina".equals(item.code()) && "rerank-native".equals(item.compatibilitySurface())));
         assertTrue(response.providerPresets().stream().anyMatch(item -> "perplexity".equals(item.code()) && item.capabilityTags().contains("web_search")));
         assertTrue(response.cliClients().stream().anyMatch(item -> "CODEX".equals(item.clientFamily())));
@@ -56,16 +66,17 @@ class PublicDocsBundleServiceTests {
         assertTrue(response.conformanceChecks().contains("openai.conversations-local-lifecycle"));
         assertTrue(response.conformanceChecks().contains("openai.vector-stores-local-lifecycle"));
         assertTrue(response.conformanceChecks().contains("openai.vector-store-files-local-attachment"));
+        assertTrue(response.conformanceChecks().contains("openai.vector-store-files-local-ingestion-artifact"));
         assertTrue(response.conformanceChecks().contains("openai.vector-store-file-content-local-read"));
         assertTrue(response.conformanceChecks().contains("openai.vector-store-search-local-text"));
         assertTrue(response.conformanceChecks().contains("openai.responses-file-search-local-vector-store-binding"));
         assertTrue(response.conformanceChecks().contains("openai.vector-store-file-batches-local-lifecycle"));
-        assertTrue(response.conformanceChecks().contains("openai.batches-list-local-catalog"));
-        assertTrue(response.conformanceChecks().contains("openai.models-delete-local-registry"));
-        assertTrue(response.conformanceChecks().contains("openai.fine-tuning-events-checkpoints-local-lineage"));
+        assertFalse(response.conformanceChecks().contains("openai.batches-list-local-catalog"));
+        assertFalse(response.conformanceChecks().contains("openai.models-delete-local-registry"));
         assertTrue(response.conformanceChecks().contains("openai.webhook-signature-replay"));
         assertTrue(response.conformanceChecks().contains("openai.webhooks-ingress-event-persistence"));
-        assertTrue(response.compatibility().stream().anyMatch(item ->
+        assertTrue(response.conformanceChecks().contains("codex.responses-smoke-boundary"));
+        assertFalse(response.compatibility().stream().anyMatch(item ->
                 "openai".equals(item.protocol()) && item.supportedOperations().contains("models.registry_delete")));
         assertTrue(response.compatibility().stream().anyMatch(item ->
                 "openai".equals(item.protocol()) && item.supportedOperations().contains("conversations.local_lineage")));
@@ -73,6 +84,8 @@ class PublicDocsBundleServiceTests {
                 "openai".equals(item.protocol()) && item.supportedOperations().contains("vector_stores.local_lifecycle")));
         assertTrue(response.compatibility().stream().anyMatch(item ->
                 "openai".equals(item.protocol()) && item.supportedOperations().contains("vector_store_files.local_attachment")));
+        assertTrue(response.compatibility().stream().anyMatch(item ->
+                "openai".equals(item.protocol()) && item.supportedOperations().contains("vector_store_files.local_ingestion_artifact")));
         assertTrue(response.compatibility().stream().anyMatch(item ->
                 "openai".equals(item.protocol()) && item.supportedOperations().contains("vector_store_files.local_content_read")));
         assertTrue(response.compatibility().stream().anyMatch(item ->
@@ -83,13 +96,12 @@ class PublicDocsBundleServiceTests {
                 "openai".equals(item.protocol()) && item.supportedOperations().contains("vector_store_file_batches.local_lifecycle")));
         assertTrue(response.compatibility().stream().anyMatch(item ->
                 "openai".equals(item.protocol()) && item.supportedOperations().contains("webhooks.ingress_event_persistence")));
-        assertTrue(response.compatibility().stream().anyMatch(item ->
-                "openai".equals(item.protocol()) && item.supportedOperations().contains("fine_tuning.local_lineage")));
-        assertTrue(response.routingNotes().stream().anyMatch(item -> item.contains("Fine-tuning events/checkpoints")));
+        assertTrue(response.routingNotes().stream().anyMatch(item -> item.contains("官方非核心 API 不纳入公开兼容面")));
         assertTrue(response.routingNotes().stream().anyMatch(item -> item.contains("file_search 可校验本地 vector_store_ids")));
         assertTrue(response.routingNotes().stream().anyMatch(item -> item.contains("OpenAI Conversations")));
         assertTrue(response.routingNotes().stream().anyMatch(item -> item.contains("OpenAI Vector Stores")));
         assertTrue(response.routingNotes().stream().anyMatch(item -> item.contains("/v1/webhooks/openai")));
+        assertTrue(response.routingNotes().stream().anyMatch(item -> item.contains("Codex 单独限定为 Responses smoke")));
     }
 
     @Test
@@ -140,11 +152,9 @@ class PublicDocsBundleServiceTests {
         assertTrue(openApi.path("paths").has("/v1/vector_stores/{vectorStoreId}/file_batches/{batchId}/cancel"));
         assertTrue(openApi.path("paths").has("/v1/vector_stores/{vectorStoreId}/file_batches/{batchId}/files"));
         assertTrue(openApi.path("paths").has("/v1/webhooks/openai"));
-        assertTrue(openApi.path("paths").has("/v1/batches"));
         assertTrue(openApi.path("paths").has("/v1/models"));
         assertTrue(openApi.path("paths").has("/v1/models/{model}"));
-        assertTrue(openApi.path("paths").has("/v1/fine_tuning/jobs/{jobId}/events"));
-        assertTrue(openApi.path("paths").has("/v1/fine_tuning/jobs/{jobId}/checkpoints"));
+        assertFalse(openApi.path("paths").path("/v1/models/{model}").has("delete"));
         assertTrue(openApi.path("paths").has("/v1/web_search"));
         assertTrue(openApi.path("paths").has("/api/v1/media/provider-matrix"));
         var chatProperties = openApi.path("paths")
@@ -301,16 +311,7 @@ class PublicDocsBundleServiceTests {
                 .path("schema")
                 .path("properties")
                 .has("type"));
-        assertTrue(hasParameter(openApi.path("paths").path("/v1/batches").path("get"), "after"));
-        assertTrue(hasParameter(openApi.path("paths").path("/v1/batches").path("get"), "limit"));
         assertTrue(hasParameter(openApi.path("paths").path("/v1/models/{model}").path("get"), "model"));
-        assertTrue(hasParameter(openApi.path("paths").path("/v1/models/{model}").path("delete"), "model"));
-        assertTrue(hasParameter(openApi.path("paths").path("/v1/fine_tuning/jobs/{jobId}/events").path("get"), "jobId"));
-        assertTrue(hasParameter(openApi.path("paths").path("/v1/fine_tuning/jobs/{jobId}/events").path("get"), "after"));
-        assertTrue(hasParameter(openApi.path("paths").path("/v1/fine_tuning/jobs/{jobId}/events").path("get"), "limit"));
-        assertTrue(hasParameter(openApi.path("paths").path("/v1/fine_tuning/jobs/{jobId}/checkpoints").path("get"), "jobId"));
-        assertTrue(hasParameter(openApi.path("paths").path("/v1/fine_tuning/jobs/{jobId}/checkpoints").path("get"), "after"));
-        assertTrue(hasParameter(openApi.path("paths").path("/v1/fine_tuning/jobs/{jobId}/checkpoints").path("get"), "limit"));
         assertTrue(openApi.path("components").path("securitySchemes").has("bearerAuth"));
     }
 

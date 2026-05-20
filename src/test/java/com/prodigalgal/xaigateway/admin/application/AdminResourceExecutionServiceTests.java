@@ -140,14 +140,12 @@ class AdminResourceExecutionServiceTests {
 
         var templates = service.templates();
 
-        assertEquals(7, templates.size());
+        assertEquals(5, templates.size());
         org.junit.jupiter.api.Assertions.assertTrue(templates.stream().anyMatch(item -> "response".equals(item.resourceType())
                 && "chat_execute".equals(item.executionSurface())));
         org.junit.jupiter.api.Assertions.assertTrue(templates.stream().anyMatch(item -> "image".equals(item.resourceType())));
         org.junit.jupiter.api.Assertions.assertTrue(templates.stream().anyMatch(item -> "audio".equals(item.resourceType())));
         org.junit.jupiter.api.Assertions.assertTrue(templates.stream().anyMatch(item -> "file".equals(item.resourceType())));
-        org.junit.jupiter.api.Assertions.assertTrue(templates.stream().anyMatch(item -> "batch".equals(item.resourceType())));
-        org.junit.jupiter.api.Assertions.assertTrue(templates.stream().anyMatch(item -> "tuning".equals(item.resourceType())));
         org.junit.jupiter.api.Assertions.assertTrue(templates.stream().anyMatch(item -> "cache".equals(item.resourceType())));
     }
 }

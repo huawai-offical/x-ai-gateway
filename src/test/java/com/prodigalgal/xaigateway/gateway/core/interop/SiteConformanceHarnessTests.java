@@ -321,12 +321,6 @@ class SiteConformanceHarnessTests {
             root.put("displayName", "doc.txt");
             return root;
         }
-        if (fixture.requestPath().contains(":batchGenerateContent")) {
-            root.remove("model");
-            root.putObject("config").put("displayName", "batch-job");
-            root.put("inputFile", "file_123");
-            return root;
-        }
         if ("/v1/files".equals(fixture.requestPath())) {
             if (!"file_list".equals(fixture.operationHint())) {
                 root.put("filename", "doc.txt");
@@ -341,31 +335,7 @@ class SiteConformanceHarnessTests {
             root.put("bytes", 12);
             return root;
         }
-        if ("/v1/batches".equals(fixture.requestPath())) {
-            root.put("input_file_id", "file_123");
-            root.put("endpoint", "/v1/chat/completions");
-            return root;
-        }
-        if ("/v1/fine_tuning/jobs".equals(fixture.requestPath())) {
-            root.put("training_file", "file_train");
-            root.put("suffix", "demo");
-            return root;
-        }
         if ("/v1/realtime/client_secrets".equals(fixture.requestPath())) {
-            return root;
-        }
-        if ("/v1/messages/batches".equals(fixture.requestPath())) {
-            root.remove("model");
-            root.putArray("requests")
-                    .addObject()
-                    .put("custom_id", "req-1")
-                    .putObject("params")
-                    .put("model", fixture.requestedModel())
-                    .put("max_tokens", 64)
-                    .putArray("messages")
-                    .addObject()
-                    .put("role", "user")
-                    .put("content", "hi");
             return root;
         }
         return root;
@@ -444,8 +414,6 @@ class SiteConformanceHarnessTests {
         entity.setSupportsModeration(fixture.snapshotModeration());
         entity.setSupportsFiles(fixture.snapshotFiles());
         entity.setSupportsUploads(fixture.snapshotUploads());
-        entity.setSupportsBatches(fixture.snapshotBatches());
-        entity.setSupportsTuning(fixture.snapshotTuning());
         entity.setSupportsRealtime(fixture.snapshotRealtime());
         entity.setAuthStrategy(policy.authStrategy());
         entity.setPathStrategy(policy.pathStrategy());
@@ -523,8 +491,6 @@ class SiteConformanceHarnessTests {
             boolean snapshotModeration,
             boolean snapshotFiles,
             boolean snapshotUploads,
-            boolean snapshotBatches,
-            boolean snapshotTuning,
             boolean snapshotRealtime,
             boolean expectedExecutable,
             String expectedEffectiveLevel,

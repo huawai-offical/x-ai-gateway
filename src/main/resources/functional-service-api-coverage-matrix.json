@@ -1,0 +1,384 @@
+{
+  "schemaVersion": "2026-05-19.functional-service-api-coverage.v1",
+  "sourceTask": "TASK-20260514-029-01",
+  "scopeDecision": "ADR-0010",
+  "productScope": "conversation_streaming_tools_multimodal_functional_service_api",
+  "principles": [
+    "不追求 OpenAI、Anthropic、Gemini、Vertex 或 Codex 官方 API 全量覆盖。",
+    "只声明对话、streaming、tools/function calling、多模态输入输出，以及直接支撑这些能力的模型发现、文件/RAG/file_search、认证、限流、审计、usage 和 smoke。",
+    "provider-specific batch、job、pipeline、fine-tuning、eval、official admin 与非 Responses Codex 内部 API 默认 out_of_scope。"
+  ],
+  "statusValues": [
+    "core",
+    "supporting",
+    "governance",
+    "out_of_scope"
+  ],
+  "deriveTargets": [
+    "docs/openapi/public-openapi.json",
+    "src/main/resources/provider-catalog.json",
+    "docs/public-api-compatibility.md",
+    "docs/public-sdk-examples.md",
+    "src/test/resources/conformance/endpoint-conformance-matrix.json",
+    "src/test/resources/conformance/accepted-exceptions.json"
+  ],
+  "featureFamilies": [
+    {
+      "id": "conversation.create",
+      "status": "core",
+      "description": "同步或非流式对话生成入口。",
+      "canonicalOperations": [
+        "chat_completion",
+        "response_create",
+        "message_create",
+        "generate_content"
+      ],
+      "openAiStandardPaths": [
+        "/v1/chat/completions",
+        "/v1/responses"
+      ],
+      "providerSurfaces": [
+        {
+          "provider": "openai",
+          "protocol": "openai",
+          "paths": [
+            "/v1/chat/completions",
+            "/v1/responses"
+          ],
+          "contract": "OpenAI Direct 或 OpenAI-compatible 对话/Responses 标准区。"
+        },
+        {
+          "provider": "openai_compatible",
+          "protocol": "openai",
+          "paths": [
+            "/v1/chat/completions"
+          ],
+          "contract": "MiMo 等 OpenAI-compatible key 只作为 chat/tools 功能性验证，不承诺 OpenAI object lifecycle。"
+        },
+        {
+          "provider": "anthropic",
+          "protocol": "anthropic_native",
+          "paths": [
+            "/v1/messages"
+          ],
+          "contract": "Claude Messages 映射到 canonical conversation/tools。"
+        },
+        {
+          "provider": "gemini",
+          "protocol": "google_native",
+          "paths": [
+            "/v1beta/models/{model}:generateContent"
+          ],
+          "contract": "Gemini generateContent 映射到 canonical conversation/tools。"
+        },
+        {
+          "provider": "vertex",
+          "protocol": "google_native",
+          "paths": [
+            "/v1/projects/{project}/locations/{location}/publishers/google/models/{model}:generateContent"
+          ],
+          "contract": "Vertex project/location 只作为寻址和凭证边界。"
+        },
+        {
+          "provider": "codex",
+          "protocol": "codex-responses",
+          "paths": [
+            "/backend-api/codex/responses"
+          ],
+          "contract": "仅用于官方账号 Responses smoke/proxy，不注册为通用 provider preset。"
+        }
+      ]
+    },
+    {
+      "id": "conversation.streaming",
+      "status": "core",
+      "description": "对话与 Responses streaming 输出。",
+      "canonicalOperations": [
+        "chat_completion_stream",
+        "response_stream",
+        "message_stream",
+        "generate_content_stream"
+      ],
+      "openAiStandardPaths": [
+        "/v1/chat/completions",
+        "/v1/responses"
+      ],
+      "providerSurfaces": [
+        {
+          "provider": "openai",
+          "protocol": "openai",
+          "paths": [
+            "/v1/chat/completions",
+            "/v1/responses"
+          ],
+          "contract": "stream=true 或 SSE passthrough/canonical stream。"
+        },
+        {
+          "provider": "openai_compatible",
+          "protocol": "openai",
+          "paths": [
+            "/v1/chat/completions"
+          ],
+          "contract": "仅按 compatible chat streaming 验证，不推导 Responses 或 object lifecycle。"
+        },
+        {
+          "provider": "anthropic",
+          "protocol": "anthropic_native",
+          "paths": [
+            "/v1/messages"
+          ],
+          "contract": "Messages streaming 映射到 canonical stream。"
+        },
+        {
+          "provider": "gemini",
+          "protocol": "google_native",
+          "paths": [
+            "/v1beta/models/{model}:streamGenerateContent"
+          ],
+          "contract": "Gemini streamGenerateContent 仅作为对话 streaming。"
+        }
+      ]
+    },
+    {
+      "id": "tools.function_calling",
+      "status": "core",
+      "description": "function calling/tool use 主链路。",
+      "canonicalOperations": [
+        "function_tool_call",
+        "tool_use"
+      ],
+      "openAiStandardPaths": [
+        "/v1/chat/completions",
+        "/v1/responses"
+      ],
+      "providerSurfaces": [
+        {
+          "provider": "openai",
+          "protocol": "openai",
+          "paths": [
+            "/v1/chat/completions",
+            "/v1/responses"
+          ],
+          "contract": "Chat tools 与 Responses function tools；非 function hosted tools 显式拒绝或进入 supporting 边界。"
+        },
+        {
+          "provider": "openai_compatible",
+          "protocol": "openai",
+          "paths": [
+            "/v1/chat/completions"
+          ],
+          "contract": "MiMo 等 compatible provider 只验 function tools/tool_choice 主路径。"
+        },
+        {
+          "provider": "anthropic",
+          "protocol": "anthropic_native",
+          "paths": [
+            "/v1/messages"
+          ],
+          "contract": "Claude tool_use 映射到 canonical function tools。"
+        },
+        {
+          "provider": "gemini",
+          "protocol": "google_native",
+          "paths": [
+            "/v1beta/models/{model}:generateContent"
+          ],
+          "contract": "Gemini function declarations 映射到 canonical tools。"
+        }
+      ]
+    },
+    {
+      "id": "multimodal.input_output",
+      "status": "core",
+      "description": "对话主链所需的图像、音频和文本多模态输入输出。",
+      "canonicalOperations": [
+        "vision_input",
+        "audio_transcription",
+        "audio_speech",
+        "image_generation",
+        "moderation_create"
+      ],
+      "openAiStandardPaths": [
+        "/v1/chat/completions",
+        "/v1/responses",
+        "/v1/audio/transcriptions",
+        "/v1/audio/speech",
+        "/v1/images/generations",
+        "/v1/moderations"
+      ],
+      "providerSurfaces": [
+        {
+          "provider": "openai",
+          "protocol": "openai",
+          "paths": [
+            "/v1/audio/transcriptions",
+            "/v1/audio/speech",
+            "/v1/images/generations",
+            "/v1/moderations"
+          ],
+          "contract": "只保留对话/多模态产品面，不扩展 Videos parity。"
+        },
+        {
+          "provider": "gemini",
+          "protocol": "google_native",
+          "paths": [
+            "/v1beta/models/{model}:generateContent"
+          ],
+          "contract": "多模态内容随 generateContent 进入，不承诺 Gemini 全量媒体 API。"
+        }
+      ]
+    },
+    {
+      "id": "rag.file_search",
+      "status": "supporting",
+      "description": "Responses file_search、本地 Vector Store、Files/Uploads 与 RAG 支撑面。",
+      "canonicalOperations": [
+        "file_create",
+        "upload_create",
+        "vector_store_search",
+        "response_file_search"
+      ],
+      "openAiStandardPaths": [
+        "/v1/files",
+        "/v1/uploads",
+        "/v1/vector_stores",
+        "/v1/responses"
+      ],
+      "providerSurfaces": [
+        {
+          "provider": "openai",
+          "protocol": "openai",
+          "paths": [
+            "/v1/files",
+            "/v1/uploads",
+            "/v1/vector_stores",
+            "/v1/responses"
+          ],
+          "contract": "gateway-local lifecycle、local ingestion、local text search 与 Responses file_search 绑定；不承诺 hosted file_search_call 全生命周期。"
+        },
+        {
+          "provider": "gemini",
+          "protocol": "google_native",
+          "paths": [
+            "/upload/v1beta/files",
+            "/v1beta/files"
+          ],
+          "contract": "Gemini files 仅作为对话/RAG 支撑面。"
+        }
+      ]
+    },
+    {
+      "id": "embeddings.supporting",
+      "status": "supporting",
+      "description": "RAG、检索和本地索引支撑所需 embeddings。",
+      "canonicalOperations": [
+        "embedding_create"
+      ],
+      "openAiStandardPaths": [
+        "/v1/embeddings"
+      ],
+      "providerSurfaces": [
+        {
+          "provider": "openai",
+          "protocol": "openai",
+          "paths": [
+            "/v1/embeddings"
+          ],
+          "contract": "用于 RAG 与 search 支撑。"
+        },
+        {
+          "provider": "gemini",
+          "protocol": "google_native",
+          "paths": [
+            "/v1beta/models/{model}:embedContent",
+            "/v1beta/models/{model}:batchEmbedContents"
+          ],
+          "contract": "作为 RAG 支撑面，不扩大为 batch prediction。"
+        }
+      ]
+    },
+    {
+      "id": "stateful.conversations_webhooks_realtime",
+      "status": "supporting",
+      "description": "对话状态、Webhook 入站、Realtime 基线与本地持久化支撑。",
+      "canonicalOperations": [
+        "conversation_lifecycle",
+        "webhook_ingress",
+        "realtime_client_secret_create"
+      ],
+      "openAiStandardPaths": [
+        "/v1/conversations",
+        "/v1/webhooks/openai",
+        "/v1/realtime/client_secrets"
+      ],
+      "providerSurfaces": [
+        {
+          "provider": "openai",
+          "protocol": "openai",
+          "paths": [
+            "/v1/conversations",
+            "/v1/webhooks/openai",
+            "/v1/realtime/client_secrets"
+          ],
+          "contract": "本地 lifecycle、Standard Webhooks 入站与 Realtime client secret 基线；不承诺 full calls/WebRTC/SIP。"
+        }
+      ]
+    },
+    {
+      "id": "model_discovery_usage_audit_smoke",
+      "status": "governance",
+      "description": "模型发现、认证、usage、审计、预算与真实 smoke 的治理支撑。",
+      "canonicalOperations": [
+        "model_list",
+        "credential_smoke",
+        "usage_budget_guard",
+        "audit_event"
+      ],
+      "openAiStandardPaths": [
+        "/v1/models"
+      ],
+      "providerSurfaces": [
+        {
+          "provider": "all",
+          "protocol": "mixed",
+          "paths": [
+            "/v1/models",
+            "/admin/credentials/{id}/functional-provider/smoke",
+            "/admin/accounts/{id}/official/codex/responses-smoke"
+          ],
+          "contract": "治理 API 是 x-ai-gateway 自身运营面，不等同于 provider 官方 Admin API。"
+        }
+      ]
+    }
+  ],
+  "outOfScope": [
+    {
+      "id": "openai.fine_tuning",
+      "reason": "非对话/tools 主链能力；除非重新产品化，否则不进入公开兼容承诺。"
+    },
+    {
+      "id": "openai.batches",
+      "reason": "异步批处理不是当前功能性服务 API 主线。"
+    },
+    {
+      "id": "openai.evals_admin_graders",
+      "reason": "评测与官方 Admin API 不属于 gateway 对话代理产品面。"
+    },
+    {
+      "id": "openai.videos_containers_skills",
+      "reason": "官方 Videos、Containers、Skills 不在当前核心范围。"
+    },
+    {
+      "id": "anthropic.message_batches",
+      "reason": "provider-specific async batch API out。"
+    },
+    {
+      "id": "gemini.vertex_batch_prediction_tuning_pipeline_job_admin",
+      "reason": "Gemini/Vertex batch prediction、tuning、pipeline/job/admin 只保留范围外记录。"
+    },
+    {
+      "id": "codex.non_responses_internal_api",
+      "reason": "Codex 只保留 Responses smoke/proxy 边界。"
+    }
+  ]
+}

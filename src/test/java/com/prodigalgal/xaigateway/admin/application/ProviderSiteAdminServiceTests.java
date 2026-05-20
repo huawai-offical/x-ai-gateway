@@ -34,6 +34,7 @@ import org.mockito.Mockito;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -258,8 +259,6 @@ class ProviderSiteAdminServiceTests {
         assertEquals("native", response.features().get("file_object").supportStatus());
         assertEquals(SupportStatus.NATIVE, response.surfaces().get("file_create").supportStatus());
         assertEquals(InteropCapabilityLevel.NATIVE, response.surfaces().get("file_create").degradationLevel());
-        assertEquals(SupportStatus.NATIVE, response.surfaces().get("batch_create").supportStatus());
-        assertEquals(SupportStatus.NATIVE, response.surfaces().get("tuning_create").supportStatus());
         assertEquals("native", response.features().get("audio_transcription").supportStatus());
         assertEquals(SupportStatus.NATIVE, response.surfaces().get("audio_transcription").supportStatus());
         assertEquals(SupportStatus.NATIVE, response.surfaces().get("image_generation").supportStatus());
@@ -317,14 +316,12 @@ class ProviderSiteAdminServiceTests {
         assertEquals(SupportStatus.NATIVE, response.surfaces().get("moderation_create").supportStatus());
         assertEquals("native", response.features().get("file_object").supportStatus());
         assertEquals(SupportStatus.NATIVE, response.surfaces().get("file_create").supportStatus());
-        assertEquals(SupportStatus.NATIVE, response.surfaces().get("batch_create").supportStatus());
-        assertEquals(SupportStatus.NATIVE, response.surfaces().get("tuning_create").supportStatus());
         assertEquals("blocked", response.features().get("upload_create").supportStatus());
         assertEquals(SupportStatus.BLOCKED, response.surfaces().get("realtime_client_secret_create").supportStatus());
     }
 
     @Test
-    void shouldExposeAnthropicFileAndNativeMessageBatchSurfaces() {
+    void shouldExposeAnthropicFileSurfaceOnlyForFunctionalApiScope() {
         UpstreamSiteProfileRepository profileRepository = Mockito.mock(UpstreamSiteProfileRepository.class);
         SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
         SiteModelCapabilityRepository modelCapabilityRepository = Mockito.mock(SiteModelCapabilityRepository.class);
@@ -358,15 +355,11 @@ class ProviderSiteAdminServiceTests {
         ProviderSiteResponse response = service.get(3L);
 
         assertEquals("native", response.features().get("file_object").supportStatus());
-        assertEquals("blocked", response.features().get("batch_create").supportStatus());
-        assertEquals("native", response.features().get("anthropic_message_batch").supportStatus());
+        assertFalse(response.features().containsKey("batch_create"));
+        assertFalse(response.features().containsKey("anthropic_message_batch"));
         assertEquals(SupportStatus.NATIVE, response.surfaces().get("file_create").supportStatus());
-        assertEquals(SupportStatus.BLOCKED, response.surfaces().get("batch_create").supportStatus());
-        assertEquals(SupportStatus.NATIVE, response.surfaces().get("anthropic_message_batch_create").supportStatus());
-        assertEquals(com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend.ORCHESTRATION,
-                response.surfaces().get("anthropic_message_batch_create").preferredBackend());
-        assertTrue(response.surfaces().get("batch_create").blockerReasons().stream()
-                .anyMatch(reason -> reason.contains("Message Batches")));
+        assertFalse(response.surfaces().containsKey("batch_create"));
+        assertFalse(response.surfaces().containsKey("anthropic_message_batch_create"));
     }
 
     @Test
@@ -396,16 +389,12 @@ class ProviderSiteAdminServiceTests {
         SiteCapabilitySnapshotEntity openAiDirectSnapshot = sampleSnapshot(openAiDirect);
         openAiDirectSnapshot.setSupportsFiles(true);
         openAiDirectSnapshot.setSupportsUploads(true);
-        openAiDirectSnapshot.setSupportsBatches(true);
-        openAiDirectSnapshot.setSupportsTuning(true);
         openAiDirectSnapshot.setSupportsRealtime(true);
 
         UpstreamSiteProfileEntity openAiCompatible = sampleOpenAiCompatibleSite(5L);
         SiteCapabilitySnapshotEntity openAiCompatibleSnapshot = sampleSnapshot(openAiCompatible);
         openAiCompatibleSnapshot.setSupportsFiles(true);
         openAiCompatibleSnapshot.setSupportsUploads(true);
-        openAiCompatibleSnapshot.setSupportsBatches(true);
-        openAiCompatibleSnapshot.setSupportsTuning(true);
         openAiCompatibleSnapshot.setSupportsRealtime(true);
 
         Mockito.when(profileRepository.findById(4L)).thenReturn(Optional.of(openAiDirect));
@@ -424,15 +413,11 @@ class ProviderSiteAdminServiceTests {
 
         assertEquals(SupportStatus.ORCHESTRATION, openAiDirectResponse.surfaces().get("file_create").supportStatus());
         assertEquals(SupportStatus.ORCHESTRATION, openAiDirectResponse.surfaces().get("upload_create").supportStatus());
-        assertEquals(SupportStatus.ORCHESTRATION, openAiDirectResponse.surfaces().get("batch_create").supportStatus());
-        assertEquals(SupportStatus.ORCHESTRATION, openAiDirectResponse.surfaces().get("tuning_create").supportStatus());
         assertEquals(SupportStatus.ORCHESTRATION, openAiDirectResponse.surfaces().get("realtime_client_secret_create").supportStatus());
 
         assertEquals("blocked", openAiCompatibleResponse.features().get("file_object").supportStatus());
         assertEquals(SupportStatus.BLOCKED, openAiCompatibleResponse.surfaces().get("file_create").supportStatus());
         assertEquals(SupportStatus.BLOCKED, openAiCompatibleResponse.surfaces().get("upload_create").supportStatus());
-        assertEquals(SupportStatus.BLOCKED, openAiCompatibleResponse.surfaces().get("batch_create").supportStatus());
-        assertEquals(SupportStatus.BLOCKED, openAiCompatibleResponse.surfaces().get("tuning_create").supportStatus());
         assertEquals(SupportStatus.BLOCKED, openAiCompatibleResponse.surfaces().get("realtime_client_secret_create").supportStatus());
         assertTrue(openAiCompatibleResponse.surfaces().get("file_create").blockerReasons().stream()
                 .anyMatch(reason -> reason.contains("accepted exception")));
@@ -512,9 +497,6 @@ class ProviderSiteAdminServiceTests {
                 InteropFeature.MODERATION,
                 InteropFeature.FILE_OBJECT,
                 InteropFeature.UPLOAD_CREATE,
-                InteropFeature.BATCH_CREATE,
-                InteropFeature.ANTHROPIC_MESSAGE_BATCH,
-                InteropFeature.TUNING_CREATE,
                 InteropFeature.REALTIME_CLIENT_SECRET,
                 InteropFeature.RERANK,
                 InteropFeature.VIDEO_GENERATION,
@@ -653,8 +635,6 @@ class ProviderSiteAdminServiceTests {
         snapshot.setSupportsModeration(true);
         snapshot.setSupportsFiles(site.getSiteKind() == UpstreamSiteKind.GEMINI_DIRECT || site.getSiteKind() == UpstreamSiteKind.VERTEX_AI);
         snapshot.setSupportsUploads(false);
-        snapshot.setSupportsBatches(site.getSiteKind() == UpstreamSiteKind.GEMINI_DIRECT || site.getSiteKind() == UpstreamSiteKind.VERTEX_AI);
-        snapshot.setSupportsTuning(site.getSiteKind() == UpstreamSiteKind.GEMINI_DIRECT || site.getSiteKind() == UpstreamSiteKind.VERTEX_AI);
         snapshot.setSupportsRealtime(false);
         snapshot.setRefreshedAt(Instant.parse("2026-04-15T02:00:00Z"));
         return snapshot;
@@ -667,13 +647,11 @@ class ProviderSiteAdminServiceTests {
         snapshot.setHealthState("READY");
         snapshot.setSupportsResponses(true);
         snapshot.setSupportsFiles(true);
-        snapshot.setSupportsBatches(true);
         snapshot.setSupportsEmbeddings(false);
         snapshot.setSupportsAudio(false);
         snapshot.setSupportsImages(false);
         snapshot.setSupportsModeration(false);
         snapshot.setSupportsUploads(false);
-        snapshot.setSupportsTuning(false);
         snapshot.setSupportsRealtime(false);
         snapshot.setRefreshedAt(Instant.parse("2026-04-16T02:00:00Z"));
         return snapshot;

@@ -74,12 +74,12 @@ class AsyncResourceAdminControllerTests {
     void shouldReturnAsyncResourceDetail() throws Exception {
         Instant createdAt = Instant.parse("2026-04-15T10:00:00Z");
         Instant updatedAt = Instant.parse("2026-04-15T10:05:00Z");
-        Mockito.when(asyncResourceAdminService.getAsyncResource("batch_1"))
+        Mockito.when(asyncResourceAdminService.getAsyncResource("upload_1"))
                 .thenReturn(new AsyncResourceDetailResponse(
                         new CanonicalResourceLifecycle(
-                                "batch_1",
-                                GatewayAsyncResourceType.BATCH,
-                                "validating",
+                                "upload_1",
+                                GatewayAsyncResourceType.UPLOAD,
+                                "in_progress",
                                 "in_progress",
                                 false,
                                 false,
@@ -93,8 +93,8 @@ class AsyncResourceAdminControllerTests {
                         List.of(new CanonicalResourceTransition("created", "queued", createdAt)),
                         new CanonicalResourceLineage(
                                 "upstream_object_with_local_lineage",
-                                "batch_1",
-                                "batch-upstream-1",
+                                "upload_1",
+                                "upload-upstream-1",
                                 101L,
                                 1L,
                                 "gpt-4o",
@@ -108,18 +108,18 @@ class AsyncResourceAdminControllerTests {
                                 Map.of("externalFileId", "file-upstream-1")
                         )),
                         objectMapper.readTree("{\"input_file_id\":\"file-upstream-1\"}"),
-                        objectMapper.readTree("{\"id\":\"batch_1\",\"status\":\"validating\"}"),
+                        objectMapper.readTree("{\"id\":\"upload_1\",\"status\":\"in_progress\"}"),
                         objectMapper.readTree("{\"object_mode\":\"upstream_object_with_local_lineage\"}")
                 ));
 
         webTestClient.get()
-                .uri("/admin/resources/async/batch_1")
+                .uri("/admin/resources/async/upload_1")
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.lifecycle.normalizedStatus").isEqualTo("in_progress")
                 .jsonPath("$.transitions[0].eventType").isEqualTo("created")
-                .jsonPath("$.lineage.upstreamObjectId").isEqualTo("batch-upstream-1")
+                .jsonPath("$.lineage.upstreamObjectId").isEqualTo("upload-upstream-1")
                 .jsonPath("$.artifacts[0].artifactKind").isEqualTo("gateway_file_binding")
                 .jsonPath("$.requestPayloadJson.input_file_id").isEqualTo("file-upstream-1");
     }

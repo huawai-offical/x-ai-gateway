@@ -7,6 +7,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Clock;
 import java.util.HexFormat;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
@@ -24,6 +25,7 @@ public class OpenAiWebhookEventService {
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
+    @Autowired
     public OpenAiWebhookEventService(
             GatewayAsyncResourceRepository gatewayAsyncResourceRepository,
             ObjectMapper objectMapper) {

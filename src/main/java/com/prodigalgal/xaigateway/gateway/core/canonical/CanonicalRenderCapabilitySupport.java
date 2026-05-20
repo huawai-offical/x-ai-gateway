@@ -32,7 +32,6 @@ public final class CanonicalRenderCapabilitySupport {
             case "google_native" -> isGeminiContentPath(normalizedRequestPath)
                     || isGeminiEmbeddingsPath(normalizedRequestPath)
                     || isGeminiFilesPath(normalizedRequestPath)
-                    || isGeminiBatchesPath(normalizedRequestPath)
                     || isGeminiResourceMode(normalizedRequestPath, resourceType)
                     || resourceType == TranslationResourceType.CHAT
                     ? InteropCapabilityLevel.NATIVE
@@ -91,12 +90,6 @@ public final class CanonicalRenderCapabilitySupport {
                 || requestPath.startsWith("/v1beta/files/"));
     }
 
-    private static boolean isGeminiBatchesPath(String requestPath) {
-        return requestPath != null
-                && (requestPath.startsWith("/v1beta/models/") && requestPath.contains(":batchGenerateContent")
-                || requestPath.startsWith("/v1beta/batches/"));
-    }
-
     private static boolean isGeminiResourceMode(String requestPath, TranslationResourceType resourceType) {
         if (!isGeminiContentPath(requestPath)) {
             return false;
@@ -111,8 +104,7 @@ public final class CanonicalRenderCapabilitySupport {
         if (requestPath == null || requestPath.isBlank()) {
             return false;
         }
-        return "/v1/messages/batches".equals(requestPath)
-                || requestPath.startsWith("/v1/messages/batches/");
+        return false;
     }
 
     private static String normalizeGoogleNativeNamespace(String requestPath) {

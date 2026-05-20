@@ -263,8 +263,6 @@ public class ProviderSiteAdminService {
                 siteCapabilityTruthService.supportsFeature(entity, snapshot, InteropFeature.MODERATION),
                 siteCapabilityTruthService.supportsFeature(entity, snapshot, InteropFeature.FILE_OBJECT),
                 siteCapabilityTruthService.supportsFeature(entity, snapshot, InteropFeature.UPLOAD_CREATE),
-                siteCapabilityTruthService.supportsFeature(entity, snapshot, InteropFeature.BATCH_CREATE),
-                siteCapabilityTruthService.supportsFeature(entity, snapshot, InteropFeature.TUNING_CREATE),
                 siteCapabilityTruthService.supportsFeature(entity, snapshot, InteropFeature.REALTIME_CLIENT_SECRET)
         );
     }
@@ -374,9 +372,6 @@ public class ProviderSiteAdminService {
                 Map.entry(InteropFeature.MODERATION.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.MODERATION))),
                 Map.entry(InteropFeature.FILE_OBJECT.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.FILE_OBJECT))),
                 Map.entry(InteropFeature.UPLOAD_CREATE.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.UPLOAD_CREATE))),
-                Map.entry(InteropFeature.BATCH_CREATE.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.BATCH_CREATE))),
-                Map.entry(InteropFeature.ANTHROPIC_MESSAGE_BATCH.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.ANTHROPIC_MESSAGE_BATCH))),
-                Map.entry(InteropFeature.TUNING_CREATE.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.TUNING_CREATE))),
                 Map.entry(InteropFeature.REALTIME_CLIENT_SECRET.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.REALTIME_CLIENT_SECRET))),
                 Map.entry(InteropFeature.RERANK.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.RERANK))),
                 Map.entry(InteropFeature.VIDEO_GENERATION.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.VIDEO_GENERATION))),
@@ -460,33 +455,6 @@ public class ProviderSiteAdminService {
                         TranslationResourceType.UPLOAD,
                         TranslationOperation.UPLOAD_CREATE,
                         List.of(InteropFeature.UPLOAD_CREATE, InteropFeature.FILE_OBJECT)
-                )),
-                Map.entry("batch_create", toSurface(
-                        entity,
-                        snapshot,
-                        "openai",
-                        "/v1/batches",
-                        TranslationResourceType.BATCH,
-                        TranslationOperation.BATCH_CREATE,
-                        List.of(InteropFeature.BATCH_CREATE, InteropFeature.FILE_OBJECT)
-                )),
-                Map.entry("anthropic_message_batch_create", toSurface(
-                        entity,
-                        snapshot,
-                        "anthropic_native",
-                        "/v1/messages/batches",
-                        TranslationResourceType.BATCH,
-                        TranslationOperation.ANTHROPIC_MESSAGE_BATCH_CREATE,
-                        List.of(InteropFeature.ANTHROPIC_MESSAGE_BATCH)
-                )),
-                Map.entry("tuning_create", toSurface(
-                        entity,
-                        snapshot,
-                        "openai",
-                        "/v1/fine_tuning/jobs",
-                        TranslationResourceType.TUNING,
-                        TranslationOperation.TUNING_CREATE,
-                        List.of(InteropFeature.TUNING_CREATE, InteropFeature.FILE_OBJECT)
                 )),
                 Map.entry("realtime_client_secret_create", toSurface(
                         entity,
@@ -637,13 +605,7 @@ public class ProviderSiteAdminService {
             return false;
         }
         return switch (siteKind) {
-            case GEMINI_DIRECT, VERTEX_AI -> resourceType == TranslationResourceType.FILE
-                    || resourceType == TranslationResourceType.BATCH
-                    || resourceType == TranslationResourceType.TUNING;
-            case ANTHROPIC_DIRECT -> resourceType == TranslationResourceType.FILE
-                    || operation == TranslationOperation.ANTHROPIC_MESSAGE_BATCH_CREATE
-                    || operation == TranslationOperation.ANTHROPIC_MESSAGE_BATCH_GET
-                    || operation == TranslationOperation.ANTHROPIC_MESSAGE_BATCH_CANCEL;
+            case GEMINI_DIRECT, VERTEX_AI, ANTHROPIC_DIRECT -> resourceType == TranslationResourceType.FILE;
             default -> false;
         };
     }

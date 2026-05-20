@@ -134,8 +134,6 @@ class ProviderSiteAdminControllerTests {
                         true,
                         true,
                         true,
-                        true,
-                        true,
                         true
                 )
         ));

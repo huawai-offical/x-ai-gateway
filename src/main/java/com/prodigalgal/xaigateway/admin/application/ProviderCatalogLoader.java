@@ -131,8 +131,8 @@ public class ProviderCatalogLoader {
         String version = "2026.05.01-fallback";
         return new ProviderCatalogSnapshot(version, source, List.of(
                 preset("openai", "OpenAI", UpstreamSiteKind.OPENAI_DIRECT, "https://api.openai.com",
-                        "OpenAI 官方 API，覆盖 Chat、Responses、Embeddings、Audio、Images、Moderation、Files、Uploads、Batches、Fine-tuning 与 Realtime 基础面。",
-                        List.of("chat", "responses", "embeddings", "audio", "images", "moderation", "files", "batches", "realtime"),
+                        "OpenAI 对话与 tools 功能性服务 API，覆盖 Chat、Responses、Embeddings、Audio、Images、Moderation、Files、Uploads、Models、Vector Stores 与 Realtime 基础面；官方非核心 API 不纳入当前公开范围。",
+                        List.of("chat", "responses", "embeddings", "audio", "images", "moderation", "files", "models", "vector_stores", "realtime"),
                         "openai-public-pricing", "openai_error", version, source, List.of("chat.native", "responses.emulated", "files.native"),
                         "openai-native", "native-first",
                         List.of("gpt-4.1", "gpt-4o", "o-series", "text-embedding", "gpt-image", "realtime"),
@@ -159,19 +159,23 @@ public class ProviderCatalogLoader {
                         List.of("openrouter-auto", "byok-routing"), "aggregator-pass-through-pricing",
                         List.of("realtime_client_secret: current gateway does not trust aggregated realtime surface.")),
                 preset("anthropic", "Anthropic", UpstreamSiteKind.ANTHROPIC_DIRECT, "https://api.anthropic.com",
-                        "Anthropic Messages API，通过 translation layer 提供 OpenAI-style 入口与 anthropic_native surface。",
-                        List.of("chat", "tools", "thinking", "anthropic_native", "message_batches"),
-                        "anthropic-public-pricing", "anthropic_error", version, source, List.of("messages.native", "message-batches.native"),
+                        "Anthropic Messages API，仅按 OpenAI 标准功能区收紧为 chat/tools/thinking 入口，不追求 Anthropic 全量官方 API。",
+                        List.of("chat", "tools", "thinking", "anthropic_native"),
+                        "anthropic-public-pricing", "anthropic_error", version, source, List.of("messages.native"),
                         "anthropic-native", "translation-layer",
                         List.of("claude-sonnet", "claude-opus"), "public-list-price-anthropic",
-                        List.of("embeddings: Anthropic stable embeddings API is not exposed in current gateway.")),
+                        List.of(
+                                "embeddings: Anthropic stable embeddings API is not exposed in current gateway.",
+                                "non_core_provider_apis: provider-specific async/admin/eval APIs are outside the OpenAI standard functional zone.")),
                 preset("gemini", "Gemini", UpstreamSiteKind.GEMINI_DIRECT, "https://generativelanguage.googleapis.com",
-                        "Google Gemini API，通过 translation layer 提供 OpenAI-style 入口与 google_native surface。",
-                        List.of("chat", "embeddings", "files", "batches", "google_native"),
-                        "gemini-public-pricing", "gemini_error", version, source, List.of("generate-content.native", "files.orchestrated", "batches.orchestrated"),
+                        "Google Gemini API，仅按 OpenAI 标准功能区收紧为 generateContent、embeddings 与 files 支撑面，不追求 Gemini 全量官方 API。",
+                        List.of("chat", "embeddings", "files", "google_native"),
+                        "gemini-public-pricing", "gemini_error", version, source, List.of("generate-content.native", "files.orchestrated"),
                         "google-native", "translation-layer",
                         List.of("gemini-2.5-pro", "gemini-2.5-flash", "text-embedding"), "public-list-price-gemini",
-                        List.of("realtime_client_secret: Gemini live token is not equivalent to OpenAI realtime client_secret."))
+                        List.of(
+                                "realtime_client_secret: Gemini live token is not equivalent to OpenAI realtime client_secret.",
+                                "non_core_provider_apis: provider-specific async/admin/eval APIs are outside the OpenAI standard functional zone."))
         ));
     }
 

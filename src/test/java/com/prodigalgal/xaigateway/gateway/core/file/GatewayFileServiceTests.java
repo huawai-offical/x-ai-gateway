@@ -98,7 +98,7 @@ class GatewayFileServiceTests {
         Mockito.when(upstreamCredentialRepository.findAllByIdInAndDeletedFalse(List.of(101L)))
                 .thenReturn(List.of(credential(101L, ProviderType.OPENAI_DIRECT, 1L, "https://api.openai.com")));
         Mockito.when(upstreamSiteProfileRepository.findById(1L)).thenReturn(Optional.of(siteProfile(1L, UpstreamSiteKind.OPENAI_DIRECT)));
-        Mockito.when(snapshotRepository.findBySiteProfile_Id(1L)).thenReturn(Optional.of(snapshot(true, false, false, AuthStrategy.BEARER, PathStrategy.OPENAI_V1)));
+        Mockito.when(snapshotRepository.findBySiteProfile_Id(1L)).thenReturn(Optional.of(snapshot(true, AuthStrategy.BEARER, PathStrategy.OPENAI_V1)));
         Mockito.when(credentialCryptoService.decrypt("cipher")).thenReturn("api-key");
         Mockito.when(gatewayFileRepository.save(any())).thenAnswer(invocation -> {
             GatewayFileEntity entity = invocation.getArgument(0);
@@ -170,7 +170,7 @@ class GatewayFileServiceTests {
                 .thenReturn(List.of(credential));
         Mockito.when(upstreamSiteProfileRepository.findById(2L)).thenReturn(Optional.of(siteProfile));
         Mockito.when(snapshotRepository.findBySiteProfile_Id(2L))
-                .thenReturn(Optional.of(snapshot(true, false, false, AuthStrategy.API_KEY_QUERY, PathStrategy.GEMINI_V1BETA_MODELS)));
+                .thenReturn(Optional.of(snapshot(true, AuthStrategy.API_KEY_QUERY, PathStrategy.GEMINI_V1BETA_MODELS)));
         Mockito.when(credentialMaterialResolver.resolveStored(credential)).thenReturn(credentialMaterial);
         Mockito.when(gatewayFileRepository.save(any())).thenAnswer(invocation -> {
             GatewayFileEntity entity = invocation.getArgument(0);
@@ -251,7 +251,7 @@ class GatewayFileServiceTests {
                 .thenReturn(List.of(credential));
         Mockito.when(upstreamSiteProfileRepository.findById(3L)).thenReturn(Optional.of(siteProfile));
         Mockito.when(snapshotRepository.findBySiteProfile_Id(3L))
-                .thenReturn(Optional.of(snapshot(true, false, false, AuthStrategy.BEARER, PathStrategy.GEMINI_V1BETA_MODELS)));
+                .thenReturn(Optional.of(snapshot(true, AuthStrategy.BEARER, PathStrategy.GEMINI_V1BETA_MODELS)));
         Mockito.when(credentialMaterialResolver.resolveStored(credential)).thenReturn(credentialMaterial);
         Mockito.when(gatewayFileRepository.save(any())).thenAnswer(invocation -> {
             GatewayFileEntity entity = invocation.getArgument(0);
@@ -604,14 +604,10 @@ class GatewayFileServiceTests {
 
     private SiteCapabilitySnapshotEntity snapshot(
             boolean supportsFiles,
-            boolean supportsBatches,
-            boolean supportsTuning,
             AuthStrategy authStrategy,
             PathStrategy pathStrategy) {
         SiteCapabilitySnapshotEntity entity = new SiteCapabilitySnapshotEntity();
         entity.setSupportsFiles(supportsFiles);
-        entity.setSupportsBatches(supportsBatches);
-        entity.setSupportsTuning(supportsTuning);
         entity.setSupportedProtocols(List.of("openai"));
         entity.setAuthStrategy(authStrategy);
         entity.setPathStrategy(pathStrategy);

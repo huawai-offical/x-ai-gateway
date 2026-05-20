@@ -1,17 +1,13 @@
 package com.prodigalgal.xaigateway.gateway.core.resource;
 
-import com.prodigalgal.xaigateway.gateway.core.catalog.FineTunedModelRegistrationService;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceArtifact;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceLineage;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceLifecycle;
 import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayAsyncResourceEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCacheReferenceEntity;
-import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayAsyncResourceRepository;
-import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import java.time.Instant;
 import java.util.concurrent.TimeUnit;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -32,8 +28,6 @@ public class GatewayPublicResourceService {
     private final GatewayAsyncResourceService gatewayAsyncResourceService;
     private final GatewayAsyncResourceCanonicalizer gatewayAsyncResourceCanonicalizer;
     private final GatewayCacheResourceService gatewayCacheResourceService;
-    private final UpstreamCredentialRepository upstreamCredentialRepository;
-    private final FineTunedModelRegistrationService fineTunedModelRegistrationService;
     private final ObjectMapper objectMapper;
 
     public GatewayPublicResourceService(
@@ -41,15 +35,11 @@ public class GatewayPublicResourceService {
             GatewayAsyncResourceService gatewayAsyncResourceService,
             GatewayAsyncResourceCanonicalizer gatewayAsyncResourceCanonicalizer,
             GatewayCacheResourceService gatewayCacheResourceService,
-            UpstreamCredentialRepository upstreamCredentialRepository,
-            FineTunedModelRegistrationService fineTunedModelRegistrationService,
             ObjectMapper objectMapper) {
         this.gatewayAsyncResourceRepository = gatewayAsyncResourceRepository;
         this.gatewayAsyncResourceService = gatewayAsyncResourceService;
         this.gatewayAsyncResourceCanonicalizer = gatewayAsyncResourceCanonicalizer;
         this.gatewayCacheResourceService = gatewayCacheResourceService;
-        this.upstreamCredentialRepository = upstreamCredentialRepository;
-        this.fineTunedModelRegistrationService = fineTunedModelRegistrationService;
         this.objectMapper = objectMapper;
     }
 
@@ -73,9 +63,11 @@ public class GatewayPublicResourceService {
         ArrayNode data = response.putArray("data");
         gatewayAsyncResourceRepository.search(
                         distributedKeyId,
-                        resourceType,
-                        normalizeStatus(status),
-                        PageRequest.of(0, limit))
+                resourceType,
+                normalizeStatus(status),
+                PageRequest.of(0, limit))
+                .stream()
+                .filter(entity -> isPublicOperationType(entity.getResourceType()))
                 .forEach(entity -> data.add(toOperationResponse(entity)));
         response.put("has_more", false);
         return response;
@@ -83,14 +75,12 @@ public class GatewayPublicResourceService {
 
     @Transactional(readOnly = true)
     public ObjectNode getOperation(Long distributedKeyId, String operationName) {
-        return toOperationResponse(resolveAsyncResource(distributedKeyId, operationName, null));
+        return toOperationResponse(resolvePublicAsyncResource(distributedKeyId, operationName, null));
     }
 
     public ObjectNode cancelOperation(Long distributedKeyId, String operationName) {
-        GatewayAsyncResourceEntity entity = resolveAsyncResource(distributedKeyId, operationName, null);
+        GatewayAsyncResourceEntity entity = resolvePublicAsyncResource(distributedKeyId, operationName, null);
         JsonNode payload = switch (entity.getResourceType()) {
-            case BATCH -> gatewayAsyncResourceService.cancelBatch(entity.getResourceKey(), distributedKeyId);
-            case TUNING -> gatewayAsyncResourceService.cancelTuning(entity.getResourceKey(), distributedKeyId);
             case UPLOAD -> gatewayAsyncResourceService.cancelUpload(entity.getResourceKey(), distributedKeyId);
             case VIDEO -> gatewayAsyncResourceService.cancelVideoTask(entity.getResourceKey(), distributedKeyId);
             case MUSIC -> gatewayAsyncResourceService.cancelMusicTask(entity.getResourceKey(), distributedKeyId);
@@ -127,7 +117,7 @@ public class GatewayPublicResourceService {
     }
 
     public ObjectNode deleteOperation(Long distributedKeyId, String operationName) {
-        GatewayAsyncResourceEntity entity = resolveAsyncResource(distributedKeyId, operationName, null);
+        GatewayAsyncResourceEntity entity = resolvePublicAsyncResource(distributedKeyId, operationName, null);
         entity.setDeleted(true);
         ObjectNode metadata = readObject(entity.getMetadataJson());
         metadata.put("deleted_at", Instant.now().getEpochSecond());
@@ -137,23 +127,6 @@ public class GatewayPublicResourceService {
         ObjectNode response = toOperationResponse(entity);
         response.put("deleted", true);
         return response;
-    }
-
-    public JsonNode createTuning(Long distributedKeyId, JsonNode requestBody) {
-        return gatewayAsyncResourceService.createTuning(distributedKeyId, requestBody);
-    }
-
-    @Transactional(readOnly = true)
-    public JsonNode listTunings(Long distributedKeyId) {
-        return gatewayAsyncResourceService.listTunings(distributedKeyId);
-    }
-
-    public JsonNode getTuning(Long distributedKeyId, String tuningId) {
-        return gatewayAsyncResourceService.getTuning(normalizeResourceName(tuningId), distributedKeyId);
-    }
-
-    public JsonNode cancelTuning(Long distributedKeyId, String tuningId) {
-        return gatewayAsyncResourceService.cancelTuning(normalizeResourceName(tuningId), distributedKeyId);
     }
 
     public JsonNode createVideo(Long distributedKeyId, JsonNode requestBody) {
@@ -192,72 +165,6 @@ public class GatewayPublicResourceService {
         return gatewayAsyncResourceService.downloadMusicTaskArtifact(normalizeResourceName(musicId), distributedKeyId);
     }
 
-    public ObjectNode deleteTuning(Long distributedKeyId, String tuningId) {
-        GatewayAsyncResourceEntity entity = resolveAsyncResource(distributedKeyId, tuningId, GatewayAsyncResourceType.TUNING);
-        entity.setDeleted(true);
-        entity.setStatus("deleted");
-        ObjectNode metadata = readObject(entity.getMetadataJson());
-        unregisterFineTunedModel(entity, metadata);
-        metadata.put("deleted_at", Instant.now().getEpochSecond());
-        appendEvent(metadata, "deleted", "deleted");
-        entity.setMetadataJson(writeJson(metadata));
-        ObjectNode response = readObject(entity.getResponsePayloadJson());
-        response.put("id", entity.getResourceKey());
-        response.put("object", "fine_tuning.job.deleted");
-        response.put("deleted", true);
-        entity.setResponsePayloadJson(writeJson(response));
-        gatewayAsyncResourceRepository.save(entity);
-        return response;
-    }
-
-    public ObjectNode importTuning(Long distributedKeyId, String tuningId, JsonNode requestBody) {
-        GatewayAsyncResourceEntity entity = resolveAsyncResource(distributedKeyId, tuningId, GatewayAsyncResourceType.TUNING);
-        ObjectNode response = readObject(entity.getResponsePayloadJson());
-        ObjectNode metadata = readObject(entity.getMetadataJson());
-        String tunedModelName = firstText(response, "fine_tuned_model", "tuned_model", "model");
-        if (tunedModelName == null || tunedModelName.isBlank()) {
-            throw new IllegalArgumentException("当前 tuning 尚未产生可导入的 tuned model。");
-        }
-        Long siteProfileId = longValue(metadata, "site_profile_id");
-        Long credentialId = longValue(metadata, "credential_id");
-        UpstreamCredentialEntity credential = credentialId == null
-                ? null
-                : upstreamCredentialRepository.findById(credentialId).orElse(null);
-        if (credential == null) {
-            throw new IllegalArgumentException("未找到 tuning 绑定的上游凭证，无法导入模型。");
-        }
-        String aliasName = firstText(requestBody, "alias", "aliasName", "modelAlias");
-        if (aliasName == null || aliasName.isBlank()) {
-            aliasName = firstText(readObject(entity.getRequestPayloadJson()), "suffix");
-        }
-        FineTunedModelRegistrationService.RegistrationResult registration = fineTunedModelRegistrationService.register(
-                siteProfileId,
-                credential.getProviderType(),
-                firstText(readObject(entity.getRequestPayloadJson()), "model"),
-                tunedModelName,
-                aliasName,
-                entity.getResourceKey());
-        if (registration.modelKey() != null) {
-            metadata.put("registered_model_key", registration.modelKey());
-        }
-        metadata.put("registered_model_name", tunedModelName);
-        metadata.put("registered_at", Instant.now().getEpochSecond());
-        metadata.remove("registered_aliases");
-        ArrayNode aliases = metadata.putArray("registered_aliases");
-        registration.aliases().forEach(aliases::add);
-        appendEvent(metadata, "model_imported", entity.getStatus());
-        entity.setMetadataJson(writeJson(metadata));
-        gatewayAsyncResourceRepository.save(entity);
-
-        ObjectNode result = objectMapper.createObjectNode();
-        result.put("object", "tuning.import_result");
-        result.put("id", entity.getResourceKey());
-        result.put("fine_tuned_model", tunedModelName);
-        result.put("model_key", registration.modelKey());
-        result.set("aliases", objectMapper.valueToTree(registration.aliases()));
-        return result;
-    }
-
     @Transactional(readOnly = true)
     public ObjectNode lineage(Long distributedKeyId, String resourceType, String resourceId) {
         String normalizedType = resourceType == null ? "" : resourceType.trim().toLowerCase(Locale.ROOT);
@@ -265,7 +172,7 @@ public class GatewayPublicResourceService {
             return cacheLineage(distributedKeyId, resourceId);
         }
         GatewayAsyncResourceType asyncType = toAsyncResourceType(normalizedType);
-        GatewayAsyncResourceEntity entity = resolveAsyncResource(distributedKeyId, resourceId, asyncType);
+        GatewayAsyncResourceEntity entity = resolvePublicAsyncResource(distributedKeyId, resourceId, asyncType);
         CanonicalResourceLifecycle lifecycle = gatewayAsyncResourceCanonicalizer.toLifecycle(entity);
         CanonicalResourceLineage lineage = gatewayAsyncResourceCanonicalizer.toLineage(entity);
         List<CanonicalResourceArtifact> artifacts = gatewayAsyncResourceCanonicalizer.toArtifacts(entity);
@@ -406,6 +313,17 @@ public class GatewayPublicResourceService {
         return entity;
     }
 
+    private GatewayAsyncResourceEntity resolvePublicAsyncResource(
+            Long distributedKeyId,
+            String resourceName,
+            GatewayAsyncResourceType expectedType) {
+        GatewayAsyncResourceEntity entity = resolveAsyncResource(distributedKeyId, resourceName, expectedType);
+        if (!isPublicOperationType(entity.getResourceType())) {
+            throw new IllegalArgumentException("该资源类型不属于当前公开功能性服务 API。");
+        }
+        return entity;
+    }
+
     private GatewayAsyncResourceType toAsyncResourceType(String resourceType) {
         return switch (resourceType) {
             case "response", "responses" -> GatewayAsyncResourceType.RESPONSE;
@@ -413,13 +331,15 @@ public class GatewayPublicResourceService {
             case "vector_store_file", "vector_store_files" -> GatewayAsyncResourceType.VECTOR_STORE_FILE;
             case "vector_store_file_batch", "vector_store_file_batches" -> GatewayAsyncResourceType.VECTOR_STORE_FILE_BATCH;
             case "upload", "uploads" -> GatewayAsyncResourceType.UPLOAD;
-            case "batch", "batches" -> GatewayAsyncResourceType.BATCH;
-            case "tuning", "tunings", "fine_tuning", "fine_tuning.jobs" -> GatewayAsyncResourceType.TUNING;
             case "video", "videos" -> GatewayAsyncResourceType.VIDEO;
             case "music", "musics" -> GatewayAsyncResourceType.MUSIC;
             case "operation", "operations", "" -> null;
             default -> throw new IllegalArgumentException("不支持的 resourceType：" + resourceType);
         };
+    }
+
+    private boolean isPublicOperationType(GatewayAsyncResourceType resourceType) {
+        return true;
     }
 
     private String normalizeResourceType(String resourceType) {
@@ -476,28 +396,7 @@ public class GatewayPublicResourceService {
         if (normalized.startsWith("operations/")) {
             normalized = normalized.substring("operations/".length());
         }
-        if (normalized.startsWith("tunings/")) {
-            normalized = normalized.substring("tunings/".length());
-        }
         return normalized;
-    }
-
-    private void unregisterFineTunedModel(GatewayAsyncResourceEntity entity, ObjectNode metadata) {
-        String registeredModelKey = firstText(metadata, "registered_model_key");
-        List<String> aliases = new ArrayList<>();
-        JsonNode aliasNode = metadata.path("registered_aliases");
-        if (aliasNode.isArray()) {
-            aliasNode.forEach(item -> aliases.add(item.asText()));
-        }
-        if ((registeredModelKey == null || registeredModelKey.isBlank()) && aliases.isEmpty()) {
-            return;
-        }
-        Long siteProfileId = longValue(metadata, "site_profile_id");
-        fineTunedModelRegistrationService.unregister(siteProfileId, registeredModelKey, aliases, entity.getResourceKey());
-        metadata.remove("registered_model_key");
-        metadata.remove("registered_model_name");
-        metadata.remove("registered_alias_key");
-        metadata.remove("registered_aliases");
     }
 
     private ObjectNode node(String id, String type, String label, Map<String, ?> attributes) {
@@ -539,22 +438,6 @@ public class GatewayPublicResourceService {
         } catch (JacksonException exception) {
             throw new IllegalStateException("序列化资源 JSON 失败。", exception);
         }
-    }
-
-    private String firstText(JsonNode node, String... fieldNames) {
-        if (node == null || node.isMissingNode()) {
-            return null;
-        }
-        for (String fieldName : fieldNames) {
-            JsonNode value = node.path(fieldName);
-            if (!value.isMissingNode() && !value.isNull()) {
-                String text = value.asText(null);
-                if (text != null && !text.isBlank()) {
-                    return text;
-                }
-            }
-        }
-        return null;
     }
 
     private Long longValue(JsonNode node, String fieldName) {

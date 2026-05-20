@@ -53,7 +53,7 @@ public class PublicDocsBundleService {
                         "创建或获取 Distributed Key。",
                         "把 OpenAI-compatible client 的 base URL 设置为 https://gateway.example.com/v1。",
                         "将 Authorization Bearer 设置为完整 Distributed Key secret。",
-                        "先调用 /v1/chat/completions smoke，再按需启用 Chat typed parameters、Claude、Gemini、Ollama 兼容路径。",
+                        "先调用 /v1/chat/completions smoke，再按 OpenAI 标准功能区启用 Responses、Claude Messages、Gemini/Vertex generateContent 与 Codex Responses smoke。",
                         "失败时读取 error_code 和 requestId，再到管理端 trace 查询路由与账务记录。"
                 ),
                 compatibility(),
@@ -71,14 +71,13 @@ public class PublicDocsBundleService {
                         "OpenAI Direct 非流式 Responses create 会优先返回上游原始 Responses JSON，并把 model 重写为 public model；OpenAI Direct stream=true 时透传上游原始 SSE 事件；无 native raw 能力时回退 canonical encoder。",
                         "Responses tools 当前执行 function tools；file_search 可校验本地 vector_store_ids 并把本地 search 结果注入上下文，但不声明 hosted file_search_call lifecycle；web_search_preview、mcp、custom、code_interpreter、computer_use_preview、image_generation、shell/apply_patch 等仍会显式拒绝。",
                         "OpenAI Conversations 使用 gateway local lineage，支持 conversation create/retrieve/update/delete 与 item create/list/retrieve/delete；item list 默认 order=desc、limit=20，一次最多追加 20 个 item。",
-                        "OpenAI Vector Stores 使用 gateway local lifecycle 基线，支持 vector_store create/list/retrieve/update/delete、vector_store.file attach/list/retrieve/delete/content、本地文本 search、Responses file_search 本地绑定以及 vector_store.file_batch create/retrieve/cancel/list files；真实向量入库、语义向量检索和 hosted file_search_call lifecycle 仍按 TASK-20260514-023 后续拆分。",
-                        "OpenAI Models Delete 仅删除当前 Distributed Key 下经 gateway fine-tuning/import 登记的 fine-tuned model registry，公共模型与跨租户模型不会被删除。",
-                        "OpenAI Fine-tuning events/checkpoints 返回当前 Distributed Key 下 gateway-tracked tuning job 的本地 lineage 列表；不声明同步上游完整事件历史或 checkpoint permissions。",
+                        "OpenAI Vector Stores 使用 gateway local lifecycle 基线，支持 vector_store create/list/retrieve/update/delete、vector_store.file attach/list/retrieve/delete/content、本地 chunk ingestion、本地文本 search、Responses file_search 本地绑定以及 vector_store.file_batch create/retrieve/cancel/list files；真实 embedding/vector index 入库、语义向量检索和 hosted file_search_call lifecycle 仍按 TASK-20260514-023 后续拆分。",
                         "非流式 Chat/Responses 支持 Idempotency-Key 本地响应重放；同 key 不同请求体会被拒绝，幂等记录默认保留 24 小时。",
                         "Chat stream 支持 stream_options.include_usage，开启后会在 [DONE] 前输出 choices=[] 的 usage chunk；Responses canonical stream event 会携带本地单调递增 sequence_number，并按 stream_options.include_obfuscation 控制 delta event obfuscation 字段；OpenAI Direct raw SSE 保留上游原始 sequence 与 event shape。",
                         "OpenAI Webhooks 提供 POST /v1/webhooks/openai 接收入口，按 Standard Webhooks 校验 webhook-id、webhook-timestamp、webhook-signature，使用 raw body 验签，并把合法 event 保存为本地 WEBHOOK_EVENT；重复 delivery 或重复 event id 返回 duplicate=true 且不重复落库。",
                         "OpenAI path 本地限流命中会返回 429、rate_limit_error，并带 Retry-After 与 x-ratelimit remaining/reset headers。",
-                        "Realtime、Files、Batches、Caches 等非 Chat 能力需要先查看 provider capability matrix。"
+                        "Files、Uploads、Models、Vector Stores 和 Realtime client secret 仅作为对话、tools、RAG/file_search 的支撑能力公开；官方非核心 API 不纳入公开兼容面。",
+                        "Anthropic、Gemini、Vertex 按 OpenAI 标准功能区收紧为 chat/messages/generateContent、tools、embeddings/files 等支撑面；Codex 单独限定为 Responses smoke/反代边界，拒绝 provider-specific async/admin/eval 和非 Responses Codex 内部接口。"
                 ),
                 List.of(
                         "usage_record 记录 tokens 与 completeness，billing rollup 可按 day/week/month 聚合。",
@@ -97,26 +96,25 @@ public class PublicDocsBundleService {
                         "openai.responses-stream-obfuscation",
                        "openai.responses-input-tokens-compact",
                        "openai.responses-input-tokens-native-passthrough",
-                       "openai.responses-compact-native-passthrough",
-                       "openai.responses-native-json-passthrough",
-                       "openai.responses-native-stream-sse-passthrough",
-                       "openai.responses-remote-lifecycle-passthrough",
-                       "openai.responses-untracked-remote-lifecycle-route-hints",
-                       "openai.responses-tool-registry-boundary",
-                       "openai.responses-file-search-local-vector-store-binding",
+                        "openai.responses-compact-native-passthrough",
+                        "openai.responses-native-json-passthrough",
+                        "openai.responses-native-stream-sse-passthrough",
+                        "openai.responses-remote-lifecycle-passthrough",
+                        "openai.responses-untracked-remote-lifecycle-route-hints",
+                        "openai.responses-tool-registry-boundary",
+                        "openai.responses-file-search-local-vector-store-binding",
                         "openai.conversations-local-lifecycle",
                         "openai.vector-stores-local-lifecycle",
                         "openai.vector-store-files-local-attachment",
+                        "openai.vector-store-files-local-ingestion-artifact",
                         "openai.vector-store-file-content-local-read",
                         "openai.vector-store-search-local-text",
                         "openai.vector-store-file-batches-local-lifecycle",
-                        "openai.batches-list-local-catalog",
-                        "openai.models-delete-local-registry",
-                        "openai.fine-tuning-events-checkpoints-local-lineage",
                         "openai.webhook-signature-replay",
                         "openai.webhooks-ingress-event-persistence",
                         "claude.messages.translation",
                         "gemini.generate-content.translation",
+                        "codex.responses-smoke-boundary",
                         "ollama.chat.native",
                         "web_search.provider-adapter",
                         "files.cache.operations"
@@ -137,7 +135,7 @@ public class PublicDocsBundleService {
                         "Create or retrieve a Distributed Key.",
                         "Set your OpenAI-compatible base URL to https://gateway.example.com/v1.",
                         "Use the full Distributed Key secret as the Authorization Bearer token.",
-                        "Run /v1/chat/completions first, then enable Chat typed parameters, Claude, Gemini, or Ollama compatible flows.",
+                        "Run /v1/chat/completions first, then enable Responses, Claude Messages, Gemini/Vertex generateContent, or Codex Responses smoke within the OpenAI standard functional zone.",
                         "On failures, inspect error_code and requestId, then query admin traces."
                 ),
                 compatibility(),
@@ -155,14 +153,13 @@ public class PublicDocsBundleService {
                         "OpenAI Direct non-streaming Responses create prefers the upstream raw Responses JSON and rewrites model to the public model; OpenAI Direct stream=true passes through upstream raw SSE events; canonical encoding remains the fallback when no native raw capability exists.",
                         "Responses tools currently execute function tools; file_search can validate local vector_store_ids and inject local search context, but hosted file_search_call lifecycle is not claimed. web_search_preview, mcp, custom, code_interpreter, computer_use_preview, image_generation, shell and apply_patch remain explicitly rejected.",
                         "OpenAI Conversations use gateway local lineage and support conversation create/retrieve/update/delete plus item create/list/retrieve/delete; item lists default to order=desc and limit=20, and each create call accepts at most 20 items.",
-                        "OpenAI Vector Stores use a gateway-local lifecycle baseline for vector_store create/list/retrieve/update/delete, vector_store.file attach/list/retrieve/delete/content, local text search, Responses file_search local binding and vector_store.file_batch create/retrieve/cancel/list files; real vector ingestion, semantic vector retrieval and hosted file_search_call lifecycle remain tracked under TASK-20260514-023.",
-                        "OpenAI Models Delete only removes gateway-registered fine-tuned model registry entries that belong to the current Distributed Key; public models and cross-tenant models are protected.",
-                        "OpenAI Fine-tuning events/checkpoints return gateway-tracked local lineage lists for the current Distributed Key; they do not claim full upstream event history sync or checkpoint permissions.",
+                        "OpenAI Vector Stores use a gateway-local lifecycle baseline for vector_store create/list/retrieve/update/delete, vector_store.file attach/list/retrieve/delete/content, local chunk ingestion, local text search, Responses file_search local binding and vector_store.file_batch create/retrieve/cancel/list files; real embedding/vector index ingestion, semantic vector retrieval and hosted file_search_call lifecycle remain tracked under TASK-20260514-023.",
                         "Non-streaming Chat/Responses support local Idempotency-Key response replay; reusing a key with a different request body is rejected, and records are retained for 24 hours by default.",
                         "Chat streams support stream_options.include_usage by emitting a choices=[] usage chunk before [DONE]; Responses canonical stream events include a local monotonic sequence_number and honor stream_options.include_obfuscation for delta event obfuscation fields; OpenAI Direct raw SSE keeps upstream sequence and event shape.",
                         "OpenAI Webhooks expose POST /v1/webhooks/openai, verify webhook-id, webhook-timestamp and webhook-signature against the raw body, persist valid events as local WEBHOOK_EVENT records, and return duplicate=true without another write for duplicate deliveries or duplicate event ids.",
                         "Local rate limit hits on OpenAI paths return 429, rate_limit_error, Retry-After and x-ratelimit remaining/reset headers.",
-                        "Realtime, Files, Batches and Caches depend on the provider capability matrix."
+                        "Files, Uploads, Models, Vector Stores and Realtime client secrets are exposed only as support surfaces for conversations, tools and RAG/file_search; official non-core APIs are outside the public compatibility surface.",
+                        "Anthropic, Gemini and Vertex are narrowed to the OpenAI standard functional zone for chat/messages/generateContent, tools and embeddings/files support surfaces; Codex is separately limited to the Responses smoke/proxy boundary, while provider-specific async/admin/eval APIs and non-Responses Codex internals are rejected."
                 ),
                 List.of(
                         "usage_record stores token usage and completeness; billing rollup supports day/week/month windows.",
@@ -179,28 +176,27 @@ public class PublicDocsBundleService {
                         "openai.responses-local-lifecycle",
                         "openai.streaming-event-usage-sequence",
                         "openai.responses-stream-obfuscation",
-                       "openai.responses-input-tokens-compact",
-                       "openai.responses-input-tokens-native-passthrough",
-                       "openai.responses-compact-native-passthrough",
-                       "openai.responses-native-json-passthrough",
-                       "openai.responses-native-stream-sse-passthrough",
-                       "openai.responses-remote-lifecycle-passthrough",
-                       "openai.responses-untracked-remote-lifecycle-route-hints",
-                       "openai.responses-tool-registry-boundary",
-                       "openai.responses-file-search-local-vector-store-binding",
+                        "openai.responses-input-tokens-compact",
+                        "openai.responses-input-tokens-native-passthrough",
+                        "openai.responses-compact-native-passthrough",
+                        "openai.responses-native-json-passthrough",
+                        "openai.responses-native-stream-sse-passthrough",
+                        "openai.responses-remote-lifecycle-passthrough",
+                        "openai.responses-untracked-remote-lifecycle-route-hints",
+                        "openai.responses-tool-registry-boundary",
+                        "openai.responses-file-search-local-vector-store-binding",
                         "openai.conversations-local-lifecycle",
                         "openai.vector-stores-local-lifecycle",
                         "openai.vector-store-files-local-attachment",
+                        "openai.vector-store-files-local-ingestion-artifact",
                         "openai.vector-store-file-content-local-read",
                         "openai.vector-store-search-local-text",
                         "openai.vector-store-file-batches-local-lifecycle",
-                        "openai.batches-list-local-catalog",
-                        "openai.models-delete-local-registry",
-                        "openai.fine-tuning-events-checkpoints-local-lineage",
                         "openai.webhook-signature-replay",
                         "openai.webhooks-ingress-event-persistence",
                         "claude.messages.translation",
                         "gemini.generate-content.translation",
+                        "codex.responses-smoke-boundary",
                         "ollama.chat.native",
                         "web_search.provider-adapter",
                         "files.cache.operations"
@@ -214,7 +210,7 @@ public class PublicDocsBundleService {
         ObjectNode info = root.putObject("info");
         info.put("title", "x-ai-gateway Public API");
         info.put("version", "2026.05.18");
-        info.put("description", "公开接入面的最小 OpenAPI 事实源，覆盖 docs、OpenAI-compatible、Claude/Gemini 兼容入口和 Media provider matrix。");
+        info.put("description", "公开接入面的最小 OpenAPI 事实源，按 OpenAI 标准功能区覆盖 docs、OpenAI-compatible、Claude/Gemini/Vertex 功能性入口、Codex Responses smoke 边界和 Media provider matrix。");
         root.putArray("servers")
                 .addObject()
                 .put("url", "https://gateway.example.com")
@@ -239,6 +235,10 @@ public class PublicDocsBundleService {
         ObjectNode responsesCreate = addPath(paths, "post", "/v1/responses", "OpenAI-compatible Responses", true);
         addResponsesRequestBody(responsesCreate);
         addIdempotencyHeader(responsesCreate);
+        ObjectNode codexResponses = addPath(paths, "post", "/backend-api/codex/responses", "ChatGPT / Codex Responses native compatibility endpoint", true);
+        codexResponses.put("description", "Exposes the ChatGPT / Codex native responses compatibility endpoint, using specialized fields like messages, parent_message_id, and reasoning_effort.");
+        addCodexResponsesRequestBody(codexResponses);
+        addIdempotencyHeader(codexResponses);
         ObjectNode responsesInputTokens = addPath(paths, "post", "/v1/responses/input_tokens", "Count Response input tokens", true);
         responsesInputTokens.put("description", "Counts Response input tokens. OpenAI Direct routes use native upstream counting when available; route-unavailable cases fall back to the local deterministic estimate.");
         addResponsesRequestBody(responsesInputTokens);
@@ -290,7 +290,7 @@ public class PublicDocsBundleService {
         addConversationIdPathParameter(conversationItemDelete);
         addConversationItemIdPathParameter(conversationItemDelete);
         ObjectNode vectorStoreCreate = addPath(paths, "post", "/v1/vector_stores", "Create a local OpenAI Vector Store", true);
-        vectorStoreCreate.put("description", "Creates a gateway-local Vector Store lifecycle object. File ids are accepted as local references; local content read and local text search are available, while real vector ingestion is not implemented in this baseline.");
+        vectorStoreCreate.put("description", "Creates a gateway-local Vector Store lifecycle object. File ids are attached as local references with local chunk ingestion metadata; local content read and local text search are available, while hosted OpenAI embedding/vector index ingestion is not implemented in this baseline.");
         addVectorStoreRequestBody(vectorStoreCreate);
         ObjectNode vectorStoreList = addPath(paths, "get", "/v1/vector_stores", "List local OpenAI Vector Stores", true);
         vectorStoreList.put("description", "Lists gateway-local Vector Stores for the current Distributed Key with OpenAI-compatible list envelope pagination.");
@@ -301,17 +301,17 @@ public class PublicDocsBundleService {
         addVectorStoreIdPathParameter(vectorStoreUpdate);
         addVectorStoreRequestBody(vectorStoreUpdate);
         ObjectNode vectorStoreSearch = addPath(paths, "post", "/v1/vector_stores/{vectorStoreId}/search", "Search a local OpenAI Vector Store", true);
-        vectorStoreSearch.put("description", "Searches readable gateway-local vector_store.file attachments with a deterministic UTF-8 lexical baseline. This does not perform hosted OpenAI semantic vector ingestion or rerank.");
+        vectorStoreSearch.put("description", "Searches persisted local ingestion chunks first with a deterministic UTF-8 lexical baseline, and falls back to raw gateway file text for legacy attachments. This does not perform hosted OpenAI semantic vector retrieval or rerank.");
         addVectorStoreIdPathParameter(vectorStoreSearch);
         addVectorStoreSearchRequestBody(vectorStoreSearch);
         ObjectNode vectorStoreDelete = addPath(paths, "delete", "/v1/vector_stores/{vectorStoreId}", "Delete a local OpenAI Vector Store", true);
         addVectorStoreIdPathParameter(vectorStoreDelete);
         ObjectNode vectorStoreFileCreate = addPath(paths, "post", "/v1/vector_stores/{vectorStoreId}/files", "Attach a local OpenAI Vector Store File", true);
-        vectorStoreFileCreate.put("description", "Attaches a file id to a gateway-local Vector Store as a local vector_store.file reference. This does not perform real vector ingestion.");
+        vectorStoreFileCreate.put("description", "Attaches a file id to a gateway-local Vector Store, reads the current gateway file, and persists local chunk ingestion metadata plus usage_bytes. This does not perform hosted OpenAI embedding/vector index ingestion.");
         addVectorStoreIdPathParameter(vectorStoreFileCreate);
         addVectorStoreFileRequestBody(vectorStoreFileCreate);
         ObjectNode vectorStoreFileList = addPath(paths, "get", "/v1/vector_stores/{vectorStoreId}/files", "List local OpenAI Vector Store Files", true);
-        vectorStoreFileList.put("description", "Lists gateway-local Vector Store File attachments. Local file content read and deterministic local text search are available; real vector ingestion and semantic vector search are not implemented in this baseline.");
+        vectorStoreFileList.put("description", "Lists gateway-local Vector Store File attachments. Local chunk ingestion metadata, file content read and deterministic local text search are available; hosted OpenAI embedding/vector index ingestion and semantic vector search are not implemented in this baseline.");
         addVectorStoreIdPathParameter(vectorStoreFileList);
         addVectorStoreFileListParameters(vectorStoreFileList);
         ObjectNode vectorStoreFileGet = addPath(paths, "get", "/v1/vector_stores/{vectorStoreId}/files/{fileId}", "Retrieve a local OpenAI Vector Store File", true);
@@ -325,7 +325,7 @@ public class PublicDocsBundleService {
         addVectorStoreIdPathParameter(vectorStoreFileDelete);
         addVectorStoreFileIdPathParameter(vectorStoreFileDelete);
         ObjectNode vectorStoreFileBatchCreate = addPath(paths, "post", "/v1/vector_stores/{vectorStoreId}/file_batches", "Create a local OpenAI Vector Store File Batch", true);
-        vectorStoreFileBatchCreate.put("description", "Creates a gateway-local vector_store.file_batch and attaches multiple file ids after all duplicate checks pass. This does not perform real vector ingestion.");
+        vectorStoreFileBatchCreate.put("description", "Creates a gateway-local vector_store.file_batch and attaches multiple file ids after all duplicate checks pass, persisting local chunk ingestion metadata for each file. This does not perform hosted OpenAI embedding/vector index ingestion.");
         addVectorStoreIdPathParameter(vectorStoreFileBatchCreate);
         addVectorStoreFileBatchRequestBody(vectorStoreFileBatchCreate);
         ObjectNode vectorStoreFileBatchGet = addPath(paths, "get", "/v1/vector_stores/{vectorStoreId}/file_batches/{batchId}", "Retrieve a local OpenAI Vector Store File Batch", true);
@@ -344,25 +344,11 @@ public class PublicDocsBundleService {
         openAiWebhook.put("description", "Verifies Standard Webhooks headers against the raw request body and stores valid OpenAI events as gateway-local WEBHOOK_EVENT resources. Duplicate webhook deliveries or duplicate event ids return duplicate=true without another write.");
         addWebhookHeaders(openAiWebhook);
         addWebhookRequestBody(openAiWebhook);
-        ObjectNode batchList = addPath(paths, "get", "/v1/batches", "List gateway-tracked OpenAI Batch objects", true);
-        batchList.put("description", "Returns Batch objects created through this gateway for the current Distributed Key; upstream organization history created outside the gateway is not enumerated.");
-        addBatchListParameters(batchList);
         ObjectNode modelList = addPath(paths, "get", "/v1/models", "List accessible OpenAI-compatible models", true);
         modelList.put("description", "Lists public gateway model ids and aliases accessible to the current Distributed Key.");
         ObjectNode modelGet = addPath(paths, "get", "/v1/models/{model}", "Retrieve an accessible OpenAI-compatible model", true);
         modelGet.put("description", "Retrieves model metadata from the gateway model catalog when the current Distributed Key may access it.");
         addModelPathParameter(modelGet);
-        ObjectNode modelDelete = addPath(paths, "delete", "/v1/models/{model}", "Delete a gateway-registered fine-tuned model", true);
-        modelDelete.put("description", "Deletes only fine-tuned model registry entries created or imported through this gateway for the current Distributed Key; it does not delete public models or call upstream owner-role model deletion.");
-        addModelPathParameter(modelDelete);
-        ObjectNode tuningEvents = addPath(paths, "get", "/v1/fine_tuning/jobs/{jobId}/events", "List gateway-tracked Fine-tuning job events", true);
-        tuningEvents.put("description", "Returns local lifecycle events recorded by this gateway for the current Distributed Key's Fine-tuning job; it does not enumerate the upstream organization's full event history.");
-        addFineTuningJobPathParameter(tuningEvents);
-        addFineTuningListParameters(tuningEvents, "event");
-        ObjectNode tuningCheckpoints = addPath(paths, "get", "/v1/fine_tuning/jobs/{jobId}/checkpoints", "List gateway-tracked Fine-tuning checkpoints", true);
-        tuningCheckpoints.put("description", "Returns local checkpoint evidence for the current Distributed Key's Fine-tuning job. If the gateway has no completed model or checkpoint evidence, data is empty.");
-        addFineTuningJobPathParameter(tuningCheckpoints);
-        addFineTuningListParameters(tuningCheckpoints, "checkpoint");
         addPath(paths, "post", "/v1/web_search", "Provider-governed Web Search", true);
         addPath(paths, "post", "/v1/messages", "Claude Messages compatible endpoint", true);
         addPath(paths, "post", "/v1beta/models/{model}:generateContent", "Gemini generateContent compatible endpoint", true);
@@ -390,21 +376,21 @@ public class PublicDocsBundleService {
                         "openai",
                         "/v1",
                         List.of("OpenAI SDK", "Codex", "OpenCode", "OpenClaw", "curl"),
-                        List.of("chat.completions", "chat.typed-parameters", "stored_chat.completions", "responses", "responses.lifecycle", "responses.file_search_local_vector_store_binding", "conversations.local_lineage", "vector_stores.local_lifecycle", "vector_store_files.local_attachment", "vector_store_files.local_content_read", "vector_stores.local_text_search", "vector_store_file_batches.local_lifecycle", "webhooks.ingress_event_persistence", "embeddings", "files", "batches", "fine_tuning.local_lineage", "models.registry_delete", "realtime"),
+                        List.of("chat.completions", "chat.typed-parameters", "stored_chat.completions", "responses", "responses.lifecycle", "responses.file_search_local_vector_store_binding", "conversations.local_lineage", "vector_stores.local_lifecycle", "vector_store_files.local_attachment", "vector_store_files.local_ingestion_artifact", "vector_store_files.local_content_read", "vector_stores.local_text_search", "vector_store_file_batches.local_lifecycle", "webhooks.ingress_event_persistence", "embeddings", "files", "models", "realtime"),
                         "OpenAI-compatible clients should use /v1 as base path. OpenAI Direct supports typed Chat parameters; third-party compatible sites are governed by provider capability."
                 ),
                 new PublicDocsCompatibilityResponse(
                         "claude",
                         "/v1",
                         List.of("Claude Code", "Anthropic SDK through compatible config"),
-                        List.of("messages", "message_batches"),
+                        List.of("messages"),
                         "Claude native semantics are translated when provider capability allows it."
                 ),
                 new PublicDocsCompatibilityResponse(
                         "gemini",
                         "/v1",
                         List.of("Gemini CLI", "Google GenAI compatible clients"),
-                        List.of("generateContent", "files", "cachedContents", "batches"),
+                        List.of("generateContent", "files", "cachedContents"),
                         "Gemini native objects are exposed through gateway resource lineage when needed."
                 ),
                 new PublicDocsCompatibilityResponse(
@@ -647,6 +633,23 @@ public class PublicDocsBundleService {
         addProperty(properties, "tool_choice", "object", "Responses tool choice string or object. Non-function forced tool choices are rejected explicitly until their execution boundary is implemented.");
     }
 
+    private void addCodexResponsesRequestBody(ObjectNode operation) {
+        ObjectNode schema = operation.putObject("requestBody")
+                .putObject("content")
+                .putObject("application/json")
+                .putObject("schema");
+        schema.put("type", "object");
+        schema.putArray("required").add("model");
+        ObjectNode properties = schema.putObject("properties");
+        addProperty(properties, "model", "string", "OpenAI model name or gateway model alias.");
+        addProperty(properties, "messages", "array", "Codex conversation messages array.");
+        addProperty(properties, "parent_message_id", "string", "Parent message ID for session thread affinity.");
+        addProperty(properties, "reasoning_effort", "string", "Reasoning effort configuration (e.g. low, medium, high).");
+        addProperty(properties, "stream", "boolean", "When true, emit Codex-style server-sent events.");
+        addProperty(properties, "store", "boolean", "When true, persist the Response as a local resp_ resource.");
+        addProperty(properties, "metadata", "object", "OpenAI metadata object preserved by the gateway.");
+    }
+
     private void addConversationRequestBody(ObjectNode operation, boolean requireMetadata) {
         ObjectNode schema = operation.putObject("requestBody")
                 .putObject("content")
@@ -681,7 +684,7 @@ public class PublicDocsBundleService {
         ObjectNode properties = schema.putObject("properties");
         addProperty(properties, "name", "string", "Optional Vector Store name.");
         addProperty(properties, "metadata", "object", "OpenAI metadata object preserved by the gateway.");
-        addProperty(properties, "file_ids", "array", "Local file ids to associate as references. Local content read and local text search are available; real vector ingestion is not implemented in this baseline.");
+        addProperty(properties, "file_ids", "array", "Local file ids to associate as references. Local chunk ingestion metadata, content read and local text search are available; hosted OpenAI embedding/vector index ingestion is not implemented in this baseline.");
         addProperty(properties, "expires_after", "object", "OpenAI expires_after object, for example anchor=last_active_at and days=7.");
         addProperty(properties, "expires_at", "integer", "Optional Unix seconds expiration timestamp.");
     }
@@ -823,16 +826,7 @@ public class PublicDocsBundleService {
         parameter.put("name", "model");
         parameter.put("in", "path");
         parameter.put("required", true);
-        parameter.put("description", "Model id or gateway fine-tuned model alias.");
-        parameter.putObject("schema").put("type", "string");
-    }
-
-    private void addFineTuningJobPathParameter(ObjectNode operation) {
-        ObjectNode parameter = parameters(operation).addObject();
-        parameter.put("name", "jobId");
-        parameter.put("in", "path");
-        parameter.put("required", true);
-        parameter.put("description", "Gateway-tracked Fine-tuning job id.");
+        parameter.put("description", "Model id or gateway model alias.");
         parameter.putObject("schema").put("type", "string");
     }
 
@@ -875,16 +869,6 @@ public class PublicDocsBundleService {
         addQueryParameter(operation, "limit", "integer", "Number of Vector Store Files to return. Defaults to 20; valid range is 1 to 100.");
         addQueryParameter(operation, "order", "string", "Sort by creation time: asc or desc. Defaults to desc.");
         addQueryParameter(operation, "filter", "string", "Optional local status filter such as completed or failed.");
-    }
-
-    private void addBatchListParameters(ObjectNode operation) {
-        addQueryParameter(operation, "after", "string", "Cursor id of the last Batch from the previous page.");
-        addQueryParameter(operation, "limit", "integer", "Number of Batch objects to return. Defaults to 20; valid range is 1 to 100.");
-    }
-
-    private void addFineTuningListParameters(ObjectNode operation, String itemName) {
-        addQueryParameter(operation, "after", "string", "Cursor id of the last Fine-tuning " + itemName + " from the previous page.");
-        addQueryParameter(operation, "limit", "integer", "Number of Fine-tuning " + itemName + " records to return. Defaults to 20; valid range is 1 to 100.");
     }
 
     private void addResponsesIncludeParameter(ObjectNode operation) {

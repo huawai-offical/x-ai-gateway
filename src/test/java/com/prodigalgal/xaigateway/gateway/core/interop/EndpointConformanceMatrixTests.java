@@ -41,7 +41,6 @@ import org.springframework.util.StringUtils;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -268,32 +267,6 @@ class EndpointConformanceMatrixTests {
             case "image_edit", "image_variation" -> root.put("prompt", "hello x-ai");
             case "moderation_create" -> root.put("input", "hello x-ai");
             case "file_create" -> root.put("filename", "doc.txt").put("purpose", "assistants").put("bytes", 12);
-            case "batch_create" -> {
-                if ("google_native".equals(definition.protocol())) {
-                    ObjectNode batchBody = OBJECT_MAPPER.createObjectNode();
-                    batchBody.putObject("config").put("displayName", "batch-job");
-                    batchBody.put("inputFile", "file_123");
-                    yield batchBody;
-                }
-                yield root.put("input_file_id", "file_123").put("endpoint", "/v1/chat/completions");
-            }
-            case "anthropic_message_batch_create" -> {
-                ArrayNode requests = root.putArray("requests");
-                ObjectNode params = requests.addObject()
-                        .put("custom_id", "req_1")
-                        .putObject("params");
-                params.put("model", definition.requestedModel());
-                params.put("max_tokens", 64);
-                params.putArray("messages")
-                        .addObject()
-                        .put("role", "user")
-                        .putArray("content")
-                        .addObject()
-                        .put("type", "text")
-                        .put("text", "hello x-ai");
-                yield root;
-            }
-            case "tuning_create" -> root.put("training_file", "file_train").put("suffix", "x-ai");
             case "realtime_client_secret_create" -> root.put("model", definition.requestedModel());
             default -> root;
         };
@@ -424,8 +397,6 @@ class EndpointConformanceMatrixTests {
         entity.setSupportsModeration(scenario.snapshotModeration());
         entity.setSupportsFiles(scenario.snapshotFiles());
         entity.setSupportsUploads(scenario.snapshotUploads());
-        entity.setSupportsBatches(scenario.snapshotBatches());
-        entity.setSupportsTuning(scenario.snapshotTuning());
         entity.setSupportsRealtime(scenario.snapshotRealtime());
         entity.setAuthStrategy(policy.authStrategy());
         entity.setPathStrategy(policy.pathStrategy());
@@ -453,7 +424,7 @@ class EndpointConformanceMatrixTests {
                 UpstreamSiteKind.OPENAI_DIRECT,
                 List.of("openai", "responses"),
                 true, true, true, true, true,
-                true, true, true, true, true, true, true, true, true, true
+                true, true, true, true, true, true, true, true
         ));
         scenarios.put("openai-compatible", new ScenarioDefinition(
                 ProviderType.OPENAI_COMPATIBLE,
@@ -461,7 +432,7 @@ class EndpointConformanceMatrixTests {
                 UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC,
                 List.of("openai", "responses"),
                 true, true, true, true, true,
-                true, true, true, true, true, false, false, false, false, false
+                true, true, true, true, true, false, false, false
         ));
         scenarios.put("gemini-direct", new ScenarioDefinition(
                 ProviderType.GEMINI_DIRECT,
@@ -469,7 +440,7 @@ class EndpointConformanceMatrixTests {
                 UpstreamSiteKind.GEMINI_DIRECT,
                 List.of("google_native", "openai"),
                 true, true, true, true, true,
-                true, true, true, true, true, true, false, true, true, false
+                true, true, true, true, true, true, false, false
         ));
         scenarios.put("anthropic-direct", new ScenarioDefinition(
                 ProviderType.ANTHROPIC_DIRECT,
@@ -477,7 +448,7 @@ class EndpointConformanceMatrixTests {
                 UpstreamSiteKind.ANTHROPIC_DIRECT,
                 List.of("anthropic_native", "openai"),
                 true, true, true, false, true,
-                false, false, false, false, false, true, false, false, false, false
+                false, false, false, false, false, true, false, false
         ));
         scenarios.put("anthropic-files", new ScenarioDefinition(
                 ProviderType.ANTHROPIC_DIRECT,
@@ -485,7 +456,7 @@ class EndpointConformanceMatrixTests {
                 UpstreamSiteKind.ANTHROPIC_DIRECT,
                 List.of("anthropic_native", "openai"),
                 true, true, true, false, true,
-                false, false, false, false, false, true, false, false, false, false
+                false, false, false, false, false, true, false, false
         ));
         return scenarios;
     }
@@ -507,18 +478,11 @@ class EndpointConformanceMatrixTests {
                         List.of("/v1/files", "/v1/files/{fileId}", "/v1/files/{fileId}/content")
                 ),
                 new AcceptedExceptionRecord(
-                        "anthropic-message-batches-not-generic-batches",
-                        "provider_protocol",
-                        "Anthropic `messages/batches` 不等价于 generic `/v1/batches`。",
-                        "Anthropic Message Batches 是原生 messages request array 语义，不等价于当前 file-driven /v1/batches contract，因此当前不开放。",
-                        List.of("/v1/batches")
-                ),
-                new AcceptedExceptionRecord(
                         "openai-compatible-object-lifecycle-blocked",
                         "provider_family",
                         "OPENAI_COMPATIBLE family 不扩成 object lifecycle 通用替代实现。",
                         "OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；object lifecycle 仍作为 accepted exception，不在当前实现面内。",
-                        List.of("/v1/files", "/v1/uploads", "/v1/batches", "/v1/fine_tuning/jobs", "/v1/realtime/client_secrets")
+                        List.of("/v1/files", "/v1/uploads", "/v1/realtime/client_secrets")
                 ),
                 new AcceptedExceptionRecord(
                         "notion-mcp-auth-required",
@@ -556,24 +520,10 @@ class EndpointConformanceMatrixTests {
         definitions.add(provider("openai", "POST", "/v1/uploads/{uploadId}/complete", "/v1/uploads/upload_1/complete", "upload_complete", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiUploadsControllerTests.java", null, null, "openai-direct"));
         definitions.add(provider("openai", "POST", "/v1/uploads/{uploadId}/cancel", "/v1/uploads/upload_1/cancel", "upload_cancel", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiUploadsControllerTests.java", null, null, "openai-direct"));
 
-        definitions.add(provider("openai", "POST", "/v1/batches", "/v1/batches", "batch_create", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiBatchesControllerTests.java", null, null, "openai-direct"));
-        definitions.add(provider("openai", "GET", "/v1/batches", "/v1/batches", "batch_list", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiBatchesControllerTests.java", null, null, "openai-direct"));
-        definitions.add(provider("openai", "GET", "/v1/batches/{batchId}", "/v1/batches/batch_1", "batch_get", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiBatchesControllerTests.java", null, null, "openai-direct"));
-        definitions.add(provider("openai", "POST", "/v1/batches/{batchId}/cancel", "/v1/batches/batch_1/cancel", "batch_cancel", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiBatchesControllerTests.java", null, null, "openai-direct"));
-
-        definitions.add(provider("openai", "POST", "/v1/fine_tuning/jobs", "/v1/fine_tuning/jobs", "tuning_create", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiFineTuningJobsControllerTests.java", null, null, "openai-direct"));
-        definitions.add(provider("openai", "GET", "/v1/fine_tuning/jobs", "/v1/fine_tuning/jobs", "tuning_list", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiFineTuningJobsControllerTests.java", null, null, "openai-direct"));
-        definitions.add(provider("openai", "GET", "/v1/fine_tuning/jobs/{jobId}", "/v1/fine_tuning/jobs/ftjob_1", "tuning_get", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiFineTuningJobsControllerTests.java", null, null, "openai-direct"));
-        definitions.add(provider("openai", "GET", "/v1/fine_tuning/jobs/{jobId}/events", "/v1/fine_tuning/jobs/ftjob_1/events", "tuning_events_list", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiFineTuningJobsControllerTests.java", null, null, "openai-direct"));
-        definitions.add(provider("openai", "GET", "/v1/fine_tuning/jobs/{jobId}/checkpoints", "/v1/fine_tuning/jobs/ftjob_1/checkpoints", "tuning_checkpoints_list", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiFineTuningJobsControllerTests.java", null, null, "openai-direct"));
-        definitions.add(provider("openai", "POST", "/v1/fine_tuning/jobs/{jobId}/cancel", "/v1/fine_tuning/jobs/ftjob_1/cancel", "tuning_cancel", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiFineTuningJobsControllerTests.java", null, null, "openai-direct"));
-
         definitions.add(provider("openai", "POST", "/v1/realtime/client_secrets", "/v1/realtime/client_secrets", "realtime_client_secret_create", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "gpt-4o-realtime-preview", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiRealtimeControllerTests.java", null, null, "openai-direct"));
 
         definitions.add(provider("openai", "POST", "/v1/files", "/v1/files", "file_create", ProviderFamily.OPENAI, ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/gateway/core/interop/SiteCapabilityTruthServiceTests.java", "openai-compatible-object-lifecycle-blocked", null, "openai-compatible"));
         definitions.add(provider("openai", "POST", "/v1/uploads", "/v1/uploads", "upload_create", ProviderFamily.OPENAI, ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/gateway/core/interop/SiteCapabilityTruthServiceTests.java", "openai-compatible-object-lifecycle-blocked", null, "openai-compatible"));
-        definitions.add(provider("openai", "POST", "/v1/batches", "/v1/batches", "batch_create", ProviderFamily.OPENAI, ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/gateway/core/interop/SiteCapabilityTruthServiceTests.java", "openai-compatible-object-lifecycle-blocked", null, "openai-compatible"));
-        definitions.add(provider("openai", "POST", "/v1/fine_tuning/jobs", "/v1/fine_tuning/jobs", "tuning_create", ProviderFamily.OPENAI, ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/gateway/core/interop/SiteCapabilityTruthServiceTests.java", "openai-compatible-object-lifecycle-blocked", null, "openai-compatible"));
         definitions.add(provider("openai", "POST", "/v1/realtime/client_secrets", "/v1/realtime/client_secrets", "realtime_client_secret_create", ProviderFamily.OPENAI, ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC, "gpt-4o-realtime-preview", "json", "src/test/java/com/prodigalgal/xaigateway/gateway/core/interop/SiteCapabilityTruthServiceTests.java", "openai-compatible-object-lifecycle-blocked", null, "openai-compatible"));
 
         definitions.add(provider("google_native", "POST", "/v1beta/models/{model}:generateContent", "/v1beta/models/gemini-2.5-pro:generateContent", "chat_completion", ProviderFamily.GEMINI, ProviderType.GEMINI_DIRECT, UpstreamSiteKind.GEMINI_DIRECT, "gemini-2.5-pro", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/google/GeminiGenerateContentControllerTests.java", null, null, "gemini-direct"));
@@ -585,13 +535,9 @@ class EndpointConformanceMatrixTests {
         definitions.add(provider("google_native", "GET", "/v1beta/files", "/v1beta/files", "file_list", ProviderFamily.GEMINI, ProviderType.GEMINI_DIRECT, UpstreamSiteKind.GEMINI_DIRECT, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/google/GeminiFilesControllerTests.java", null, null, "gemini-direct"));
         definitions.add(provider("google_native", "GET", "/v1beta/files/{fileName}", "/v1beta/files/file_123", "file_get", ProviderFamily.GEMINI, ProviderType.GEMINI_DIRECT, UpstreamSiteKind.GEMINI_DIRECT, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/google/GeminiFilesControllerTests.java", null, null, "gemini-direct"));
         definitions.add(provider("google_native", "DELETE", "/v1beta/files/{fileName}", "/v1beta/files/file_123", "file_delete", ProviderFamily.GEMINI, ProviderType.GEMINI_DIRECT, UpstreamSiteKind.GEMINI_DIRECT, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/google/GeminiFilesControllerTests.java", null, null, "gemini-direct"));
-        definitions.add(provider("google_native", "POST", "/v1beta/models/{model}:batchGenerateContent", "/v1beta/models/gemini-2.5-pro:batchGenerateContent", "batch_create", ProviderFamily.GEMINI, ProviderType.GEMINI_DIRECT, UpstreamSiteKind.GEMINI_DIRECT, "gemini-2.5-pro", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/google/GeminiBatchesControllerTests.java", null, null, "gemini-direct"));
-        definitions.add(provider("google_native", "GET", "/v1beta/batches/{batchName}", "/v1beta/batches/batch_1", "batch_get", ProviderFamily.GEMINI, ProviderType.GEMINI_DIRECT, UpstreamSiteKind.GEMINI_DIRECT, "gemini-2.5-pro", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/google/GeminiBatchesControllerTests.java", null, null, "gemini-direct"));
-        definitions.add(provider("google_native", "POST", "/v1beta/batches/{batchName}:cancel", "/v1beta/batches/batch_1:cancel", "batch_cancel", ProviderFamily.GEMINI, ProviderType.GEMINI_DIRECT, UpstreamSiteKind.GEMINI_DIRECT, "gemini-2.5-pro", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/google/GeminiBatchesControllerTests.java", null, null, "gemini-direct"));
         definitions.add(provider("google_native", "POST", "/google/v1beta/models/{model}:embedContent", "/google/v1beta/models/text-embedding-004:embedContent", "embedding_create", ProviderFamily.GEMINI, ProviderType.GEMINI_DIRECT, UpstreamSiteKind.GEMINI_DIRECT, "text-embedding-004", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/google/GoogleNativeNamespaceControllerTests.java", null, null, "gemini-direct"));
         definitions.add(provider("google_native", "POST", "/google/upload/v1beta/files", "/google/upload/v1beta/files", "file_create", ProviderFamily.GEMINI, ProviderType.GEMINI_DIRECT, UpstreamSiteKind.GEMINI_DIRECT, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/google/GoogleNativeUploadNamespaceControllerTests.java", null, null, "gemini-direct"));
         definitions.add(provider("google_native", "GET", "/google/v1beta/files", "/google/v1beta/files", "file_list", ProviderFamily.GEMINI, ProviderType.GEMINI_DIRECT, UpstreamSiteKind.GEMINI_DIRECT, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/google/GoogleNativeNamespaceControllerTests.java", null, null, "gemini-direct"));
-        definitions.add(provider("google_native", "POST", "/google/v1beta/models/{model}:batchGenerateContent", "/google/v1beta/models/gemini-2.5-pro:batchGenerateContent", "batch_create", ProviderFamily.GEMINI, ProviderType.GEMINI_DIRECT, UpstreamSiteKind.GEMINI_DIRECT, "gemini-2.5-pro", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/google/GoogleNativeNamespaceControllerTests.java", null, null, "gemini-direct"));
 
         definitions.add(provider("anthropic_native", "POST", "/v1/messages", "/v1/messages", "chat_completion", ProviderFamily.ANTHROPIC, ProviderType.ANTHROPIC_DIRECT, UpstreamSiteKind.ANTHROPIC_DIRECT, "claude-sonnet-4", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/anthropic/AnthropicMessagesControllerTests.java", null, null, "anthropic-direct"));
         definitions.add(provider("openai", "POST", "/v1/files", "/v1/files", "file_create", ProviderFamily.ANTHROPIC, ProviderType.ANTHROPIC_DIRECT, UpstreamSiteKind.ANTHROPIC_DIRECT, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiFilesControllerTests.java", null, null, "anthropic-files"));
@@ -599,10 +545,6 @@ class EndpointConformanceMatrixTests {
         definitions.add(provider("openai", "GET", "/v1/files/{fileId}", "/v1/files/file_123", "file_get", ProviderFamily.ANTHROPIC, ProviderType.ANTHROPIC_DIRECT, UpstreamSiteKind.ANTHROPIC_DIRECT, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiFilesControllerTests.java", null, null, "anthropic-files"));
         definitions.add(provider("openai", "GET", "/v1/files/{fileId}/content", "/v1/files/file_123/content", "file_content_get", ProviderFamily.ANTHROPIC, ProviderType.ANTHROPIC_DIRECT, UpstreamSiteKind.ANTHROPIC_DIRECT, "resource-orchestration", "binary", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiFilesControllerTests.java", null, null, "anthropic-files"));
         definitions.add(provider("openai", "DELETE", "/v1/files/{fileId}", "/v1/files/file_123", "file_delete", ProviderFamily.ANTHROPIC, ProviderType.ANTHROPIC_DIRECT, UpstreamSiteKind.ANTHROPIC_DIRECT, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiFilesControllerTests.java", null, null, "anthropic-files"));
-        definitions.add(provider("openai", "POST", "/v1/batches", "/v1/batches", "batch_create", ProviderFamily.ANTHROPIC, ProviderType.ANTHROPIC_DIRECT, UpstreamSiteKind.ANTHROPIC_DIRECT, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/gateway/core/interop/SiteCapabilityTruthServiceTests.java", "anthropic-message-batches-not-generic-batches", null, "anthropic-direct"));
-        definitions.add(provider("anthropic_native", "POST", "/v1/messages/batches", "/v1/messages/batches", "anthropic_message_batch_create", ProviderFamily.ANTHROPIC, ProviderType.ANTHROPIC_DIRECT, UpstreamSiteKind.ANTHROPIC_DIRECT, "claude-sonnet-4", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/anthropic/AnthropicMessageBatchesControllerTests.java", null, null, "anthropic-direct"));
-        definitions.add(provider("anthropic_native", "GET", "/v1/messages/batches/{messageBatchId}", "/v1/messages/batches/msgbatch_1", "anthropic_message_batch_get", ProviderFamily.ANTHROPIC, ProviderType.ANTHROPIC_DIRECT, UpstreamSiteKind.ANTHROPIC_DIRECT, "claude-sonnet-4", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/anthropic/AnthropicMessageBatchesControllerTests.java", null, null, "anthropic-direct"));
-        definitions.add(provider("anthropic_native", "POST", "/v1/messages/batches/{messageBatchId}/cancel", "/v1/messages/batches/msgbatch_1/cancel", "anthropic_message_batch_cancel", ProviderFamily.ANTHROPIC, ProviderType.ANTHROPIC_DIRECT, UpstreamSiteKind.ANTHROPIC_DIRECT, "claude-sonnet-4", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/anthropic/AnthropicMessageBatchesControllerTests.java", null, null, "anthropic-direct"));
 
         definitions.add(control("interop", "/api/v1/interop/plan", "interop_plan", "json", "src/test/java/com/prodigalgal/xaigateway/gateway/core/interop/GatewayInteropPlanServiceTests.java"));
         definitions.add(control("public_resource", "/api/v1/caches", "cache_list", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/publicapi/GatewayPublicResourceControllersTests.java"));
@@ -610,8 +552,6 @@ class EndpointConformanceMatrixTests {
         definitions.add(control("public_resource", "/api/v1/resources/{resourceType}/{resourceId}/lineage", "resource_lineage", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/publicapi/GatewayPublicResourceControllersTests.java"));
         definitions.add(control("public_resource", "/api/v1/operations", "operation_list", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/publicapi/GatewayPublicResourceControllersTests.java"));
         definitions.add(control("public_resource", "/api/v1/operations/{operationName}:cancel", "operation_cancel", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/publicapi/GatewayPublicResourceControllersTests.java"));
-        definitions.add(control("public_resource", "/api/v1/tunings", "tuning_create_list", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/publicapi/GatewayPublicResourceControllersTests.java"));
-        definitions.add(control("public_resource", "/api/v1/tunings/{tuningId}:import", "tuning_import", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/publicapi/GatewayPublicResourceControllersTests.java"));
         definitions.add(control("admin", "/admin/translation/explain", "translation_explain", "json", "src/test/java/com/prodigalgal/xaigateway/admin/application/TranslationExplainServiceTests.java"));
         definitions.add(control("admin", "/admin/resource/execute", "admin_resource_execute", "json", "src/test/java/com/prodigalgal/xaigateway/admin/application/AdminResourceExecutionServiceTests.java"));
         definitions.add(control("admin", "/admin/resource/templates", "admin_resource_templates", "json", "src/test/java/com/prodigalgal/xaigateway/admin/application/AdminResourceExecutionServiceTests.java"));
@@ -723,8 +663,6 @@ class EndpointConformanceMatrixTests {
             boolean snapshotModeration,
             boolean snapshotFiles,
             boolean snapshotUploads,
-            boolean snapshotBatches,
-            boolean snapshotTuning,
             boolean snapshotRealtime
     ) {
     }

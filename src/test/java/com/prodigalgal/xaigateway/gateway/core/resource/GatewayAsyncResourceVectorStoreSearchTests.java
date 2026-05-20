@@ -129,6 +129,42 @@ class GatewayAsyncResourceVectorStoreSearchTests {
     }
 
     @Test
+    void shouldSearchPersistedLocalIngestionChunksBeforeReadingRawFileContent() throws Exception {
+        GatewayAsyncResourceRepository repository = Mockito.mock(GatewayAsyncResourceRepository.class);
+        GatewayFileRepository fileRepository = Mockito.mock(GatewayFileRepository.class);
+        GatewayAsyncResourceService service = service(repository, fileRepository);
+        GatewayAsyncResourceEntity vectorStore = vectorStore("vs_1", 1);
+        GatewayAsyncResourceEntity ingested = vectorStoreFileWithIngestion(
+                "vsf_1",
+                "vs_1",
+                "file_ingested",
+                "docs",
+                9,
+                1,
+                "pricing policy and renewal refund matrix"
+        );
+        Mockito.when(repository.findByResourceKeyAndResourceTypeAndDeletedFalse(
+                "vs_1",
+                GatewayAsyncResourceType.VECTOR_STORE
+        )).thenReturn(Optional.of(vectorStore));
+        Mockito.when(repository.findAllByDistributedKeyIdAndUpstreamObjectIdAndDeletedFalse(1L, "vs_1"))
+                .thenReturn(List.of(ingested));
+
+        JsonNode page = service.searchVectorStore("vs_1", 1L, objectMapper.readTree("""
+                {"query":"renewal refund","filters":{"type":"eq","key":"category","value":"docs"}}
+                """));
+
+        assertEquals(1, page.path("data").size());
+        JsonNode result = page.path("data").path(0);
+        assertEquals("file_ingested", result.path("file_id").asText());
+        assertEquals("ingested.txt", result.path("filename").asText());
+        assertEquals("chunk_1", result.path("chunk_id").asText());
+        assertEquals(0, result.path("chunk_index").asInt());
+        assertTrue(result.path("content").path(0).path("text").asText().contains("renewal refund"));
+        Mockito.verify(fileRepository, Mockito.never()).findByFileKeyAndDeletedFalse(Mockito.anyString());
+    }
+
+    @Test
     void shouldRejectInvalidSearchRequest() throws Exception {
         GatewayAsyncResourceRepository repository = Mockito.mock(GatewayAsyncResourceRepository.class);
         GatewayAsyncResourceService service = service(repository, Mockito.mock(GatewayFileRepository.class));
@@ -234,6 +270,39 @@ class GatewayAsyncResourceVectorStoreSearchTests {
         entity.setRequestPayloadJson("{}");
         entity.setResponsePayloadJson(objectMapper.writeValueAsString(response));
         entity.setMetadataJson("{}");
+        return entity;
+    }
+
+    private GatewayAsyncResourceEntity vectorStoreFileWithIngestion(
+            String resourceKey,
+            String vectorStoreId,
+            String fileId,
+            String category,
+            int priority,
+            long sequence,
+            String chunkText) throws Exception {
+        GatewayAsyncResourceEntity entity = vectorStoreFile(resourceKey, vectorStoreId, fileId, category, priority, sequence);
+        ObjectNode metadata = objectMapper.createObjectNode();
+        ObjectNode ingestion = metadata.putObject("ingestion");
+        ingestion.put("object_mode", "gateway_vector_store_file_ingestion");
+        ingestion.put("status", "completed");
+        ingestion.put("index_version", "local-chunk-v1");
+        ingestion.put("file_id", fileId);
+        ingestion.put("filename", "ingested.txt");
+        ingestion.put("content_sha256", "a".repeat(64));
+        ingestion.put("bytes", chunkText.getBytes(StandardCharsets.UTF_8).length);
+        ingestion.put("estimated_tokens", 10);
+        ingestion.put("chunk_count", 1);
+        ingestion.put("chunk_size_tokens", 800);
+        ingestion.put("chunk_overlap_tokens", 120);
+        ingestion.putArray("chunks").addObject()
+                .put("chunk_id", "chunk_1")
+                .put("chunk_index", 0)
+                .put("text", chunkText)
+                .put("start_char", 0)
+                .put("end_char", chunkText.length())
+                .put("estimated_tokens", 10);
+        entity.setMetadataJson(objectMapper.writeValueAsString(metadata));
         return entity;
     }
 

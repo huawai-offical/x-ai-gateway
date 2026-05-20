@@ -58,7 +58,6 @@ import reactor.core.publisher.Flux;
         GeminiGenerateContentResourceEncoder.class,
         GeminiEmbeddingsEncoder.class,
         GeminiFilesEncoder.class,
-        GeminiBatchesEncoder.class,
         GoogleNativeNonChatCanonicalRenderer.class,
         NonChatCanonicalRenderService.class,
         GatewayClientFamilyResolver.class

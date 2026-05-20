@@ -120,8 +120,6 @@ public class ExecutionBackendPolicyService {
         }
         if (semantics.resourceType() == TranslationResourceType.FILE
                 || semantics.resourceType() == TranslationResourceType.UPLOAD
-                || semantics.resourceType() == TranslationResourceType.BATCH
-                || semantics.resourceType() == TranslationResourceType.TUNING
                 || semantics.resourceType() == TranslationResourceType.REALTIME
                 || semantics.resourceType() == TranslationResourceType.VIDEO
                 || semantics.resourceType() == TranslationResourceType.MUSIC
@@ -138,7 +136,7 @@ public class ExecutionBackendPolicyService {
         return switch (semantics.resourceType()) {
             case EMBEDDING -> List.of(ExecutionBackend.NATIVE);
             case AUDIO, IMAGE, MODERATION, RERANK, WEB_SEARCH -> List.of(ExecutionBackend.PASSTHROUGH);
-            case FILE, UPLOAD, BATCH, TUNING, REALTIME, VIDEO, MUSIC, TASK -> List.of(ExecutionBackend.ORCHESTRATION);
+            case FILE, UPLOAD, REALTIME, VIDEO, MUSIC, TASK -> List.of(ExecutionBackend.ORCHESTRATION);
             case CHAT, RESPONSE, UNKNOWN -> List.of();
         };
     }

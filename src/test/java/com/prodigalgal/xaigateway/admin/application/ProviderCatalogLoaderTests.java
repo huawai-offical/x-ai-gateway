@@ -11,6 +11,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -50,6 +51,14 @@ class ProviderCatalogLoaderTests {
                 .filter(item -> item.code().equals("vertex"))
                 .findFirst()
                 .orElseThrow();
+        ProviderPresetDefinition anthropic = snapshot.presets().stream()
+                .filter(item -> item.code().equals("anthropic"))
+                .findFirst()
+                .orElseThrow();
+        ProviderPresetDefinition gemini = snapshot.presets().stream()
+                .filter(item -> item.code().equals("gemini"))
+                .findFirst()
+                .orElseThrow();
 
         assertEquals(UpstreamSiteKind.OPENAI_DIRECT, openai.siteKind());
         assertEquals("openai-native", openai.compatibilitySurface());
@@ -61,18 +70,14 @@ class ProviderCatalogLoaderTests {
         assertTrue(openai.conformanceChecks().contains("openai.conversations-local-lifecycle"));
         assertTrue(openai.conformanceChecks().contains("openai.vector-stores-local-lifecycle"));
         assertTrue(openai.conformanceChecks().contains("openai.vector-store-files-local-attachment"));
+        assertTrue(openai.conformanceChecks().contains("openai.vector-store-files-local-ingestion-artifact"));
         assertTrue(openai.conformanceChecks().contains("openai.vector-store-file-content-local-read"));
         assertTrue(openai.conformanceChecks().contains("openai.vector-store-search-local-text"));
         assertTrue(openai.conformanceChecks().contains("openai.responses-file-search-local-vector-store-binding"));
         assertTrue(openai.conformanceChecks().contains("openai.vector-store-file-batches-local-lifecycle"));
         assertTrue(openai.conformanceChecks().contains("openai.webhooks-ingress-event-persistence"));
-        assertTrue(openai.conformanceChecks().contains("openai.batches-list-local-catalog"));
-        assertTrue(openai.conformanceChecks().contains("openai.models-delete-local-registry"));
-        assertTrue(openai.conformanceChecks().contains("openai.fine-tuning-events-checkpoints-local-lineage"));
-        assertTrue(openai.capabilityTags().contains("fine_tuning"));
-        assertTrue(openai.unsupportedFeatures().stream().anyMatch(item -> item.contains("administration_api")));
-        assertTrue(openai.unsupportedFeatures().stream().anyMatch(item -> item.contains("fine_tuning_pause_resume_permissions")));
-        assertTrue(openai.unsupportedFeatures().stream().anyMatch(item -> item.contains("models_delete_upstream_owner_passthrough")));
+        assertFalse(openai.conformanceChecks().contains("openai.models-delete-local-registry"));
+        assertTrue(openai.unsupportedFeatures().stream().anyMatch(item -> item.contains("non_core_official_apis_out_of_scope")));
         assertTrue(openai.unsupportedFeatures().stream().anyMatch(item -> item.contains("responses_non_function_tools")));
         assertTrue(openai.unsupportedFeatures().stream().anyMatch(item -> item.contains("vector_stores_child_resources")));
         assertTrue(openai.unsupportedFeatures().stream().anyMatch(item -> item.contains("realtime_full_calls_webrtc_sip")));
@@ -111,6 +116,16 @@ class ProviderCatalogLoaderTests {
         assertEquals("google-native", vertex.compatibilitySurface());
         assertEquals("vertex-google-native", vertex.supportStrategy());
         assertTrue(vertex.capabilityTags().contains("project_location"));
+        assertTrue(vertex.description().contains("OpenAI 标准功能区"));
+        assertTrue(vertex.unsupportedFeatures().stream().anyMatch(item -> item.contains("non_core_provider_apis_out_of_scope")));
+
+        assertEquals(UpstreamSiteKind.ANTHROPIC_DIRECT, anthropic.siteKind());
+        assertTrue(anthropic.description().contains("OpenAI 标准功能区"));
+        assertTrue(anthropic.unsupportedFeatures().stream().anyMatch(item -> item.contains("non_core_provider_apis_out_of_scope")));
+
+        assertEquals(UpstreamSiteKind.GEMINI_DIRECT, gemini.siteKind());
+        assertTrue(gemini.description().contains("OpenAI 标准功能区"));
+        assertTrue(gemini.unsupportedFeatures().stream().anyMatch(item -> item.contains("non_core_provider_apis_out_of_scope")));
     }
 
     @Test

@@ -34,3 +34,26 @@
 Advanced JavaScript 示例额外展示 `response_format`、`tools/tool_choice`、`store/metadata`、`parallel_tool_calls`、`service_tier`、`stream_options`，并通过 `X_AI_GATEWAY_CHAT_WEB_SEARCH=1` 与 `X_AI_GATEWAY_CHAT_AUDIO=1` 显式启用 `web_search_options` 和 `modalities/audio`。
 
 没有真实 provider key 时，示例用于展示接入形态和 SDK 代码，不承诺上游真实调用成功。
+
+## Codex CLI 接入配置 (~/.codex/config.toml)
+
+当您使用本地的 Codex CLI 工具通过网关代理进行访问时，可以通过配置 `~/.codex/config.toml` 将通信协议配置为 `"responses"` 模式，以在网关的标准 Responses 边界内建立安全的运行状态。
+
+配置实例如下：
+
+```toml
+# ~/.codex/config.toml
+
+[gateway]
+# 配置网关 Base URL 路径，指向网关 v1 服务端点
+base_url = "https://gateway.example.com/v1"
+
+# 配置为 responses 协议，以便无缝对接网关 Responses 专有接口
+wire_api = "responses"
+
+[auth]
+# 您的 Distributed Key
+api_key = "dk-xxxxxx"
+```
+
+通过这一配置，Codex CLI 将把请求安全路由到 `/backend-api/codex/responses` 私有端点，并支持会话亲和性与基于会话的上下文链追溯。

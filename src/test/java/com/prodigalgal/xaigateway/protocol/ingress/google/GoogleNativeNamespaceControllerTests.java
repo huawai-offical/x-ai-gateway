@@ -27,9 +27,6 @@ class GoogleNativeNamespaceControllerTests {
     private GeminiEmbeddingsController embeddingsController;
 
     @MockitoBean
-    private GeminiBatchesController batchesController;
-
-    @MockitoBean
     private GeminiFilesController filesController;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -89,4 +86,5 @@ class GoogleNativeNamespaceControllerTests {
                 .expectBody()
                 .jsonPath("$.error").isEqualTo("NATIVE_PATH_UNSUPPORTED");
     }
+
 }

@@ -28,7 +28,6 @@ import tools.jackson.databind.node.ObjectNode;
         GeminiEmbeddingsEncoder.class,
         GeminiGenerateContentResourceEncoder.class,
         GeminiFilesEncoder.class,
-        GeminiBatchesEncoder.class,
         GoogleNativeNonChatCanonicalRenderer.class,
         NonChatCanonicalRenderService.class
 })

@@ -47,11 +47,9 @@ class PublicOpenApiSnapshotTests {
         assertTrue(root.path("paths").has("/v1/vector_stores/{vectorStoreId}/file_batches/{batchId}/cancel"));
         assertTrue(root.path("paths").has("/v1/vector_stores/{vectorStoreId}/file_batches/{batchId}/files"));
         assertTrue(root.path("paths").has("/v1/webhooks/openai"));
-        assertTrue(root.path("paths").has("/v1/batches"));
         assertTrue(root.path("paths").has("/v1/models"));
         assertTrue(root.path("paths").has("/v1/models/{model}"));
-        assertTrue(root.path("paths").has("/v1/fine_tuning/jobs/{jobId}/events"));
-        assertTrue(root.path("paths").has("/v1/fine_tuning/jobs/{jobId}/checkpoints"));
+        assertFalse(root.path("paths").path("/v1/models/{model}").has("delete"));
         JsonNode chatProperties = root.path("paths")
                 .path("/v1/chat/completions")
                 .path("post")
@@ -208,16 +206,7 @@ class PublicOpenApiSnapshotTests {
                 .path("schema")
                 .path("properties")
                 .has("type"));
-        assertTrue(hasParameter(root.path("paths").path("/v1/batches").path("get"), "after"));
-        assertTrue(hasParameter(root.path("paths").path("/v1/batches").path("get"), "limit"));
         assertTrue(hasParameter(root.path("paths").path("/v1/models/{model}").path("get"), "model"));
-        assertTrue(hasParameter(root.path("paths").path("/v1/models/{model}").path("delete"), "model"));
-        assertTrue(hasParameter(root.path("paths").path("/v1/fine_tuning/jobs/{jobId}/events").path("get"), "jobId"));
-        assertTrue(hasParameter(root.path("paths").path("/v1/fine_tuning/jobs/{jobId}/events").path("get"), "after"));
-        assertTrue(hasParameter(root.path("paths").path("/v1/fine_tuning/jobs/{jobId}/events").path("get"), "limit"));
-        assertTrue(hasParameter(root.path("paths").path("/v1/fine_tuning/jobs/{jobId}/checkpoints").path("get"), "jobId"));
-        assertTrue(hasParameter(root.path("paths").path("/v1/fine_tuning/jobs/{jobId}/checkpoints").path("get"), "after"));
-        assertTrue(hasParameter(root.path("paths").path("/v1/fine_tuning/jobs/{jobId}/checkpoints").path("get"), "limit"));
         assertTrue(root.path("components").path("securitySchemes").has("bearerAuth"));
     }
 
@@ -249,5 +238,12 @@ class PublicOpenApiSnapshotTests {
             }
         }
         return false;
+    }
+
+    @Test
+    void writeLatestOpenApiSnapshot() throws IOException {
+        JsonNode latest = new com.prodigalgal.xaigateway.protocol.ingress.publicapi.PublicDocsBundleService().openApi();
+        String json = OBJECT_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(latest);
+        Files.writeString(Path.of("docs/openapi/public-openapi.json"), json);
     }
 }

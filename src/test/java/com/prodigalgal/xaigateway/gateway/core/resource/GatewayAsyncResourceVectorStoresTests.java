@@ -5,12 +5,16 @@ import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyQueryService;
 import com.prodigalgal.xaigateway.gateway.core.interop.SiteCapabilityTruthService;
 import com.prodigalgal.xaigateway.gateway.core.site.UpstreamSitePolicyService;
 import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayAsyncResourceEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayFileEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayAsyncResourceRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayFileBindingRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayFileRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.SiteCapabilitySnapshotRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamSiteProfileRepository;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -39,8 +43,11 @@ class GatewayAsyncResourceVectorStoresTests {
     @Test
     void shouldCreateVectorStoreWithOpenAiShapeAndLocalLineage() throws Exception {
         GatewayAsyncResourceRepository repository = Mockito.mock(GatewayAsyncResourceRepository.class);
+        GatewayFileRepository fileRepository = Mockito.mock(GatewayFileRepository.class);
         Mockito.when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        GatewayAsyncResourceService service = service(repository);
+        GatewayAsyncResourceService service = service(repository, fileRepository);
+        stubGatewayFile(fileRepository, "file_1", "first.txt", "first vector store file");
+        stubGatewayFile(fileRepository, "file_2", "second.txt", "second vector store file");
 
         JsonNode created = service.createVectorStore(1L, objectMapper.readTree("""
                 {
@@ -75,6 +82,7 @@ class GatewayAsyncResourceVectorStoresTests {
         assertEquals(GatewayAsyncResourceType.VECTOR_STORE_FILE, savedEntities.get(1).getResourceType());
         assertEquals(created.path("id").asText(), savedEntities.get(1).getUpstreamObjectId());
         assertTrue(savedEntities.get(1).getResponsePayloadJson().contains("\"id\":\"file_1\""));
+        assertTrue(savedEntities.get(1).getMetadataJson().contains("gateway_vector_store_file_ingestion"));
         assertTrue(savedEntities.get(2).getResponsePayloadJson().contains("\"id\":\"file_2\""));
     }
 
@@ -184,6 +192,12 @@ class GatewayAsyncResourceVectorStoresTests {
     }
 
     private GatewayAsyncResourceService service(GatewayAsyncResourceRepository repository) {
+        return service(repository, Mockito.mock(GatewayFileRepository.class));
+    }
+
+    private GatewayAsyncResourceService service(
+            GatewayAsyncResourceRepository repository,
+            GatewayFileRepository fileRepository) {
         SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
         return new GatewayAsyncResourceService(
                 repository,
@@ -191,7 +205,7 @@ class GatewayAsyncResourceVectorStoresTests {
                 Mockito.mock(UpstreamCredentialRepository.class),
                 Mockito.mock(UpstreamSiteProfileRepository.class),
                 snapshotRepository,
-                Mockito.mock(GatewayFileRepository.class),
+                fileRepository,
                 Mockito.mock(GatewayFileBindingRepository.class),
                 Mockito.mock(CredentialCryptoService.class),
                 new SiteCapabilityTruthService(new UpstreamSitePolicyService(), snapshotRepository),
@@ -199,6 +213,37 @@ class GatewayAsyncResourceVectorStoresTests {
                 Clock.fixed(Instant.parse("2026-05-15T00:00:00Z"), ZoneOffset.UTC),
                 WebClient.builder()
         );
+    }
+
+    private void stubGatewayFile(
+            GatewayFileRepository fileRepository,
+            String fileKey,
+            String filename,
+            String content) throws Exception {
+        Path contentPath = Files.createTempFile("vector-store-create-", ".txt");
+        Files.writeString(contentPath, content, StandardCharsets.UTF_8);
+        Mockito.when(fileRepository.findByFileKeyAndDeletedFalse(fileKey))
+                .thenReturn(Optional.of(gatewayFile(fileKey, 1L, filename, contentPath)));
+    }
+
+    private GatewayFileEntity gatewayFile(
+            String fileKey,
+            Long distributedKeyId,
+            String filename,
+            Path storagePath) throws Exception {
+        GatewayFileEntity entity = new GatewayFileEntity();
+        ReflectionTestUtils.setField(entity, "id", 200L);
+        ReflectionTestUtils.setField(entity, "createdAt", Instant.parse("2026-05-15T00:00:00Z"));
+        entity.setFileKey(fileKey);
+        entity.setDistributedKeyId(distributedKeyId);
+        entity.setFilename(filename);
+        entity.setMimeType("text/plain");
+        entity.setPurpose("assistants");
+        entity.setSizeBytes(Files.size(storagePath));
+        entity.setSha256("0".repeat(64));
+        entity.setStoragePath(storagePath.toString());
+        entity.setStatus("processed");
+        return entity;
     }
 
     private GatewayAsyncResourceEntity vectorStore(String id, long sequence) throws Exception {

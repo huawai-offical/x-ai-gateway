@@ -25,7 +25,6 @@ import tools.jackson.databind.node.ObjectNode;
         GatewayCachesController.class,
         GatewayResourceLineageController.class,
         GatewayOperationsController.class,
-        GatewayTuningsController.class,
         GatewayMediaTasksController.class
 })
 @Import(PermitAllSecurityTestConfig.class)
@@ -126,21 +125,21 @@ class GatewayPublicResourceControllersTests {
     void shouldReturnResourceLineage() {
         ObjectNode response = objectMapper.createObjectNode();
         response.put("object", "resource.lineage");
-        response.put("root", "gateway:ftjob_1");
-        response.putArray("nodes").addObject().put("id", "gateway:ftjob_1");
+        response.put("root", "gateway:resp_1");
+        response.putArray("nodes").addObject().put("id", "gateway:resp_1");
         response.putArray("edges");
 
-        Mockito.when(gatewayPublicResourceService.lineage(1L, "tunings", "ftjob_1"))
+        Mockito.when(gatewayPublicResourceService.lineage(1L, "responses", "resp_1"))
                 .thenReturn(response);
 
         webTestClient.get()
-                .uri("/api/v1/resources/tunings/ftjob_1/lineage")
+                .uri("/api/v1/resources/responses/resp_1/lineage")
                 .header(HttpHeaders.AUTHORIZATION, AUTHORIZATION)
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.object").isEqualTo("resource.lineage")
-                .jsonPath("$.root").isEqualTo("gateway:ftjob_1");
+                .jsonPath("$.root").isEqualTo("gateway:resp_1");
     }
 
     @Test
@@ -148,33 +147,33 @@ class GatewayPublicResourceControllersTests {
         ObjectNode response = objectMapper.createObjectNode();
         response.put("object", "list");
         response.putArray("data").addObject()
-                .put("name", "operations/ftjob_1")
+                .put("name", "operations/resp_1")
                 .put("done", false);
 
-        Mockito.when(gatewayPublicResourceService.listOperations(1L, "tunings", "running"))
+        Mockito.when(gatewayPublicResourceService.listOperations(1L, "responses", "running"))
                 .thenReturn(response);
 
         webTestClient.get()
-                .uri("/api/v1/operations?resourceType=tunings&status=running")
+                .uri("/api/v1/operations?resourceType=responses&status=running")
                 .header(HttpHeaders.AUTHORIZATION, AUTHORIZATION)
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
-                .jsonPath("$.data[0].name").isEqualTo("operations/ftjob_1");
+                .jsonPath("$.data[0].name").isEqualTo("operations/resp_1");
     }
 
     @Test
     void shouldCancelOperation() {
         ObjectNode response = objectMapper.createObjectNode();
         response.put("object", "operation");
-        response.put("name", "operations/ftjob_1");
+        response.put("name", "operations/video_1");
         response.put("done", true);
 
-        Mockito.when(gatewayPublicResourceService.cancelOperation(1L, "ftjob_1"))
+        Mockito.when(gatewayPublicResourceService.cancelOperation(1L, "video_1"))
                 .thenReturn(response);
 
         webTestClient.post()
-                .uri("/api/v1/operations/ftjob_1:cancel")
+                .uri("/api/v1/operations/video_1:cancel")
                 .header(HttpHeaders.AUTHORIZATION, AUTHORIZATION)
                 .exchange()
                 .expectStatus().isOk()
@@ -186,14 +185,14 @@ class GatewayPublicResourceControllersTests {
     void shouldWaitOperation() {
         ObjectNode response = objectMapper.createObjectNode();
         response.put("object", "operation");
-        response.put("name", "operations/ftjob_1");
+        response.put("name", "operations/video_1");
         response.put("waited", true);
 
-        Mockito.when(gatewayPublicResourceService.waitOperation(Mockito.eq(1L), Mockito.eq("ftjob_1"), Mockito.any(JsonNode.class)))
+        Mockito.when(gatewayPublicResourceService.waitOperation(Mockito.eq(1L), Mockito.eq("video_1"), Mockito.any(JsonNode.class)))
                 .thenReturn(response);
 
         webTestClient.post()
-                .uri("/api/v1/operations/ftjob_1:wait")
+                .uri("/api/v1/operations/video_1:wait")
                 .header(HttpHeaders.AUTHORIZATION, AUTHORIZATION)
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("{}")
@@ -318,55 +317,6 @@ class GatewayPublicResourceControllersTests {
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.active").isEqualTo(true);
-    }
-
-    @Test
-    void shouldCreateTuning() {
-        ObjectNode response = objectMapper.createObjectNode();
-        response.put("id", "ftjob_1");
-        response.put("object", "fine_tuning.job");
-        response.put("status", "queued");
-
-        Mockito.when(gatewayPublicResourceService.createTuning(Mockito.eq(1L), Mockito.any(JsonNode.class)))
-                .thenReturn(response);
-
-        webTestClient.post()
-                .uri("/api/v1/tunings")
-                .header(HttpHeaders.AUTHORIZATION, AUTHORIZATION)
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue("""
-                        {
-                          "model": "gemini-2.5-pro",
-                          "training_file": "file_train_1"
-                        }
-                        """)
-                .exchange()
-                .expectStatus().isOk()
-                .expectBody()
-                .jsonPath("$.id").isEqualTo("ftjob_1")
-                .jsonPath("$.status").isEqualTo("queued");
-    }
-
-    @Test
-    void shouldImportTuningModel() {
-        ObjectNode response = objectMapper.createObjectNode();
-        response.put("object", "tuning.import_result");
-        response.put("fine_tuned_model", "tunedModels/demo");
-        response.putArray("aliases").add("demo");
-
-        Mockito.when(gatewayPublicResourceService.importTuning(Mockito.eq(1L), Mockito.eq("ftjob_1"), Mockito.any(JsonNode.class)))
-                .thenReturn(response);
-
-        webTestClient.post()
-                .uri("/api/v1/tunings/ftjob_1:import")
-                .header(HttpHeaders.AUTHORIZATION, AUTHORIZATION)
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue("{\"alias\":\"demo\"}")
-                .exchange()
-                .expectStatus().isOk()
-                .expectBody()
-                .jsonPath("$.object").isEqualTo("tuning.import_result")
-                .jsonPath("$.aliases[0]").isEqualTo("demo");
     }
 
     private ObjectNode cacheNode(String id) {
