@@ -4,6 +4,11 @@
 
 x-ai-gateway 不以 OpenAI、Anthropic、Gemini、Vertex、Codex 等官方 API 全量覆盖为目标；项目主线是对话、streaming、tools/function calling、多模态输入输出，以及直接支撑这些能力的认证、模型发现、RAG/file_search、限流、审计、usage 和真实 smoke。范围决策以 [ADR-0010](decisions/ADR-0010-functional-service-api-scope.md) 为准。
 
+## 当前口径提示
+
+- 2026-05-21 起，控制台已收紧并下线 `官方账号运行态`、`能力矩阵`、`Native 命名空间兼容`、`Provider 参考差距`、`站点档案`、`成本路由策略中心`、`向量检索排障沙盒` 等前端入口；相关 Markdown 若仍保留，多用于历史实现记录、后端保留接口说明或公开 API 兼容事实源。
+- `/admin/accounts*`、`/admin/provider-sites*`、`/admin/vector-stores*` 以及公开 `/v1/vector_stores*`、Responses `file_search` 本地绑定当前暂不删除；阅读相关文档时，应按“控制台已下线、后端/API 暂保留”的状态理解。
+
 ## 需求
 
 - [REQ-20260501-001 本地化协作流程迁移](requirements/REQ-20260501-001-local-workflow-migration.md)
@@ -74,6 +79,9 @@ x-ai-gateway 不以 OpenAI、Anthropic、Gemini、Vertex、Codex 等官方 API �
 - [REQ-20260518-006 非核心 API 兼容代码彻底清理](requirements/REQ-20260518-006-non-core-api-code-eradication.md)
 - [REQ-20260519-001 Gemini 与 MiMo 功能性服务 API 真实 Smoke](requirements/REQ-20260519-001-functional-real-smoke-gemini-mimo.md)
 - [REQ-20260519-002 Codex 功能性服务 API 最高优先推进](requirements/REQ-20260519-002-codex-priority-functional-service-api.md)
+- [REQ-20260521-003 Liquibase 新 Baseline 重建](requirements/REQ-20260521-003-liquibase-baseline-rebuild.md)
+- [REQ-20260521-004 上游凭证入口统一与官方账号概念澄清](requirements/REQ-20260521-004-upstream-credential-entry-and-official-account-clarity.md)
+- [REQ-20260521-005 控制台重复功能下线与向量能力范围收窄](requirements/REQ-20260521-005-console-feature-retirement-and-vector-scope-prune.md)
 
 ## 决策
 
@@ -107,6 +115,8 @@ x-ai-gateway 不以 OpenAI、Anthropic、Gemini、Vertex、Codex 等官方 API �
 - [REP-20260514 OpenAI API 全量覆盖任务拆解](reports/REP-20260514-openai-full-api-coverage-task-breakdown.md)
 - [REP-20260518 对话与 Tools 功能性 API Backlog 重规划](reports/REP-20260518-functional-service-api-backlog-replan.md)
 - [REP-20260519 Codex 最高优先级重排](reports/REP-20260519-codex-priority-replan.md)
+- [REP-20260521 项目进度复核与 Codex/UI/UX 优先级重排](reports/REP-20260521-project-progress-codex-uiux-reprioritization.md)
+- [REP-20260521 功能性服务 API Backlog 收口审计](reports/REP-20260521-functional-scope-backlog-closeout.md)
 
 ## 迁移记录
 
@@ -119,6 +129,7 @@ x-ai-gateway 不以 OpenAI、Anthropic、Gemini、Vertex、Codex 等官方 API �
 - [client-onboarding-pack](client-onboarding-pack.md)
 - [codex-functional-service-api-facts](codex-functional-service-api-facts.md)
 - [functional-service-api-coverage-matrix](functional-service-api-coverage-matrix.md)
+- [files-uploads-models-functional-support](files-uploads-models-functional-support.md)
 - [client-instance-plugin-deeplink](client-instance-plugin-deeplink.md)
 - [cloud-cli-request-filter](cloud-cli-request-filter.md)
 - [operations-drill-evidence](operations-drill-evidence.md)
@@ -126,6 +137,7 @@ x-ai-gateway 不以 OpenAI、Anthropic、Gemini、Vertex、Codex 等官方 API �
 - [ollama-document-file-support](ollama-document-file-support.md)
 - [official-account-quota-refresh](official-account-quota-refresh.md)
 - [media-provider-executors](media-provider-executors.md)
+- [multimodal-supporting-parameters](multimodal-supporting-parameters.md)
 - [openai-conversations-local-lifecycle](openai-conversations-local-lifecycle.md)
 - [openai-webhooks-ingress-event-persistence](openai-webhooks-ingress-event-persistence.md)
 - [linux-systemd-data-migration](linux-systemd-data-migration.md)

@@ -3,6 +3,8 @@
 关联需求：[REQ-20260506-003 第九批任务闭环设计](requirements/REQ-20260506-003-ninth-priority-task-closure-design.md)  
 关联任务：[TASK-20260501-006 编程类账号身份治理](../tasks/done/TASK-20260501-006-programming-account-identity.md)
 
+> 当前状态：控制台中的 `官方账号运行态` 入口已下线。本文描述的是 `GET /admin/accounts/{id}/programming-identity` 等后端治理事实，不再表示账号身份治理仍以独立控制台能力对外暴露。
+
 ## 实现范围
 
 - 扩展 `UpstreamAccountProviderType`：

@@ -1,12 +1,14 @@
-# AI IDE/CLI 官方账号导入与配额刷新
+# AI IDE/CLI 官方账号导入与配额刷新（后端保留说明）
 
 日期：2026-05-06  
 关联需求：[REQ-20260506-017 AI IDE/CLI 官方账号导入与配额刷新](requirements/REQ-20260506-017-official-account-import-quota-refresh.md)  
 关联任务：[TASK-20260506-021 AI IDE/CLI 官方账号导入与配额刷新](../tasks/done/TASK-20260506-021-ai-ide-account-import-quota-refresh.md)
 
+> 当前状态：控制台中的 `官方账号运行态` 入口已下线；本文仅保留 `POST /admin/accounts/official/import`、`POST /admin/accounts/{id}/official/quota-refresh`、`GET /admin/accounts/{id}/official/quota` 等后端/Admin 事实说明，不再表示这是当前产品主入口。
+
 ## 背景
 
-Codex、GitHub Copilot、Gemini CLI 这类 AI IDE/CLI 官方账号需要云端统一导入、加密保存和配额运营面。系统已有 `UpstreamAccountEntity` 的 token 密文字段、quota 字段和 refresh 状态字段，本轮在这些事实源上补齐官方账号专用 API。
+Codex、GitHub Copilot、Gemini CLI 这类 AI IDE/CLI 官方账号仍有后端导入、加密保存和配额运维需求。系统已有 `UpstreamAccountEntity` 的 token 密文字段、quota 字段和 refresh 状态字段，本文记录当前暂保留的官方账号专用 Admin API。
 
 ## 支持账号类型
 

@@ -1,5 +1,7 @@
 # 公开文档、兼容性样例与 i18n 基础
 
+> 当前状态：控制台中的 `能力矩阵`、`Native 命名空间兼容`、`站点档案`、`向量检索排障沙盒` 等入口已下线。本文保留公开协议、兼容性边界和 API 事实源；凡提到 Vector Stores、Responses `file_search`、Codex smoke 或 provider catalog，均应理解为“后端/API 暂保留”，不是当前控制台主入口。
+
 ## 文档接口
 
 ```text
@@ -140,6 +142,8 @@ Conversations 采用 gateway local lineage，面向 OpenAI-compatible 客户端�
 本地 item 作为独立 `gateway_async_resource` 保存，`upstreamObjectId` 记录 parent conversation id。删除 conversation 不级联删除 item lineage；但公开 item endpoint 仍要求 conversation id 可定位。本轮不声明 OpenAI Direct Conversations 上游 passthrough，`include` 作为 no-op 兼容参数被接受。
 
 ## OpenAI Vector Stores 本地 Lifecycle
+
+控制台中的向量页面和排障沙盒已下线；以下内容仅描述仍暂时保留的公开 `/v1/vector_stores*` 与 Responses `file_search` 本地绑定事实。
 
 Vector Stores 先建立 gateway local lifecycle 基线，面向 OpenAI-compatible 客户端提供本地对象生命周期：
 

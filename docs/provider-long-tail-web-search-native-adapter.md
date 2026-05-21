@@ -20,6 +20,8 @@
 
 ## Gap Matrix 收敛
 
+这里的 `Gap Matrix` 与 `Native Adapter` 仅指内部服务事实源和协议适配边界；控制台中的 `Provider 参考差距`、`Native 命名空间兼容` 页面已下线，不再作为当前产品入口。
+
 - `ProviderReferenceGapService.providerRows` 中 xAI、Perplexity、Vertex 已从 `MISSING` 收敛为 `SUPPORTED`。
 - `mediaRows.web_search` 从 `PLANNED` 收敛为 `PROVIDER_ADAPTER`，provider presets 包含 `openai` 与 `perplexity`。
 - `pricingRows` 增加 xAI、Perplexity、Vertex 的公开价格源跟踪占位，真正的版本化同步继续归属 `TASK-20260514-005`。

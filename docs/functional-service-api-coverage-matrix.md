@@ -1,8 +1,8 @@
 # 功能性服务 API Coverage Matrix
 
-状态：Draft
-日期：2026-05-19
-关联任务：[TASK-20260514-029-01](../tasks/done/TASK-20260514-029-01-functional-service-api-coverage-matrix-source.md)
+状态：Derived Complete (tests deferred)
+日期：2026-05-21
+关联任务：[TASK-20260514-029-01](../tasks/done/TASK-20260514-029-01-functional-service-api-coverage-matrix-source.md)、[TASK-20260514-029-04](../tasks/done/TASK-20260514-029-04-openapi-coverage-sdk-finalization.md)
 
 ## 事实源
 
@@ -13,6 +13,8 @@ src/main/resources/functional-service-api-coverage-matrix.json
 ```
 
 该矩阵只描述 x-ai-gateway 当前产品范围：对话、streaming、tools/function calling、多模态输入输出，以及直接支撑这些能力的模型发现、RAG/file_search、认证、限流、审计、usage 和 smoke。它不是 OpenAI、Anthropic、Gemini、Vertex 或 Codex 官方 API 全量覆盖清单。
+
+当前控制台中的 `能力矩阵` 页面已下线；这里保留的是 docs 内的事实源矩阵，用于约束公开 API、catalog 和测试口径，不表示仍存在对应前端主入口。
 
 ## 当前分类
 
@@ -34,13 +36,15 @@ src/main/resources/functional-service-api-coverage-matrix.json
 
 ## 后续派生
 
-后续切片应优先让以下文件从该矩阵收敛：
+该矩阵已开始向以下文件收敛：
 
-- `docs/openapi/public-openapi.json`
-- `src/main/resources/provider-catalog.json`
-- `docs/public-api-compatibility.md`
-- `docs/public-sdk-examples.md`
-- `src/test/resources/conformance/endpoint-conformance-matrix.json`
-- `src/test/resources/conformance/accepted-exceptions.json`
+| 派生目标 | 状态 | 说明 |
+| --- | --- | --- |
+| `docs/openapi/public-openapi.json` | Done | `TASK-20260514-029-04` 已补全 core/supporting/governance 已实现路径，不声明 out_of_scope API。 |
+| `src/main/resources/provider-catalog.json` | Done | 已按功能性服务 API 范围收紧 unsupportedFeatures 与 provider 边界。 |
+| `docs/public-api-compatibility.md` | Done | 已明确 OpenAI Direct、OpenAI-compatible Generic、Anthropic/Gemini/Vertex/Codex native 边界。 |
+| `docs/public-sdk-examples.md` | Done | `TASK-20260514-029-04` 已补充 OpenAI Direct native、OpenAI-compatible Generic、自定义 provider adapter 三模式示例。 |
+| `src/test/resources/conformance/endpoint-conformance-matrix.json` | Done | 已按功能性服务 API 范围承接 endpoint conformance，并移除 Audio translations、Images edits/variations 等非支撑端点。 |
+| `src/test/resources/conformance/accepted-exceptions.json` | Done | 已将非核心 API 纳入 accepted exceptions 或 out-of-scope 决策。 |
 
-当前切片先建立 source 与文档，不执行自动生成和测试。恢复测试后应补 coverage matrix consistency tests，至少校验 out-of-scope 不再被 public docs 或 catalog 宣称为 supported。
+当前用户要求先不执行测试。本轮只做文档/快照派生、JSON 解析和强类型编译；恢复测试后应补 coverage matrix consistency tests，至少校验 out-of-scope 不再被 public docs 或 catalog 宣称为 supported。

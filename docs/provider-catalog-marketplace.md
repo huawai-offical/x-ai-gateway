@@ -1,4 +1,6 @@
-# Provider Catalog Marketplace 与签名更新
+# Provider Catalog Marketplace 与签名更新（后端保留说明）
+
+> 当前状态：控制台中的 `站点档案`、`Provider 参考差距` 与相关治理入口已下线。本文保留的是 `/admin/provider-sites/*` 背后的 catalog marketplace 后端说明，不再表示这些能力仍以控制台页面形式对外提供。
 
 ## 管理端入口
 
