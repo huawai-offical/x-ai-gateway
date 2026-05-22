@@ -81,7 +81,31 @@ type CreateKeyResponse = {
 type StepId = 'basic' | 'scope' | 'limits' | 'client' | 'review'
 const STEPS: StepId[] = ['basic', 'scope', 'limits', 'client', 'review']
 
-const PROTOCOL_OPTIONS = ['openai', 'responses', 'anthropic', 'gemini'] as const
+const PROTOCOL_SUITE_OPTIONS = [
+  'openai.native',
+  'openai_compatible.generic',
+  'azure_openai.openai_compatible',
+  'deepseek.openai_compatible',
+  'xiaomi_mimo.openai_compatible',
+  'qwen.openai_compatible',
+  'moonshot.openai_compatible',
+  'siliconflow.openai_compatible',
+  'volcengine.openai_compatible',
+  'minimax.openai_compatible',
+  'dify.openai_compatible',
+  'grok.openai_compatible',
+  'mistral.openai_compatible',
+  'cohere.openai_compatible',
+  'jina.openai_compatible',
+  'together.openai_compatible',
+  'fireworks.openai_compatible',
+  'openrouter.openai_compatible',
+  'perplexity.openai_compatible',
+  'anthropic.native',
+  'gemini.native',
+  'vertex_ai.gemini_native',
+  'ollama.native',
+] as const
 const PROVIDER_OPTIONS = ['OPENAI_DIRECT', 'OPENAI_COMPATIBLE', 'ANTHROPIC_DIRECT', 'GEMINI_DIRECT', 'OLLAMA_DIRECT'] as const
 const CLIENT_FAMILY_OPTIONS = ['GENERIC_OPENAI', 'CODEX', 'GEMINI_CLI', 'CLAUDE_CODE'] as const
 
@@ -106,7 +130,7 @@ const KEY_TEMPLATES = [
     label: '平衡默认',
     hint: '适合大多数团队环境，兼顾安全与吞吐。',
     patch: {
-      allowedProtocolSuites: ['openai', 'responses'],
+      allowedProtocolSuites: ['openai.native'],
       allowedProviderTypes: ['OPENAI_DIRECT'],
       allowedModels: ['gpt-4o-mini'],
       allowedClientFamilies: ['GENERIC_OPENAI'],
@@ -125,7 +149,7 @@ const KEY_TEMPLATES = [
     label: '高吞吐',
     hint: '适合批处理场景，放宽并发与 TPS。',
     patch: {
-      allowedProtocolSuites: ['openai', 'responses'],
+      allowedProtocolSuites: ['openai.native', 'openai_compatible.generic', 'deepseek.openai_compatible', 'xiaomi_mimo.openai_compatible'],
       allowedProviderTypes: ['OPENAI_DIRECT', 'OPENAI_COMPATIBLE'],
       allowedModels: ['gpt-4o-mini', 'deepseek-chat'],
       allowedClientFamilies: ['GENERIC_OPENAI', 'CODEX'],
@@ -144,7 +168,7 @@ const KEY_TEMPLATES = [
     label: '安全收敛',
     hint: '严格限制调用面，适合生产高风险场景。',
     patch: {
-      allowedProtocolSuites: ['openai'],
+      allowedProtocolSuites: ['openai.native'],
       allowedProviderTypes: ['OPENAI_DIRECT'],
       allowedModels: ['gpt-4.1'],
       allowedClientFamilies: ['GENERIC_OPENAI'],
@@ -342,7 +366,7 @@ export function KeysPage() {
                   <div className="text-sm text-muted-foreground">{item.keyPrefix}</div>
                   <div className="flex flex-wrap gap-2">
                     <StatusBadge tone={item.active ? 'success' : 'warning'}>{item.active ? '启用' : '停用'}</StatusBadge>
-                    <StatusBadge>{item.allowedProtocolSuites.length ? item.allowedProtocolSuites.join(', ') : '全部协议'}</StatusBadge>
+                    <StatusBadge>{item.allowedProtocolSuites.length ? item.allowedProtocolSuites.join(', ') : '全部协议簇'}</StatusBadge>
                   </div>
                   <div className="text-sm text-muted-foreground">允许提供方：{item.allowedProviderTypes.length ? item.allowedProviderTypes.join(', ') : '全部'}</div>
                   <div className="text-sm text-muted-foreground">最近更新：{formatInstant(item.updatedAt)}</div>
@@ -465,8 +489,8 @@ export function KeysPage() {
               <TabsContent value="scope" className="pt-3">
                 <div className="flex flex-col gap-4">
                   <OptionToggleGroup
-                    title="允许协议"
-                    options={PROTOCOL_OPTIONS}
+                    title="允许厂商协议簇"
+                    options={PROTOCOL_SUITE_OPTIONS}
                     selected={form.allowedProtocolSuites}
                     onToggle={(value) => setForm((current) => ({ ...current, allowedProtocolSuites: toggleOption(current.allowedProtocolSuites, value) }))}
                   />
@@ -699,7 +723,7 @@ function createEmptyForm(): CreateKeyForm {
     description: '',
     active: true,
     templateId: 'balanced',
-    allowedProtocolSuites: ['openai', 'responses'],
+    allowedProtocolSuites: ['openai.native'],
     allowedModels: ['gpt-4o-mini'],
     allowedProviderTypes: ['OPENAI_DIRECT'],
     budgetLimitMicros: '2000000',
@@ -724,7 +748,7 @@ function buildCreatePayload(form: CreateKeyForm) {
     keyName,
     description: form.description.trim() || null,
     active: form.active,
-    allowedProtocolSuites: Array.from(new Set(form.allowedProtocolSuites.map((item) => item.toLowerCase()))),
+    allowedProtocolSuites: Array.from(new Set(form.allowedProtocolSuites.map(normalizeProtocolSuite).filter(Boolean))),
     allowedModels: Array.from(new Set(form.allowedModels)),
     allowedProviderTypes: Array.from(new Set(form.allowedProviderTypes.map((item) => item.toUpperCase()))),
     expiresAt: form.expiresAt ? new Date(form.expiresAt).toISOString() : null,
@@ -746,6 +770,10 @@ function toggleOption(current: string[], nextValue: string) {
   return [...current, nextValue]
 }
 
+function normalizeProtocolSuite(value: string) {
+  return value.trim().toLowerCase().replaceAll('-', '_').replaceAll('/', '.')
+}
+
 function parseOptionalNumber(value: string) {
   if (!value.trim()) {
     return null
@@ -763,4 +791,3 @@ function toDatetimeLocalValue(daysFromNow: number) {
   const local = new Date(target.getTime() - offset * 60 * 1000)
   return local.toISOString().slice(0, 16)
 }
-

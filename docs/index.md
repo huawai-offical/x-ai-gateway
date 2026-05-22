@@ -6,8 +6,9 @@ x-ai-gateway 不以 OpenAI、Anthropic、Gemini、Vertex、Codex 等官方 API �
 
 ## 当前口径提示
 
-- 2026-05-21 起，控制台已收紧并下线 `官方账号运行态`、`能力矩阵`、`Native 命名空间兼容`、`Provider 参考差距`、`站点档案`、`成本路由策略中心`、`向量检索排障沙盒` 等前端入口；相关 Markdown 若仍保留，多用于历史实现记录、后端保留接口说明或公开 API 兼容事实源。
-- `/admin/accounts/group/{groupId}`、`/admin/accounts/{id}`、freeze/runtime-reset/import/quota-refresh/smoke、`/admin/provider-sites` + `/{id}/capabilities`、`/admin/vector-stores*` 以及公开 `/v1/vector_stores*`、`/v1/files*`、Responses `file_search` 本地绑定当前保留；阅读相关文档时，应按“控制台已下线、后端/API 仅保留主线支撑面”的状态理解。
+- 2026-05-21 起，控制台已收紧并下线 `官方账号运行态`、`Native 命名空间兼容`、`Provider 参考差距`、`成本路由策略中心`、`向量检索排障沙盒` 等前端入口；相关 Markdown 若仍保留，多用于历史实现记录、后端保留接口说明或公开 API 兼容事实源。
+- 2026-05-22 起，`站点档案` 以“厂商管理 / API 入口”口径重新进入现役控制台，承接厂商、协议入口、conversation profile、模型能力、预设导入和 capability matrix。旧 `Provider 参考差距` 仍不恢复。
+- `/admin/accounts/group/{groupId}`、`/admin/accounts/{id}`、freeze/runtime-reset/import/quota-refresh/smoke、`/admin/provider-sites`、`/admin/provider-sites/{id}/capabilities`、`/admin/provider-sites/capability-matrix`、`/admin/vector-stores*` 以及公开 `/v1/vector_stores*`、`/v1/files*`、Responses `file_search` 本地绑定当前保留。
 
 ## 需求
 
@@ -95,6 +96,11 @@ x-ai-gateway 不以 OpenAI、Anthropic、Gemini、Vertex、Codex 等官方 API �
 - [REQ-20260522-003 提示气泡化与超大文件组件化拆分](requirements/REQ-20260522-003-toast-feedback-and-component-splitting.md)
 - [REQ-20260522-004 .gitignore 通配符化整理](requirements/REQ-20260522-004-gitignore-wildcard-cleanup.md)
 - [REQ-20260522-005 Model Policy 分层收敛与第三阶段路由治理](requirements/REQ-20260522-005-model-policy-layered-resolution.md)
+- [REQ-20260522-006 分发 Key 协议簇授权迁移](requirements/REQ-20260522-006-protocol-suite-authorization-migration.md)
+- [REQ-20260522-007 厂商管理中心](requirements/REQ-20260522-007-vendor-management-center.md)
+- [REQ-20260522-010 Observability Redis 超时退避与同步兜底](requirements/REQ-20260522-010-observability-redis-timeout-backoff.md)
+- [REQ-20260522-011 默认厂商 API 入口引导](requirements/REQ-20260522-011-default-provider-site-bootstrap.md)
+- [REQ-20260522-012 上游凭证绑定厂商 API 入口](requirements/REQ-20260522-012-credential-vendor-site-binding.md)
 
 ## 决策
 

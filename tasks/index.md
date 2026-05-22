@@ -61,13 +61,17 @@
 | P0-UI-UX-11 | [TASK-20260522-003 提示气泡化与超大文件组件化拆分](done/TASK-20260522-003-toast-feedback-and-component-splitting.md) | Done | `InlineError` 改为左上角 toast，调试工作台拆出预设和展示组件 |
 | P1-UI-UX-12 | [TASK-20260522-004 原生确认弹窗与通知入口统一](backlog/TASK-20260522-004-confirm-dialog-notification-unification.md) | Backlog | 迁移 18 处 `window.confirm` 到统一确认弹窗 |
 | P1-ARCH-02 | [TASK-20260522-005 超大文件分批组件化与服务拆分](backlog/TASK-20260522-005-giant-file-decomposition-roadmap.md) | Backlog | 按 P0/P1 清单继续拆前端巨页和后端超级服务 |
+| P0-ARCH-03 | [TASK-20260522-010 Observability Redis 超时退避与同步兜底](done/TASK-20260522-010-observability-redis-timeout-backoff.md) | Done | Redis 热路径队列超时后退避，并让请求观测写入直接同步兜底 |
 | P2-INFRA-01 | [TASK-20260522-006 .gitignore 通配符化整理](done/TASK-20260522-006-gitignore-wildcard-cleanup.md) | Done | 将逐文件缓存 ignore 清单归并为目录级和通配符规则 |
 | P0-CODEX-06 | [TASK-20260522-007 Model Policy 分层收敛父任务](done/TASK-20260522-007-model-policy-layered-resolution-parent.md) | Done | 覆盖模型策略表、逐层收缩、Admin API、自动探测、健康裁剪、模型级限流、fallback chain 与灰度路由 |
 | P0-CODEX-06a | [TASK-20260522-007-01 Model Policy 策略表与运行时解析](done/TASK-20260522-007-01-model-policy-runtime-resolution.md) | Done | 策略 schema、resolver、路由模型解析与候选裁剪 |
 | P0-CODEX-06b | [TASK-20260522-007-02 Model Policy 管理端、预览与冲突检测](done/TASK-20260522-007-02-model-policy-admin-preview-conflict.md) | Done | `/admin/model-policies` CRUD、preview、conflicts 与 preset 导入 |
 | P0-CODEX-06c | [TASK-20260522-007-03 Model Policy 第三阶段运行态治理](done/TASK-20260522-007-03-model-policy-runtime-governance.md) | Done | discovery policy、健康/额度裁剪、模型级 rpm、fallback chain 与 canary weight |
 | P0-CODEX-06d | [TASK-20260522-008 模型刷新幂等性修复](done/TASK-20260522-008-model-refresh-idempotency.md) | Done | 修复重复点击刷新模型触发 `site_model_capability` 唯一约束冲突，并关闭 Redis Repository 扫描噪音 |
-| P0-CODEX-06e | [TASK-20260522-009 分发 Key 协议簇授权迁移](in-progress/TASK-20260522-009-protocol-suite-authorization-migration.md) | In Progress | 将 Key/访问组的 `allowedProtocols` 直接迁移为厂商协议簇 `allowedProtocolSuites`，不保留旧字段兼容 |
+| P0-CODEX-06e | [TASK-20260522-009 分发 Key 协议簇授权迁移](done/TASK-20260522-009-protocol-suite-authorization-migration.md) | Done | 将 Key/访问组的 `allowedProtocols` 直接迁移为厂商协议簇 `allowedProtocolSuites`，不保留旧字段兼容 |
+| P0-CODEX-06f | [TASK-20260522-011 厂商管理中心补齐](done/TASK-20260522-011-vendor-management-center.md) | Done | 恢复并补齐厂商管理、API 入口 CRUD、预设导入、能力刷新和 capability matrix |
+| P0-CODEX-06g | [TASK-20260522-012 默认厂商 API 入口引导](done/TASK-20260522-012-default-provider-site-bootstrap.md) | Done | 启动时自动导入非 deprecated provider preset，生成默认厂商 API 入口和站点级快照 |
+| P0-CODEX-06h | [TASK-20260522-013 上游凭证绑定厂商 API 入口](done/TASK-20260522-013-credential-vendor-site-binding.md) | Done | 新增/编辑 API Key 上游凭证改为选择厂商/API 入口，并由入口派生 provider type 与 Base URL |
 | P0-FUNC-01 | [TASK-20260514-020 OpenAI 多模态支撑参数边界收紧](done/TASK-20260514-020-openai-multimodal-supporting-parameters.md) | Done | 已清理 Audio translations 与 Images edits/variations 残留，并固定多模态支撑参数 |
 | P0-FUNC-02 | [TASK-20260514-021 OpenAI Files、Uploads、Models 功能性支撑面](done/TASK-20260514-021-openai-files-uploads-models-functional-support.md) | Done | 已补 Files list 参数与 envelope，并确认 Batches/Fine-tuning 不回到公开支持面 |
 | P0-CODEX-05 | [TASK-20260514-031 OpenAI 真实 Smoke 与认证成本防护](backlog/TASK-20260514-031-openai-real-smoke-certification-harness.md) | Backlog | Critical；承接 Codex/OpenAI-compatible smoke 机制，等待恢复测试或真实 key 执行窗口 |

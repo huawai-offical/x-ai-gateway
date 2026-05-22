@@ -332,6 +332,7 @@ public class SiteCapabilityTruthService {
                 providerTypeFor(siteKind),
                 null,
                 providerFamilyFor(siteKind),
+                null,
                 siteKind,
                 null,
                 null,

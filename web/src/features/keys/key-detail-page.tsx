@@ -144,7 +144,7 @@ export function KeyDetailPage() {
           <InfoGrid
             items={[
               { key: 'active', label: '状态', value: <StatusBadge tone={activeDraft.active ? 'success' : 'warning'}>{activeDraft.active ? '启用' : '停用'}</StatusBadge> },
-              { key: 'protocols', label: '允许协议', value: activeDraft.allowedProtocolSuites.join(', ') || '全部' },
+              { key: 'protocols', label: '允许协议簇', value: activeDraft.allowedProtocolSuites.join(', ') || '全部' },
               { key: 'models', label: '允许模型', value: activeDraft.allowedModels.join(', ') || '全部' },
               { key: 'providers', label: '允许提供方', value: activeDraft.allowedProviderTypes.join(', ') || '全部' },
             ]}

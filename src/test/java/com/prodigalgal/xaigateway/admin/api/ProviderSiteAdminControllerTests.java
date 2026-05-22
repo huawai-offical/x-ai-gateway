@@ -16,6 +16,7 @@ import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
 import com.prodigalgal.xaigateway.testsupport.PermitAllSecurityTestConfig;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -78,6 +79,93 @@ class ProviderSiteAdminControllerTests {
                 .jsonPath("$[0].supportedProtocols[0]").isEqualTo("openai");
     }
 
+    @Test
+    void shouldExposeProviderSiteManagementEndpoints() {
+        Mockito.when(providerSiteAdminService.get(1L)).thenReturn(sampleSite());
+        Mockito.when(providerSiteAdminService.create(Mockito.any(ProviderSiteRequest.class))).thenReturn(sampleSite());
+        Mockito.when(providerSiteAdminService.update(Mockito.eq(1L), Mockito.any(ProviderSiteRequest.class))).thenReturn(sampleSite());
+        Mockito.when(providerSiteAdminService.refreshCapabilities(1L)).thenReturn(sampleSite());
+        Mockito.when(providerSiteAdminService.refreshCapabilities(List.of(1L))).thenReturn(List.of(sampleSite()));
+        Mockito.when(providerSiteAdminService.capabilityMatrix()).thenReturn(List.of(sampleCapabilityMatrixRow()));
+        Mockito.when(providerSiteAdminService.listPresets()).thenReturn(List.of(samplePreset()));
+        Mockito.when(providerSiteAdminService.getPreset("openai-main")).thenReturn(samplePreset());
+        Mockito.when(providerSiteAdminService.importPreset(Mockito.eq("openai-main"), Mockito.any(ProviderSitePresetImportRequest.class)))
+                .thenReturn(sampleSite());
+
+        webTestClient.get()
+                .uri("/admin/provider-sites/1")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.id").isEqualTo(1);
+
+        webTestClient.post()
+                .uri("/admin/provider-sites")
+                .bodyValue(sampleRequest())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.profileCode").isEqualTo("site:openai_direct");
+
+        webTestClient.put()
+                .uri("/admin/provider-sites/1")
+                .bodyValue(sampleRequest())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.displayName").isEqualTo("OPENAI_DIRECT");
+
+        webTestClient.delete()
+                .uri("/admin/provider-sites/1")
+                .exchange()
+                .expectStatus().isOk();
+        Mockito.verify(providerSiteAdminService).delete(1L);
+
+        webTestClient.post()
+                .uri("/admin/provider-sites/1/refresh")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.healthState").isEqualTo("READY");
+
+        webTestClient.post()
+                .uri("/admin/provider-sites/refresh")
+                .bodyValue(new ProviderSiteRefreshRequest(List.of(1L)))
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$[0].id").isEqualTo(1);
+
+        webTestClient.get()
+                .uri("/admin/provider-sites/capability-matrix")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$[0].siteProfileId").isEqualTo(1);
+
+        webTestClient.get()
+                .uri("/admin/provider-sites/presets")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$[0].code").isEqualTo("openai-main");
+
+        webTestClient.get()
+                .uri("/admin/provider-sites/presets/openai-main")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.displayName").isEqualTo("OpenAI 主站");
+
+        webTestClient.post()
+                .uri("/admin/provider-sites/presets/openai-main/import")
+                .bodyValue(new ProviderSitePresetImportRequest(true, true))
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.profileCode").isEqualTo("site:openai_direct");
+    }
+
     private ProviderSiteResponse sampleSite() {
         return new ProviderSiteResponse(
                 1L,
@@ -127,6 +215,93 @@ class ProviderSiteAdminControllerTests {
                 Instant.now(),
                 Instant.now(),
                 Instant.now()
+        );
+    }
+
+    private ProviderSiteRequest sampleRequest() {
+        return new ProviderSiteRequest(
+                "site:openai_direct",
+                "OpenAI 主站",
+                "openai",
+                "OpenAI",
+                UpstreamSiteKind.OPENAI_DIRECT,
+                "https://api.openai.com",
+                "sample",
+                Map.of("reasoningContentMode", "passthrough"),
+                true
+        );
+    }
+
+    private ProviderSitePresetResponse samplePreset() {
+        return new ProviderSitePresetResponse(
+                "openai-main",
+                "site:openai_direct",
+                "OpenAI 主站",
+                "openai",
+                "OpenAI",
+                UpstreamSiteKind.OPENAI_DIRECT,
+                ProviderFamily.OPENAI,
+                AuthStrategy.BEARER,
+                PathStrategy.OPENAI_V1,
+                ModelAddressingStrategy.MODEL_NAME,
+                ErrorSchemaStrategy.OPENAI_ERROR,
+                "https://api.openai.com",
+                "sample",
+                List.of("openai", "responses"),
+                "sse",
+                "provider-native",
+                List.of("chat", "responses"),
+                "official",
+                "openai",
+                "2026-05-22",
+                "local",
+                false,
+                List.of("models"),
+                "openai",
+                "native",
+                List.of("gpt"),
+                "{}",
+                List.of(),
+                Map.of("reasoningContentMode", "passthrough"),
+                Map.of(),
+                false,
+                null
+        );
+    }
+
+    private CapabilityMatrixRowResponse sampleCapabilityMatrixRow() {
+        return new CapabilityMatrixRowResponse(
+                1L,
+                "site:openai_direct",
+                "OPENAI_DIRECT",
+                ProviderFamily.OPENAI,
+                UpstreamSiteKind.OPENAI_DIRECT,
+                SiteProfileSource.MANUAL,
+                AuthStrategy.BEARER,
+                PathStrategy.OPENAI_V1,
+                ErrorSchemaStrategy.OPENAI_ERROR,
+                "READY",
+                null,
+                List.of("openai", "responses"),
+                "openai",
+                List.of("api_key"),
+                "sse",
+                "provider-native",
+                0,
+                null,
+                1L,
+                true,
+                2,
+                Instant.now(),
+                Map.of(),
+                Map.of(),
+                true,
+                true,
+                false,
+                false,
+                true,
+                true,
+                true
         );
     }
 }

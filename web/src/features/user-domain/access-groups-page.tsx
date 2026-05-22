@@ -263,7 +263,7 @@ export function AccessGroupsPage() {
                       <StatusBadge tone={group.active ? 'success' : 'warning'}>{group.active ? '启用' : '停用'}</StatusBadge>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
-                      {formatList(group.allowedProtocolSuites) || '不限协议'} / {group.allowedModels.length} 个模型
+                      {formatList(group.allowedProtocolSuites) || '不限协议簇'} / {group.allowedModels.length} 个模型
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
                       套餐 {group.planBindingCount} / Key {group.keyGrantCount}
@@ -312,7 +312,7 @@ export function AccessGroupsPage() {
                 items={[
                   { key: 'name', label: '名称', value: selectedGroup.groupName },
                   { key: 'status', label: '状态', value: selectedGroup.active ? '启用' : '停用' },
-                  { key: 'protocols', label: '协议', value: formatList(selectedGroup.allowedProtocolSuites) || '不限' },
+                  { key: 'protocols', label: '协议簇', value: formatList(selectedGroup.allowedProtocolSuites) || '不限' },
                   { key: 'models', label: '模型', value: formatList(selectedGroup.allowedModels) || '不限' },
                   { key: 'providers', label: '提供方', value: formatList(selectedGroup.allowedProviderTypes) || '不限' },
                   { key: 'clients', label: '客户端', value: formatList(selectedGroup.allowedClientFamilies) || '不限' },
@@ -395,7 +395,7 @@ export function AccessGroupsPage() {
                       columnsClassName="md:grid-cols-2"
                       items={[
                         { key: 'source', label: '来源访问组', value: formatList(resolvedPolicyQuery.data.sourceAccessGroups) || '无' },
-                        { key: 'protocols', label: '协议', value: formatList(resolvedPolicyQuery.data.allowedProtocolSuites) || '不限' },
+                        { key: 'protocols', label: '协议簇', value: formatList(resolvedPolicyQuery.data.allowedProtocolSuites) || '不限' },
                         { key: 'models', label: '模型', value: formatList(resolvedPolicyQuery.data.allowedModels) || '不限' },
                         { key: 'providers', label: '提供方', value: formatList(resolvedPolicyQuery.data.allowedProviderTypes) || '不限' },
                         { key: 'clients', label: '客户端', value: formatList(resolvedPolicyQuery.data.allowedClientFamilies) || '不限' },
@@ -443,7 +443,7 @@ export function AccessGroupsPage() {
               </TabsContent>
               <TabsContent value="policy" className="pt-3">
                 <div className="grid gap-4 md:grid-cols-2">
-                  <Input value={form.allowedProtocolSuites} onChange={(event) => setForm((current) => ({ ...current, allowedProtocolSuites: event.target.value }))} placeholder="协议：openai,anthropic,gemini" />
+                  <Input value={form.allowedProtocolSuites} onChange={(event) => setForm((current) => ({ ...current, allowedProtocolSuites: event.target.value }))} placeholder="协议簇：openai.native,xiaomi_mimo.openai_compatible" />
                   <Input value={form.allowedProviderTypes} onChange={(event) => setForm((current) => ({ ...current, allowedProviderTypes: event.target.value }))} placeholder="提供方：openai、gemini 或 OPENAI_DIRECT" />
                   <Input value={form.allowedClientFamilies} onChange={(event) => setForm((current) => ({ ...current, allowedClientFamilies: event.target.value }))} placeholder="客户端：CODEX,GENERIC_OPENAI" />
                   <Input type="number" min={1} value={form.rpmLimit} onChange={(event) => setForm((current) => ({ ...current, rpmLimit: event.target.value }))} placeholder="RPM 限制，留空为不限" />
@@ -459,7 +459,7 @@ export function AccessGroupsPage() {
                   items={[
                     { key: 'name', label: '名称', value: form.groupName || '未填写' },
                     { key: 'status', label: '状态', value: form.active ? '启用' : '停用' },
-                    { key: 'protocols', label: '协议', value: form.allowedProtocolSuites || '不限' },
+                    { key: 'protocols', label: '协议簇', value: form.allowedProtocolSuites || '不限' },
                     { key: 'models', label: '模型', value: splitValues(form.allowedModels).length ? `${splitValues(form.allowedModels).length} 个模型` : '不限' },
                     { key: 'providers', label: '提供方', value: form.allowedProviderTypes || '不限' },
                     { key: 'clients', label: '客户端', value: form.allowedClientFamilies || '不限' },
@@ -496,7 +496,7 @@ function emptyForm(): GroupForm {
     description: '',
     active: true,
     priority: '100',
-    allowedProtocolSuites: 'openai,anthropic,gemini',
+    allowedProtocolSuites: 'openai.native,anthropic.native,gemini.native',
     allowedModels: '',
     allowedProviderTypes: '',
     allowedClientFamilies: '',

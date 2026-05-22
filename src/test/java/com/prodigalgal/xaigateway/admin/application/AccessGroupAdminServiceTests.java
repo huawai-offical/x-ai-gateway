@@ -49,7 +49,7 @@ class AccessGroupAdminServiceTests {
                 "demo",
                 null,
                 null,
-                List.of(" OpenAI ", "openai"),
+                List.of(" OpenAI.Native ", "openai.native"),
                 List.of(" GPT-5-MINI "),
                 List.of("openai"),
                 List.of("codex"),
@@ -60,7 +60,7 @@ class AccessGroupAdminServiceTests {
         ));
 
         assertEquals("default", response.groupName());
-        assertEquals(List.of("openai"), response.allowedProtocolSuites());
+        assertEquals(List.of("openai.native"), response.allowedProtocolSuites());
         assertEquals(List.of("gpt-5-mini"), response.allowedModels());
         assertEquals(List.of("OPENAI_DIRECT"), response.allowedProviderTypes());
         assertEquals(List.of("CODEX"), response.allowedClientFamilies());

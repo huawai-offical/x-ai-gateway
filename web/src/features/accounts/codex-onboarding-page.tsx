@@ -203,7 +203,7 @@ export function CodexOnboardingPage() {
           keyName: `codex-cli-${Date.now()}`,
           description: 'Codex CLI 专用访问密钥，由接入向导创建。',
           active: false,
-          allowedProtocolSuites: ['openai', 'responses'],
+          allowedProtocolSuites: ['openai.native'],
           allowedModels: [DEFAULT_MODEL],
           allowedProviderTypes: ['OPENAI_DIRECT'],
           allowedClientFamilies: ['CODEX'],
@@ -616,7 +616,8 @@ function isCodexGroup(group: AccountGroup) {
 }
 
 function isCodexKey(key: DistributedKey) {
-  return key.allowedClientFamilies?.includes('CODEX') || key.allowedProtocolSuites?.includes('responses')
+  return key.allowedClientFamilies?.includes('CODEX')
+    || key.allowedProtocolSuites?.some((suite) => suite.startsWith('openai') || suite.includes('.openai_compatible')) === true
 }
 
 function statusTone(status: string) {

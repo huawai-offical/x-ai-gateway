@@ -31,6 +31,7 @@ import com.prodigalgal.xaigateway.gateway.core.model.ModelPolicyCandidateDecisio
 import com.prodigalgal.xaigateway.gateway.core.model.ModelPolicyResolvedModel;
 import com.prodigalgal.xaigateway.gateway.core.model.ModelPolicyResolver;
 import com.prodigalgal.xaigateway.gateway.core.shared.ModelIdNormalizer;
+import com.prodigalgal.xaigateway.gateway.core.shared.ProtocolSuite;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.infra.persistence.repository.NetworkProxyRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
@@ -315,9 +316,6 @@ public class GatewayRouteSelectionService {
                 .orElseThrow(() -> new IllegalArgumentException("未找到可用的 DistributedKey。"));
 
         String normalizedProtocol = normalize(request.protocol());
-        if (!isProtocolAllowed(distributedKey, normalizedProtocol)) {
-            throw new IllegalArgumentException("当前 DistributedKey 不允许访问该协议。");
-        }
         if (distributedKey.expiresAt() != null && distributedKey.expiresAt().isBefore(Instant.now())) {
             throw new IllegalArgumentException("当前 DistributedKey 已过期。");
         }
@@ -505,8 +503,14 @@ public class GatewayRouteSelectionService {
             throw new IllegalArgumentException("当前 DistributedKey 不允许所选 provider。");
         }
 
+        boolean anyProtocolSuiteAllowed = resolutions.stream()
+                .anyMatch(item -> !item.providerBlocked() && !item.protocolSuiteBlocked());
+        if (!anyProtocolSuiteAllowed) {
+            throw new IllegalArgumentException("当前 DistributedKey 不允许所选厂商协议簇。");
+        }
+
         int bestCapabilityRank = resolutions.stream()
-                .filter(item -> !item.providerBlocked() && !item.featureBlocked())
+                .filter(item -> !item.providerBlocked() && !item.protocolSuiteBlocked() && !item.featureBlocked())
                 .mapToInt(StaticCandidateResolution::capabilityRank)
                 .max()
                 .orElse(0);
@@ -559,7 +563,8 @@ public class GatewayRouteSelectionService {
             GatewayRequestSemantics semantics) {
         RouteCandidateView candidate = modelPolicyDecision.candidate();
         boolean providerBlocked = !isProviderAllowed(distributedKey, candidate);
-        NonChatRoutePolicyDecision policyDecision = providerBlocked
+        boolean protocolSuiteBlocked = !isProtocolSuiteAllowed(distributedKey, candidate);
+        NonChatRoutePolicyDecision policyDecision = providerBlocked || protocolSuiteBlocked
                 ? null
                 : nonChatRoutePolicyService.evaluateCandidate(
                         normalizedProtocol,
@@ -581,10 +586,11 @@ public class GatewayRouteSelectionService {
                         ),
                         request.requestBody() instanceof tools.jackson.databind.JsonNode jsonNode ? jsonNode : null
                 );
-        InteropCapabilityLevel renderLevel = providerBlocked || policyDecision == null
+        InteropCapabilityLevel renderLevel = providerBlocked || protocolSuiteBlocked || policyDecision == null
                 ? InteropCapabilityLevel.UNSUPPORTED
                 : policyDecision.renderCapabilityLevel();
         boolean featureBlocked = providerBlocked
+                || protocolSuiteBlocked
                 || policyDecision == null
                 || !policyDecision.blockedReasons().isEmpty()
                 || policyDecision.overallCapabilityLevel() == InteropCapabilityLevel.UNSUPPORTED;
@@ -602,6 +608,7 @@ public class GatewayRouteSelectionService {
                         capabilityRank
                 ),
                 providerBlocked,
+                protocolSuiteBlocked,
                 featureBlocked,
                 renderBlocked,
                 renderLevel,
@@ -614,6 +621,8 @@ public class GatewayRouteSelectionService {
         List<String> exclusionReasons = new ArrayList<>(resolution.modelPolicyExclusionReasons());
         if (resolution.providerBlocked()) {
             exclusionReasons.add("provider_not_allowed");
+        } else if (resolution.protocolSuiteBlocked()) {
+            exclusionReasons.add("protocol_suite_not_allowed");
         } else if (resolution.renderBlocked()) {
             exclusionReasons.add("render_unsupported");
         } else if (resolution.featureBlocked()) {
@@ -953,8 +962,12 @@ public class GatewayRouteSelectionService {
                 .toList();
     }
 
-    private boolean isProtocolAllowed(DistributedKeyView distributedKey, String protocol) {
-        return distributedKey.allowedProtocolSuites().isEmpty() || distributedKey.allowedProtocolSuites().contains(protocol);
+    private boolean isProtocolSuiteAllowed(DistributedKeyView distributedKey, RouteCandidateView candidate) {
+        return distributedKey.allowedProtocolSuites().isEmpty()
+                || distributedKey.allowedProtocolSuites().contains(ProtocolSuite.fromVendorAndSiteKind(
+                        candidate.candidate().vendorCode(),
+                        candidate.candidate().siteKind()
+                ));
     }
 
     private boolean isModelAllowed(DistributedKeyView distributedKey, String requestedModel, String publicModel, String resolvedModelKey) {
@@ -1015,6 +1028,7 @@ public class GatewayRouteSelectionService {
     private record StaticCandidateResolution(
             RouteCandidateView candidate,
             boolean providerBlocked,
+            boolean protocolSuiteBlocked,
             boolean featureBlocked,
             boolean renderBlocked,
             InteropCapabilityLevel renderLevel,

@@ -30,6 +30,8 @@ export type ProviderSite = {
   id: number
   profileCode: string
   displayName: string
+  vendorCode?: string | null
+  vendorName?: string | null
   providerFamily: string
   siteKind: string
   authStrategy: string
@@ -38,6 +40,7 @@ export type ProviderSite = {
   errorSchemaStrategy: string
   baseUrlPattern?: string | null
   description?: string | null
+  conversationProfile?: Record<string, unknown>
   profileSource: string
   active: boolean
   healthState: string
@@ -65,6 +68,8 @@ export type ProviderSitePreset = {
   code: string
   profileCode: string
   displayName: string
+  vendorCode?: string | null
+  vendorName?: string | null
   siteKind: string
   providerFamily: string
   authStrategy: string
@@ -88,6 +93,8 @@ export type ProviderSitePreset = {
   modelFamilies: string[]
   pricingMetadata: string
   unsupportedFeatures: string[]
+  conversationProfile?: unknown
+  modelPolicies?: unknown
   imported: boolean
   existingSiteProfileId?: number | null
 }
@@ -433,6 +440,8 @@ type SiteSnapshotSummaryInput = {
 
 export function siteProfileSourceLabel(source?: string | null) {
   switch (source) {
+    case 'PRESET':
+      return '预设建档'
     case 'AUTO_DISCOVERED':
       return '自动建档'
     case 'MANUAL':
@@ -655,9 +664,12 @@ export type ObservabilityTraceResponse = {
 export type ProviderSiteDraft = {
   profileCode: string
   displayName: string
+  vendorCode: string
+  vendorName: string
   siteKind: string
   baseUrlPattern: string
   description: string
+  conversationProfileJson: string
   active: boolean
 }
 
@@ -679,6 +691,7 @@ export const SITE_KIND_OPTIONS = [
   'TOGETHER',
   'FIREWORKS',
   'OPENROUTER',
+  'PERPLEXITY',
   'ANTHROPIC_DIRECT',
   'GEMINI_DIRECT',
   'OLLAMA_DIRECT',

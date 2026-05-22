@@ -43,6 +43,7 @@ public record CredentialResponse(
         Long proxyId,
         Long tlsFingerprintProfileId,
         Long siteProfileId,
+        Long protocolEndpointId,
         Long groupId,
         String groupName,
         Instant createdAt,

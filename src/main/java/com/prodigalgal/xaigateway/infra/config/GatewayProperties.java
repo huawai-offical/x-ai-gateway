@@ -564,6 +564,7 @@ public class GatewayProperties {
             private String queueKey = "xag:observability:hot-path";
             private Duration flushInterval = Duration.ofSeconds(1);
             private int batchSize = 200;
+            private Duration redisFailureBackoff = Duration.ofSeconds(30);
 
             public boolean isEnabled() {
                 return enabled;
@@ -595,6 +596,14 @@ public class GatewayProperties {
 
             public void setBatchSize(int batchSize) {
                 this.batchSize = batchSize;
+            }
+
+            public Duration getRedisFailureBackoff() {
+                return redisFailureBackoff;
+            }
+
+            public void setRedisFailureBackoff(Duration redisFailureBackoff) {
+                this.redisFailureBackoff = redisFailureBackoff;
             }
         }
     }

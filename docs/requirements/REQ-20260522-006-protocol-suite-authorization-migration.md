@@ -85,4 +85,24 @@
 
 ## 当前状态
 
-In Progress
+Done
+
+## 实施结果
+
+- 新增 `ProtocolSuite`，集中维护厂商协议簇 code、`UpstreamSiteKind` 映射和 MiMo/DeepSeek 等 `vendorCode` 特例。
+- `DistributedKeyEntity`、`AccessGroupEntity`、Admin/Portal DTO 与服务统一迁移到 `allowedProtocolSuites`。
+- `ModelCatalogQueryService` 与 `GatewayRouteSelectionService` 在候选层按 `vendorCode + siteKind` 推导协议簇并过滤；入口协议仍由 `supportedProtocols`、canonical surface 和 interop policy 判断。
+- `CatalogCandidateView` 补充 `vendorCode`，用于区分 MiMo 这类挂在 OpenAI-compatible generic site kind 下的具体厂商。
+- 前端 Key、Key 详情、Portal Key、Codex onboarding、用户域访问组页面改为展示/提交厂商协议簇，不再把 `responses` 当作 Key 授权选项。
+- 新增 `db.changelog-0003-protocol-suite-authorization.yaml`，在不修改已执行 baseline 的前提下重命名列并迁移旧 JSON 值。历史 baseline 中的 `allowed_protocols_json` 只作为迁移前状态存在，不代表继续保留业务字段或旧 API 兼容。
+
+## 验证记录
+
+- `.\gradlew.bat compileJava compileTestJava`：通过。
+- `.\gradlew.bat compileJava compileTestJava test --tests "com.prodigalgal.xaigateway.gateway.core.auth.AccessGroupEntitlementServiceTests" --tests "com.prodigalgal.xaigateway.admin.application.AccessGroupAdminServiceTests" --tests "com.prodigalgal.xaigateway.portal.application.PortalAuthServiceTests" --tests "com.prodigalgal.xaigateway.gateway.core.catalog.ModelCatalogQueryServiceTests" --tests "com.prodigalgal.xaigateway.gateway.core.routing.GatewayRouteSelectionServiceTests"`：通过。
+- `bun run typecheck`：通过。
+- `bun run test -- keys-page key-detail-page portal-home-page portal-keys-page codex-onboarding-page account-group-detail-page access-groups-page`：通过，实际匹配并执行 4 个测试文件 13 个用例。
+
+## 遗留说明
+
+- `.\gradlew.bat test` 全量仍存在与本任务非同源的失败：官方账号导入测试缺少账号分组 mock、资源/endpoint conformance baseline 与现有实现漂移、缺少 `removed-object-lifecycle` fixture、部分 OpenAI Direct dry-run 资源族数量基线不一致。协议簇相关聚焦测试已通过；这些失败建议另立 conformance/test-baseline 清理任务处理。

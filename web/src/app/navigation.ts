@@ -8,6 +8,7 @@ import {
   BotMessageSquareIcon,
   DatabaseZapIcon,
   KeyRoundIcon,
+  LandmarkIcon,
   NetworkIcon,
   ShieldIcon,
   ShieldCheckIcon,
@@ -54,6 +55,7 @@ const baseNavigationGroups: NavigationGroup[] = [
     label: '接入与模型',
     items: [
       { to: '/credentials', label: '上游凭证', icon: KeyRoundIcon },
+      { to: '/provider-sites', label: '厂商管理', icon: LandmarkIcon },
       { to: '/keys', label: '访问密钥', icon: ShieldIcon },
       { to: '/account-groups', label: '账号分组', icon: TablePropertiesIcon },
       { to: '/models', label: '模型目录', icon: BotMessageSquareIcon, end: true },
@@ -121,6 +123,12 @@ const routeMeta: RouteMeta[] = [
     title: '上游凭证',
     groupLabel: '接入与模型',
     navTo: '/credentials',
+  },
+  {
+    patterns: ['/provider-sites', '/provider-sites/:id', '/capability-matrix'],
+    title: '厂商管理',
+    groupLabel: '接入与模型',
+    navTo: '/provider-sites',
   },
   {
     patterns: ['/accounts'],

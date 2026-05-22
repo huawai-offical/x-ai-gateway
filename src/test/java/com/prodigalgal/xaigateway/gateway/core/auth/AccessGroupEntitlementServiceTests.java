@@ -37,7 +37,7 @@ class AccessGroupEntitlementServiceTests {
         GatewayUserEntity user = user(1L);
         DistributedKeyEntity key = key(10L, user);
         SubscriptionPlanEntity plan = plan(3L);
-        AccessGroupEntity group = group(5L, "starter-access", List.of("openai"), List.of("gpt-5-mini"), 60);
+        AccessGroupEntity group = group(5L, "starter-access", List.of("openai.native"), List.of("gpt-5-mini"), 60);
         PlanAccessGroupEntity binding = planBinding(plan, group);
         UserSubscriptionEntity subscription = subscription(user, plan);
 
@@ -51,7 +51,7 @@ class AccessGroupEntitlementServiceTests {
         ResolvedAccessPolicy policy = service.resolveForDistributedKey(key);
 
         assertEquals(List.of("starter-access"), policy.sourceAccessGroups());
-        assertEquals(List.of("openai"), policy.allowedProtocolSuites());
+        assertEquals(List.of("openai.native"), policy.allowedProtocolSuites());
         assertEquals(List.of("gpt-5-mini"), policy.allowedModels());
         assertEquals(60, policy.rpmLimit());
     }
@@ -61,8 +61,8 @@ class AccessGroupEntitlementServiceTests {
         GatewayUserEntity user = user(1L);
         DistributedKeyEntity key = key(10L, user);
         SubscriptionPlanEntity plan = plan(3L);
-        AccessGroupEntity inherited = group(5L, "starter-access", List.of("openai"), List.of("gpt-5-mini"), 60);
-        AccessGroupEntity override = group(6L, "key-override", List.of("anthropic"), List.of("claude-sonnet-4"), 30);
+        AccessGroupEntity inherited = group(5L, "starter-access", List.of("openai.native"), List.of("gpt-5-mini"), 60);
+        AccessGroupEntity override = group(6L, "key-override", List.of("anthropic.native"), List.of("claude-sonnet-4"), 30);
         DistributedKeyAccessGroupGrantEntity grant = keyGrant(key, override, "OVERRIDE");
 
         Mockito.when(keyGrantRepository.findAllByDistributedKey_IdAndActiveTrueOrderByPriorityAscCreatedAtAsc(10L))
@@ -75,7 +75,7 @@ class AccessGroupEntitlementServiceTests {
         ResolvedAccessPolicy policy = service.resolveForDistributedKey(key);
 
         assertEquals(List.of("key-override"), policy.sourceAccessGroups());
-        assertEquals(List.of("anthropic"), policy.allowedProtocolSuites());
+        assertEquals(List.of("anthropic.native"), policy.allowedProtocolSuites());
         assertEquals(List.of("claude-sonnet-4"), policy.allowedModels());
         assertEquals(30, policy.rpmLimit());
     }

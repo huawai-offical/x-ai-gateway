@@ -33,6 +33,7 @@ import tools.jackson.databind.ObjectMapper;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CredentialAdminServiceTests {
@@ -58,7 +59,11 @@ class CredentialAdminServiceTests {
         UpstreamCredentialEntity deleted = credential(31L, ProviderType.GEMINI_DIRECT);
         deleted.setDeleted(true);
         deleted.setActive(false);
-        UpstreamSiteProfileEntity siteProfile = siteProfile(9L);
+        UpstreamSiteProfileEntity siteProfile = siteProfile(
+                9L,
+                UpstreamSiteKind.GEMINI_DIRECT,
+                "https://generativelanguage.googleapis.com"
+        );
 
         Mockito.when(cryptoService.fingerprint("gemini-secret")).thenReturn("fp-gemini");
         Mockito.when(cryptoService.encrypt("gemini-secret")).thenReturn("enc-gemini-secret");
@@ -76,14 +81,14 @@ class CredentialAdminServiceTests {
                 Mockito.eq(List.of("gemini-2.5-pro"))
         )).thenReturn(List.of("gemini-2.5-pro"));
         Mockito.when(modelCatalogService.normalize(Mockito.anyList())).thenAnswer(invocation -> invocation.getArgument(0));
-        Mockito.when(siteRegistryService.ensureSiteProfile(ProviderType.GEMINI_DIRECT, "https://generativelanguage.googleapis.com", null))
+        Mockito.when(siteRegistryService.ensureSiteProfile(null, null, 9L))
                 .thenReturn(siteProfile);
         Mockito.when(credentialRepository.save(Mockito.any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         CredentialResponse response = service.create(new CredentialRequest(
                 "Gemini AI Studio 01",
-                ProviderType.GEMINI_DIRECT,
-                "https://generativelanguage.googleapis.com",
+                null,
+                null,
                 CredentialAuthKind.API_KEY,
                 "gemini-secret",
                 null,
@@ -91,6 +96,7 @@ class CredentialAdminServiceTests {
                 true,
                 null,
                 null,
+                9L,
                 null,
                 3L,
                 List.of("gemini-2.5-pro")
@@ -121,12 +127,16 @@ class CredentialAdminServiceTests {
         UpstreamAccountGroupEntity openAiGroup = new UpstreamAccountGroupEntity();
         ReflectionTestUtils.setField(openAiGroup, "id", 4L);
         openAiGroup.setProviderType(UpstreamAccountProviderType.OPENAI_OAUTH);
-        UpstreamSiteProfileEntity openAiSite = siteProfile(41L);
+        UpstreamSiteProfileEntity openAiSite = siteProfile(
+                41L,
+                UpstreamSiteKind.DEEPSEEK,
+                "https://api.deepseek.com"
+        );
 
         Mockito.when(cryptoService.fingerprint("shared-secret")).thenReturn("fp-shared");
         Mockito.when(cryptoService.encrypt("shared-secret")).thenReturn("enc-shared");
         Mockito.when(groupRepository.findById(4L)).thenReturn(Optional.of(openAiGroup));
-        Mockito.when(siteRegistryService.ensureSiteProfile(ProviderType.OPENAI_COMPATIBLE, "https://api.deepseek.com", null))
+        Mockito.when(siteRegistryService.ensureSiteProfile(null, null, 41L))
                 .thenReturn(openAiSite);
         Mockito.when(credentialRepository.findFirstByApiKeyFingerprintAndProviderTypeAndBaseUrlAndSiteProfileIdOrderByUpdatedAtDesc(
                         "fp-shared",
@@ -156,8 +166,8 @@ class CredentialAdminServiceTests {
 
         CredentialResponse response = service.create(new CredentialRequest(
                 "DeepSeek OpenAI",
-                ProviderType.OPENAI_COMPATIBLE,
-                "https://api.deepseek.com",
+                null,
+                null,
                 CredentialAuthKind.API_KEY,
                 "shared-secret",
                 null,
@@ -165,6 +175,7 @@ class CredentialAdminServiceTests {
                 true,
                 null,
                 null,
+                41L,
                 null,
                 4L,
                 List.of("deepseek-chat")
@@ -177,6 +188,47 @@ class CredentialAdminServiceTests {
                 "https://api.deepseek.com",
                 41L
         );
+    }
+
+    @Test
+    void shouldRejectApiKeyCredentialWithoutProviderSite() {
+        UpstreamCredentialRepository credentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        CredentialCryptoService cryptoService = Mockito.mock(CredentialCryptoService.class);
+        SupportedModelCatalogService modelCatalogService = Mockito.mock(SupportedModelCatalogService.class);
+        UpstreamAccountGroupRepository groupRepository = Mockito.mock(UpstreamAccountGroupRepository.class);
+        ProviderSiteRegistryService siteRegistryService = Mockito.mock(ProviderSiteRegistryService.class);
+        CredentialAdminService service = service(
+                credentialRepository,
+                cryptoService,
+                modelCatalogService,
+                groupRepository,
+                siteRegistryService
+        );
+        UpstreamAccountGroupEntity group = new UpstreamAccountGroupEntity();
+        ReflectionTestUtils.setField(group, "id", 4L);
+
+        Mockito.when(groupRepository.findById(4L)).thenReturn(Optional.of(group));
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> service.create(new CredentialRequest(
+                "Missing API Entry",
+                null,
+                null,
+                CredentialAuthKind.API_KEY,
+                "shared-secret",
+                null,
+                Map.of(),
+                true,
+                null,
+                null,
+                null,
+                null,
+                4L,
+                List.of()
+        )));
+
+        assertEquals("API Key 上游凭证必须绑定厂商/API 入口。", exception.getMessage());
+        Mockito.verify(siteRegistryService, Mockito.never()).ensureSiteProfile(Mockito.any(), Mockito.any(), Mockito.any());
+        Mockito.verify(credentialRepository, Mockito.never()).save(Mockito.any());
     }
 
     @Test
@@ -624,7 +676,8 @@ class CredentialAdminServiceTests {
                 siteRegistryService,
                 accountGroupRepository,
                 new ObjectMapper(),
-                modelCatalogService
+                modelCatalogService,
+                new com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendPolicyService()
         );
     }
 
@@ -643,12 +696,14 @@ class CredentialAdminServiceTests {
         return entity;
     }
 
-    private UpstreamSiteProfileEntity siteProfile(Long id) {
+    private UpstreamSiteProfileEntity siteProfile(Long id, UpstreamSiteKind siteKind, String baseUrlPattern) {
         UpstreamSiteProfileEntity entity = new UpstreamSiteProfileEntity();
         ReflectionTestUtils.setField(entity, "id", id);
-        entity.setProfileCode("site:gemini_direct");
-        entity.setDisplayName("GEMINI_DIRECT");
-        entity.setSiteKind(UpstreamSiteKind.GEMINI_DIRECT);
+        entity.setProfileCode("site:" + siteKind.name().toLowerCase(java.util.Locale.ROOT));
+        entity.setDisplayName(siteKind.name());
+        entity.setSiteKind(siteKind);
+        entity.setBaseUrlPattern(baseUrlPattern);
+        entity.setActive(true);
         return entity;
     }
 

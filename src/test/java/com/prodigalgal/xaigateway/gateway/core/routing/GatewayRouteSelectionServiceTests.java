@@ -97,7 +97,7 @@ class GatewayRouteSelectionServiceTests {
                 "test-key",
                 "sk-gw-test",
                 "masked",
-                List.of("responses"),
+                List.of("xiaomi_mimo.openai_compatible"),
                 List.of("gpt-5-codex"),
                 List.of(new DistributedCredentialBindingView(
                         11L,
@@ -225,7 +225,7 @@ class GatewayRouteSelectionServiceTests {
                 "test-key",
                 "sk-gw-test",
                 "sk-gw-test...masked",
-                List.of("openai"),
+                List.of("openai.native"),
                 List.of(),
                 List.of(new DistributedCredentialBindingView(
                         11L,
@@ -244,7 +244,7 @@ class GatewayRouteSelectionServiceTests {
                 "https://api.openai.com",
                 "gpt-4o",
                 "gpt-4o",
-                List.of("openai"),
+                List.of("openai.native"),
                 true,
                 false,
                 true,
@@ -363,7 +363,7 @@ class GatewayRouteSelectionServiceTests {
                 "test-key",
                 "sk-gw-test",
                 "sk-gw-test...masked",
-                List.of("openai"),
+                List.of("openai.native"),
                 List.of(),
                 List.of(new DistributedCredentialBindingView(
                         11L,
@@ -382,7 +382,7 @@ class GatewayRouteSelectionServiceTests {
                 "https://api.openai.com",
                 "gpt-4o",
                 "gpt-4o",
-                List.of("openai"),
+                List.of("openai.native"),
                 true,
                 false,
                 true,
@@ -483,11 +483,11 @@ class GatewayRouteSelectionServiceTests {
         );
 
         DistributedKeyView keyView = new DistributedKeyView(
-                1L, "test-key", "sk-gw-test", "masked", List.of("openai"), List.of(), List.of()
+                1L, "test-key", "sk-gw-test", "masked", List.of("openai.native"), List.of(), List.of()
         );
         CatalogCandidateView candidate = new CatalogCandidateView(
                 101L, "candidate", ProviderType.OPENAI_DIRECT, "https://api.openai.com", "gpt-4o", "gpt-4o",
-                List.of("openai"), true, true, true, true, true, true, ReasoningTransport.OPENAI_CHAT
+                List.of("openai.native"), true, true, true, true, true, true, ReasoningTransport.OPENAI_CHAT
         );
         RouteCandidateView routeCandidateView = new RouteCandidateView(candidate, 11L, 10, 100, "NATIVE", 3);
         RouteCandidateEvaluation evaluation = new RouteCandidateEvaluation(
@@ -562,7 +562,7 @@ class GatewayRouteSelectionServiceTests {
                 "test-key",
                 "sk-gw-test",
                 "masked",
-                List.of("openai"),
+                List.of("gemini.native"),
                 List.of(),
                 List.of(new DistributedCredentialBindingView(
                         11L,
@@ -704,7 +704,7 @@ class GatewayRouteSelectionServiceTests {
                 "test-key",
                 "sk-gw-test",
                 "masked",
-                List.of("openai"),
+                List.of("openai.native"),
                 List.of(),
                 List.of(new DistributedCredentialBindingView(
                         11L,
@@ -723,7 +723,7 @@ class GatewayRouteSelectionServiceTests {
                 "https://api.openai.com",
                 "gpt-4o-mini",
                 "gpt-4o-mini",
-                List.of("openai"),
+                List.of("openai.native"),
                 true,
                 true,
                 true,

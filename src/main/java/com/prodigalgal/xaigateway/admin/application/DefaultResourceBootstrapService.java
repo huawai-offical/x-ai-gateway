@@ -14,12 +14,15 @@ public class DefaultResourceBootstrapService {
 
     private final AccountGroupAdminService accountGroupAdminService;
     private final NetworkGovernanceService networkGovernanceService;
+    private final ProviderSiteRegistryService providerSiteRegistryService;
 
     public DefaultResourceBootstrapService(
             AccountGroupAdminService accountGroupAdminService,
-            NetworkGovernanceService networkGovernanceService) {
+            NetworkGovernanceService networkGovernanceService,
+            ProviderSiteRegistryService providerSiteRegistryService) {
         this.accountGroupAdminService = accountGroupAdminService;
         this.networkGovernanceService = networkGovernanceService;
+        this.providerSiteRegistryService = providerSiteRegistryService;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -31,6 +34,11 @@ public class DefaultResourceBootstrapService {
     public void bootstrapDefaults() {
         var defaultGroup = accountGroupAdminService.ensureDefaultGroup();
         networkGovernanceService.ensureDefaultTlsProfiles();
-        log.info("默认资源引导完成：default 账号分组 id={}，TLS 指纹默认画像已校验。", defaultGroup.getId());
+        var providerSites = providerSiteRegistryService.importDefaultPresets();
+        log.info(
+                "默认资源引导完成：default 账号分组 id={}，TLS 指纹默认画像已校验，默认厂商 API 入口={} 个。",
+                defaultGroup.getId(),
+                providerSites.size()
+        );
     }
 }

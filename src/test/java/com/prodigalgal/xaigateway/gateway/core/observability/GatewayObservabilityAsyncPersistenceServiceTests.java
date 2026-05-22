@@ -17,6 +17,7 @@ import com.prodigalgal.xaigateway.infra.persistence.repository.RouteDecisionLogR
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UsageRecordRepository;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -31,7 +32,9 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GatewayObservabilityAsyncPersistenceServiceTests {
 
@@ -313,6 +316,61 @@ class GatewayObservabilityAsyncPersistenceServiceTests {
     }
 
     @Test
+    void shouldBackOffFlushWhenRedisReadTimesOut() {
+        QueueFixture fixture = new QueueFixture();
+        fixture.gatewayProperties.getObservability().getAsync().setRedisFailureBackoff(Duration.ofMinutes(1));
+        Mockito.when(fixture.listOperations.leftPop(Mockito.anyString(), Mockito.anyLong()))
+                .thenThrow(new IllegalStateException("redis timeout"));
+
+        GatewayObservabilityAsyncPersistenceService service = fixture.service();
+
+        assertEquals(0, service.flushBatch());
+        Mockito.verify(fixture.listOperations).leftPop("xag:observability:hot-path", 200L);
+
+        Mockito.clearInvocations(fixture.redisTemplate, fixture.listOperations);
+        assertEquals(0, service.flushBatch());
+        Mockito.verifyNoInteractions(fixture.redisTemplate, fixture.listOperations);
+    }
+
+    @Test
+    void shouldBackOffEnqueueWhenRedisWriteTimesOut() {
+        QueueFixture fixture = new QueueFixture();
+        fixture.gatewayProperties.getObservability().getAsync().setRedisFailureBackoff(Duration.ofMinutes(1));
+        Mockito.doThrow(new IllegalStateException("redis timeout"))
+                .when(fixture.listOperations)
+                .rightPush(Mockito.anyString(), Mockito.anyString());
+
+        GatewayObservabilityAsyncPersistenceService service = fixture.service();
+
+        assertFalse(service.enqueueRequestLogStart(requestStartSnapshot("req-timeout")));
+        Mockito.verify(fixture.listOperations).rightPush(Mockito.eq("xag:observability:hot-path"), Mockito.anyString());
+
+        Mockito.clearInvocations(fixture.redisTemplate, fixture.listOperations);
+        assertFalse(service.enqueueRequestLogStart(requestStartSnapshot("req-backoff")));
+        Mockito.verifyNoInteractions(fixture.redisTemplate, fixture.listOperations);
+        assertEquals(0, fixture.queue.size());
+    }
+
+    @Test
+    void shouldRetryRedisQueueAfterBackoffExpires() {
+        QueueFixture fixture = new QueueFixture();
+        fixture.gatewayProperties.getObservability().getAsync().setRedisFailureBackoff(Duration.ZERO);
+        Mockito.doThrow(new IllegalStateException("redis timeout"))
+                .doAnswer(invocation -> {
+                    fixture.queue.add(invocation.getArgument(1));
+                    return (long) fixture.queue.size();
+                })
+                .when(fixture.listOperations)
+                .rightPush(Mockito.anyString(), Mockito.anyString());
+
+        GatewayObservabilityAsyncPersistenceService service = fixture.service();
+
+        assertFalse(service.enqueueRequestLogStart(requestStartSnapshot("req-timeout")));
+        assertTrue(service.enqueueRequestLogStart(requestStartSnapshot("req-recovered")));
+        assertEquals(1, fixture.queue.size());
+    }
+
+    @Test
     void shouldMergeRuntimeMetricsThroughRedisQueueBeforeWritingBackToPg() {
         QueueFixture fixture = new QueueFixture();
         UpstreamCredentialEntity credential = new UpstreamCredentialEntity();
@@ -399,6 +457,44 @@ class GatewayObservabilityAsyncPersistenceServiceTests {
         assertEquals(Instant.parse("2026-04-20T12:02:00Z"), account.getLastUsedAt());
         Mockito.verify(fixture.upstreamCredentialRepository).save(credential);
         Mockito.verify(fixture.upstreamAccountRepository).save(account);
+    }
+
+    private static GatewayObservabilityAsyncPersistenceService.RequestLogSnapshot requestStartSnapshot(String requestId) {
+        return new GatewayObservabilityAsyncPersistenceService.RequestLogSnapshot(
+                requestId,
+                1L,
+                "sk-gw-test",
+                "openai",
+                "/v1/chat/completions",
+                "chat",
+                "chat_completions",
+                "model-a",
+                "model-a",
+                "model-a",
+                "model-a",
+                ProviderType.OPENAI_DIRECT,
+                101L,
+                "WEIGHTED_HASH",
+                "native",
+                "NATIVE",
+                "NATIVE",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                "prefix-1",
+                "finger-1",
+                false,
+                GatewayRequestStatus.IN_PROGRESS,
+                null,
+                null,
+                null,
+                Instant.parse("2026-04-20T12:00:00Z"),
+                null
+        );
     }
 
     private static final class QueueFixture {

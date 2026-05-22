@@ -5,6 +5,7 @@ import com.prodigalgal.xaigateway.gateway.core.auth.AccessGroupEntitlementServic
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeySecretService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeySecrets;
 import com.prodigalgal.xaigateway.gateway.core.shared.ModelIdNormalizer;
+import com.prodigalgal.xaigateway.gateway.core.shared.ProtocolSuite;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.account.UpstreamAccountProviderType;
 import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyAccountGroupBindingEntity;
@@ -304,9 +305,12 @@ public class PortalAuthService {
         key.setDescription("用户门户自助创建");
         key.setOwnerUser(user);
         key.setActive(true);
-        key.setAllowedProtocolSuites(resolveProtocols(request.allowedProtocolSuites(), defaultGroup.getSupportedProtocols()));
+        ProviderType defaultProviderType = defaultGroup.getProviderType() == null
+                ? ProviderType.OPENAI_DIRECT
+                : defaultGroup.getProviderType().routeProviderType();
+        key.setAllowedProtocolSuites(resolveProtocolSuites(request.allowedProtocolSuites(), defaultProviderType));
         key.setAllowedModels(resolveModels(request.allowedModels(), defaultGroup.getSupportedModels()));
-        key.setAllowedProviderTypes(List.of(defaultGroup.getProviderType().routeProviderType().name()));
+        key.setAllowedProviderTypes(List.of(defaultProviderType.name()));
         key.setRpmLimit(positiveOrDefault(request.rpmLimit(), 60));
         key.setTpmLimit(positiveOrDefault(request.tpmLimit(), 120_000));
         key.setConcurrencyLimit(positiveOrDefault(request.concurrencyLimit(), 2));
@@ -824,20 +828,21 @@ public class PortalAuthService {
         return value == null || value <= 0 ? fallback : value;
     }
 
-    private List<String> resolveProtocols(List<String> requested, List<String> groupProtocols) {
-        List<String> available = normalizePlainList(groupProtocols).stream()
-                .map(value -> value.toLowerCase(Locale.ROOT))
-                .toList();
-        List<String> selected = normalizePlainList(requested).stream()
-                .map(value -> value.toLowerCase(Locale.ROOT))
-                .toList();
-        if (selected.isEmpty()) {
-            return available.isEmpty() ? List.of("openai") : available;
+    private List<String> resolveProtocolSuites(List<String> requested, ProviderType providerType) {
+        List<String> selected = ProtocolSuite.normalizeList(requested);
+        if (!selected.isEmpty()) {
+            return selected;
         }
-        if (!available.isEmpty() && !available.containsAll(selected)) {
-            throw new IllegalArgumentException("存在默认账号分组不支持的协议。");
+        if (providerType == ProviderType.ANTHROPIC_DIRECT) {
+            return List.of(ProtocolSuite.ANTHROPIC_NATIVE);
         }
-        return selected;
+        if (providerType == ProviderType.GEMINI_DIRECT) {
+            return List.of(ProtocolSuite.GEMINI_NATIVE, ProtocolSuite.VERTEX_AI_GEMINI_NATIVE);
+        }
+        if (providerType == ProviderType.OLLAMA_DIRECT) {
+            return List.of(ProtocolSuite.OLLAMA_NATIVE);
+        }
+        return ProtocolSuite.OPENAI_COMPATIBLE_FAMILY;
     }
 
     private List<String> resolveModels(List<String> requested, List<String> groupModels) {

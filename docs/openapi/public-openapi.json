@@ -2346,41 +2346,6 @@
         }
       }
     },
-    "/v1/realtime/client_secrets" : {
-      "post" : {
-        "summary" : "Create Realtime client secret baseline",
-        "operationId" : "post_v1_realtime_client_secrets",
-        "tags" : [ "gateway" ],
-        "security" : [ {
-          "bearerAuth" : [ ]
-        } ],
-        "responses" : {
-          "200" : {
-            "description" : "OK"
-          }
-        },
-        "description" : "Creates a short-lived Realtime client secret through gateway-local orchestration. This is the functional text/session baseline and does not claim full WebRTC, SIP or calls parity.",
-        "requestBody" : {
-          "content" : {
-            "application/json" : {
-              "schema" : {
-                "type" : "object",
-                "properties" : {
-                  "session" : {
-                    "type" : "object",
-                    "description" : "Realtime session configuration such as model, modalities and instructions."
-                  },
-                  "expires_after" : {
-                    "type" : "object",
-                    "description" : "Optional expiry policy for the short-lived client secret."
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/v1/models" : {
       "get" : {
         "summary" : "List accessible OpenAI-compatible models",

@@ -92,7 +92,9 @@ class CredentialAdminControllerTests {
                           "providerType":"GEMINI_DIRECT",
                           "baseUrl":"https://generativelanguage.googleapis.com",
                           "authKind":"API_KEY",
-                          "secret":"token"
+                          "secret":"token",
+                          "siteProfileId":15,
+                          "groupId":15
                         }
                         """)
                 .exchange()
@@ -339,6 +341,7 @@ class CredentialAdminControllerTests {
                 null,
                 null,
                 15L,
+                21L,
                 15L,
                 "default",
                 now,
@@ -378,6 +381,7 @@ class CredentialAdminControllerTests {
                 now,
                 sourceType.equals("API_KEY") ? null : now,
                 sourceType.equals("API_KEY") ? null : now,
+                null,
                 null,
                 null,
                 null,

@@ -26,7 +26,7 @@ import org.hibernate.annotations.UpdateTimestamp;
         uniqueConstraints = {
                 @UniqueConstraint(
                         name = "uk_upstream_credential_scope_fingerprint",
-                        columnNames = {"api_key_fingerprint", "provider_type", "base_url", "site_profile_id"}
+                        columnNames = {"api_key_fingerprint", "provider_type", "base_url", "site_profile_id", "protocol_endpoint_id"}
                 )
         },
         indexes = {
@@ -174,6 +174,10 @@ public class UpstreamCredentialEntity {
     @Column(name = "site_profile_id")
     @Comment("绑定的站点档案 ID。")
     private Long siteProfileId;
+
+    @Column(name = "protocol_endpoint_id")
+    @Comment("绑定的厂商协议入口 ID。")
+    private Long protocolEndpointId;
 
     @Column(name = "group_id", nullable = true)
     @Comment("账号分组 ID。")
@@ -451,6 +455,14 @@ public class UpstreamCredentialEntity {
 
     public void setSiteProfileId(Long siteProfileId) {
         this.siteProfileId = siteProfileId;
+    }
+
+    public Long getProtocolEndpointId() {
+        return protocolEndpointId;
+    }
+
+    public void setProtocolEndpointId(Long protocolEndpointId) {
+        this.protocolEndpointId = protocolEndpointId;
     }
 
     public Long getGroupId() {

@@ -16,6 +16,7 @@ import com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
 import com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendPolicyService;
 import com.prodigalgal.xaigateway.gateway.core.shared.ModelIdNormalizer;
+import com.prodigalgal.xaigateway.gateway.core.shared.ProtocolSuite;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SiteModelCapabilityEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.SiteModelCapabilityRepository;
@@ -78,9 +79,6 @@ public class ModelCatalogQueryService {
 
     public List<GatewayPublicModelView> listAccessiblePublicModels(DistributedKeyView distributedKey, String protocol) {
         String normalizedProtocol = normalizeProtocol(protocol);
-        if (!isProtocolAllowed(distributedKey, normalizedProtocol)) {
-            throw new IllegalArgumentException("当前 DistributedKey 不允许访问该协议。");
-        }
 
         Set<Long> boundCredentialIds = distributedKey.bindings().stream()
                 .map(DistributedCredentialBindingView::credentialId)
@@ -104,6 +102,7 @@ public class ModelCatalogQueryService {
         ).stream()
                 .filter(candidate -> actualCapabilityLevel(candidate) != InteropCapabilityLevel.UNSUPPORTED)
                 .filter(candidate -> supportsProtocolSurface(candidate, normalizedProtocol))
+                .filter(candidate -> isProtocolSuiteAllowed(distributedKey, candidate))
                 .sorted(Comparator.comparing(CatalogCandidateView::modelKey).thenComparing(CatalogCandidateView::credentialId))
                 .toList();
 
@@ -268,8 +267,9 @@ public class ModelCatalogQueryService {
         return providerMatches && baseUrlMatches;
     }
 
-    private boolean isProtocolAllowed(DistributedKeyView distributedKey, String protocol) {
-        return distributedKey.allowedProtocolSuites().isEmpty() || distributedKey.allowedProtocolSuites().contains(protocol);
+    private boolean isProtocolSuiteAllowed(DistributedKeyView distributedKey, CatalogCandidateView candidate) {
+        return distributedKey.allowedProtocolSuites().isEmpty()
+                || distributedKey.allowedProtocolSuites().contains(ProtocolSuite.fromVendorAndSiteKind(candidate.vendorCode(), candidate.siteKind()));
     }
 
     private boolean isModelAllowed(DistributedKeyView distributedKey, String modelNameOrAlias) {
@@ -416,6 +416,7 @@ public class ModelCatalogQueryService {
                 credential.getProviderType(),
                 capability.getSiteProfile().getId(),
                 capability.getSiteProfile().getProviderFamily(),
+                capability.getSiteProfile().getVendorCode(),
                 capability.getSiteProfile().getSiteKind(),
                 capability.getSiteProfile().getAuthStrategy(),
                 capability.getSiteProfile().getPathStrategy(),

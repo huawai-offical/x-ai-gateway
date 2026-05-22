@@ -275,6 +275,7 @@ public class ExecutionBackendPolicyService {
             return ProviderType.OPENAI_COMPATIBLE;
         }
         return switch (siteKind) {
+            case OPENAI_DIRECT, AZURE_OPENAI -> ProviderType.OPENAI_DIRECT;
             case ANTHROPIC_DIRECT -> ProviderType.ANTHROPIC_DIRECT;
             case GEMINI_DIRECT, VERTEX_AI -> ProviderType.GEMINI_DIRECT;
             case OLLAMA_DIRECT -> ProviderType.OLLAMA_DIRECT;

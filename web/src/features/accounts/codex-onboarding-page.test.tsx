@@ -29,7 +29,7 @@ const { apiRequestMock } = vi.hoisted(() => ({
           keyName: 'codex-cli-key',
           maskedKey: 'xag_***test',
           active: true,
-          allowedProtocolSuites: ['openai', 'responses'],
+          allowedProtocolSuites: ['openai.native'],
           allowedModels: ['gpt-5.4@low'],
           allowedProviderTypes: ['OPENAI_DIRECT'],
           allowedClientFamilies: ['CODEX'],

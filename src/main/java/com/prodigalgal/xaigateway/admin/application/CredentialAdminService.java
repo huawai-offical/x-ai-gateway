@@ -16,6 +16,7 @@ import com.prodigalgal.xaigateway.admin.api.OpenAiDirectSmokeCertificationRespon
 import com.prodigalgal.xaigateway.admin.api.OpenAiDirectSmokeRequest;
 import com.prodigalgal.xaigateway.admin.api.OpenAiDirectSmokeResponse;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CredentialModelDiscoveryService;
+import com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendPolicyService;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
@@ -46,6 +47,7 @@ public class CredentialAdminService {
     private final UpstreamAccountGroupRepository upstreamAccountGroupRepository;
     private final ObjectMapper objectMapper;
     private final SupportedModelCatalogService supportedModelCatalogService;
+    private final ExecutionBackendPolicyService executionBackendPolicyService;
     private final OpenAiDirectSmokeHttpClient openAiDirectSmokeHttpClient;
     private final OpenAiDirectResourceSmokeHttpClient openAiDirectResourceSmokeHttpClient;
     private final FunctionalProviderSmokeHttpClient functionalProviderSmokeHttpClient;
@@ -59,7 +61,8 @@ public class CredentialAdminService {
             ProviderSiteRegistryService providerSiteRegistryService,
             UpstreamAccountGroupRepository upstreamAccountGroupRepository,
             ObjectMapper objectMapper,
-            SupportedModelCatalogService supportedModelCatalogService) {
+            SupportedModelCatalogService supportedModelCatalogService,
+            ExecutionBackendPolicyService executionBackendPolicyService) {
         this.upstreamCredentialRepository = upstreamCredentialRepository;
         this.credentialCryptoService = credentialCryptoService;
         this.credentialModelDiscoveryService = credentialModelDiscoveryService;
@@ -67,6 +70,7 @@ public class CredentialAdminService {
         this.upstreamAccountGroupRepository = upstreamAccountGroupRepository;
         this.objectMapper = objectMapper;
         this.supportedModelCatalogService = supportedModelCatalogService;
+        this.executionBackendPolicyService = executionBackendPolicyService;
         this.openAiDirectSmokeHttpClient = new OpenAiDirectSmokeHttpClient(objectMapper);
         this.openAiDirectResourceSmokeHttpClient = new OpenAiDirectResourceSmokeHttpClient(objectMapper);
         this.functionalProviderSmokeHttpClient = new FunctionalProviderSmokeHttpClient(objectMapper);
@@ -106,16 +110,14 @@ public class CredentialAdminService {
         String secret = requireSecret(request.resolvedSecret());
         String fingerprint = credentialCryptoService.fingerprint(secret);
         UpstreamAccountGroupEntity group = resolveGroup(request.groupId());
-        UpstreamSiteProfileEntity siteProfile = providerSiteRegistryService.ensureSiteProfile(
-                request.providerType(),
-                request.baseUrl().trim(),
-                request.siteProfileId()
-        );
+        UpstreamSiteProfileEntity siteProfile = requireCredentialSiteProfile(request.siteProfileId());
+        ProviderType providerType = providerTypeForSite(siteProfile);
+        String baseUrl = baseUrlForSite(siteProfile);
         UpstreamCredentialEntity entity = upstreamCredentialRepository
                 .findFirstByApiKeyFingerprintAndProviderTypeAndBaseUrlAndSiteProfileIdOrderByUpdatedAtDesc(
                         fingerprint,
-                        request.providerType(),
-                        request.baseUrl().trim(),
+                        providerType,
+                        baseUrl,
                         siteProfile.getId()
                 )
                 .map(existing -> {
@@ -127,7 +129,7 @@ public class CredentialAdminService {
                 })
                 .orElseGet(UpstreamCredentialEntity::new);
 
-        apply(entity, request, true, group, siteProfile);
+        apply(entity, request, true, group, siteProfile, providerType, baseUrl);
         return toResponse(upstreamCredentialRepository.save(entity));
     }
 
@@ -927,14 +929,44 @@ public class CredentialAdminService {
         return entity.get();
     }
 
+    private UpstreamSiteProfileEntity requireCredentialSiteProfile(Long siteProfileId) {
+        if (siteProfileId == null) {
+            throw new IllegalArgumentException("API Key 上游凭证必须绑定厂商/API 入口。");
+        }
+        UpstreamSiteProfileEntity siteProfile = providerSiteRegistryService.ensureSiteProfile(null, null, siteProfileId);
+        if (!siteProfile.isActive()) {
+            throw new IllegalArgumentException("指定的厂商/API 入口已停用，不能绑定上游凭证。");
+        }
+        return siteProfile;
+    }
+
+    private UpstreamSiteProfileEntity requireExistingCredentialSiteProfile(UpstreamCredentialEntity entity) {
+        if (entity.getSiteProfileId() == null) {
+            throw new IllegalArgumentException("API Key 上游凭证必须绑定厂商/API 入口。");
+        }
+        return requireCredentialSiteProfile(entity.getSiteProfileId());
+    }
+
+    private ProviderType providerTypeForSite(UpstreamSiteProfileEntity siteProfile) {
+        return executionBackendPolicyService.providerTypeForSite(siteProfile.getSiteKind());
+    }
+
+    private String baseUrlForSite(UpstreamSiteProfileEntity siteProfile) {
+        String baseUrl = siteProfile.getBaseUrlPattern();
+        if (baseUrl == null || baseUrl.isBlank()) {
+            throw new IllegalArgumentException("指定的厂商/API 入口未配置 Base URL，不能绑定上游凭证。");
+        }
+        return baseUrl.trim();
+    }
+
     private void apply(UpstreamCredentialEntity entity, CredentialRequest request, boolean requireSecret) {
         UpstreamAccountGroupEntity group = resolveGroup(request.groupId());
-        UpstreamSiteProfileEntity siteProfile = providerSiteRegistryService.ensureSiteProfile(
-                request.providerType(),
-                request.baseUrl().trim(),
-                request.siteProfileId()
-        );
-        apply(entity, request, requireSecret, group, siteProfile);
+        UpstreamSiteProfileEntity siteProfile = request.siteProfileId() == null
+                ? requireExistingCredentialSiteProfile(entity)
+                : requireCredentialSiteProfile(request.siteProfileId());
+        ProviderType providerType = providerTypeForSite(siteProfile);
+        String baseUrl = baseUrlForSite(siteProfile);
+        apply(entity, request, requireSecret, group, siteProfile, providerType, baseUrl);
     }
 
     private void apply(
@@ -942,22 +974,24 @@ public class CredentialAdminService {
             CredentialRequest request,
             boolean requireSecret,
             UpstreamAccountGroupEntity group,
-            UpstreamSiteProfileEntity siteProfile) {
+            UpstreamSiteProfileEntity siteProfile,
+            ProviderType providerType,
+            String baseUrl) {
         applySecret(
                 entity,
                 request.resolvedSecret(),
                 requireSecret,
-                request.providerType(),
-                request.baseUrl().trim(),
+                providerType,
+                baseUrl,
                 siteProfile.getId()
         );
         entity.setCredentialName(request.credentialName().trim());
-        entity.setProviderType(request.providerType());
-        entity.setBaseUrl(request.baseUrl().trim());
+        entity.setProviderType(providerType);
+        entity.setBaseUrl(baseUrl);
         entity.setAuthKind(request.resolvedAuthKind());
         entity.setCredentialMetadataJson(writeMetadata(request.resolvedCredentialMetadata()));
         entity.setSupportedModels(supportedModelCatalogService.resolveForCredentialImport(
-                request.providerType(),
+                providerType,
                 group,
                 request.resolvedSupportedModels()
         ));
@@ -1038,6 +1072,7 @@ public class CredentialAdminService {
                 entity.getProxyId(),
                 entity.getTlsFingerprintProfileId(),
                 entity.getSiteProfileId(),
+                entity.getProtocolEndpointId(),
                 entity.getGroupId(),
                 groupName,
                 entity.getCreatedAt(),

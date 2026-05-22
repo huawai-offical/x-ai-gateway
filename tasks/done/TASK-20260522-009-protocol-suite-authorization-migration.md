@@ -75,12 +75,12 @@
 
 ## 验收标准
 
-- [ ] 代码中不再存在 `allowedProtocols` 业务字段。
-- [ ] 数据库不再使用 `allowed_protocols_json` 列。
-- [ ] 路由判断使用 `allowedProtocolSuites` 和候选 `siteKind`。
-- [ ] 前端创建 Key 不再把 `responses` 当作允许协议选项。
-- [ ] 后端 targeted tests 与编译通过。
-- [ ] 文档和任务状态回写完成。
+- [x] 代码中不再存在 `allowedProtocols` 业务字段。
+- [x] 数据库运行态列迁移为 `allowed_protocol_suites_json`；历史 baseline 里的 `allowed_protocols_json` 仅作为 0003 迁移前状态存在。
+- [x] 路由判断使用 `allowedProtocolSuites` 和候选 `vendorCode + siteKind`。
+- [x] 前端创建 Key 不再把 `responses` 当作允许协议选项。
+- [x] 后端 targeted tests 与编译通过。
+- [x] 文档和任务状态回写完成。
 
 ## 测试边界
 
@@ -99,4 +99,23 @@
 
 ## 当前状态
 
-In Progress
+Done
+
+## 实施记录
+
+- 新增 `ProtocolSuite`，统一协议簇 code、site kind 映射和 MiMo/DeepSeek vendor 特例。
+- 分发 Key、访问组、Admin/Portal DTO、权益解析、目录查询和路由选择统一迁移到 `allowedProtocolSuites`。
+- `CatalogCandidateView` 补充 `vendorCode`，候选过滤时不再把入口协议当授权字段。
+- 新增 Liquibase `0003-protocol-suite-authorization`，直接重命名列并转换旧 JSON 值，不保留旧 API 字段兼容。
+- 前端 Key 创建/展示、Portal Key、自助访问组、Codex onboarding 和相关测试 mock 已切换到协议簇值。
+
+## 验证记录
+
+- `.\gradlew.bat compileJava compileTestJava`：通过。
+- `.\gradlew.bat compileJava compileTestJava test --tests "com.prodigalgal.xaigateway.gateway.core.auth.AccessGroupEntitlementServiceTests" --tests "com.prodigalgal.xaigateway.admin.application.AccessGroupAdminServiceTests" --tests "com.prodigalgal.xaigateway.portal.application.PortalAuthServiceTests" --tests "com.prodigalgal.xaigateway.gateway.core.catalog.ModelCatalogQueryServiceTests" --tests "com.prodigalgal.xaigateway.gateway.core.routing.GatewayRouteSelectionServiceTests"`：通过。
+- `bun run typecheck`：通过。
+- `bun run test -- keys-page key-detail-page portal-home-page portal-keys-page codex-onboarding-page account-group-detail-page access-groups-page`：通过，实际执行 4 个测试文件 13 个用例。
+
+## 遗留问题
+
+- `.\gradlew.bat test` 全量仍失败，失败集中在官方账号导入测试缺少账号分组 mock、资源/endpoint conformance baseline 漂移、缺少 `removed-object-lifecycle` fixture、OpenAI Direct dry-run 资源族数量基线不一致。该问题不属于本任务的协议簇授权迁移闭环，建议拆分新的测试基线清理任务。

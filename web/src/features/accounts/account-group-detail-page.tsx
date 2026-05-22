@@ -1815,9 +1815,8 @@ function isDistributedKeyCompatibleWithGroup(key: DistributedKey, group: Account
   }
   const groupProviderType = resolveRouteProviderType(group.providerType)
   const providerMatches = !key.allowedProviderTypes?.length || key.allowedProviderTypes.includes(groupProviderType)
-  const protocolMatches = !key.allowedProtocolSuites?.length || !group.supportedProtocols?.length || key.allowedProtocolSuites.some((protocol) => group.supportedProtocols?.includes(protocol))
   const clientFamilyMatches = !key.allowedClientFamilies?.length || !group.allowedClientFamilies?.length || key.allowedClientFamilies.some((family) => group.allowedClientFamilies?.includes(family))
-  return providerMatches && protocolMatches && clientFamilyMatches
+  return providerMatches && clientFamilyMatches
 }
 
 function buildRuntimeBatchPreflight(accounts: Account[]): RuntimeBatchRecoveryResult {

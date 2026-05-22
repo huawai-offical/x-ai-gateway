@@ -11,6 +11,7 @@ import com.prodigalgal.xaigateway.gateway.core.auth.AccessGroupEntitlementServic
 import com.prodigalgal.xaigateway.gateway.core.auth.ResolvedAccessPolicy;
 import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
 import com.prodigalgal.xaigateway.gateway.core.shared.ModelIdNormalizer;
+import com.prodigalgal.xaigateway.gateway.core.shared.ProtocolSuite;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.infra.persistence.entity.AccessGroupEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyAccessGroupGrantEntity;
@@ -158,7 +159,7 @@ public class AccessGroupAdminService {
         entity.setDescription(blankToNull(request.description()));
         entity.setActive(request.active() == null ? isCreate || entity.isActive() : request.active());
         entity.setPriority(resolvePriority(request.priority(), entity.getPriority()));
-        entity.setAllowedProtocolSuites(normalizeProtocols(request.allowedProtocolSuites()));
+        entity.setAllowedProtocolSuites(normalizeProtocolSuites(request.allowedProtocolSuites()));
         entity.setAllowedModels(normalizeModels(request.allowedModels()));
         entity.setAllowedProviderTypes(normalizeProviderTypes(request.allowedProviderTypes()));
         entity.setAllowedClientFamilies(normalizeClientFamilies(request.allowedClientFamilies()));
@@ -218,15 +219,8 @@ public class AccessGroupAdminService {
         return value == null || value <= 0 ? null : value;
     }
 
-    private List<String> normalizeProtocols(List<String> protocols) {
-        if (protocols == null) {
-            return List.of();
-        }
-        return protocols.stream()
-                .filter(value -> value != null && !value.isBlank())
-                .map(value -> value.trim().toLowerCase(Locale.ROOT))
-                .distinct()
-                .toList();
+    private List<String> normalizeProtocolSuites(List<String> protocolSuites) {
+        return ProtocolSuite.normalizeList(protocolSuites);
     }
 
     private List<String> normalizeModels(List<String> models) {

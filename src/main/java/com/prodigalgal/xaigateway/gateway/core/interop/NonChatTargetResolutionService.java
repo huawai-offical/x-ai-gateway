@@ -284,6 +284,7 @@ public class NonChatTargetResolutionService {
                 credential.get().getProviderType(),
                 siteProfile == null ? null : siteProfile.getId(),
                 siteProfile == null ? providerFamilyFor(credential.get().getProviderType()) : siteProfile.getProviderFamily(),
+                siteProfile == null ? null : siteProfile.getVendorCode(),
                 siteProfile == null ? null : siteProfile.getSiteKind(),
                 siteProfile == null ? null : siteProfile.getAuthStrategy(),
                 siteProfile == null ? null : siteProfile.getPathStrategy(),

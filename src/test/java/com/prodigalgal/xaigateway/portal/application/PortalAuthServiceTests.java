@@ -471,7 +471,7 @@ class PortalAuthServiceTests {
         ReflectionTestUtils.setField(key, "id", id);
         key.setKeyName("Portal Key");
         key.setMaskedKey("xag_****_tail");
-        key.setAllowedProtocolSuites(List.of("openai"));
+        key.setAllowedProtocolSuites(List.of("openai.native"));
         key.setAllowedModels(List.of("gpt-5-mini"));
         key.setActive(true);
         return key;

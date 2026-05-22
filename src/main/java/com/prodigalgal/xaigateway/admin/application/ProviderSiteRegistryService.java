@@ -105,6 +105,20 @@ public class ProviderSiteRegistryService {
 
     public UpstreamSiteProfileEntity importPreset(String code, boolean active, boolean refreshCapabilities) {
         ProviderPresetDefinition preset = findPreset(code);
+        return importPreset(preset, active, refreshCapabilities);
+    }
+
+    public List<UpstreamSiteProfileEntity> importDefaultPresets() {
+        return providerCatalogLoader.load().presets().stream()
+                .filter(preset -> !preset.deprecated())
+                .map(preset -> importPreset(preset, true, true))
+                .toList();
+    }
+
+    private UpstreamSiteProfileEntity importPreset(
+            ProviderPresetDefinition preset,
+            boolean active,
+            boolean refreshCapabilities) {
         String profileCode = preset.profileCode();
         Optional<UpstreamSiteProfileEntity> existing = upstreamSiteProfileRepository.findByProfileCode(profileCode);
         UpstreamSiteProfileEntity entity = existing.orElseGet(() -> upstreamSiteProfileRepository.save(createProfile(preset, active)));
@@ -186,7 +200,7 @@ public class ProviderSiteRegistryService {
         entity.setBaseUrlPattern(preset.defaultBaseUrl());
         entity.setDescription(preset.description());
         entity.setConversationProfileJson(writeJson(preset.conversationProfile()));
-        entity.setProfileSource(SiteProfileSource.MANUAL);
+        entity.setProfileSource(SiteProfileSource.PRESET);
         entity.setActive(active);
         return entity;
     }
@@ -280,7 +294,7 @@ public class ProviderSiteRegistryService {
             policy.setMappingSource("preset");
             policy.setDescription("由 provider preset 导入：" + preset.code());
             ModelPolicyEntity existing = modelPolicyRepository
-                    .findAllByScopeTypeAndScopeIdAndEnabledTrueOrderByPriorityAscCreatedAtAsc(
+                    .findAllByScopeTypeAndScopeIdOrderByPriorityAscCreatedAtAsc(
                             ModelPolicyScopeType.SITE_PROFILE,
                             siteProfile.getId()
                     )

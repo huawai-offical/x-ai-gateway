@@ -42,6 +42,7 @@ const { apiRequestMock } = vi.hoisted(() => ({
           secretFingerprint: `fp-${index + 1}`,
           metadata: {},
           active: true,
+          siteProfileId: 20,
           groupId: 3,
           groupName: 'Gemini AI Studio',
           lastUsedAt: null,
@@ -76,6 +77,64 @@ const { apiRequestMock } = vi.hoisted(() => ({
         { id: 8, profileName: 'Chrome 指纹', profileCode: 'chrome-stable', active: true },
       ]
     }
+    if (url === '/admin/provider-sites' && !init?.method) {
+      return [
+        {
+          id: 10,
+          profileCode: 'site:openai',
+          displayName: 'OpenAI API',
+          vendorCode: 'openai',
+          vendorName: 'OpenAI',
+          providerFamily: 'OPENAI',
+          siteKind: 'OPENAI_DIRECT',
+          authStrategy: 'BEARER',
+          pathStrategy: 'OPENAI_V1',
+          modelAddressingStrategy: 'MODEL_NAME',
+          errorSchemaStrategy: 'OPENAI_ERROR',
+          baseUrlPattern: 'https://api.openai.com',
+          profileSource: 'PRESET',
+          active: true,
+          healthState: 'UNKNOWN',
+          supportedProtocols: ['openai'],
+          compatibilitySurface: 'openai',
+          credentialRequirements: ['api_key'],
+          cooldownCredentialCount: 0,
+          linkedCredentialCount: 0,
+          hasSnapshot: false,
+          supportedBackends: ['SPRING_AI', 'NATIVE'],
+          features: {},
+          surfaces: {},
+          modelCount: 0,
+        },
+        {
+          id: 20,
+          profileCode: 'site:gemini',
+          displayName: 'Gemini API',
+          vendorCode: 'gemini',
+          vendorName: 'Gemini',
+          providerFamily: 'GOOGLE',
+          siteKind: 'GEMINI_DIRECT',
+          authStrategy: 'API_KEY_QUERY',
+          pathStrategy: 'GEMINI_V1BETA',
+          modelAddressingStrategy: 'MODEL_NAME',
+          errorSchemaStrategy: 'GOOGLE_ERROR',
+          baseUrlPattern: 'https://generativelanguage.googleapis.com',
+          profileSource: 'PRESET',
+          active: true,
+          healthState: 'UNKNOWN',
+          supportedProtocols: ['gemini'],
+          compatibilitySurface: 'gemini',
+          credentialRequirements: ['api_key_query'],
+          cooldownCredentialCount: 0,
+          linkedCredentialCount: 0,
+          hasSnapshot: false,
+          supportedBackends: ['SPRING_AI', 'NATIVE'],
+          features: {},
+          surfaces: {},
+          modelCount: 0,
+        },
+      ]
+    }
     if (typeof url === 'string' && url.startsWith('/admin/credentials/model-catalog')) {
       return ['gpt-5.4', 'gemini-2.5-pro']
     }
@@ -87,8 +146,8 @@ const { apiRequestMock } = vi.hoisted(() => ({
       return {
         id: 1,
         credentialName: payload.credentialName ?? 'OpenAI Key',
-        providerType: 'OPENAI_DIRECT',
-        baseUrl: 'https://api.openai.com',
+        providerType: payload.providerType ?? 'OPENAI_DIRECT',
+        baseUrl: payload.baseUrl ?? 'https://api.openai.com',
         authKind: 'API_KEY',
         secretFingerprint: 'fp',
         credentialMetadata: {},
@@ -147,7 +206,7 @@ describe('CredentialsPage', () => {
 
     fireEvent.change(within(createDialog).getByPlaceholderText('例如：OpenAI 主账号 Key'), { target: { value: 'OpenAI Key' } })
     fireEvent.click(within(createDialog).getByRole('button', { name: '下一步' }))
-    fireEvent.change(await within(createDialog).findByPlaceholderText('https://api.openai.com'), { target: { value: 'https://api.openai.com' } })
+    fireEvent.change(await within(createDialog).findByRole('combobox', { name: '厂商/API 入口' }), { target: { value: '10' } })
     fireEvent.click(within(createDialog).getByRole('button', { name: '下一步' }))
     fireEvent.change(await within(createDialog).findByPlaceholderText('输入上游密钥'), { target: { value: 'secret-token' } })
     fireEvent.click(within(createDialog).getByRole('button', { name: '下一步' }))
@@ -172,6 +231,9 @@ describe('CredentialsPage', () => {
       const call = apiRequestMock.mock.calls.find(([url, init]) => url === '/admin/credentials' && init?.method === 'POST')
       expect(call).toBeTruthy()
       expect(JSON.parse(String(call?.[1]?.body))).toMatchObject({
+        siteProfileId: 10,
+        providerType: 'OPENAI_DIRECT',
+        baseUrl: 'https://api.openai.com',
         proxyId: 9,
         tlsFingerprintProfileId: 8,
         supportedModels: ['gpt-5.4'],
@@ -195,7 +257,7 @@ describe('CredentialsPage', () => {
     fireEvent.change(within(createDialog).getByRole('combobox', { name: '创建模式' }), { target: { value: 'batch' } })
     fireEvent.change(within(createDialog).getByPlaceholderText('例如：OpenAI-Prod'), { target: { value: 'BatchOpenAI' } })
     fireEvent.click(within(createDialog).getByRole('button', { name: '下一步' }))
-    fireEvent.change(await within(createDialog).findByPlaceholderText('https://api.openai.com'), { target: { value: 'https://api.openai.com' } })
+    fireEvent.change(await within(createDialog).findByRole('combobox', { name: '厂商/API 入口' }), { target: { value: '10' } })
     fireEvent.click(within(createDialog).getByRole('button', { name: '下一步' }))
     fireEvent.change(await within(createDialog).findByRole('textbox', { name: '批量密钥文本（每行一条）' }), { target: { value: 'sk-a\nsk-b' } })
     fireEvent.click(within(createDialog).getByRole('button', { name: '下一步' }))

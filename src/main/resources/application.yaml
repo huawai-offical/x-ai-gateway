@@ -108,3 +108,4 @@ gateway:
       queue-key: ${GATEWAY_OBSERVABILITY_ASYNC_QUEUE_KEY:xag:observability:hot-path}
       flush-interval: ${GATEWAY_OBSERVABILITY_ASYNC_FLUSH_INTERVAL:PT1S}
       batch-size: ${GATEWAY_OBSERVABILITY_ASYNC_BATCH_SIZE:200}
+      redis-failure-backoff: ${GATEWAY_OBSERVABILITY_ASYNC_REDIS_FAILURE_BACKOFF:PT30S}

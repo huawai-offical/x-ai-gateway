@@ -12,6 +12,7 @@ import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeySecretService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeySecrets;
 import com.prodigalgal.xaigateway.gateway.core.shared.ModelIdNormalizer;
+import com.prodigalgal.xaigateway.gateway.core.shared.ProtocolSuite;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeySecretExportGrantEntity;
@@ -376,7 +377,7 @@ public class DistributedKeyAdminService {
         entity.setDescription(blankToNull(request.description()));
         entity.setOwnerUser(resolveOwnerUser(request.ownerUserId()));
         entity.setActive(resolveActive(request.active(), entity.isActive(), isCreate));
-        entity.setAllowedProtocols(normalizeProtocols(request.allowedProtocols()));
+        entity.setAllowedProtocolSuites(normalizeProtocolSuites(request.allowedProtocolSuites()));
         entity.setAllowedModels(normalizeModels(request.allowedModels()));
         entity.setAllowedProviderTypes(normalizeProviderTypes(request.allowedProviderTypes()));
         entity.setExpiresAt(request.expiresAt());
@@ -416,16 +417,8 @@ public class DistributedKeyAdminService {
         }
     }
 
-    private List<String> normalizeProtocols(List<String> protocols) {
-        if (protocols == null) {
-            return List.of();
-        }
-
-        return protocols.stream()
-                .filter(value -> value != null && !value.isBlank())
-                .map(value -> value.trim().toLowerCase(Locale.ROOT))
-                .distinct()
-                .toList();
+    private List<String> normalizeProtocolSuites(List<String> protocolSuites) {
+        return ProtocolSuite.normalizeList(protocolSuites);
     }
 
     private List<String> normalizeModels(List<String> models) {
@@ -650,7 +643,7 @@ public class DistributedKeyAdminService {
                 entity.getOwnerUser() == null ? null : entity.getOwnerUser().getId(),
                 entity.getOwnerUser() == null ? null : entity.getOwnerUser().getEmail(),
                 entity.isActive(),
-                entity.getAllowedProtocols(),
+                entity.getAllowedProtocolSuites(),
                 entity.getAllowedModels(),
                 entity.getAllowedProviderTypes(),
                 entity.getExpiresAt(),

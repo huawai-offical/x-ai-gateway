@@ -17,10 +17,16 @@ class DefaultResourceBootstrapServiceTests {
         defaultGroup.setProviderType(UpstreamAccountProviderType.OPENAI_OAUTH);
         Mockito.when(accountGroupAdminService.ensureDefaultGroup()).thenReturn(defaultGroup);
         NetworkGovernanceService networkGovernanceService = Mockito.mock(NetworkGovernanceService.class);
+        ProviderSiteRegistryService providerSiteRegistryService = Mockito.mock(ProviderSiteRegistryService.class);
 
-        new DefaultResourceBootstrapService(accountGroupAdminService, networkGovernanceService).bootstrapDefaults();
+        new DefaultResourceBootstrapService(
+                accountGroupAdminService,
+                networkGovernanceService,
+                providerSiteRegistryService
+        ).bootstrapDefaults();
 
         Mockito.verify(accountGroupAdminService).ensureDefaultGroup();
         Mockito.verify(networkGovernanceService).ensureDefaultTlsProfiles();
+        Mockito.verify(providerSiteRegistryService).importDefaultPresets();
     }
 }

@@ -634,7 +634,7 @@ function buildCodexAccess(
 }
 
 function isCodexPortalKey(key: PortalKey) {
-  return key.allowedProtocolSuites?.includes('responses')
+  return key.allowedProtocolSuites?.some((suite) => suite.startsWith('openai') || suite.includes('.openai_compatible')) === true
     || key.allowedModels?.some((model) => model.toLowerCase().includes('gpt-5')) === true
     || key.keyName.toLowerCase().includes('codex')
 }

@@ -2,6 +2,7 @@ package com.prodigalgal.xaigateway.admin.application;
 
 import com.prodigalgal.xaigateway.admin.api.ProviderSitePresetResponse;
 import com.prodigalgal.xaigateway.gateway.core.catalog.DiscoveredModelDefinition;
+import com.prodigalgal.xaigateway.gateway.core.model.ModelPolicyScopeType;
 import com.prodigalgal.xaigateway.gateway.core.shared.AuthStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ErrorSchemaStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ModelAddressingStrategy;
@@ -13,7 +14,9 @@ import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
 import com.prodigalgal.xaigateway.gateway.core.site.UpstreamSitePolicyService;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SiteCapabilitySnapshotEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SiteModelCapabilityEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.ModelPolicyEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamSiteProfileEntity;
+import com.prodigalgal.xaigateway.infra.persistence.repository.ModelPolicyRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.SiteCapabilitySnapshotRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.SiteModelCapabilityRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamSiteProfileRepository;
@@ -79,7 +82,7 @@ class ProviderSiteRegistryServiceTests {
 
         assertEquals("preset:openrouter", result.getProfileCode());
         assertEquals(UpstreamSiteKind.OPENROUTER, result.getSiteKind());
-        assertEquals(SiteProfileSource.MANUAL, result.getProfileSource());
+        assertEquals(SiteProfileSource.PRESET, result.getProfileSource());
         assertEquals("https://openrouter.ai/api/v1", result.getBaseUrlPattern());
 
         ArgumentCaptor<SiteCapabilitySnapshotEntity> snapshotCaptor = ArgumentCaptor.forClass(SiteCapabilitySnapshotEntity.class);
@@ -163,6 +166,122 @@ class ProviderSiteRegistryServiceTests {
         verify(modelCapabilityRepository, never()).findAllBySiteProfile_IdOrderByModelKeyAsc(2L);
     }
 
+    @Test
+    void shouldImportOnlyNonDeprecatedDefaultPresets() {
+        UpstreamSiteProfileRepository profileRepository = Mockito.mock(UpstreamSiteProfileRepository.class);
+        SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        SiteModelCapabilityRepository modelCapabilityRepository = Mockito.mock(SiteModelCapabilityRepository.class);
+        ProviderSiteRegistryService service = new ProviderSiteRegistryService(
+                profileRepository,
+                snapshotRepository,
+                modelCapabilityRepository,
+                new UpstreamSitePolicyService(),
+                catalog("""
+                        {
+                          "catalogVersion": "test",
+                          "catalogSource": "unit",
+                          "presets": [
+                            {
+                              "code": "openai",
+                              "displayName": "OpenAI",
+                              "siteKind": "OPENAI_DIRECT",
+                              "defaultBaseUrl": "https://api.openai.com",
+                              "conformanceChecks": ["chat.native"]
+                            },
+                            {
+                              "code": "deepseek",
+                              "displayName": "DeepSeek",
+                              "siteKind": "DEEPSEEK",
+                              "defaultBaseUrl": "https://api.deepseek.com",
+                              "conformanceChecks": ["chat.native"]
+                            },
+                            {
+                              "code": "legacy_vendor",
+                              "displayName": "Legacy Vendor",
+                              "siteKind": "OPENAI_COMPATIBLE_GENERIC",
+                              "defaultBaseUrl": "https://legacy.example.com/v1",
+                              "deprecated": true,
+                              "conformanceChecks": ["chat.native"]
+                            }
+                          ]
+                        }
+                        """)
+        );
+        when(profileRepository.findByProfileCode(anyString())).thenReturn(Optional.empty());
+        when(profileRepository.save(any(UpstreamSiteProfileEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(snapshotRepository.findBySiteProfile_Id(null)).thenReturn(Optional.empty());
+        when(snapshotRepository.save(any(SiteCapabilitySnapshotEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        List<UpstreamSiteProfileEntity> result = service.importDefaultPresets();
+
+        assertEquals(2, result.size());
+        assertEquals(List.of("preset:openai", "preset:deepseek"), result.stream()
+                .map(UpstreamSiteProfileEntity::getProfileCode)
+                .toList());
+        assertTrue(result.stream().allMatch(item -> item.getProfileSource() == SiteProfileSource.PRESET));
+        verify(profileRepository, never()).findByProfileCode("preset:legacy_vendor");
+        verify(snapshotRepository, Mockito.times(2)).save(any(SiteCapabilitySnapshotEntity.class));
+        verify(modelCapabilityRepository, never()).saveAll(anyIterable());
+    }
+
+    @Test
+    void shouldNotRecreateDisabledPresetModelPolicyOnDefaultImport() {
+        UpstreamSiteProfileRepository profileRepository = Mockito.mock(UpstreamSiteProfileRepository.class);
+        SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        SiteModelCapabilityRepository modelCapabilityRepository = Mockito.mock(SiteModelCapabilityRepository.class);
+        ModelPolicyRepository modelPolicyRepository = Mockito.mock(ModelPolicyRepository.class);
+        ProviderSiteRegistryService service = new ProviderSiteRegistryService(
+                profileRepository,
+                snapshotRepository,
+                modelCapabilityRepository,
+                modelPolicyRepository,
+                new UpstreamSitePolicyService(),
+                catalog("""
+                        {
+                          "catalogVersion": "test",
+                          "catalogSource": "unit",
+                          "presets": [
+                            {
+                              "code": "xiaomi_mimo",
+                              "displayName": "Xiaomi MiMo",
+                              "siteKind": "OPENAI_COMPATIBLE_GENERIC",
+                              "defaultBaseUrl": "https://token-plan-sgp.xiaomimimo.com/v1",
+                              "conformanceChecks": ["chat.native"],
+                              "modelPolicies": [
+                                {
+                                  "policyKind": "MAP",
+                                  "publicModel": "gpt-5-codex",
+                                  "upstreamModel": "mimo-v2.5-pro",
+                                  "supportedProtocols": ["responses"]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                        """)
+        );
+        UpstreamSiteProfileEntity site = sampleSite(3L);
+        site.setProfileCode("preset:xiaomi_mimo");
+        ModelPolicyEntity disabledPolicy = new ModelPolicyEntity();
+        disabledPolicy.setPublicModelKey("gpt-5-codex");
+        disabledPolicy.setUpstreamModelKey("mimo-v2.5-pro");
+        disabledPolicy.setMappingSource("preset");
+        disabledPolicy.setEnabled(false);
+
+        when(profileRepository.findByProfileCode("preset:xiaomi_mimo")).thenReturn(Optional.of(site));
+        when(profileRepository.findByIdForUpdate(3L)).thenReturn(Optional.of(site));
+        when(snapshotRepository.findBySiteProfile_Id(3L)).thenReturn(Optional.empty());
+        when(snapshotRepository.save(any(SiteCapabilitySnapshotEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(modelPolicyRepository.findAllByScopeTypeAndScopeIdOrderByPriorityAscCreatedAtAsc(
+                ModelPolicyScopeType.SITE_PROFILE,
+                3L
+        )).thenReturn(List.of(disabledPolicy));
+
+        service.importDefaultPresets();
+
+        verify(modelPolicyRepository, never()).save(any(ModelPolicyEntity.class));
+    }
+
     private ProviderSiteRegistryService newService(UpstreamSiteProfileRepository profileRepository) {
         return new ProviderSiteRegistryService(
                 profileRepository,
@@ -171,6 +290,15 @@ class ProviderSiteRegistryServiceTests {
                 new UpstreamSitePolicyService(),
                 new ProviderCatalogLoader(new ObjectMapper())
         );
+    }
+
+    private ProviderCatalogLoader catalog(String json) {
+        return new ProviderCatalogLoader(new ObjectMapper()) {
+            @Override
+            public ProviderCatalogSnapshot load() {
+                return loadFromJson(json, "unit-test");
+            }
+        };
     }
 
     private UpstreamSiteProfileEntity sampleSite(Long id) {

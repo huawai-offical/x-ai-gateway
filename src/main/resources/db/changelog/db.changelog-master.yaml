@@ -3,3 +3,7 @@ databaseChangeLog:
       file: db/changelog/changes/db.changelog-0001-baseline.yaml
   - include:
       file: db/changelog/changes/db.changelog-0002-model-policy.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0003-protocol-suite-authorization.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0004-provider-protocol-endpoints.yaml

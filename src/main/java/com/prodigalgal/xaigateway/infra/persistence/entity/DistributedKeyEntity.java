@@ -72,7 +72,7 @@ public class DistributedKeyEntity {
 
     @Convert(converter = StringListJsonConverter.class)
     @Column(name = "allowed_protocol_suites_json", nullable = false, columnDefinition = "text")
-    @Comment("允许的协议白名单，JSON 数组。")
+    @Comment("允许的厂商协议簇白名单，JSON 数组。")
     private List<String> allowedProtocolSuites = List.of();
 
     @Convert(converter = StringListJsonConverter.class)

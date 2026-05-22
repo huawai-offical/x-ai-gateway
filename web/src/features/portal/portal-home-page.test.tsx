@@ -32,7 +32,7 @@ vi.mock('./api', () => ({
       keyName: 'codex-cli-key',
       maskedKey: 'xag_***codex',
       active: true,
-      allowedProtocolSuites: ['openai', 'responses'],
+      allowedProtocolSuites: ['openai.native'],
       allowedModels: ['gpt-5.4@low'],
       rpmLimit: 60,
       lastUsedAt: '2026-05-07T02:00:00Z',

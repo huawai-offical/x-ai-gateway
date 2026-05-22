@@ -26,6 +26,7 @@ import com.prodigalgal.xaigateway.gateway.core.shared.PathStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderFamily;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.shared.ReasoningTransport;
+import com.prodigalgal.xaigateway.gateway.core.shared.ProtocolSuite;
 import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
 import com.prodigalgal.xaigateway.gateway.core.site.UpstreamSitePolicyService;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SiteCapabilitySnapshotEntity;
@@ -199,14 +200,14 @@ class SiteConformanceHarnessTests {
                 "test",
                 "sk-gw-test",
                 "masked",
-                List.of(fixture.protocol()),
+                List.of(ProtocolSuite.fromVendorAndSiteKind(vendorCode(fixture), fixture.siteKind())),
                 List.of(),
                 List.of(new DistributedCredentialBindingView(
                         1L,
                         101L,
                         "credential",
-                        fixture.providerType(),
-                        "https://example.com",
+                fixture.providerType(),
+                "https://example.com",
                         1,
                         100
                 ))
@@ -346,6 +347,7 @@ class SiteConformanceHarnessTests {
                 fixture.providerType(),
                 1L,
                 fixture.providerFamily(),
+                vendorCode(fixture),
                 fixture.siteKind(),
                 policy.authStrategy(),
                 policy.pathStrategy(),
@@ -390,6 +392,7 @@ class SiteConformanceHarnessTests {
         siteProfile.setProfileCode("site:" + fixture.siteKind().name().toLowerCase());
         siteProfile.setDisplayName(fixture.siteKind().name());
         siteProfile.setProviderFamily(fixture.providerFamily());
+        siteProfile.setVendorCode(vendorCode(fixture));
         siteProfile.setSiteKind(fixture.siteKind());
         UpstreamSitePolicyService.SitePolicy policy = new UpstreamSitePolicyService().policy(fixture.siteKind());
         siteProfile.setAuthStrategy(policy.authStrategy());
@@ -451,6 +454,13 @@ class SiteConformanceHarnessTests {
         credential.setSiteProfileId(1L);
         setId(credential, 101L);
         return credential;
+    }
+
+    private static String vendorCode(ConformanceFixture fixture) {
+        if ("xiaomi-mimo-openai-compatible-chat".equals(fixture.name())) {
+            return "xiaomi_mimo";
+        }
+        return null;
     }
 
     private static void setId(Object target, Long value) {

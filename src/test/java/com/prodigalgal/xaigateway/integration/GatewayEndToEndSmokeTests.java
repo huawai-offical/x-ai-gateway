@@ -473,7 +473,7 @@ class GatewayEndToEndSmokeTests {
         distributedKey.setKeyPrefix("sk-gw-test");
         distributedKey.setSecretHash(distributedKeySecretService.hashSecret(openAiSecret));
         distributedKey.setMaskedKey("sk-gw-test...masked");
-        distributedKey.setAllowedProtocolSuites(List.of("openai", "responses", "anthropic_native", "google_native"));
+        distributedKey.setAllowedProtocolSuites(List.of("openai.native", "anthropic.native", "gemini.native"));
         distributedKey.setAllowedModels(List.of("gpt-4o", "claude-sonnet-4", "gemini-2.5-pro"));
         distributedKey.setActive(true);
         distributedKey = distributedKeyRepository.save(distributedKey);

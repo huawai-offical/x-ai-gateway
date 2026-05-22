@@ -22,12 +22,12 @@ import { PaginatedRows } from '@/components/app/table-pagination'
 import { formatInstant } from '@/lib/format'
 import { apiRequest } from '@/lib/api'
 import { useTypedMutation, useTypedQuery } from '@/lib/typed-react-query'
+import type { ProviderSite } from '../provider-sites/types'
 import {
   AUTH_KIND_OPTIONS,
   buildCredentialPayload,
   createEmptyCredentialForm,
   credentialToFormState,
-  PROVIDER_TYPE_OPTIONS,
   type CredentialConnectivityResponse,
   type CredentialFormState,
   type CredentialModelRefreshResponse,
@@ -142,6 +142,22 @@ export function CredentialsPage() {
     queryKey: ['tls-profiles'],
     queryFn: () => apiRequest<TlsProfileOption[]>('/admin/network/tls-profiles'),
   })
+  const providerSitesQuery = useTypedQuery<ProviderSite[]>({
+    queryKey: ['provider-sites', 'credential-options'],
+    queryFn: () => apiRequest<ProviderSite[]>('/admin/provider-sites'),
+  })
+  const providerSiteOptions = useMemo(
+    () => normalizeCredentialProviderSites(providerSitesQuery.data ?? []),
+    [providerSitesQuery.data],
+  )
+  const selectedProviderSite = useMemo(
+    () => findProviderSite(providerSiteOptions, form.siteProfileId),
+    [form.siteProfileId, providerSiteOptions],
+  )
+  const selectedEditingProviderSite = useMemo(
+    () => findProviderSite(providerSiteOptions, editingForm.siteProfileId),
+    [editingForm.siteProfileId, providerSiteOptions],
+  )
   const modelCatalogQuery = useTypedQuery<string[]>({
     queryKey: ['credentials', 'model-catalog', createSource, form.providerType, form.groupId],
     queryFn: () => {
@@ -393,7 +409,7 @@ export function CredentialsPage() {
     if (row.sourceType !== 'API_KEY') {
       return
     }
-    handleOpenEditCredential(inventoryRowToCredential(row))
+    handleOpenEditCredential(inventoryRowToCredential(row, providerSiteOptions))
     setEditingModelKeyword('')
   }
 
@@ -646,6 +662,7 @@ export function CredentialsPage() {
                         setForm((current) => ({
                           ...current,
                           groupId: nextGroup ? String(nextGroup.id) : current.groupId,
+                          siteProfileId: nextSource === 'codexAuthJson' ? '' : current.siteProfileId,
                         }))
                       }}
                     >
@@ -718,44 +735,48 @@ export function CredentialsPage() {
                     </label>
                   </div>
                 ) : (
-                  <div className="grid gap-4 md:grid-cols-3">
-                  <label className="flex flex-col gap-2">
-                    <span className="text-sm font-medium text-foreground">提供方</span>
-                    <select
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                      value={form.providerType}
-                      onChange={(event) => setForm((current) => ({ ...current, providerType: event.target.value }))}
-                    >
-                      {PROVIDER_TYPE_OPTIONS.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="flex flex-col gap-2">
-                    <span className="text-sm font-medium text-foreground">认证类型</span>
-                    <select
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                      value={form.authKind}
-                      onChange={(event) => setForm((current) => ({ ...current, authKind: event.target.value }))}
-                    >
-                      {AUTH_KIND_OPTIONS.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="flex flex-col gap-2 md:col-span-3">
-                    <span className="text-sm font-medium text-foreground">基础 URL</span>
-                    <Input
-                      value={form.baseUrl}
-                      onChange={(event) => setForm((current) => ({ ...current, baseUrl: event.target.value }))}
-                      placeholder="https://api.openai.com"
-                    />
-                  </label>
-                </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <label className="flex flex-col gap-2 md:col-span-2">
+                      <span className="text-sm font-medium text-foreground">厂商/API 入口</span>
+                      <select
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                        value={form.siteProfileId}
+                        onChange={(event) => {
+                          setConnectivityResult(null)
+                          setForm((current) => applyProviderSiteToForm(current, event.target.value, providerSiteOptions))
+                        }}
+                      >
+                        <option value="" disabled>{providerSitesQuery.isPending ? '加载中' : '请选择厂商/API 入口'}</option>
+                        {providerSiteOptions.map((site) => (
+                          <option key={site.id} value={String(site.id)} disabled={!isSelectableProviderSite(site)}>
+                            {providerSiteOptionLabel(site)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="flex flex-col gap-2">
+                      <span className="text-sm font-medium text-foreground">提供方类型</span>
+                      <Input value={form.providerType} readOnly />
+                    </label>
+                    <label className="flex flex-col gap-2">
+                      <span className="text-sm font-medium text-foreground">认证类型</span>
+                      <select
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                        value={form.authKind}
+                        onChange={(event) => setForm((current) => ({ ...current, authKind: event.target.value }))}
+                      >
+                        {AUTH_KIND_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="flex flex-col gap-2 md:col-span-2">
+                      <span className="text-sm font-medium text-foreground">Base URL</span>
+                      <Input value={selectedProviderSite?.baseUrlPattern ?? form.baseUrl} readOnly />
+                    </label>
+                  </div>
                 )}
               </TabsContent>
 
@@ -859,14 +880,6 @@ export function CredentialsPage() {
                       暂无可用账号分组，请先创建账号分组后再录入上游凭证。
                     </div>
                   ) : null}
-                  <label className="flex flex-col gap-2 md:col-span-2">
-                    <span className="text-sm font-medium text-foreground">Site Profile ID</span>
-                    <Input
-                      value={form.siteProfileId}
-                      onChange={(event) => setForm((current) => ({ ...current, siteProfileId: event.target.value }))}
-                      placeholder="可选"
-                    />
-                  </label>
                 </div>
               </TabsContent>
 
@@ -916,9 +929,11 @@ export function CredentialsPage() {
                         </div>
                       </div>
                       <div>
-                        <div className="text-xs text-muted-foreground">提供方</div>
+                        <div className="text-xs text-muted-foreground">厂商/API 入口</div>
                         <div className="font-medium text-foreground">
-                          {createSource === 'codexAuthJson' ? 'CODEX_OAUTH / auth.json' : `${form.providerType} / ${form.authKind}`}
+                          {createSource === 'codexAuthJson'
+                            ? 'CODEX_OAUTH / auth.json'
+                            : `${selectedProviderSite ? providerSiteOptionLabel(selectedProviderSite) : '未选择'} / ${form.authKind}`}
                         </div>
                       </div>
                       <div>
@@ -1009,12 +1024,12 @@ export function CredentialsPage() {
                 下一步
               </Button>
               {canShowConnectivityTest ? (
-                <Button type="button" variant="outline" onClick={handleConnectivityTest} disabled={connectivityMutation.isPending || createMode === 'batch'}>
+                <Button type="button" variant="outline" onClick={handleConnectivityTest} disabled={connectivityMutation.isPending || createMode === 'batch' || !form.siteProfileId}>
                   测试联通性
                 </Button>
               ) : null}
               {canShowCreateButton ? (
-                <Button type="submit" disabled={createPending || !form.groupId}>
+                <Button type="submit" disabled={createPending || !form.groupId || (createSource === 'secret' && !form.siteProfileId)}>
                   {createSource === 'codexAuthJson' ? '导入 auth.json' : (createMode === 'single' ? '创建凭证' : '批量创建')}
                 </Button>
               ) : null}
@@ -1035,7 +1050,7 @@ export function CredentialsPage() {
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>编辑上游凭证</DialogTitle>
-            <DialogDescription>更新凭证信息。</DialogDescription>
+            <DialogDescription className="sr-only">更新凭证信息。</DialogDescription>
           </DialogHeader>
           <form className="flex flex-col gap-4" onSubmit={handleUpdateCredential}>
             <div className="grid gap-4 md:grid-cols-2">
@@ -1061,19 +1076,24 @@ export function CredentialsPage() {
                   ))}
                 </select>
               </label>
-              <label className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-foreground">提供方</span>
+              <label className="flex flex-col gap-2 md:col-span-2">
+                <span className="text-sm font-medium text-foreground">厂商/API 入口</span>
                 <select
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  value={editingForm.providerType}
-                  onChange={(event) => setEditingForm((current) => ({ ...current, providerType: event.target.value }))}
+                  value={editingForm.siteProfileId}
+                  onChange={(event) => setEditingForm((current) => applyProviderSiteToForm(current, event.target.value, providerSiteOptions))}
                 >
-                  {PROVIDER_TYPE_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
+                  <option value="" disabled>{providerSitesQuery.isPending ? '加载中' : '请选择厂商/API 入口'}</option>
+                  {providerSiteOptions.map((site) => (
+                    <option key={site.id} value={String(site.id)} disabled={!isSelectableProviderSite(site)}>
+                      {providerSiteOptionLabel(site)}
                     </option>
                   ))}
                 </select>
+              </label>
+              <label className="flex flex-col gap-2">
+                <span className="text-sm font-medium text-foreground">提供方类型</span>
+                <Input value={editingForm.providerType} readOnly />
               </label>
               <label className="flex flex-col gap-2">
                 <span className="text-sm font-medium text-foreground">认证类型</span>
@@ -1090,11 +1110,8 @@ export function CredentialsPage() {
                 </select>
               </label>
               <label className="flex flex-col gap-2 md:col-span-2">
-                <span className="text-sm font-medium text-foreground">基础 URL</span>
-                <Input
-                  value={editingForm.baseUrl}
-                  onChange={(event) => setEditingForm((current) => ({ ...current, baseUrl: event.target.value }))}
-                />
+                <span className="text-sm font-medium text-foreground">Base URL</span>
+                <Input value={selectedEditingProviderSite?.baseUrlPattern ?? editingForm.baseUrl} readOnly />
               </label>
               <label className="flex flex-col gap-2 md:col-span-2">
                 <span className="text-sm font-medium text-foreground">更新密钥（可选）</span>
@@ -1113,14 +1130,6 @@ export function CredentialsPage() {
                   onChange={(event) => setEditingForm((current) => ({ ...current, active: event.target.checked }))}
                 />
                 <span className="text-sm font-medium text-foreground">启用凭证</span>
-              </label>
-              <label className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-foreground">Site Profile ID</span>
-                <Input
-                  value={editingForm.siteProfileId}
-                  onChange={(event) => setEditingForm((current) => ({ ...current, siteProfileId: event.target.value }))}
-                  placeholder="可选"
-                />
               </label>
               <SearchableIdSelect
                 label="代理"
@@ -1576,6 +1585,74 @@ function filterOptions(options: string[], keyword: string) {
   return options.filter((option) => option.toLowerCase().includes(normalizedKeyword))
 }
 
+function normalizeCredentialProviderSites(sites: ProviderSite[]) {
+  return [...sites]
+    .sort((left, right) => {
+      const leftVendor = (left.vendorName ?? left.vendorCode ?? '').localeCompare(right.vendorName ?? right.vendorCode ?? '')
+      if (leftVendor !== 0) {
+        return leftVendor
+      }
+      return left.displayName.localeCompare(right.displayName)
+    })
+}
+
+function applyProviderSiteToForm(
+  form: CredentialFormState,
+  siteProfileId: string,
+  providerSites: ProviderSite[],
+): CredentialFormState {
+  const site = findProviderSite(providerSites, siteProfileId)
+  if (!site) {
+    return {
+      ...form,
+      siteProfileId,
+      providerType: 'OPENAI_COMPATIBLE',
+      baseUrl: '',
+    }
+  }
+  return {
+    ...form,
+    siteProfileId,
+    providerType: providerTypeForSiteKind(site.siteKind),
+    baseUrl: site.baseUrlPattern ?? '',
+  }
+}
+
+function findProviderSite(providerSites: ProviderSite[], siteProfileId: string) {
+  const id = Number(siteProfileId)
+  if (!Number.isFinite(id)) {
+    return null
+  }
+  return providerSites.find((site) => site.id === id) ?? null
+}
+
+function providerTypeForSiteKind(siteKind: string) {
+  switch (siteKind) {
+    case 'OPENAI_DIRECT':
+    case 'AZURE_OPENAI':
+      return 'OPENAI_DIRECT'
+    case 'ANTHROPIC_DIRECT':
+      return 'ANTHROPIC_DIRECT'
+    case 'GEMINI_DIRECT':
+    case 'VERTEX_AI':
+      return 'GEMINI_DIRECT'
+    case 'OLLAMA_DIRECT':
+      return 'OLLAMA_DIRECT'
+    default:
+      return 'OPENAI_COMPATIBLE'
+  }
+}
+
+function isSelectableProviderSite(site: ProviderSite) {
+  return site.active && Boolean(site.baseUrlPattern?.trim())
+}
+
+function providerSiteOptionLabel(site: ProviderSite) {
+  const vendor = site.vendorName ?? site.vendorCode ?? '未归属厂商'
+  const status = isSelectableProviderSite(site) ? '' : '（不可用）'
+  return `${vendor} / ${site.displayName}${status}`
+}
+
 function toggleOption(current: string[], nextValue: string) {
   if (current.includes(nextValue)) {
     return current.filter((item) => item !== nextValue)
@@ -1619,12 +1696,15 @@ function rowStatusTone(row: UpstreamCredentialInventoryResponse): StatusTone {
   return 'success'
 }
 
-function inventoryRowToCredential(row: UpstreamCredentialInventoryResponse): CredentialResponse {
+function inventoryRowToCredential(row: UpstreamCredentialInventoryResponse, providerSites: ProviderSite[]): CredentialResponse {
+  const site = row.siteProfileId == null
+    ? null
+    : providerSites.find((item) => item.id === row.siteProfileId)
   return {
     id: row.sourceId,
     credentialName: row.displayName,
-    providerType: row.providerType,
-    baseUrl: row.baseUrl ?? '',
+    providerType: site == null ? row.providerType : providerTypeForSiteKind(site.siteKind),
+    baseUrl: site?.baseUrlPattern ?? row.baseUrl ?? '',
     authKind: row.authKind ?? 'API_KEY',
     supportedModels: row.supportedModels ?? [],
     secretFingerprint: row.secretFingerprint ?? '',

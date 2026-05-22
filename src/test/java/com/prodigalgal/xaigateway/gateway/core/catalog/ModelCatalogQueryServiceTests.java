@@ -31,7 +31,6 @@ import org.mockito.Mockito;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertIterableEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.when;
@@ -87,7 +86,7 @@ class ModelCatalogQueryServiceTests {
                 "test-key",
                 "sk-gw-test",
                 "masked",
-                List.of("openai"),
+                List.of("openai.native"),
                 List.of("gpt-4o", "writer-fast"),
                 List.of(
                         new DistributedCredentialBindingView(1L, 101L, "openai-1", ProviderType.OPENAI_DIRECT, "https://api.openai.com", 10, 100),
@@ -124,7 +123,7 @@ class ModelCatalogQueryServiceTests {
                 "test-key",
                 "sk-gw-test",
                 "masked",
-                List.of("anthropic"),
+                List.of("anthropic.native"),
                 List.of(),
                 List.of(new DistributedCredentialBindingView(
                         1L,
@@ -137,7 +136,7 @@ class ModelCatalogQueryServiceTests {
                 ))
         );
 
-        assertThrows(IllegalArgumentException.class, () -> service.listAccessiblePublicModels(distributedKeyView, "openai"));
+        assertTrue(service.listAccessiblePublicModels(distributedKeyView, "openai").isEmpty());
     }
 
     @Test
@@ -182,7 +181,7 @@ class ModelCatalogQueryServiceTests {
                 "test-key",
                 "sk-gw-test",
                 "masked",
-                List.of("openai"),
+                List.of("openai.native"),
                 List.of("writer-fast"),
                 List.of(new DistributedCredentialBindingView(
                         1L,

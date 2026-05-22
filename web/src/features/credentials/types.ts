@@ -178,6 +178,9 @@ export function credentialToFormState(credential: CredentialResponse): Credentia
 
 export function buildCredentialPayload(form: CredentialFormState) {
   const metadata = parseCredentialMetadata(form.metadataJson)
+  if (!form.siteProfileId.trim()) {
+    throw new Error('请选择厂商/API 入口后再保存上游凭证。')
+  }
   return {
     credentialName: form.credentialName.trim(),
     providerType: form.providerType,

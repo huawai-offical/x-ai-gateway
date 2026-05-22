@@ -25,6 +25,7 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -56,6 +57,7 @@ public class GatewayObservabilityAsyncPersistenceService {
     private final UpstreamAccountRepository upstreamAccountRepository;
     private final GatewayProperties gatewayProperties;
     private final TransactionTemplate transactionTemplate;
+    private final AtomicReference<Instant> redisUnavailableUntil = new AtomicReference<>();
 
     public GatewayObservabilityAsyncPersistenceService(
             StringRedisTemplate stringRedisTemplate,
@@ -151,14 +153,19 @@ public class GatewayObservabilityAsyncPersistenceService {
         if (!isAsyncEnabled()) {
             return 0;
         }
+        if (isRedisBackoffActive()) {
+            return 0;
+        }
 
         List<String> serializedEntries;
         try {
             serializedEntries = stringRedisTemplate.opsForList().leftPop(queueKey(), batchSize());
         } catch (RuntimeException exception) {
+            markRedisUnavailable(exception);
             log.warn("从 Redis 读取 observability 热路径队列失败，等待下一轮重试。", exception);
             return 0;
         }
+        clearRedisUnavailable();
 
         if (serializedEntries == null || serializedEntries.isEmpty()) {
             return 0;
@@ -188,16 +195,21 @@ public class GatewayObservabilityAsyncPersistenceService {
         if (!isAsyncEnabled()) {
             return false;
         }
+        if (isRedisBackoffActive()) {
+            return false;
+        }
 
         try {
             stringRedisTemplate.opsForList().rightPush(
                     queueKey(),
                     objectMapper.writeValueAsString(new QueueEnvelope(type, objectMapper.valueToTree(payload)))
             );
+            clearRedisUnavailable();
             return true;
         } catch (JacksonException exception) {
             throw new IllegalStateException("序列化 observability 热路径事件失败。", exception);
         } catch (RuntimeException exception) {
+            markRedisUnavailable(exception);
             log.warn("写入 Redis observability 热路径队列失败，回退同步写库。", exception);
             return false;
         }
@@ -342,6 +354,7 @@ public class GatewayObservabilityAsyncPersistenceService {
         try {
             stringRedisTemplate.opsForList().leftPushAll(queueKey(), entriesToRestore);
         } catch (RuntimeException exception) {
+            markRedisUnavailable(exception);
             log.error("observability 热路径队列回写 Redis 失败，当前批次可能需要人工补偿。", exception);
         }
     }
@@ -622,6 +635,39 @@ public class GatewayObservabilityAsyncPersistenceService {
 
     private long batchSize() {
         return Math.max(1, gatewayProperties.getObservability().getAsync().getBatchSize());
+    }
+
+    private boolean isRedisBackoffActive() {
+        Instant unavailableUntil = redisUnavailableUntil.get();
+        if (unavailableUntil == null) {
+            return false;
+        }
+        Instant now = Instant.now();
+        if (now.isBefore(unavailableUntil)) {
+            return true;
+        }
+        redisUnavailableUntil.compareAndSet(unavailableUntil, null);
+        return false;
+    }
+
+    private void markRedisUnavailable(RuntimeException exception) {
+        Instant unavailableUntil = Instant.now().plus(redisFailureBackoff());
+        redisUnavailableUntil.set(unavailableUntil);
+        if (log.isDebugEnabled()) {
+            log.debug("observability Redis 队列进入退避，截止时间={}。", unavailableUntil, exception);
+        }
+    }
+
+    private void clearRedisUnavailable() {
+        redisUnavailableUntil.set(null);
+    }
+
+    private java.time.Duration redisFailureBackoff() {
+        java.time.Duration backoff = gatewayProperties.getObservability().getAsync().getRedisFailureBackoff();
+        if (backoff == null || backoff.isNegative()) {
+            return java.time.Duration.ZERO;
+        }
+        return backoff;
     }
 
     private record QueueEnvelope(String type, JsonNode payload) {

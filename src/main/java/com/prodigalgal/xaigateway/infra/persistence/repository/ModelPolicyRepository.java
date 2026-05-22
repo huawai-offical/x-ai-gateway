@@ -23,4 +23,8 @@ public interface ModelPolicyRepository extends JpaRepository<ModelPolicyEntity, 
     List<ModelPolicyEntity> findAllByScopeTypeAndScopeIdAndEnabledTrueOrderByPriorityAscCreatedAtAsc(
             ModelPolicyScopeType scopeType,
             Long scopeId);
+
+    List<ModelPolicyEntity> findAllByScopeTypeAndScopeIdOrderByPriorityAscCreatedAtAsc(
+            ModelPolicyScopeType scopeType,
+            Long scopeId);
 }

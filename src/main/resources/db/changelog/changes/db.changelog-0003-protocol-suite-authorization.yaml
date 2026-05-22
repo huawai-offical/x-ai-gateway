@@ -1,0 +1,95 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0003-protocol-suite-authorization-rename-columns
+      author: codex
+      changes:
+        - renameColumn:
+            tableName: distributed_key
+            oldColumnName: allowed_protocols_json
+            newColumnName: allowed_protocol_suites_json
+            columnDataType: TEXT
+        - renameColumn:
+            tableName: access_group
+            oldColumnName: allowed_protocols_json
+            newColumnName: allowed_protocol_suites_json
+            columnDataType: TEXT
+
+  - changeSet:
+      id: 0003-protocol-suite-authorization-transform-postgresql
+      author: codex
+      dbms: postgresql
+      changes:
+        - sql:
+            splitStatements: false
+            sql: |
+              CREATE OR REPLACE FUNCTION xag_protocol_suites_from_protocols(raw text)
+              RETURNS text
+              LANGUAGE plpgsql
+              AS $$
+              DECLARE
+                item text;
+                suites text[] := ARRAY[]::text[];
+              BEGIN
+                IF raw IS NULL OR btrim(raw) = '' THEN
+                  RETURN '[]';
+                END IF;
+
+                BEGIN
+                  FOR item IN SELECT lower(value) FROM jsonb_array_elements_text(raw::jsonb) AS value LOOP
+                    item := replace(replace(item, '-', '_'), '/', '.');
+
+                    IF item IN ('openai', 'responses', 'chat', 'chat_completion', 'chat_completions', 'chat.completions') THEN
+                      suites := suites || ARRAY[
+                        'openai.native',
+                        'openai_compatible.generic',
+                        'azure_openai.openai_compatible',
+                        'deepseek.openai_compatible',
+                        'xiaomi_mimo.openai_compatible',
+                        'qwen.openai_compatible',
+                        'moonshot.openai_compatible',
+                        'siliconflow.openai_compatible',
+                        'volcengine.openai_compatible',
+                        'minimax.openai_compatible',
+                        'dify.openai_compatible',
+                        'grok.openai_compatible',
+                        'mistral.openai_compatible',
+                        'cohere.openai_compatible',
+                        'jina.openai_compatible',
+                        'together.openai_compatible',
+                        'fireworks.openai_compatible',
+                        'openrouter.openai_compatible',
+                        'perplexity.openai_compatible'
+                      ];
+                    ELSIF item IN ('anthropic', 'anthropic_native', 'claude') THEN
+                      suites := suites || ARRAY['anthropic.native'];
+                    ELSIF item IN ('gemini', 'google_native', 'gemini_native') THEN
+                      suites := suites || ARRAY['gemini.native', 'vertex_ai.gemini_native'];
+                    ELSIF item IN ('ollama', 'ollama_native') THEN
+                      suites := suites || ARRAY['ollama.native'];
+                    ELSE
+                      suites := suites || ARRAY[item];
+                    END IF;
+                  END LOOP;
+                EXCEPTION WHEN others THEN
+                  RETURN raw;
+                END;
+
+                SELECT ARRAY(
+                  SELECT DISTINCT value
+                  FROM unnest(suites) AS suite(value)
+                  WHERE value IS NOT NULL AND btrim(value) <> ''
+                  ORDER BY value
+                )
+                INTO suites;
+
+                RETURN COALESCE(to_jsonb(suites)::text, '[]');
+              END;
+              $$;
+
+              UPDATE distributed_key
+              SET allowed_protocol_suites_json = xag_protocol_suites_from_protocols(allowed_protocol_suites_json);
+
+              UPDATE access_group
+              SET allowed_protocol_suites_json = xag_protocol_suites_from_protocols(allowed_protocol_suites_json);
+
+              DROP FUNCTION xag_protocol_suites_from_protocols(text);

@@ -19,7 +19,7 @@ import type { PortalKey, PortalKeyCreateResponse } from './types'
 
 const DEFAULT_FORM = {
   keyName: '我的门户 Key',
-  allowedProtocolSuites: 'openai',
+  allowedProtocolSuites: 'openai.native,openai_compatible.generic,deepseek.openai_compatible,xiaomi_mimo.openai_compatible',
   allowedModels: '',
   rpmLimit: '60',
   tpmLimit: '120000',
@@ -156,7 +156,7 @@ export function PortalKeysPage() {
           </DialogHeader>
           <form className="space-y-4" onSubmit={handleCreate}>
             <Input value={form.keyName} onChange={(event) => setForm((current) => ({ ...current, keyName: event.target.value }))} placeholder="Key 名称" />
-            <Input value={form.allowedProtocolSuites} onChange={(event) => setForm((current) => ({ ...current, allowedProtocolSuites: event.target.value }))} placeholder="协议，例如 openai,responses" />
+            <Input value={form.allowedProtocolSuites} onChange={(event) => setForm((current) => ({ ...current, allowedProtocolSuites: event.target.value }))} placeholder="协议簇，例如 openai.native,xiaomi_mimo.openai_compatible" />
             <textarea
               className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
               value={form.allowedModels}

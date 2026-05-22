@@ -1,0 +1,140 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0004-provider-protocol-endpoints
+      author: codex
+      changes:
+        - createTable:
+            tableName: provider_protocol_endpoint
+            remarks: 厂商协议入口表，承载同一厂商站点下不同协议簇的独立 Base URL、路径策略和对话兼容画像。
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_provider_protocol_endpoint
+                    nullable: false
+              - column:
+                  name: site_profile_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: endpoint_code
+                  type: VARCHAR(96)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: display_name
+                  type: VARCHAR(128)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: protocol_suite
+                  type: VARCHAR(96)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: provider_type
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: site_kind
+                  type: VARCHAR(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: base_url
+                  type: VARCHAR(512)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: auth_strategy
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: path_strategy
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: model_addressing_strategy
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: error_schema_strategy
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: stream_transport
+                  type: VARCHAR(32)
+              - column:
+                  name: conversation_profile_json
+                  type: TEXT
+              - column:
+                  name: is_active
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addColumn:
+            tableName: upstream_credential
+            columns:
+              - column:
+                  name: protocol_endpoint_id
+                  type: BIGINT
+        - addUniqueConstraint:
+            tableName: provider_protocol_endpoint
+            columnNames: site_profile_id, protocol_suite
+            constraintName: uk_provider_protocol_endpoint_site_suite
+        - createIndex:
+            tableName: provider_protocol_endpoint
+            indexName: idx_provider_protocol_endpoint_site_active
+            columns:
+              - column:
+                  name: site_profile_id
+              - column:
+                  name: is_active
+        - createIndex:
+            tableName: provider_protocol_endpoint
+            indexName: idx_provider_protocol_endpoint_suite_active
+            columns:
+              - column:
+                  name: protocol_suite
+              - column:
+                  name: is_active
+        - createIndex:
+            tableName: upstream_credential
+            indexName: idx_upstream_credential_protocol_endpoint
+            columns:
+              - column:
+                  name: protocol_endpoint_id
+        - addForeignKeyConstraint:
+            baseTableName: provider_protocol_endpoint
+            baseColumnNames: site_profile_id
+            constraintName: fk_provider_protocol_endpoint_site_profile
+            referencedTableName: upstream_site_profile
+            referencedColumnNames: id
+        - addForeignKeyConstraint:
+            baseTableName: upstream_credential
+            baseColumnNames: protocol_endpoint_id
+            constraintName: fk_upstream_credential_protocol_endpoint
+            referencedTableName: provider_protocol_endpoint
+            referencedColumnNames: id
