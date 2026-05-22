@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-import '@testing-library/jest-dom/vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -22,6 +21,9 @@ mockedApiRequest.mockImplementation(async (url: string, init?: RequestInit) => {
     }
     return [{ id: 1, channelName: 'ops-email', channelType: 'EMAIL', emailTo: 'ops@example.com', templateMode: 'DEFAULT', enabled: true }]
   }
+  if (url === '/admin/integrations/channels/1' && init?.method === 'DELETE') {
+    return null
+  }
   throw new Error(`unexpected url: ${url}`)
 })
 
@@ -37,13 +39,17 @@ describe('ChannelsPage', () => {
       </QueryClientProvider>,
     )
 
-    expect(await screen.findByText('通知通道')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '已配置通道' })).toBeInTheDocument()
     expect(await screen.findByText('ops-email')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '创建通道' }))
 
-    fireEvent.change(screen.getByPlaceholderText('channel name'), { target: { value: 'ops-im' } })
-    fireEvent.change(screen.getByLabelText('channel type'), { target: { value: 'IM_WEBHOOK' } })
-    fireEvent.change(screen.getByLabelText('webhook endpoint'), { target: { value: '1' } })
-    fireEvent.click(screen.getByRole('button', { name: '创建 channel' }))
+    fireEvent.change(screen.getByPlaceholderText('请输入通道名称'), { target: { value: 'ops-im' } })
+    fireEvent.click(screen.getByRole('combobox', { name: '通道类型' }))
+    fireEvent.click(await screen.findByText('即时消息回调'))
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }))
+    fireEvent.click(await screen.findByRole('combobox', { name: '回调终端' }))
+    fireEvent.click(await screen.findByText('primary-webhook'))
+    fireEvent.click(screen.getByRole('button', { name: '创建通道' }))
 
     await waitFor(() => {
       const call = mockedApiRequest.mock.calls.find(
@@ -52,5 +58,16 @@ describe('ChannelsPage', () => {
       expect(call).toBeTruthy()
       expect(JSON.parse(call?.[1]?.body as string).channelType).toBe('IM_WEBHOOK')
     })
+
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    fireEvent.click(await screen.findByRole('button', { name: '删除' }))
+
+    await waitFor(() => {
+      expect(mockedApiRequest).toHaveBeenCalledWith(
+        '/admin/integrations/channels/1',
+        expect.objectContaining({ method: 'DELETE' }),
+      )
+    })
+    confirmSpy.mockRestore()
   })
 })

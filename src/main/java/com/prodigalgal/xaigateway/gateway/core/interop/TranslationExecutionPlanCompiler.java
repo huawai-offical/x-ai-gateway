@@ -364,13 +364,12 @@ public class TranslationExecutionPlanCompiler {
             }
         }
         return switch (semantics.operation()) {
-            case IMAGE_GENERATION, IMAGE_EDIT, IMAGE_VARIATION -> "gpt-image-1";
+            case IMAGE_GENERATION -> "gpt-image-1";
             case MODERATION_CREATE -> "omni-moderation-latest";
             case AUDIO_SPEECH -> "gpt-4o-mini-tts";
-            case AUDIO_TRANSCRIPTION, AUDIO_TRANSLATION -> "gpt-4o-mini-transcribe";
+            case AUDIO_TRANSCRIPTION -> "gpt-4o-mini-transcribe";
             case FILE_CREATE, FILE_LIST, FILE_GET, FILE_CONTENT_GET, FILE_DELETE,
-                    UPLOAD_CREATE, UPLOAD_GET, UPLOAD_PART_ADD, UPLOAD_COMPLETE, UPLOAD_CANCEL,
-                    REALTIME_CLIENT_SECRET_CREATE -> "resource-orchestration";
+                    UPLOAD_CREATE, UPLOAD_GET, UPLOAD_PART_ADD, UPLOAD_COMPLETE, UPLOAD_CANCEL -> "resource-orchestration";
             default -> throw new IllegalArgumentException("预检请求缺少 model。");
         };
     }

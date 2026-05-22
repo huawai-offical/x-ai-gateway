@@ -24,6 +24,7 @@ import com.prodigalgal.xaigateway.gateway.core.governance.QuarantineStatus;
 import com.prodigalgal.xaigateway.gateway.core.routing.CredentialHealthState;
 import com.prodigalgal.xaigateway.gateway.core.routing.HealthStateStore;
 import com.prodigalgal.xaigateway.gateway.core.routing.RoutingPolicyRuntimeEnforcementService;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.AutoActionRuleEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.QuarantineRecordEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.RouteGuardPolicyEntity;
@@ -32,6 +33,7 @@ import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamSiteProfileEn
 import com.prodigalgal.xaigateway.infra.persistence.repository.AutoActionRuleRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.QuarantineRecordRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.RouteGuardPolicyRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamSiteProfileRepository;
 import java.time.Instant;
@@ -55,6 +57,7 @@ public class GovernanceAdminService {
     private final AutoActionRuleRepository autoActionRuleRepository;
     private final QuarantineRecordRepository quarantineRecordRepository;
     private final UpstreamCredentialRepository upstreamCredentialRepository;
+    private final UpstreamAccountRepository upstreamAccountRepository;
     private final UpstreamSiteProfileRepository upstreamSiteProfileRepository;
     private final HealthStateStore healthStateStore;
     private final GovernancePolicyEngine governancePolicyEngine;
@@ -70,6 +73,7 @@ public class GovernanceAdminService {
             AutoActionRuleRepository autoActionRuleRepository,
             QuarantineRecordRepository quarantineRecordRepository,
             UpstreamCredentialRepository upstreamCredentialRepository,
+            UpstreamAccountRepository upstreamAccountRepository,
             UpstreamSiteProfileRepository upstreamSiteProfileRepository,
             HealthStateStore healthStateStore,
             GovernancePolicyEngine governancePolicyEngine,
@@ -82,6 +86,7 @@ public class GovernanceAdminService {
         this.autoActionRuleRepository = autoActionRuleRepository;
         this.quarantineRecordRepository = quarantineRecordRepository;
         this.upstreamCredentialRepository = upstreamCredentialRepository;
+        this.upstreamAccountRepository = upstreamAccountRepository;
         this.upstreamSiteProfileRepository = upstreamSiteProfileRepository;
         this.healthStateStore = healthStateStore;
         this.governancePolicyEngine = governancePolicyEngine;
@@ -108,6 +113,7 @@ public class GovernanceAdminService {
                 autoActionRuleRepository,
                 quarantineRecordRepository,
                 upstreamCredentialRepository,
+                null,
                 upstreamSiteProfileRepository,
                 healthStateStore,
                 governancePolicyEngine,
@@ -292,8 +298,11 @@ public class GovernanceAdminService {
         expireStaleQuarantines();
         Instant now = Instant.now();
 
-        List<CredentialHealthScoreResponse> credentialScores = upstreamCredentialRepository.findAllByDeletedFalseOrderByCreatedAtDesc().stream()
-                .map(credential -> toCredentialHealthScore(credential, now))
+        List<CredentialHealthScoreResponse> credentialScores = java.util.stream.Stream.concat(
+                        upstreamCredentialRepository.findAllByDeletedFalseOrderByCreatedAtDesc().stream()
+                                .map(credential -> toCredentialHealthScore(credential, now)),
+                        accountHealthScores(now)
+                )
                 .sorted(Comparator
                         .comparingInt(CredentialHealthScoreResponse::score)
                         .thenComparing(CredentialHealthScoreResponse::credentialName, Comparator.nullsLast(String::compareToIgnoreCase)))
@@ -434,17 +443,96 @@ public class GovernanceAdminService {
         }
 
         return new CredentialHealthScoreResponse(
+                "API_KEY",
                 credential.getId(),
+                credential.getId(),
+                null,
+                credential.getCredentialName(),
                 credential.getCredentialName(),
                 credential.getProviderType(),
                 credential.getSiteProfileId(),
                 credential.getProxyId(),
                 credential.isActive(),
+                null,
                 score,
                 healthState,
                 reason,
                 effectiveUntil,
                 credential.getLastUsedAt(),
+                matchedPolicyIds,
+                matchedQuarantineIds
+        );
+    }
+
+    private java.util.stream.Stream<CredentialHealthScoreResponse> accountHealthScores(Instant now) {
+        if (upstreamAccountRepository == null) {
+            return java.util.stream.Stream.empty();
+        }
+        return upstreamAccountRepository.findAllByOrderByCreatedAtDesc().stream()
+                .map(account -> toAccountHealthScore(account, now));
+    }
+
+    private CredentialHealthScoreResponse toAccountHealthScore(UpstreamAccountEntity account, Instant now) {
+        String healthState = "HEALTHY";
+        String reason = null;
+        int score = 100;
+        Instant effectiveUntil = null;
+        List<Long> matchedPolicyIds = List.of();
+        List<Long> matchedQuarantineIds = List.of();
+
+        if (!account.isActive()) {
+            healthState = "INACTIVE";
+            reason = "账号已停用。";
+            score = 0;
+        } else if (account.isFrozen()) {
+            healthState = "QUARANTINED";
+            reason = "账号已冻结，不参与路由。";
+            score = scoreForState(healthState);
+        } else if (!account.isHealthy()) {
+            healthState = "DEGRADED";
+            reason = nullToDefault(account.getLastErrorMessage(), "账号健康状态异常。");
+            score = scoreForState(healthState);
+        } else {
+            GovernanceDecision decision = governancePolicyEngine.evaluate(new GovernanceContext(
+                    account.getProviderType() == null ? null : account.getProviderType().routeProviderType(),
+                    account.getSiteProfileId(),
+                    null,
+                    account.getId(),
+                    account.getProxyId()
+            ));
+
+            if (!decision.allowed()) {
+                healthState = nullToDefault(decision.healthState(), "POLICY_BLOCKED");
+                reason = nullToDefault(decision.reason(), "命中治理规则。");
+                effectiveUntil = decision.effectiveUntil();
+                matchedPolicyIds = decision.matchedPolicyIds();
+                matchedQuarantineIds = decision.matchedQuarantineIds();
+                score = scoreForState(healthState);
+            } else if (account.getCooldownUntil() != null && account.getCooldownUntil().isAfter(now)) {
+                healthState = "COOLDOWN";
+                reason = "账号处于冷却期。";
+                effectiveUntil = account.getCooldownUntil();
+                score = scoreForState(healthState);
+            }
+        }
+
+        return new CredentialHealthScoreResponse(
+                "AUTH_JSON_ACCOUNT",
+                account.getId(),
+                null,
+                account.getId(),
+                account.getAccountName(),
+                account.getAccountName(),
+                account.getProviderType() == null ? null : account.getProviderType().routeProviderType(),
+                account.getSiteProfileId(),
+                account.getProxyId(),
+                account.isActive(),
+                account.isFrozen(),
+                score,
+                healthState,
+                reason,
+                effectiveUntil,
+                account.getLastUsedAt(),
                 matchedPolicyIds,
                 matchedQuarantineIds
         );

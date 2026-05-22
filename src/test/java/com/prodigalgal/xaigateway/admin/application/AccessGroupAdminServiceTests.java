@@ -60,7 +60,7 @@ class AccessGroupAdminServiceTests {
         ));
 
         assertEquals("default", response.groupName());
-        assertEquals(List.of("openai"), response.allowedProtocols());
+        assertEquals(List.of("openai"), response.allowedProtocolSuites());
         assertEquals(List.of("gpt-5-mini"), response.allowedModels());
         assertEquals(List.of("OPENAI_DIRECT"), response.allowedProviderTypes());
         assertEquals(List.of("CODEX"), response.allowedClientFamilies());

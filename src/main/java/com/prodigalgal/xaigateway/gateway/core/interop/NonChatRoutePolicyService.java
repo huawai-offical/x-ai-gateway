@@ -280,7 +280,6 @@ public class NonChatRoutePolicyService {
                 || candidate.providerType() == ProviderType.GEMINI_DIRECT);
         snapshot.setSupportsFiles(true);
         snapshot.setSupportsUploads(true);
-        snapshot.setSupportsRealtime(true);
         snapshot.setAuthStrategy(candidate.authStrategy());
         snapshot.setPathStrategy(candidate.pathStrategy());
         snapshot.setErrorSchemaStrategy(candidate.errorSchemaStrategy());

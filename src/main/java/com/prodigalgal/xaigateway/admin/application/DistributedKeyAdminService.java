@@ -16,7 +16,7 @@ import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeySecretExportGrantEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayUserEntity;
-import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAccountPoolBindingRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAccountGroupBindingRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAccessGroupGrantRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyBindingRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyRepository;
@@ -42,7 +42,7 @@ public class DistributedKeyAdminService {
     private final DistributedKeyRepository distributedKeyRepository;
     private final DistributedKeySecretService distributedKeySecretService;
     private final DistributedKeyBindingRepository distributedKeyBindingRepository;
-    private final DistributedKeyAccountPoolBindingRepository distributedKeyAccountPoolBindingRepository;
+    private final DistributedKeyAccountGroupBindingRepository distributedKeyAccountGroupBindingRepository;
     private final DistributedKeyAccessGroupGrantRepository keyGrantRepository;
     private final DistributedKeySecretExportGrantRepository secretExportGrantRepository;
     private final GatewayUserRepository gatewayUserRepository;
@@ -54,7 +54,7 @@ public class DistributedKeyAdminService {
             DistributedKeyRepository distributedKeyRepository,
             DistributedKeySecretService distributedKeySecretService,
             DistributedKeyBindingRepository distributedKeyBindingRepository,
-            DistributedKeyAccountPoolBindingRepository distributedKeyAccountPoolBindingRepository,
+            DistributedKeyAccountGroupBindingRepository distributedKeyAccountGroupBindingRepository,
             DistributedKeyAccessGroupGrantRepository keyGrantRepository,
             DistributedKeySecretExportGrantRepository secretExportGrantRepository,
             GatewayUserRepository gatewayUserRepository,
@@ -63,7 +63,7 @@ public class DistributedKeyAdminService {
         this.distributedKeyRepository = distributedKeyRepository;
         this.distributedKeySecretService = distributedKeySecretService;
         this.distributedKeyBindingRepository = distributedKeyBindingRepository;
-        this.distributedKeyAccountPoolBindingRepository = distributedKeyAccountPoolBindingRepository;
+        this.distributedKeyAccountGroupBindingRepository = distributedKeyAccountGroupBindingRepository;
         this.keyGrantRepository = keyGrantRepository;
         this.secretExportGrantRepository = secretExportGrantRepository;
         this.gatewayUserRepository = gatewayUserRepository;
@@ -84,7 +84,7 @@ public class DistributedKeyAdminService {
         DistributedKeyEntity entity = new DistributedKeyEntity();
         apply(entity, request, true);
         if (entity.isActive()) {
-            throw new IllegalArgumentException("分发 key 启用前必须先绑定账号池。");
+            throw new IllegalArgumentException("分发 key 启用前必须先绑定账号分组。");
         }
         entity.setKeyPrefix(secrets.keyPrefix());
         entity.setSecretHash(secrets.secretHash());
@@ -98,7 +98,7 @@ public class DistributedKeyAdminService {
         DistributedKeyEntity entity = getRequired(id);
         apply(entity, request, false);
         if (entity.isActive()) {
-            assertHasActivePoolBinding(id);
+            assertHasActiveGroupBinding(id);
         }
         return toResponse(distributedKeyRepository.save(entity));
     }
@@ -117,7 +117,7 @@ public class DistributedKeyAdminService {
     public DistributedKeyResponse toggle(Long id, boolean active) {
         DistributedKeyEntity entity = getRequired(id);
         if (active) {
-            assertHasActivePoolBinding(id);
+            assertHasActiveGroupBinding(id);
         }
         entity.setActive(active);
         return toResponse(distributedKeyRepository.save(entity));
@@ -126,7 +126,7 @@ public class DistributedKeyAdminService {
     public void delete(Long id) {
         DistributedKeyEntity entity = getRequired(id);
         distributedKeyBindingRepository.deleteAllByDistributedKey_Id(id);
-        distributedKeyAccountPoolBindingRepository.deleteAllByDistributedKey_Id(id);
+        distributedKeyAccountGroupBindingRepository.deleteAllByDistributedKey_Id(id);
         keyGrantRepository.deleteAllByDistributedKey_Id(id);
         secretExportGrantRepository.deleteAllByDistributedKey_Id(id);
         distributedKeyRepository.delete(entity);
@@ -219,7 +219,7 @@ public class DistributedKeyAdminService {
                 List.of(
                         "401：检查 secret 是否为完整值，不要把 masked key 当成真实 key 使用。",
                         "404：确认 baseUrl 是否带了重复 /v1；接入包中的 apiBaseUrl 已经包含 /v1。",
-                        "客户端命中错误账号池：检查 X-AI-Gateway-Client-Family 与 key/access group/account pool 的 allowedClientFamilies。",
+                        "客户端命中错误账号分组：检查 X-AI-Gateway-Client-Family 与 key/access group/account group 的 allowedClientFamilies。",
                         "request filter 未命中：检查 gateway.cli.request-filter.enabled、rule.action、clientFamilies、role 与 contains。",
                         "模型不可用：查看 key 的 allowedModels、allowedProviderTypes 与 route policy runtime state。",
                         "Claude/Gemini CLI 自定义 base URL 不兼容时，改用 OpenAI-compatible 客户端或 OpenCode/OpenClaw 配置。"
@@ -408,11 +408,11 @@ public class DistributedKeyAdminService {
                 .orElseThrow(() -> new IllegalArgumentException("未找到指定 Key 所属用户。"));
     }
 
-    private void assertHasActivePoolBinding(Long distributedKeyId) {
-        long activeBindings = distributedKeyAccountPoolBindingRepository
+    private void assertHasActiveGroupBinding(Long distributedKeyId) {
+        long activeBindings = distributedKeyAccountGroupBindingRepository
                 .countByDistributedKey_IdAndActiveTrue(distributedKeyId);
         if (activeBindings <= 0) {
-            throw new IllegalArgumentException("分发 key 启用前必须先绑定账号池。");
+            throw new IllegalArgumentException("分发 key 启用前必须先绑定账号分组。");
         }
     }
 

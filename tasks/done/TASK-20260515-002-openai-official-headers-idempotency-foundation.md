@@ -1,9 +1,9 @@
 # TASK-20260515-002 OpenAI 官方 Headers 与 Idempotency-Key 下发基线
 
-状态：Done  
-优先级：Critical  
-类型：子任务  
-父任务：[TASK-20260514-030](../backlog/TASK-20260514-030-openai-cross-cutting-protocol-compatibility.md)  
+状态：Done
+优先级：Critical
+类型：子任务
+父任务：[TASK-20260514-030](../done/TASK-20260514-030-openai-cross-cutting-protocol-compatibility.md)
 上游来源：[REQ-20260514-009](../../docs/requirements/REQ-20260514-009-openai-full-api-coverage-task-system.md)、[TASK-20260515-001](TASK-20260515-001-openai-error-request-id-foundation.md)
 
 ## 背景

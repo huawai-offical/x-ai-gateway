@@ -1,7 +1,7 @@
 package com.prodigalgal.xaigateway.admin.api;
 
 public record OauthStartRequest(
-        Long poolId,
+        Long groupId,
         String redirectPath
 ) {
 }

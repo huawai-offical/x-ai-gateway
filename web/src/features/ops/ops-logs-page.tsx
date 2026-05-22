@@ -1,8 +1,17 @@
 import { type FormEvent, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
-import { apiRequest } from '../../lib/api'
-import { useTypedQuery } from '../../lib/typed-react-query'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { CodePanel } from '@/components/app/code-panel'
+import { EmptyState } from '@/components/app/empty-state'
+import { InfoGrid } from '@/components/app/info-grid'
+import { InlineError } from '@/components/app/inline-error'
+import { PageSection } from '@/components/app/page-section'
+import { PageSkeleton } from '@/components/app/page-skeleton'
+import { apiRequest } from '@/lib/api'
+import { useTypedQuery } from '@/lib/typed-react-query'
 import { type ObservabilityTraceResponse } from '../provider-sites/types'
 
 type AuditLog = { id: number; category: string; action: string; resourceType?: string | null; resourceRef?: string | null; detailJson?: string | null }
@@ -32,108 +41,98 @@ export function OpsLogsPage() {
   }
 
   return (
-    <section className="page-grid">
-      <div className="panel">
-        <div className="panel-head">
-          <p className="panel-kicker">System logs</p>
-          <h2>系统日志</h2>
-        </div>
-        <div className="card-list">
-          {systemQuery.data?.map((item: AuditLog) => (
-            <div key={item.id} className="detail-card">
-              <strong>{item.category} / {item.action}</strong>
-              <span>{item.resourceType ?? '-'}</span>
-              <span>{item.resourceRef ?? '-'}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="panel">
-        <div className="panel-head">
-          <p className="panel-kicker">Runtime logs</p>
-          <h2>运行时日志开关</h2>
-        </div>
-        <div className="card-list">
-          {runtimeQuery.data?.map((item: RuntimeLog) => (
-            <div key={item.id} className="detail-card">
-              <strong>{item.loggerName}</strong>
-              <span>{item.logLevel}</span>
-              <span>{item.payloadLoggingEnabled ? 'payload on' : 'payload off'}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="panel panel-wide">
-        <div className="panel-head">
-          <p className="panel-kicker">Observability trace</p>
-          <h2>联查 Trace</h2>
-          <p className="empty-state">通过 requestId 串起 request log、route decision、cache hit 和 async 对象详情。</p>
-        </div>
-        <form className="inline-form" onSubmit={handleTraceSubmit}>
-          <label className="stacked-form">
-            <span>requestId</span>
-            <input value={traceRequestId} onChange={(event) => setTraceRequestId(event.target.value)} placeholder="输入 requestId" />
+    <div className="flex flex-col gap-6">
+      <PageSection kicker="系统日志" title="系统审计日志">
+        {systemQuery.isPending ? (
+          <PageSkeleton count={1} />
+        ) : systemQuery.error ? (
+          <InlineError error={systemQuery.error} title="系统日志加载失败" />
+        ) : systemQuery.data?.length ? (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {systemQuery.data.map((item: AuditLog) => (
+              <Card key={item.id} className="border-border/60 bg-card/92 shadow-sm">
+                <CardHeader className="gap-2 border-b border-border/60">
+                  <CardTitle className="text-base">{item.category} / {item.action}</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-2 p-5 text-sm text-muted-foreground">
+                  <div>{item.resourceType ?? '-'}</div>
+                  <div>{item.resourceRef ?? '-'}</div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <EmptyState title="当前没有系统日志" />
+        )}
+      </PageSection>
+
+      <PageSection kicker="运行时日志" title="运行时日志开关">
+        {runtimeQuery.isPending ? (
+          <PageSkeleton count={1} />
+        ) : runtimeQuery.error ? (
+          <InlineError error={runtimeQuery.error} title="运行时日志配置加载失败" />
+        ) : runtimeQuery.data?.length ? (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {runtimeQuery.data.map((item: RuntimeLog) => (
+              <Card key={item.id} className="border-border/60 bg-card/92 shadow-sm">
+                <CardHeader className="gap-2 border-b border-border/60">
+                  <CardTitle className="text-base">{item.loggerName}</CardTitle>
+                </CardHeader>
+                <CardContent className="p-5 text-sm text-muted-foreground">
+                  <div>{item.logLevel}</div>
+                  <div>{item.payloadLoggingEnabled ? '载荷记录已开启' : '载荷记录已关闭'}</div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <EmptyState title="当前没有运行时日志配置" />
+        )}
+      </PageSection>
+
+      <PageSection kicker="链路追踪" title="联查链路">
+        <form className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto]" onSubmit={handleTraceSubmit}>
+          <label className="flex flex-col gap-2">
+            <span className="text-sm font-medium text-foreground">请求 ID</span>
+            <Input value={traceRequestId} onChange={(event) => setTraceRequestId(event.target.value)} placeholder="输入请求 ID" />
           </label>
-          <button type="submit">查询 Trace</button>
+          <div className="flex items-end">
+            <Button type="submit">查询链路</Button>
+          </div>
         </form>
         {(searchParams.get('providerType') || searchParams.get('requestPath')) ? (
-          <div className="stack-bar">
-            {searchParams.get('providerType') ? <span>providerType · {searchParams.get('providerType')}</span> : null}
-            {searchParams.get('requestPath') ? <span>requestPath · {searchParams.get('requestPath')}</span> : null}
+          <div className="flex flex-wrap gap-2 rounded-2xl border border-border/60 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+            {searchParams.get('providerType') ? <span>提供方类型 · {searchParams.get('providerType')}</span> : null}
+            {searchParams.get('requestPath') ? <span>请求路径 · {searchParams.get('requestPath')}</span> : null}
           </div>
         ) : null}
         {!submittedTraceRequestId ? (
-          <p className="empty-state">输入 requestId 后可查看 trace 聚合结果。</p>
+          <EmptyState title="输入请求 ID 后可查看链路聚合结果" />
         ) : traceQuery.isPending ? (
-          <p className="empty-state">正在加载 trace…</p>
+          <PageSkeleton count={1} />
         ) : traceQuery.error ? (
-          <p className="empty-state">{traceQuery.error instanceof Error ? traceQuery.error.message : 'trace 查询失败。'}</p>
+          <InlineError error={traceQuery.error} title="链路查询失败" />
         ) : traceQuery.data ? (
-          <div className="card-list">
-            <div className="detail-grid">
-              <div className="detail-card">
-                <strong>requestId</strong>
-                <span>{traceQuery.data.requestLog?.requestId ?? submittedTraceRequestId}</span>
-              </div>
-              <div className="detail-card">
-                <strong>gatewayResourceKey</strong>
-                <span>{traceQuery.data.requestLog?.gatewayResourceKey ?? '无'}</span>
-              </div>
-              <div className="detail-card">
-                <strong>supportStatus</strong>
-                <span>{traceQuery.data.requestLog?.supportStatus ?? '-'}</span>
-              </div>
-              <div className="detail-card">
-                <strong>degradationLevel</strong>
-                <span>{traceQuery.data.requestLog?.degradationLevel ?? '-'}</span>
-              </div>
-            </div>
-            <div className="detail-grid">
-              <div className="detail-card">
-                <strong>routeDecision</strong>
-                <span>{traceQuery.data.routeDecision?.selectionSource ?? '无'}</span>
-              </div>
-              <div className="detail-card">
-                <strong>cacheHits</strong>
-                <span>{traceQuery.data.cacheHits.length}</span>
-              </div>
-              <div className="detail-card">
-                <strong>upstream refs</strong>
-                <span>{traceQuery.data.upstreamCacheReferences.length}</span>
-              </div>
-              <div className="detail-card">
-                <strong>async resource</strong>
-                <span>{traceQuery.data.asyncResourceSummary?.resourceKey ?? '无'}</span>
-              </div>
-            </div>
-            <div className="code-block">
-              <pre>{JSON.stringify(traceQuery.data, null, 2)}</pre>
-            </div>
+          <div className="flex flex-col gap-6">
+            <InfoGrid
+              items={[
+                { key: 'request-id', label: '请求 ID', value: traceQuery.data.requestLog?.requestId ?? submittedTraceRequestId },
+                { key: 'resource-key', label: '网关资源键', value: traceQuery.data.requestLog?.gatewayResourceKey ?? '无' },
+                { key: 'support-status', label: '支持状态', value: traceQuery.data.requestLog?.supportStatus ?? '-' },
+                { key: 'degradation', label: '降级级别', value: traceQuery.data.requestLog?.degradationLevel ?? '-' },
+                { key: 'route', label: '路由决策', value: traceQuery.data.routeDecision?.selectionSource ?? '无' },
+                { key: 'cache-hits', label: '缓存命中', value: traceQuery.data.cacheHits.length },
+                { key: 'upstream-refs', label: '上游缓存引用', value: traceQuery.data.upstreamCacheReferences.length },
+                { key: 'async-resource', label: '异步资源', value: traceQuery.data.asyncResourceSummary?.resourceKey ?? '无' },
+              ]}
+              columnsClassName="md:grid-cols-2 xl:grid-cols-4"
+            />
+            <CodePanel title="链路 JSON" code={JSON.stringify(traceQuery.data, null, 2)} />
           </div>
         ) : (
-          <p className="empty-state">暂无 trace 结果。</p>
+          <EmptyState title="暂无链路结果" />
         )}
-      </div>
-    </section>
+      </PageSection>
+    </div>
   )
 }

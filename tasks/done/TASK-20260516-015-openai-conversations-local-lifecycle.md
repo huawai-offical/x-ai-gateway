@@ -1,9 +1,9 @@
 # TASK-20260516-015 OpenAI Conversations 本地 Lifecycle
 
-状态：Done  
-优先级：High  
-类型：子任务  
-父任务：[TASK-20260514-019](../backlog/TASK-20260514-019-openai-conversations-webhooks-tools.md)  
+状态：Done
+优先级：High
+类型：子任务
+父任务：[TASK-20260514-019](../done/TASK-20260514-019-openai-conversations-webhooks-tools.md)
 上游来源：[REQ-20260516-015](../../docs/requirements/REQ-20260516-015-openai-conversations-local-lifecycle.md)
 
 ## 背景
@@ -79,7 +79,7 @@
 - [REQ-20260516-015](../../docs/requirements/REQ-20260516-015-openai-conversations-local-lifecycle.md)
 - [REP-20260514 OpenAI API 完整兼容性深度审计](../../docs/reports/REP-20260514-openai-api-compatibility-deep-audit.md)
 - [REP-20260514 OpenAI API 全量覆盖任务拆解](../../docs/reports/REP-20260514-openai-full-api-coverage-task-breakdown.md)
-- [TASK-20260514-019](../backlog/TASK-20260514-019-openai-conversations-webhooks-tools.md)
+- [TASK-20260514-019](../done/TASK-20260514-019-openai-conversations-webhooks-tools.md)
 
 ## 当前状态
 

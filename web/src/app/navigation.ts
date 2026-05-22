@@ -1,29 +1,26 @@
 import { matchPath } from 'react-router-dom'
-
-export type NavigationIcon =
-  | 'key'
-  | 'accounts'
-  | 'proxy'
-  | 'tls'
-  | 'probe'
-  | 'overview'
-  | 'alert'
-  | 'logs'
-  | 'site'
-  | 'matrix'
-  | 'explain'
-  | 'rules'
-  | 'install'
-  | 'backup'
-  | 'upgrade'
-  | 'history'
-  | 'integration'
+import type { LucideIcon } from 'lucide-react'
+import { toConsolePath } from './route-surfaces'
+import {
+  AlarmClockCheckIcon,
+  AppWindowIcon,
+  BlocksIcon,
+  BotMessageSquareIcon,
+  DatabaseZapIcon,
+  KeyRoundIcon,
+  NetworkIcon,
+  ShieldIcon,
+  ShieldCheckIcon,
+  SquareActivityIcon,
+  TablePropertiesIcon,
+  WaypointsIcon,
+  WebhookIcon,
+} from 'lucide-react'
 
 export type NavigationItem = {
   to: string
   label: string
-  description: string
-  icon: NavigationIcon
+  icon: LucideIcon
   end?: boolean
 }
 
@@ -35,299 +32,374 @@ export type NavigationGroup = {
 type RouteMeta = {
   patterns: string[]
   title: string
-  description: string
   groupLabel: string
   navTo: string
 }
 
-export const navigationGroups: NavigationGroup[] = [
+export type ResolvedRouteMeta = RouteMeta & {
+  navLabel: string
+  breadcrumbs: Array<{ label: string; to?: string }>
+}
+
+const baseNavigationGroups: NavigationGroup[] = [
   {
-    label: '访问与账号',
+    label: '智能运维',
     items: [
-      { to: '/keys', label: 'Keys', description: '预算、模型与协议权限', icon: 'key' },
-      { to: '/account-pools', label: '账号池', description: '管理上游账号接入与池化', icon: 'accounts' },
+      { to: '/ops', label: '智能运维总览', icon: SquareActivityIcon, end: true },
+      { to: '/ops/alerts', label: '告警中心', icon: SquareActivityIcon, end: true },
+      { to: '/ops/system-events', label: '系统事件', icon: AlarmClockCheckIcon, end: true },
     ],
   },
   {
-    label: '网络治理',
+    label: '接入与模型',
     items: [
-      { to: '/network/proxies', label: '代理池', description: '出口代理与状态追踪', icon: 'proxy' },
-      { to: '/network/tls-profiles', label: 'TLS 指纹', description: '出站画像与指纹策略', icon: 'tls', end: true },
-      { to: '/network/probes', label: '网络 Probe', description: '连通性检测与结果汇总', icon: 'probe', end: true },
+      { to: '/credentials', label: '上游凭证', icon: KeyRoundIcon },
+      { to: '/keys', label: '访问密钥', icon: ShieldIcon },
+      { to: '/account-groups', label: '账号分组', icon: TablePropertiesIcon },
+      { to: '/models', label: '模型目录', icon: BotMessageSquareIcon, end: true },
+      { to: '/network/proxies', label: '代理池', icon: NetworkIcon },
     ],
   },
   {
-    label: '运行工作台',
+    label: '路由治理',
     items: [
-      { to: '/incidents', label: 'Incidents', description: '当前风险事件、影响范围与建议动作', icon: 'overview', end: true },
-      { to: '/traces', label: 'Traces', description: '按 requestId / resource 串联 trace 与实体', icon: 'logs', end: true },
-      { to: '/ops/alerts', label: '告警中心', description: '告警规则、状态与处置', icon: 'alert', end: true },
-      { to: '/ops/probes', label: '拨测记录', description: '主动拨测与结果回溯', icon: 'probe', end: true },
+      { to: '/ops/governance', label: '治理策略', icon: ShieldCheckIcon, end: true },
+      { to: '/network/tls-profiles', label: 'TLS 指纹', icon: ShieldCheckIcon, end: true },
     ],
   },
   {
-    label: '站点真相',
+    label: '观测记录',
     items: [
-      { to: '/provider-sites', label: '站点档案', description: '站点能力、健康与鉴权', icon: 'site' },
-      { to: '/capability-matrix', label: '能力矩阵', description: '协议与能力兼容视图', icon: 'matrix', end: true },
-      { to: '/workbench', label: 'Workbench', description: '请求、计划、执行与 trace 工作台', icon: 'explain', end: true },
+      { to: '/request-logs', label: '请求日志', icon: SquareActivityIcon, end: true },
+      { to: '/traces', label: '链路追踪', icon: WaypointsIcon, end: true },
+      { to: '/upstream-cache', label: '缓存记录', icon: DatabaseZapIcon, end: true },
+      { to: '/resources', label: '资源记录', icon: BlocksIcon, end: true },
     ],
   },
   {
-    label: '策略与操作',
+    label: '用户与计费',
     items: [
-      { to: '/error-rules', label: '错误规则', description: '例外、透传与重写策略', icon: 'rules', end: true },
-      { to: '/operations/install', label: '安装初始化', description: '平台初始化与引导流程', icon: 'install', end: true },
-      { to: '/operations/changes', label: '变更编排', description: '统一申请、审批、执行与回滚', icon: 'upgrade', end: true },
-      { to: '/operations/windows', label: '维护窗口', description: '维护窗口与执行时段治理', icon: 'backup', end: true },
-      { to: '/operations/checkpoints', label: '恢复检查点', description: '真实快照、核验与恢复基线', icon: 'history', end: true },
+      { to: '/users', label: '用户清单', icon: AppWindowIcon, end: true },
+      { to: '/plans', label: '套餐管理', icon: TablePropertiesIcon, end: true },
+      { to: '/access-groups', label: '访问组', icon: ShieldCheckIcon, end: true },
+      { to: '/subscriptions', label: '订阅关系', icon: ShieldIcon, end: true },
+      { to: '/announcements', label: '公告中心', icon: AppWindowIcon, end: true },
+      { to: '/promo-codes', label: '兑换码', icon: KeyRoundIcon, end: true },
     ],
   },
   {
-    label: '外部联动',
+    label: '系统工具',
     items: [
-      { to: '/integrations/webhooks', label: 'Webhooks', description: '管理 webhook endpoint 与签名配置', icon: 'integration', end: true },
-      { to: '/integrations/channels', label: 'Channels', description: '定义 webhook / IM / email 通道', icon: 'integration', end: true },
-      { to: '/integrations/subscriptions', label: 'Subscriptions', description: '配置事件订阅与过滤条件', icon: 'integration', end: true },
-      { to: '/integrations/deliveries', label: 'Deliveries', description: '查看投递记录、失败重试与重放', icon: 'integration', end: true },
+      { to: '/settings/admin-auth', label: '控制台认证', icon: ShieldCheckIcon, end: true },
+      { to: '/settings/system', label: '系统参数', icon: DatabaseZapIcon, end: true },
+      { to: '/workbench', label: '调试工作台', icon: AppWindowIcon, end: true },
+    ],
+  },
+  {
+    label: '集成扩展',
+    items: [
+      { to: '/integrations/webhooks', label: 'Webhook', icon: WebhookIcon, end: true },
+      { to: '/integrations/channels', label: '通知通道', icon: WebhookIcon, end: true },
+      { to: '/integrations/subscriptions', label: '订阅规则', icon: ShieldCheckIcon, end: true },
+      { to: '/integrations/deliveries', label: '投递记录', icon: AlarmClockCheckIcon, end: true },
+      { to: '/integrations/external-apps', label: '扩展应用', icon: AppWindowIcon, end: true },
     ],
   },
 ]
 
+export const navigationGroups: NavigationGroup[] = baseNavigationGroups.map((group) => ({
+  ...group,
+  items: group.items.map((item) => ({
+    ...item,
+    to: toConsolePath(item.to),
+  })),
+}))
+
 const routeMeta: RouteMeta[] = [
   {
+    patterns: ['/credentials'],
+    title: '上游凭证',
+    groupLabel: '接入与模型',
+    navTo: '/credentials',
+  },
+  {
+    patterns: ['/accounts'],
+    title: '账号分组',
+    groupLabel: '接入与模型',
+    navTo: '/account-groups',
+  },
+  {
+    patterns: ['/account-groups'],
+    title: '账号分组',
+    groupLabel: '接入与模型',
+    navTo: '/account-groups',
+  },
+  {
+    patterns: ['/models'],
+    title: '大模型管理',
+    groupLabel: '接入与模型',
+    navTo: '/models',
+  },
+  {
+    patterns: ['/resources'],
+    title: '异步资源记录',
+    groupLabel: '观测记录',
+    navTo: '/resources',
+  },
+  {
+    patterns: ['/upstream-cache'],
+    title: '缓存记录',
+    groupLabel: '观测记录',
+    navTo: '/upstream-cache',
+  },
+  {
     patterns: ['/keys/:id'],
-    title: 'Key 详情',
-    description: '查看单个策略对象的预算、协议许可与绑定状态。',
-    groupLabel: '访问与账号',
+    title: '访问密钥详情',
+    groupLabel: '接入与模型',
     navTo: '/keys',
   },
   {
     patterns: ['/keys'],
-    title: 'Keys',
-    description: '统一管理 DistributedKey、预算限制与协议可见性。',
-    groupLabel: '访问与账号',
+    title: '访问密钥',
+    groupLabel: '接入与模型',
     navTo: '/keys',
   },
   {
-    patterns: ['/account-pools/:id'],
-    title: '账号池详情',
-    description: '查看池内账号、健康状态与池化规则。',
-    groupLabel: '访问与账号',
-    navTo: '/account-pools',
+    patterns: ['/users'],
+    title: '用户清单',
+    groupLabel: '用户与计费',
+    navTo: '/users',
+  },
+  {
+    patterns: ['/plans'],
+    title: '套餐管理',
+    groupLabel: '用户与计费',
+    navTo: '/plans',
+  },
+  {
+    patterns: ['/access-groups'],
+    title: '访问组与权益',
+    groupLabel: '用户与计费',
+    navTo: '/access-groups',
+  },
+  {
+    patterns: ['/subscriptions'],
+    title: '订阅关系',
+    groupLabel: '用户与计费',
+    navTo: '/subscriptions',
+  },
+  {
+    patterns: ['/announcements'],
+    title: '公告中心',
+    groupLabel: '用户与计费',
+    navTo: '/announcements',
+  },
+  {
+    patterns: ['/promo-codes'],
+    title: '兑换码活动',
+    groupLabel: '用户与计费',
+    navTo: '/promo-codes',
+  },
+  {
+    patterns: ['/account-groups/:id'],
+    title: '账号分组详情',
+    groupLabel: '接入与模型',
+    navTo: '/account-groups',
+  },
+  {
+    patterns: ['/accounts/connect/codex'],
+    title: 'Codex 接入',
+    groupLabel: '接入与模型',
+    navTo: '/account-groups',
   },
   {
     patterns: ['/accounts/connect/:provider'],
-    title: '连接上游账号',
-    description: '发起 OAuth 或等价授权流程，将账号接入统一控制面。',
-    groupLabel: '访问与账号',
-    navTo: '/account-pools',
+    title: '连接官方账号',
+    groupLabel: '接入与模型',
+    navTo: '/account-groups',
   },
   {
     patterns: ['/accounts/callback/:provider'],
-    title: '账号授权回调',
-    description: '处理授权回调并回写账号接入结果。',
-    groupLabel: '访问与账号',
-    navTo: '/account-pools',
+    title: '官方账号授权回调',
+    groupLabel: '接入与模型',
+    navTo: '/account-groups',
   },
   {
     patterns: ['/accounts/:id'],
-    title: '账号详情',
-    description: '查看单个上游账号的授权信息、状态与限制条件。',
-    groupLabel: '访问与账号',
-    navTo: '/account-pools',
-  },
-  {
-    patterns: ['/account-pools'],
-    title: '账号池',
-    description: '统一维护各厂商账号池、接入状态与容量分布。',
-    groupLabel: '访问与账号',
-    navTo: '/account-pools',
+    title: '官方账号详情',
+    groupLabel: '接入与模型',
+    navTo: '/account-groups',
   },
   {
     patterns: ['/network/proxies/:id'],
     title: '代理详情',
-    description: '查看单个代理节点的状态、链路与绑定关系。',
-    groupLabel: '网络治理',
+    groupLabel: '接入与模型',
     navTo: '/network/proxies',
   },
   {
     patterns: ['/network/proxies'],
     title: '代理池',
-    description: '集中治理出口代理、可用性与网络隔离策略。',
-    groupLabel: '网络治理',
+    groupLabel: '接入与模型',
     navTo: '/network/proxies',
   },
   {
     patterns: ['/network/tls-profiles'],
     title: 'TLS 指纹',
-    description: '维护 TLS 指纹画像与出站策略绑定。',
-    groupLabel: '网络治理',
+    groupLabel: '路由治理',
     navTo: '/network/tls-profiles',
   },
   {
-    patterns: ['/network/probes'],
-    title: '网络 Probe',
-    description: '查看网络探测目标、延迟数据与最近失败原因。',
-    groupLabel: '网络治理',
-    navTo: '/network/probes',
+    patterns: ['/request-logs'],
+    title: '请求日志',
+    groupLabel: '观测记录',
+    navTo: '/request-logs',
+  },
+  {
+    patterns: ['/dashboard'],
+    title: '角色协同视图',
+    groupLabel: '智能运维',
+    navTo: '/ops',
+  },
+  {
+    patterns: ['/ops'],
+    title: '智能运维总览',
+    groupLabel: '智能运维',
+    navTo: '/ops',
   },
   {
     patterns: ['/ops/alerts'],
     title: '告警中心',
-    description: '跟踪当前告警状态、受影响对象与处置入口。',
-    groupLabel: '运行工作台',
+    groupLabel: '智能运维',
     navTo: '/ops/alerts',
   },
   {
-    patterns: ['/ops/probes'],
-    title: '拨测记录',
-    description: '查看主动拨测计划、结果和历史变化。',
-    groupLabel: '运行工作台',
-    navTo: '/ops/probes',
+    patterns: ['/ops/system-events'],
+    title: '系统事件时间线',
+    groupLabel: '智能运维',
+    navTo: '/ops/system-events',
   },
   {
     patterns: ['/traces'],
-    title: 'Trace Workbench',
-    description: '按 requestId、resource key 和 upstream object 串联链路与实体。',
-    groupLabel: '运行工作台',
+    title: '链路时间线',
+    groupLabel: '观测记录',
     navTo: '/traces',
   },
   {
     patterns: ['/incidents'],
-    title: 'Incident Command Center',
-    description: '先回答发生了什么、影响谁、为什么危险以及下一步建议动作。',
-    groupLabel: '运行工作台',
-    navTo: '/incidents',
-  },
-  {
-    patterns: ['/provider-sites/new/settings'],
-    title: '新建站点设置',
-    description: '创建新的 provider site，并初始化基础配置与鉴权设置。',
-    groupLabel: '站点真相',
-    navTo: '/provider-sites',
-  },
-  {
-    patterns: ['/provider-sites/:id'],
-    title: '站点运行档案',
-    description: '先查看 blocker、accepted exception、推荐动作和下一步入口。',
-    groupLabel: '站点真相',
-    navTo: '/provider-sites',
-  },
-  {
-    patterns: ['/provider-sites/:id/settings'],
-    title: '站点设置',
-    description: '编辑站点配置、刷新能力快照并维护基础信息。',
-    groupLabel: '站点真相',
-    navTo: '/provider-sites',
-  },
-  {
-    patterns: ['/provider-sites'],
-    title: '站点档案',
-    description: '统一查看 provider site、健康快照与能力真相源。',
-    groupLabel: '站点真相',
-    navTo: '/provider-sites',
-  },
-  {
-    patterns: ['/capability-matrix'],
-    title: '能力矩阵',
-    description: '按 blocked、degraded 和 accepted exception 发现全局限制。',
-    groupLabel: '站点真相',
-    navTo: '/capability-matrix',
+    title: '事件处置视图',
+    groupLabel: '智能运维',
+    navTo: '/ops',
   },
   {
     patterns: ['/workbench', '/translation-debug'],
-    title: 'Translation Workbench',
-    description: '按 Request → Plan → Execute → Trace → Raw 的顺序调试请求。',
-    groupLabel: '站点真相',
+    title: '白盒调试工作台',
+    groupLabel: '系统工具',
     navTo: '/workbench',
   },
   {
-    patterns: ['/error-rules'],
-    title: '错误规则',
-    description: '集中配置错误透传、重写、阻断和例外策略。',
-    groupLabel: '策略与操作',
-    navTo: '/error-rules',
+    patterns: ['/settings/admin-auth'],
+    title: '控制台认证',
+    groupLabel: '系统工具',
+    navTo: '/settings/admin-auth',
   },
   {
-    patterns: ['/operations/install'],
-    title: '安装初始化',
-    description: '管理平台初始化步骤、状态与必要检查。',
-    groupLabel: '策略与操作',
-    navTo: '/operations/install',
+    patterns: ['/settings/system'],
+    title: '系统参数',
+    groupLabel: '系统工具',
+    navTo: '/settings/system',
   },
   {
-    patterns: ['/operations/changes', '/operations/backups', '/operations/upgrades', '/operations/rollbacks'],
-    title: '变更编排',
-    description: '统一处理 ChangePlan、审批、执行阶段与自动回滚。',
-    groupLabel: '策略与操作',
-    navTo: '/operations/changes',
+    patterns: ['/ops/governance'],
+    title: '治理策略工作台',
+    groupLabel: '路由治理',
+    navTo: '/ops/governance',
   },
   {
-    patterns: ['/operations/windows'],
-    title: '维护窗口',
-    description: '配置变更窗口，约束升级与高风险动作的执行时段。',
-    groupLabel: '策略与操作',
-    navTo: '/operations/windows',
-  },
-  {
-    patterns: ['/operations/checkpoints'],
-    title: '恢复检查点',
-    description: '查看 metadata、runtime、data 三类快照与 checkpoint 核验结果。',
-    groupLabel: '策略与操作',
-    navTo: '/operations/checkpoints',
+    patterns: ['/error-rules', '/operations/install', '/operations/changes', '/operations/backups', '/operations/upgrades', '/operations/rollbacks', '/operations/windows', '/operations/checkpoints', '/operations/maintenance-runs', '/integrations/runbooks'],
+    title: '智能运维总览',
+    groupLabel: '智能运维',
+    navTo: '/ops',
   },
   {
     patterns: ['/integrations/webhooks'],
-    title: 'Webhook Endpoints',
-    description: '管理 webhook endpoint、签名策略和 timeout，作为统一外发底座。',
-    groupLabel: '外部联动',
+    title: 'Webhook 终端',
+    groupLabel: '集成扩展',
     navTo: '/integrations/webhooks',
   },
   {
     patterns: ['/integrations/channels'],
-    title: 'Notification Channels',
-    description: '定义 webhook / IM / email 通道，并绑定对外出口。',
-    groupLabel: '外部联动',
+    title: '通知通道',
+    groupLabel: '集成扩展',
     navTo: '/integrations/channels',
   },
   {
     patterns: ['/integrations/subscriptions'],
-    title: 'Event Subscriptions',
-    description: '配置事件筛选规则，让外发通知稳定命中目标。',
-    groupLabel: '外部联动',
+    title: '订阅规则',
+    groupLabel: '集成扩展',
     navTo: '/integrations/subscriptions',
   },
   {
     patterns: ['/integrations/deliveries'],
-    title: 'Outbound Deliveries',
-    description: '查看最近投递、失败重试和 replay，形成完整外发审计链。',
-    groupLabel: '外部联动',
+    title: '投递记录',
+    groupLabel: '集成扩展',
     navTo: '/integrations/deliveries',
+  },
+  {
+    patterns: ['/integrations/external-apps'],
+    title: '控制台扩展应用',
+    groupLabel: '集成扩展',
+    navTo: '/integrations/external-apps',
+  },
+  {
+    patterns: ['/integrations/extensions/:slug'],
+    title: '扩展应用运行页',
+    groupLabel: '集成扩展',
+    navTo: '/integrations/external-apps',
   },
 ]
 
 const navigationItems = navigationGroups.flatMap((group) => group.items)
 
-export function resolveRouteMeta(pathname: string) {
+export function resolveRouteMeta(pathname: string): ResolvedRouteMeta {
+  const routePathname = stripConsolePrefix(pathname)
   const matchedRoute = routeMeta.find((item) =>
-    item.patterns.some((pattern) => matchPath({ path: pattern, end: true }, pathname)),
+    item.patterns.some((pattern) => matchPath({ path: pattern, end: true }, routePathname)),
   )
 
   if (!matchedRoute) {
     return {
-      title: 'Admin Console',
-      description: '统一承载多协议网关的配置、站点、网络与运行观测视图。',
+      patterns: ['/'],
+      title: '管理控制台',
       groupLabel: '控制台',
-      navLabel: '总览',
-      navTo: '/keys',
+      navTo: '/ops',
+      navLabel: '智能运维总览',
+      breadcrumbs: [{ label: '控制台' }, { label: '智能运维总览' }],
     }
   }
 
-  const matchedNav = navigationItems.find((item) => item.to === matchedRoute.navTo)
+  const canonicalNavTo = toConsolePath(matchedRoute.navTo)
+  const matchedNav = navigationItems.find((item) => item.to === canonicalNavTo)
+  const navLabel = matchedNav?.label ?? matchedRoute.title
+  const breadcrumbs = [{ label: matchedRoute.groupLabel }, { label: navLabel }]
+
+  if (matchedRoute.title !== navLabel) {
+    breadcrumbs.push({ label: matchedRoute.title })
+  }
 
   return {
     ...matchedRoute,
-    navLabel: matchedNav?.label ?? matchedRoute.title,
+    navTo: canonicalNavTo,
+    navLabel,
+    breadcrumbs,
   }
+}
+
+function stripConsolePrefix(pathname: string) {
+  if (pathname === '/console') {
+    return '/'
+  }
+  if (pathname.startsWith('/console/')) {
+    return pathname.slice('/console'.length)
+  }
+  return pathname
 }

@@ -294,12 +294,11 @@ public record CanonicalExecutionPlan(
             case CHAT_COMPLETION -> "chat.completions";
             case RESPONSE_CREATE -> "responses";
             case EMBEDDING_CREATE -> "embeddings";
-            case AUDIO_TRANSCRIPTION, AUDIO_TRANSLATION, AUDIO_SPEECH -> "audio";
-            case IMAGE_GENERATION, IMAGE_EDIT, IMAGE_VARIATION -> "images";
+            case AUDIO_TRANSCRIPTION, AUDIO_SPEECH -> "audio";
+            case IMAGE_GENERATION -> "images";
             case MODERATION_CREATE -> "moderations";
             case FILE_CREATE, FILE_LIST, FILE_GET, FILE_CONTENT_GET, FILE_DELETE -> "files";
             case UPLOAD_CREATE, UPLOAD_GET, UPLOAD_PART_ADD, UPLOAD_COMPLETE, UPLOAD_CANCEL -> "uploads";
-            case REALTIME_CLIENT_SECRET_CREATE -> "realtime";
             case RERANK_CREATE -> "rerank";
             case VIDEO_GENERATION_CREATE, VIDEO_GENERATION_GET, VIDEO_GENERATION_CANCEL -> "videos";
             case MUSIC_GENERATION_CREATE, MUSIC_GENERATION_GET, MUSIC_GENERATION_CANCEL -> "music";
@@ -315,11 +314,8 @@ public record CanonicalExecutionPlan(
             case RESPONSE_CREATE -> "/v1/responses";
             case EMBEDDING_CREATE -> "/v1/embeddings";
             case AUDIO_TRANSCRIPTION -> "/v1/audio/transcriptions";
-            case AUDIO_TRANSLATION -> "/v1/audio/translations";
             case AUDIO_SPEECH -> "/v1/audio/speech";
             case IMAGE_GENERATION -> "/v1/images/generations";
-            case IMAGE_EDIT -> "/v1/images/edits";
-            case IMAGE_VARIATION -> "/v1/images/variations";
             case MODERATION_CREATE -> "/v1/moderations";
             case FILE_CREATE, FILE_LIST -> "/v1/files";
             case FILE_GET, FILE_DELETE -> "/v1/files/{fileId}";
@@ -329,7 +325,6 @@ public record CanonicalExecutionPlan(
             case UPLOAD_PART_ADD -> "/v1/uploads/{uploadId}/parts";
             case UPLOAD_COMPLETE -> "/v1/uploads/{uploadId}/complete";
             case UPLOAD_CANCEL -> "/v1/uploads/{uploadId}/cancel";
-            case REALTIME_CLIENT_SECRET_CREATE -> "/v1/realtime/client_secrets";
             case RERANK_CREATE -> "/v1/rerank";
             case VIDEO_GENERATION_CREATE -> "/v1/videos/generations";
             case VIDEO_GENERATION_GET -> "/v1/videos/{taskId}";

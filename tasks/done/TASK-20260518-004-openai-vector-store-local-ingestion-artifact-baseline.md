@@ -3,7 +3,7 @@
 状态：Done
 优先级：High
 类型：子任务
-父任务：[TASK-20260514-023](../backlog/TASK-20260514-023-openai-vector-stores-full-stack.md)
+父任务：[TASK-20260514-023](../done/TASK-20260514-023-openai-vector-stores-full-stack.md)
 上游来源：[REQ-20260518-004](../../docs/requirements/REQ-20260518-004-openai-vector-store-local-ingestion-artifact-baseline.md)
 
 ## 背景
@@ -77,7 +77,7 @@ Vector Stores 本地 lifecycle、file attachment、file content、text search �
 ## 关联文档
 
 - [REQ-20260518-004](../../docs/requirements/REQ-20260518-004-openai-vector-store-local-ingestion-artifact-baseline.md)
-- [TASK-20260514-023](../backlog/TASK-20260514-023-openai-vector-stores-full-stack.md)
+- [TASK-20260514-023](../done/TASK-20260514-023-openai-vector-stores-full-stack.md)
 
 ## 当前状态
 

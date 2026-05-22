@@ -1,10 +1,10 @@
 # TASK-20260515-013 OpenAI Webhook Signature 与 Replay 防护基线
 
-状态：Done  
-优先级：Critical  
-类型：子任务  
-父任务：[TASK-20260514-030](../backlog/TASK-20260514-030-openai-cross-cutting-protocol-compatibility.md)  
-上游来源：[TASK-20260514-019](../backlog/TASK-20260514-019-openai-conversations-webhooks-tools.md)
+状态：Done
+优先级：Critical
+类型：子任务
+父任务：[TASK-20260514-030](../done/TASK-20260514-030-openai-cross-cutting-protocol-compatibility.md)
+上游来源：[TASK-20260514-019](../done/TASK-20260514-019-openai-conversations-webhooks-tools.md)
 
 ## 背景
 
@@ -70,8 +70,8 @@ OpenAI webhook 按 Standard Webhooks 规范投递，核心 headers 为 `webhook-
 
 ## 关联文档
 
-- [TASK-20260514-019](../backlog/TASK-20260514-019-openai-conversations-webhooks-tools.md)
-- [TASK-20260514-030](../backlog/TASK-20260514-030-openai-cross-cutting-protocol-compatibility.md)
+- [TASK-20260514-019](../done/TASK-20260514-019-openai-conversations-webhooks-tools.md)
+- [TASK-20260514-030](../done/TASK-20260514-030-openai-cross-cutting-protocol-compatibility.md)
 
 ## 实现结果
 

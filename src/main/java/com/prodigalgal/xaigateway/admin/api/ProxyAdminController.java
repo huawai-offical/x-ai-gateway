@@ -27,7 +27,4 @@ public class ProxyAdminController {
 
     @DeleteMapping("/{id}")
     public void delete(@PathVariable Long id) { networkGovernanceService.deleteProxy(id); }
-
-    @PostMapping("/{id}/probe")
-    public ProxyProbeResultResponse probe(@PathVariable Long id) { return networkGovernanceService.probe(id); }
 }

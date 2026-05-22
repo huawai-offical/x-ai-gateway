@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="x-ai-gateway logo">
+  <defs>
+    <linearGradient id="mark" x1="30" x2="224" y1="228" y2="30" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22c55e"/>
+      <stop offset=".48" stop-color="#3b82f6"/>
+      <stop offset="1" stop-color="#f8fafc"/>
+    </linearGradient>
+    <filter id="shadow" x="-24%" y="-24%" width="148%" height="148%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="16" stdDeviation="13" flood-color="#020617" flood-opacity=".36"/>
+    </filter>
+  </defs>
+  <g filter="url(#shadow)">
+    <path d="M108 30C123 86 160 121 222 138C160 155 123 190 108 246C93 190 56 155 -6 138C56 121 93 86 108 30Z" fill="url(#mark)"/>
+    <path d="M197 52C205 84 224 103 256 111C224 119 205 138 197 170C189 138 170 119 138 111C170 103 189 84 197 52Z" fill="#e0f2fe"/>
+    <circle cx="197" cy="111" r="6" fill="#a3e635" opacity=".9"/>
+  </g>
+</svg>

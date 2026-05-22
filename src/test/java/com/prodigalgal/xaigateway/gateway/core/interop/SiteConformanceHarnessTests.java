@@ -335,9 +335,6 @@ class SiteConformanceHarnessTests {
             root.put("bytes", 12);
             return root;
         }
-        if ("/v1/realtime/client_secrets".equals(fixture.requestPath())) {
-            return root;
-        }
         return root;
     }
 
@@ -414,7 +411,6 @@ class SiteConformanceHarnessTests {
         entity.setSupportsModeration(fixture.snapshotModeration());
         entity.setSupportsFiles(fixture.snapshotFiles());
         entity.setSupportsUploads(fixture.snapshotUploads());
-        entity.setSupportsRealtime(fixture.snapshotRealtime());
         entity.setAuthStrategy(policy.authStrategy());
         entity.setPathStrategy(policy.pathStrategy());
         entity.setErrorSchemaStrategy(policy.errorSchemaStrategy());
@@ -491,7 +487,6 @@ class SiteConformanceHarnessTests {
             boolean snapshotModeration,
             boolean snapshotFiles,
             boolean snapshotUploads,
-            boolean snapshotRealtime,
             boolean expectedExecutable,
             String expectedEffectiveLevel,
             String expectedExecutionKind,

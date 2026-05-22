@@ -157,29 +157,6 @@ class NonChatRoutePolicyServiceTests {
         assertTrue(decision.blockedReasons().isEmpty());
     }
 
-    @Test
-    void shouldKeepRealtimeClientSecretInDistributedTargetModeWhenNoTargetIsResolved() {
-        GatewayRequestSemantics semantics = new GatewayRequestSemantics(
-                TranslationResourceType.REALTIME,
-                TranslationOperation.REALTIME_CLIENT_SECRET_CREATE,
-                List.of(InteropFeature.REALTIME_CLIENT_SECRET),
-                RouteSelectionMode.DISTRIBUTED_TARGET
-        );
-
-        NonChatRoutePolicyDecision decision = service.evaluateWithoutCandidate(
-                "openai",
-                "/v1/realtime/client_secrets",
-                semantics,
-                canonicalRequest("/v1/realtime/client_secrets", "resource-orchestration"),
-                null,
-                "distributed_target_missing",
-                List.of("未找到可用的 DistributedKey 绑定。")
-        );
-
-        assertEquals(RouteSelectionMode.DISTRIBUTED_TARGET, decision.selectionMode());
-        assertEquals(SupportStatus.BLOCKED, decision.supportStatus());
-        assertTrue(decision.policyReason().contains("selection_mode=distributed_target"));
-    }
 
     private CapabilityResolutionReport report(
             InteropFeature feature,

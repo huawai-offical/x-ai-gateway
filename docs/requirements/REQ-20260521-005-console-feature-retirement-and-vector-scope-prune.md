@@ -27,6 +27,7 @@
 
 - 控制台导航、路由、页面、命令搜索中的对应入口与功能页。
 - 与这些页面直接绑定的前端交互、文案、空状态和测试用例。
+- `tasks/` 与 `tasks/index.md` 中直接把这些已下线或待删除能力当作当前产品面、当前优先级或现役控制台能力的任务引用与描述。
 - 如用户确认“彻底删除”，则继续覆盖对应 Admin API、后端治理服务、公开向量 API、OpenAPI 与文档事实源。
 
 ### 不包含
@@ -52,7 +53,7 @@
 
 1. 删除控制台中的功能入口、导航、路由、页面、页内跳转和对应前端测试。
 2. 对历史书签和旧路由使用前端 redirect，避免用户进入 404。
-3. 暂不删除 `/admin/accounts*`、`/admin/provider-sites*`、`/admin/cost-routing*`、`/admin/vector-stores*`。
+3. 暂不删除 `官方账号` 最小治理接口、`/admin/provider-sites` 的现役模型能力查询面，以及 `/admin/vector-stores*`。
 4. 暂不删除公开 `/v1/vector_stores*`、Responses `file_search` 本地绑定、OpenAPI 兼容实现和相关持久化实体。
 
 ## 本轮文档清理口径
@@ -77,7 +78,16 @@
 ## 实施结果
 
 - 2026-05-21：文档清理阶段先完成 `docs/index.md`、官方账号运行态说明、provider-sites 说明、OpenAI Direct SDK 示例、公开 API 兼容说明等口径收紧。
-- 当前已统一为“控制台已下线、后端/API 暂保留”的文档状态；未进入 `tasks/`、`web/`、`src/` 修改。
+- 当前已统一为“控制台已下线、后端/API 暂保留”的文档状态；随后继续推进 `tasks/` 与 `web/` 的同步收口。
+- 2026-05-21：继续进入 `tasks/` 体系清理，收口 `tasks/index.md` 中仍把 `官方账号运行态`、`能力矩阵`、`Native 命名空间兼容`、`Provider 参考差距`、`站点档案`、`成本路由策略中心`、`向量检索排障沙盒`、旧 `account pool` 与 `live/realtime` 口径当作现役能力的引用。
+- 2026-05-21：前端下线子任务已完成，`web/` 内对应导航、路由、页面、页内跳转、公共说明文案和测试已同步清理；旧路由通过 redirect 继续落到保留主路径。
+- 2026-05-21：在控制台下线之后，后端继续保留的是 `官方账号` 最小治理接口、`/admin/provider-sites` 现役模型能力查询面、`/admin/vector-stores*`、公开 `/v1/vector_stores*` 与 Responses `file_search` 本地绑定；`/admin/cost-routing*`、`/admin/provider-reference-gap`、`/admin/native-compatibility`、`/admin/capability-matrix` 已不再保留。
+
+## 本轮验证
+
+- 前端：`bun run typecheck` 通过
+- 前端：`bun run test -- src/app/navigation.test.ts src/features/credentials/credentials-page.test.tsx src/features/workbench/workbench-page.test.tsx src/features/accounts/account-groups-page.test.tsx src/features/accounts/account-group-detail-page.test.tsx src/features/accounts/oauth-connect-page.test.tsx` 通过
+- 前端：`web/src` 残留扫描已确认不再存在被删除页面的 import 或活跃入口文案
 
 ## 关联文档
 

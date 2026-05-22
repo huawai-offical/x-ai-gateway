@@ -40,7 +40,10 @@ public class OpenAiAudioController {
             @RequestPart(value = "language", required = false) String language,
             @RequestPart(value = "prompt", required = false) String prompt,
             @RequestPart(value = "response_format", required = false) String responseFormat,
-            @RequestPart(value = "temperature", required = false) String temperature) {
+            @RequestPart(value = "temperature", required = false) String temperature,
+            @RequestPart(value = "timestamp_granularities[]", required = false) String timestampGranularities,
+            @RequestPart(value = "include[]", required = false) String include,
+            @RequestPart(value = "stream", required = false) String stream) {
         AuthenticatedDistributedKey distributedKey = gatewayTokenAuthenticationResolver.authenticate(authorization, null, null, null);
         Map<String, String> formFields = new LinkedHashMap<>();
         formFields.put("model", model);
@@ -48,32 +51,12 @@ public class OpenAiAudioController {
         putIfPresent(formFields, "prompt", prompt);
         putIfPresent(formFields, "response_format", responseFormat);
         putIfPresent(formFields, "temperature", temperature);
+        putIfPresent(formFields, "timestamp_granularities[]", timestampGranularities);
+        putIfPresent(formFields, "include[]", include);
+        putIfPresent(formFields, "stream", stream);
         return gatewayResourceExecutionService.executeMultipartJson(
                 distributedKey.keyPrefix(),
                 "/v1/audio/transcriptions",
-                model,
-                formFields,
-                Map.of("file", file)
-        );
-    }
-
-    @PostMapping(value = "/translations", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public Mono<ResponseEntity<JsonNode>> createTranslation(
-            @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
-            @RequestPart("file") FilePart file,
-            @RequestPart("model") String model,
-            @RequestPart(value = "prompt", required = false) String prompt,
-            @RequestPart(value = "response_format", required = false) String responseFormat,
-            @RequestPart(value = "temperature", required = false) String temperature) {
-        AuthenticatedDistributedKey distributedKey = gatewayTokenAuthenticationResolver.authenticate(authorization, null, null, null);
-        Map<String, String> formFields = new LinkedHashMap<>();
-        formFields.put("model", model);
-        putIfPresent(formFields, "prompt", prompt);
-        putIfPresent(formFields, "response_format", responseFormat);
-        putIfPresent(formFields, "temperature", temperature);
-        return gatewayResourceExecutionService.executeMultipartJson(
-                distributedKey.keyPrefix(),
-                "/v1/audio/translations",
                 model,
                 formFields,
                 Map.of("file", file)

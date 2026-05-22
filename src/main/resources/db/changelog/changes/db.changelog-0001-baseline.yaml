@@ -1,0 +1,6459 @@
+databaseChangeLog:
+- changeSet:
+    id: 0001-baseline-20260521
+    author: codex
+    validCheckSum: 9:47dc00406abb3987ba4f5a0d62f8c296
+    changes:
+    - createTable:
+        tableName: system_setting
+        remarks: 系统设置表，保存网关运行时的持久化配置项。
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            remarks: 主键。
+            constraints:
+              primaryKey: true
+              primaryKeyName: pk_system_setting
+              nullable: false
+        - column:
+            name: setting_key
+            type: VARCHAR(128)
+            remarks: 配置键，使用稳定的业务名称。
+            constraints:
+              nullable: false
+        - column:
+            name: setting_value
+            type: TEXT
+            remarks: 配置值，序列化后保存。
+            constraints:
+              nullable: false
+        - column:
+            name: value_type
+            type: VARCHAR(32)
+            remarks: 配置值类型，例如 string、json、boolean。
+            constraints:
+              nullable: false
+        - column:
+            name: description
+            type: VARCHAR(512)
+            remarks: 配置项说明。
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            remarks: 创建时间（UTC）。
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            remarks: 最后更新时间（UTC）。
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: upstream_credential
+        remarks: 上游厂商凭证表，保存真实厂商 API key 及其健康状态。
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              primaryKeyName: pk_upstream_credential
+              nullable: false
+        - column:
+            name: credential_name
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: provider_type
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: base_url
+            type: VARCHAR(512)
+            constraints:
+              nullable: false
+        - column:
+            name: api_key_ciphertext
+            type: TEXT
+            constraints:
+              nullable: false
+        - column:
+            name: api_key_fingerprint
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: is_active
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: cooldown_until
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: last_error_code
+            type: VARCHAR(64)
+        - column:
+            name: last_error_message
+            type: VARCHAR(512)
+        - column:
+            name: last_error_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: last_used_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: deleted
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: proxy_id
+            type: BIGINT
+        - column:
+            name: tls_fingerprint_profile_id
+            type: BIGINT
+        - column:
+            name: site_profile_id
+            type: BIGINT
+        - column:
+            name: auth_kind
+            type: VARCHAR(32)
+            defaultValue: API_KEY
+            constraints:
+              nullable: false
+        - column:
+            name: credential_metadata_json
+            type: TEXT
+        - column:
+            name: group_id
+            type: BIGINT
+            constraints:
+              nullable: true
+        - column:
+            name: total_request_count
+            type: BIGINT
+            defaultValueNumeric: 0
+            constraints:
+              nullable: false
+        - column:
+            name: successful_request_count
+            type: BIGINT
+            defaultValueNumeric: 0
+            constraints:
+              nullable: false
+        - column:
+            name: failed_request_count
+            type: BIGINT
+            defaultValueNumeric: 0
+            constraints:
+              nullable: false
+        - column:
+            name: canceled_request_count
+            type: BIGINT
+            defaultValueNumeric: 0
+            constraints:
+              nullable: false
+        - column:
+            name: total_token_count
+            type: BIGINT
+            defaultValueNumeric: 0
+            constraints:
+              nullable: false
+        - column:
+            name: total_cache_hit_token_count
+            type: BIGINT
+            defaultValueNumeric: 0
+            constraints:
+              nullable: false
+        - column:
+            name: total_cache_write_token_count
+            type: BIGINT
+            defaultValueNumeric: 0
+            constraints:
+              nullable: false
+        - column:
+            name: total_saved_input_token_count
+            type: BIGINT
+            defaultValueNumeric: 0
+            constraints:
+              nullable: false
+        - column:
+            name: total_duration_ms
+            type: BIGINT
+            defaultValueNumeric: 0
+            constraints:
+              nullable: false
+        - column:
+            name: duration_sample_count
+            type: BIGINT
+            defaultValueNumeric: 0
+            constraints:
+              nullable: false
+        - column:
+            name: total_first_token_ms
+            type: BIGINT
+            defaultValueNumeric: 0
+            constraints:
+              nullable: false
+        - column:
+            name: first_token_sample_count
+            type: BIGINT
+            defaultValueNumeric: 0
+            constraints:
+              nullable: false
+        - column:
+            name: last_first_token_ms
+            type: BIGINT
+        - column:
+            name: min_first_token_ms
+            type: BIGINT
+        - column:
+            name: max_first_token_ms
+            type: BIGINT
+        - column:
+            name: supported_models_json
+            type: TEXT
+            defaultValue: '[]'
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: distributed_key
+        remarks: 对前台分发的网关 key。
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              primaryKeyName: pk_distributed_key
+              nullable: false
+        - column:
+            name: key_name
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: key_prefix
+            type: VARCHAR(64)
+            constraints:
+              nullable: false
+        - column:
+            name: secret_hash
+            type: VARCHAR(256)
+            constraints:
+              nullable: false
+        - column:
+            name: masked_key
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: description
+            type: VARCHAR(512)
+        - column:
+            name: is_active
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: allowed_protocols_json
+            type: TEXT
+            constraints:
+              nullable: false
+        - column:
+            name: allowed_models_json
+            type: TEXT
+            constraints:
+              nullable: false
+        - column:
+            name: last_used_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: expires_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: allowed_provider_types_json
+            type: TEXT
+        - column:
+            name: budget_limit_micros
+            type: BIGINT
+        - column:
+            name: budget_window_seconds
+            type: INT
+        - column:
+            name: rpm_limit
+            type: INT
+        - column:
+            name: tpm_limit
+            type: INT
+        - column:
+            name: concurrency_limit
+            type: INT
+        - column:
+            name: sticky_session_ttl_seconds
+            type: INT
+        - column:
+            name: allowed_client_families_json
+            type: TEXT
+        - column:
+            name: require_client_family_match
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: owner_user_id
+            type: BIGINT
+    - createTable:
+        tableName: distributed_key_binding
+        remarks: 分发 key 与上游凭证的绑定关系。
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              primaryKeyName: pk_distributed_key_binding
+              nullable: false
+        - column:
+            name: distributed_key_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: credential_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: priority
+            type: INT
+            defaultValueNumeric: 100
+            constraints:
+              nullable: false
+        - column:
+            name: weight
+            type: INT
+            defaultValueNumeric: 100
+            constraints:
+              nullable: false
+        - column:
+            name: is_active
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: description
+            type: VARCHAR(512)
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: model_alias
+        remarks: 统一模型别名表。
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              primaryKeyName: pk_model_alias
+              nullable: false
+        - column:
+            name: alias_name
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: alias_key
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: enabled
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: description
+            type: VARCHAR(512)
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: model_alias_rule
+        remarks: 统一模型别名规则表。
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              primaryKeyName: pk_model_alias_rule
+              nullable: false
+        - column:
+            name: alias_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: protocol
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: target_model_name
+            type: VARCHAR(256)
+            constraints:
+              nullable: false
+        - column:
+            name: target_model_key
+            type: VARCHAR(256)
+            constraints:
+              nullable: false
+        - column:
+            name: provider_type
+            type: VARCHAR(32)
+        - column:
+            name: base_url_pattern
+            type: VARCHAR(256)
+        - column:
+            name: priority
+            type: INT
+            defaultValueNumeric: 100
+            constraints:
+              nullable: false
+        - column:
+            name: enabled
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: description
+            type: VARCHAR(512)
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: credential_model_catalog
+        remarks: 按上游凭证发现的模型目录缓存。
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              primaryKeyName: pk_credential_model_catalog
+              nullable: false
+        - column:
+            name: credential_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: model_name
+            type: VARCHAR(256)
+            constraints:
+              nullable: false
+        - column:
+            name: model_key
+            type: VARCHAR(256)
+            constraints:
+              nullable: false
+        - column:
+            name: supported_protocols_json
+            type: TEXT
+            constraints:
+              nullable: false
+        - column:
+            name: supports_chat
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: supports_embeddings
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: supports_cache
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: supports_thinking
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: supports_visible_reasoning
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: supports_reasoning_reuse
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: reasoning_transport
+            type: VARCHAR(32)
+            defaultValue: NONE
+            constraints:
+              nullable: false
+        - column:
+            name: active
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: source_refreshed_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: route_decision_log
+        remarks: 路由决策日志，记录一次请求为何选中某个上游候选。
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              primaryKeyName: pk_route_decision_log
+              nullable: false
+        - column:
+            name: request_id
+            type: VARCHAR(64)
+            constraints:
+              nullable: false
+        - column:
+            name: distributed_key_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: distributed_key_prefix
+            type: VARCHAR(64)
+            constraints:
+              nullable: false
+        - column:
+            name: requested_model
+            type: VARCHAR(256)
+            constraints:
+              nullable: false
+        - column:
+            name: public_model
+            type: VARCHAR(256)
+            constraints:
+              nullable: false
+        - column:
+            name: resolved_model_key
+            type: VARCHAR(256)
+            constraints:
+              nullable: false
+        - column:
+            name: protocol
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: model_group
+            type: VARCHAR(256)
+            constraints:
+              nullable: false
+        - column:
+            name: selection_source
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: selected_credential_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: selected_provider_type
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: selected_base_url
+            type: VARCHAR(512)
+            constraints:
+              nullable: false
+        - column:
+            name: prefix_hash
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: fingerprint
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: candidate_count
+            type: INT
+            constraints:
+              nullable: false
+        - column:
+            name: candidate_summary_json
+            type: TEXT
+            constraints:
+              nullable: false
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: request_path
+            type: VARCHAR(256)
+        - column:
+            name: resource_type
+            type: VARCHAR(32)
+        - column:
+            name: operation
+            type: VARCHAR(64)
+        - column:
+            name: execution_backend
+            type: VARCHAR(32)
+        - column:
+            name: object_mode
+            type: VARCHAR(64)
+        - column:
+            name: support_status
+            type: VARCHAR(32)
+        - column:
+            name: degradation_level
+            type: VARCHAR(32)
+    - createTable:
+        tableName: cache_hit_log
+        remarks: 缓存命中日志，记录一次请求中的 cache hit / cache write 收益。
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              primaryKeyName: pk_cache_hit_log
+              nullable: false
+        - column:
+            name: request_id
+            type: VARCHAR(64)
+            constraints:
+              nullable: false
+        - column:
+            name: distributed_key_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: protocol
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: provider_type
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: credential_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: model_group
+            type: VARCHAR(256)
+            constraints:
+              nullable: false
+        - column:
+            name: prefix_hash
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: fingerprint
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: cache_kind
+            type: VARCHAR(64)
+            constraints:
+              nullable: false
+        - column:
+            name: cache_hit_tokens
+            type: INT
+            constraints:
+              nullable: false
+        - column:
+            name: cache_write_tokens
+            type: INT
+            constraints:
+              nullable: false
+        - column:
+            name: saved_input_tokens
+            type: INT
+            constraints:
+              nullable: false
+        - column:
+            name: cached_content_ref
+            type: VARCHAR(512)
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: request_path
+            type: VARCHAR(256)
+        - column:
+            name: resource_type
+            type: VARCHAR(32)
+        - column:
+            name: operation
+            type: VARCHAR(64)
+        - column:
+            name: execution_backend
+            type: VARCHAR(32)
+        - column:
+            name: object_mode
+            type: VARCHAR(64)
+        - column:
+            name: support_status
+            type: VARCHAR(32)
+        - column:
+            name: degradation_level
+            type: VARCHAR(32)
+    - createTable:
+        tableName: upstream_cache_reference
+        remarks: 上游显式缓存引用表，例如 Gemini cached_content 的映射。
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              primaryKeyName: pk_upstream_cache_reference
+              nullable: false
+        - column:
+            name: distributed_key_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: provider_type
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: credential_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: model_group
+            type: VARCHAR(256)
+            constraints:
+              nullable: false
+        - column:
+            name: prefix_hash
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: external_cache_ref
+            type: VARCHAR(512)
+            constraints:
+              nullable: false
+        - column:
+            name: status
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: expire_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: last_used_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: gateway_file
+        remarks: 网关文件对象元数据表。
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              primaryKeyName: pk_gateway_file
+              nullable: false
+        - column:
+            name: file_key
+            type: VARCHAR(64)
+            constraints:
+              nullable: false
+        - column:
+            name: distributed_key_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: filename
+            type: VARCHAR(256)
+            constraints:
+              nullable: false
+        - column:
+            name: mime_type
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: purpose
+            type: VARCHAR(64)
+        - column:
+            name: size_bytes
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: sha256
+            type: VARCHAR(64)
+            constraints:
+              nullable: false
+        - column:
+            name: storage_path
+            type: VARCHAR(512)
+            constraints:
+              nullable: false
+        - column:
+            name: status
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: deleted
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: gateway_file_binding
+        remarks: 网关文件对象与上游文件对象的绑定关系。
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              primaryKeyName: pk_gateway_file_binding
+              nullable: false
+        - column:
+            name: gateway_file_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: provider_type
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: credential_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: external_file_id
+            type: VARCHAR(256)
+            constraints:
+              nullable: false
+        - column:
+            name: external_filename
+            type: VARCHAR(256)
+        - column:
+            name: status
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: last_synced_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: site_profile_id
+            type: bigint
+            remarks: 上游站点档案主键，便于定位 Gemini 等 provider-aware binding 的目标站点。
+    - createTable:
+        tableName: gateway_async_resource
+        remarks: 网关异步资源与会话对象表。
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              primaryKeyName: pk_gateway_async_resource
+              nullable: false
+        - column:
+            name: resource_key
+            type: VARCHAR(96)
+            constraints:
+              nullable: false
+        - column:
+            name: distributed_key_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: resource_type
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: request_model
+            type: VARCHAR(256)
+        - column:
+            name: status
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: request_payload_json
+            type: TEXT
+        - column:
+            name: response_payload_json
+            type: TEXT
+        - column:
+            name: metadata_json
+            type: TEXT
+        - column:
+            name: deleted
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: upstream_object_id
+            type: varchar(256)
+            remarks: 上游对象名或 ID，用于 Google native 资源反查。
+    - createTable:
+        tableName: upstream_account_group
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: group_name
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: provider_type
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: supported_models_json
+            type: TEXT
+        - column:
+            name: supported_protocols_json
+            type: TEXT
+        - column:
+            name: allowed_client_families_json
+            type: TEXT
+        - column:
+            name: is_active
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: description
+            type: VARCHAR(512)
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: upstream_account
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: group_id
+            type: BIGINT
+            constraints:
+              nullable: true
+        - column:
+            name: account_name
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: provider_type
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: external_account_id
+            type: VARCHAR(256)
+        - column:
+            name: access_token_ciphertext
+            type: TEXT
+        - column:
+            name: refresh_token_ciphertext
+            type: TEXT
+        - column:
+            name: is_active
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: is_frozen
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: is_healthy
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: last_refresh_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: last_used_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: last_error_message
+            type: VARCHAR(512)
+        - column:
+            name: metadata_json
+            type: TEXT
+        - column:
+            name: proxy_id
+            type: BIGINT
+        - column:
+            name: tls_fingerprint_profile_id
+            type: BIGINT
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: site_profile_id
+            type: BIGINT
+        - column:
+            name: total_request_count
+            type: BIGINT
+            defaultValueNumeric: 0
+            constraints:
+              nullable: false
+        - column:
+            name: successful_request_count
+            type: BIGINT
+            defaultValueNumeric: 0
+            constraints:
+              nullable: false
+        - column:
+            name: failed_request_count
+            type: BIGINT
+            defaultValueNumeric: 0
+            constraints:
+              nullable: false
+        - column:
+            name: canceled_request_count
+            type: BIGINT
+            defaultValueNumeric: 0
+            constraints:
+              nullable: false
+        - column:
+            name: total_token_count
+            type: BIGINT
+            defaultValueNumeric: 0
+            constraints:
+              nullable: false
+        - column:
+            name: total_cache_hit_token_count
+            type: BIGINT
+            defaultValueNumeric: 0
+            constraints:
+              nullable: false
+        - column:
+            name: total_cache_write_token_count
+            type: BIGINT
+            defaultValueNumeric: 0
+            constraints:
+              nullable: false
+        - column:
+            name: total_saved_input_token_count
+            type: BIGINT
+            defaultValueNumeric: 0
+            constraints:
+              nullable: false
+        - column:
+            name: total_duration_ms
+            type: BIGINT
+            defaultValueNumeric: 0
+            constraints:
+              nullable: false
+        - column:
+            name: duration_sample_count
+            type: BIGINT
+            defaultValueNumeric: 0
+            constraints:
+              nullable: false
+        - column:
+            name: total_first_token_ms
+            type: BIGINT
+            defaultValueNumeric: 0
+            constraints:
+              nullable: false
+        - column:
+            name: first_token_sample_count
+            type: BIGINT
+            defaultValueNumeric: 0
+            constraints:
+              nullable: false
+        - column:
+            name: last_first_token_ms
+            type: BIGINT
+        - column:
+            name: min_first_token_ms
+            type: BIGINT
+        - column:
+            name: max_first_token_ms
+            type: BIGINT
+        - column:
+            name: supported_models_json
+            type: TEXT
+            defaultValue: '[]'
+            constraints:
+              nullable: false
+        - column:
+            name: token_expires_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: refresh_status
+            type: VARCHAR(32)
+            defaultValue: UNKNOWN
+            constraints:
+              nullable: false
+        - column:
+            name: refresh_failure_count
+            type: INT
+            defaultValueNumeric: 0
+            constraints:
+              nullable: false
+        - column:
+            name: next_refresh_after
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: cooldown_until
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: quota_window_started_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: quota_window_seconds
+            type: INT
+        - column:
+            name: quota_remaining_tokens
+            type: BIGINT
+        - column:
+            name: quota_remaining_requests
+            type: BIGINT
+        - column:
+            name: header_snapshot_json
+            type: TEXT
+        - column:
+            name: last_refresh_result_json
+            type: TEXT
+    - createTable:
+        tableName: distributed_key_account_group_binding
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: distributed_key_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: group_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: provider_type
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: priority
+            type: INT
+            defaultValueNumeric: 100
+            constraints:
+              nullable: false
+        - column:
+            name: is_active
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: oauth_authorization_session
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: session_key
+            type: VARCHAR(96)
+            constraints:
+              nullable: false
+        - column:
+            name: provider_type
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: group_id
+            type: BIGINT
+        - column:
+            name: status
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: authorization_url
+            type: TEXT
+        - column:
+            name: code_verifier
+            type: VARCHAR(256)
+        - column:
+            name: redirect_path
+            type: VARCHAR(256)
+        - column:
+            name: metadata_json
+            type: TEXT
+        - column:
+            name: expires_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: network_proxy
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: proxy_name
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: proxy_url
+            type: VARCHAR(512)
+            constraints:
+              nullable: false
+        - column:
+            name: is_active
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: description
+            type: VARCHAR(512)
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: tls_fingerprint_profile
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: profile_name
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: profile_code
+            type: VARCHAR(64)
+            constraints:
+              nullable: false
+        - column:
+            name: settings_json
+            type: TEXT
+        - column:
+            name: description
+            type: VARCHAR(512)
+        - column:
+            name: is_active
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: ops_alert_rule
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: rule_name
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: metric_key
+            type: VARCHAR(64)
+            constraints:
+              nullable: false
+        - column:
+            name: priority
+            type: INT
+            defaultValueNumeric: 100
+            constraints:
+              nullable: false
+        - column:
+            name: comparison_operator
+            type: VARCHAR(16)
+            constraints:
+              nullable: false
+        - column:
+            name: threshold_value
+            type: DECIMAL(18,4)
+            constraints:
+              nullable: false
+        - column:
+            name: severity
+            type: VARCHAR(16)
+            constraints:
+              nullable: false
+        - column:
+            name: enabled
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: description
+            type: VARCHAR(512)
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: ops_alert_event
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: rule_id
+            type: BIGINT
+        - column:
+            name: event_type
+            type: VARCHAR(64)
+            constraints:
+              nullable: false
+        - column:
+            name: severity
+            type: VARCHAR(16)
+            constraints:
+              nullable: false
+        - column:
+            name: title
+            type: VARCHAR(256)
+            constraints:
+              nullable: false
+        - column:
+            name: message
+            type: VARCHAR(1024)
+            constraints:
+              nullable: false
+        - column:
+            name: status
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: entity_type
+            type: VARCHAR(64)
+        - column:
+            name: entity_ref
+            type: VARCHAR(128)
+        - column:
+            name: metric_value
+            type: DECIMAL(18,4)
+        - column:
+            name: acknowledged_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: ops_runtime_log_setting
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: logger_name
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: log_level
+            type: VARCHAR(16)
+            constraints:
+              nullable: false
+        - column:
+            name: payload_logging_enabled
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: enabled
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: ops_operation_audit
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: category
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: action
+            type: VARCHAR(64)
+            constraints:
+              nullable: false
+        - column:
+            name: resource_type
+            type: VARCHAR(64)
+        - column:
+            name: resource_ref
+            type: VARCHAR(128)
+        - column:
+            name: detail_json
+            type: TEXT
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: error_rule
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: enabled
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: priority
+            type: INT
+            defaultValueNumeric: 100
+            constraints:
+              nullable: false
+        - column:
+            name: provider_type
+            type: VARCHAR(32)
+        - column:
+            name: protocol
+            type: VARCHAR(32)
+        - column:
+            name: model_pattern
+            type: VARCHAR(128)
+        - column:
+            name: request_path
+            type: VARCHAR(256)
+        - column:
+            name: http_status
+            type: INT
+        - column:
+            name: error_code
+            type: VARCHAR(128)
+        - column:
+            name: match_scope
+            type: VARCHAR(16)
+            constraints:
+              nullable: false
+        - column:
+            name: action
+            type: VARCHAR(16)
+            constraints:
+              nullable: false
+        - column:
+            name: rewrite_status
+            type: INT
+        - column:
+            name: rewrite_code
+            type: VARCHAR(128)
+        - column:
+            name: rewrite_message
+            type: VARCHAR(1024)
+        - column:
+            name: downgrade_policy
+            type: VARCHAR(32)
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: installation_state
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: status
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: active_release_artifact_id
+            type: BIGINT
+        - column:
+            name: bootstrap_completed
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: last_health_check_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: metadata_json
+            type: TEXT
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: backup_job
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: status
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: dry_run
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: snapshot_path
+            type: VARCHAR(512)
+        - column:
+            name: summary_json
+            type: TEXT
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: restore_job
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: backup_job_id
+            type: BIGINT
+        - column:
+            name: status
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: dry_run
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: summary_json
+            type: TEXT
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: release_artifact
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: version_name
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: artifact_ref
+            type: VARCHAR(512)
+            constraints:
+              nullable: false
+        - column:
+            name: active
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: upgrade_job
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: target_release_artifact_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: pre_backup_job_id
+            type: BIGINT
+        - column:
+            name: status
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: message
+            type: VARCHAR(1024)
+        - column:
+            name: auto_rollback_triggered
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: rollback_job
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: upgrade_job_id
+            type: BIGINT
+        - column:
+            name: release_artifact_id
+            type: BIGINT
+        - column:
+            name: backup_job_id
+            type: BIGINT
+        - column:
+            name: status
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: message
+            type: VARCHAR(1024)
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: upstream_site_profile
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: profile_code
+            type: VARCHAR(64)
+            constraints:
+              nullable: false
+              unique: true
+        - column:
+            name: display_name
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: vendor_code
+            type: VARCHAR(64)
+        - column:
+            name: vendor_name
+            type: VARCHAR(128)
+        - column:
+            name: provider_family
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: site_kind
+            type: VARCHAR(64)
+            constraints:
+              nullable: false
+        - column:
+            name: auth_strategy
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: path_strategy
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: model_addressing_strategy
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: error_schema_strategy
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: base_url_pattern
+            type: VARCHAR(512)
+        - column:
+            name: description
+            type: VARCHAR(512)
+        - column:
+            name: conversation_profile_json
+            type: TEXT
+        - column:
+            name: is_active
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: profile_source
+            type: VARCHAR(32)
+            defaultValue: MANUAL
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: site_capability_snapshot
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: site_profile_id
+            type: BIGINT
+            constraints:
+              nullable: false
+              unique: true
+        - column:
+            name: supported_protocols_json
+            type: TEXT
+            constraints:
+              nullable: false
+        - column:
+            name: supports_responses
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: supports_embeddings
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: supports_audio
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: supports_images
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: supports_moderation
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: supports_files
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: supports_uploads
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: auth_strategy
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: path_strategy
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: error_schema_strategy
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: stream_transport
+            type: VARCHAR(32)
+        - column:
+            name: fallback_strategy
+            type: VARCHAR(128)
+        - column:
+            name: health_state
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: blocked_reason
+            type: VARCHAR(512)
+        - column:
+            name: refreshed_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: site_model_capability
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: site_profile_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: model_name
+            type: VARCHAR(256)
+            constraints:
+              nullable: false
+        - column:
+            name: model_key
+            type: VARCHAR(256)
+            constraints:
+              nullable: false
+        - column:
+            name: supported_protocols_json
+            type: TEXT
+            constraints:
+              nullable: false
+        - column:
+            name: supports_chat
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: supports_embeddings
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: supports_cache
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: supports_thinking
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: supports_visible_reasoning
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: supports_reasoning_reuse
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: reasoning_transport
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: capability_level
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: is_active
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: source_refreshed_at
+            type: TIMESTAMP WITH TIME ZONE
+            constraints:
+              nullable: false
+        - column:
+            name: supports_tools
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: supports_image_input
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: request_log
+        remarks: 请求生命周期日志。
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              primaryKeyName: pk_request_log
+              nullable: false
+        - column:
+            name: request_id
+            type: VARCHAR(64)
+            constraints:
+              nullable: false
+        - column:
+            name: distributed_key_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: distributed_key_prefix
+            type: VARCHAR(64)
+            constraints:
+              nullable: false
+        - column:
+            name: protocol
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: request_path
+            type: VARCHAR(256)
+            constraints:
+              nullable: false
+        - column:
+            name: requested_model
+            type: VARCHAR(256)
+            constraints:
+              nullable: false
+        - column:
+            name: public_model
+            type: VARCHAR(256)
+            constraints:
+              nullable: false
+        - column:
+            name: resolved_model_key
+            type: VARCHAR(256)
+            constraints:
+              nullable: false
+        - column:
+            name: model_group
+            type: VARCHAR(256)
+            constraints:
+              nullable: false
+        - column:
+            name: provider_type
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: credential_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: selection_source
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: prefix_hash
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: fingerprint
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: is_stream
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: status
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: error_code
+            type: VARCHAR(64)
+        - column:
+            name: error_message
+            type: VARCHAR(1024)
+        - column:
+            name: duration_ms
+            type: BIGINT
+        - column:
+            name: started_at
+            type: TIMESTAMP WITH TIME ZONE
+            constraints:
+              nullable: false
+        - column:
+            name: completed_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: resource_type
+            type: VARCHAR(32)
+        - column:
+            name: operation
+            type: VARCHAR(64)
+        - column:
+            name: execution_backend
+            type: VARCHAR(32)
+        - column:
+            name: object_mode
+            type: VARCHAR(64)
+        - column:
+            name: support_status
+            type: VARCHAR(32)
+        - column:
+            name: degradation_level
+            type: VARCHAR(32)
+        - column:
+            name: response_kind
+            type: VARCHAR(32)
+        - column:
+            name: response_object_type
+            type: VARCHAR(128)
+        - column:
+            name: response_object_id
+            type: VARCHAR(256)
+        - column:
+            name: response_status
+            type: VARCHAR(64)
+        - column:
+            name: canonical_event_count
+            type: INT
+        - column:
+            name: gateway_resource_key
+            type: VARCHAR(96)
+        - column:
+            name: client_family
+            type: VARCHAR(64)
+        - column:
+            name: client_instance
+            type: VARCHAR(128)
+        - column:
+            name: workspace_hint
+            type: VARCHAR(256)
+        - column:
+            name: session_affinity_source
+            type: VARCHAR(64)
+        - column:
+            name: session_affinity_key
+            type: VARCHAR(64)
+    - createTable:
+        tableName: usage_record
+        remarks: 归一化 usage 记录。
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              primaryKeyName: pk_usage_record
+              nullable: false
+        - column:
+            name: request_id
+            type: VARCHAR(64)
+            constraints:
+              nullable: false
+        - column:
+            name: distributed_key_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: protocol
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: request_path
+            type: VARCHAR(256)
+            constraints:
+              nullable: false
+        - column:
+            name: model_group
+            type: VARCHAR(256)
+            constraints:
+              nullable: false
+        - column:
+            name: provider_type
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: credential_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: is_stream
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: completeness
+            type: VARCHAR(16)
+            constraints:
+              nullable: false
+        - column:
+            name: usage_source
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: raw_prompt_tokens
+            type: INT
+            constraints:
+              nullable: false
+        - column:
+            name: prompt_tokens
+            type: INT
+            constraints:
+              nullable: false
+        - column:
+            name: completion_tokens
+            type: INT
+            constraints:
+              nullable: false
+        - column:
+            name: reasoning_tokens
+            type: INT
+            constraints:
+              nullable: false
+        - column:
+            name: cache_hit_tokens
+            type: INT
+            constraints:
+              nullable: false
+        - column:
+            name: cache_write_tokens
+            type: INT
+            constraints:
+              nullable: false
+        - column:
+            name: upstream_cache_hit_tokens
+            type: INT
+            constraints:
+              nullable: false
+        - column:
+            name: upstream_cache_write_tokens
+            type: INT
+            constraints:
+              nullable: false
+        - column:
+            name: saved_input_tokens
+            type: INT
+            constraints:
+              nullable: false
+        - column:
+            name: cached_content_ref
+            type: VARCHAR(512)
+        - column:
+            name: total_tokens
+            type: INT
+            constraints:
+              nullable: false
+        - column:
+            name: native_usage_payload_json
+            type: TEXT
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: client_family
+            type: VARCHAR(64)
+        - column:
+            name: client_instance
+            type: VARCHAR(128)
+        - column:
+            name: workspace_hint
+            type: VARCHAR(256)
+    - createTable:
+        tableName: audit_log
+        remarks: 后台操作与网关事件审计日志。
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              primaryKeyName: pk_audit_log
+              nullable: false
+        - column:
+            name: request_id
+            type: VARCHAR(64)
+        - column:
+            name: audit_type
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: action
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: target_type
+            type: VARCHAR(64)
+            constraints:
+              nullable: false
+        - column:
+            name: target_id
+            type: VARCHAR(256)
+        - column:
+            name: status
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: actor
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: path
+            type: VARCHAR(512)
+        - column:
+            name: detail_json
+            type: TEXT
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: route_guard_policy
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: policy_name
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: target_type
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: provider_type
+            type: VARCHAR(32)
+        - column:
+            name: site_profile_id
+            type: BIGINT
+        - column:
+            name: credential_id
+            type: BIGINT
+        - column:
+            name: account_id
+            type: BIGINT
+        - column:
+            name: proxy_id
+            type: BIGINT
+        - column:
+            name: policy_mode
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: action_type
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: ttl_seconds
+            type: INT
+        - column:
+            name: priority
+            type: INT
+            defaultValueNumeric: 100
+            constraints:
+              nullable: false
+        - column:
+            name: enabled
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: description
+            type: VARCHAR(512)
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: retry_policy
+            type: TEXT
+        - column:
+            name: fallback_policy
+            type: TEXT
+        - column:
+            name: circuit_breaker_policy
+            type: TEXT
+        - column:
+            name: rate_limit_policy
+            type: TEXT
+    - createTable:
+        tableName: auto_action_rule
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: rule_name
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: event_type
+            type: VARCHAR(64)
+            constraints:
+              nullable: false
+        - column:
+            name: severity
+            type: VARCHAR(16)
+        - column:
+            name: entity_type
+            type: VARCHAR(64)
+        - column:
+            name: action_type
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: ttl_seconds
+            type: INT
+        - column:
+            name: recovery_mode
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: enabled
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: description
+            type: VARCHAR(512)
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: quarantine_record
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: target_type
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: provider_type
+            type: VARCHAR(32)
+        - column:
+            name: site_profile_id
+            type: BIGINT
+        - column:
+            name: credential_id
+            type: BIGINT
+        - column:
+            name: account_id
+            type: BIGINT
+        - column:
+            name: proxy_id
+            type: BIGINT
+        - column:
+            name: source_rule_id
+            type: BIGINT
+        - column:
+            name: source_event_id
+            type: BIGINT
+        - column:
+            name: action_type
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: recovery_mode
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: reason
+            type: VARCHAR(1024)
+            constraints:
+              nullable: false
+        - column:
+            name: status
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: started_at
+            type: TIMESTAMP WITH TIME ZONE
+            constraints:
+              nullable: false
+        - column:
+            name: expires_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: released_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: release_reason
+            type: VARCHAR(512)
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: slo_policy
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: policy_name
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: scope_type
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: scope_ref
+            type: VARCHAR(128)
+        - column:
+            name: window_minutes
+            type: INT
+            defaultValueNumeric: 60
+            constraints:
+              nullable: false
+        - column:
+            name: error_budget_ratio
+            type: DECIMAL(10,4)
+            constraints:
+              nullable: false
+        - column:
+            name: warning_burn_rate
+            type: DECIMAL(10,2)
+            constraints:
+              nullable: false
+        - column:
+            name: critical_burn_rate
+            type: DECIMAL(10,2)
+            constraints:
+              nullable: false
+        - column:
+            name: enabled
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: description
+            type: VARCHAR(512)
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: alert_silence
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: silence_name
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: event_type
+            type: VARCHAR(64)
+        - column:
+            name: severity
+            type: VARCHAR(16)
+        - column:
+            name: entity_type
+            type: VARCHAR(64)
+        - column:
+            name: entity_ref
+            type: VARCHAR(128)
+        - column:
+            name: starts_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: ends_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: enabled
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: reason
+            type: VARCHAR(512)
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: maintenance_window
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: window_name
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: scope_type
+            type: VARCHAR(32)
+        - column:
+            name: scope_ref
+            type: VARCHAR(128)
+        - column:
+            name: starts_at
+            type: TIMESTAMP WITH TIME ZONE
+            constraints:
+              nullable: false
+        - column:
+            name: ends_at
+            type: TIMESTAMP WITH TIME ZONE
+            constraints:
+              nullable: false
+        - column:
+            name: enabled
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: description
+            type: VARCHAR(512)
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: change_plan
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: plan_name
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: plan_type
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: execution_class
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: status
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: release_artifact_id
+            type: BIGINT
+        - column:
+            name: recovery_checkpoint_id
+            type: BIGINT
+        - column:
+            name: maintenance_window_id
+            type: BIGINT
+        - column:
+            name: rollback_playbook_id
+            type: BIGINT
+        - column:
+            name: requested_by
+            type: VARCHAR(128)
+        - column:
+            name: approved_by
+            type: VARCHAR(128)
+        - column:
+            name: manual_override
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: override_reason
+            type: VARCHAR(512)
+        - column:
+            name: emergency_reason
+            type: VARCHAR(512)
+        - column:
+            name: risk_level
+            type: VARCHAR(32)
+        - column:
+            name: current_stage
+            type: VARCHAR(64)
+        - column:
+            name: current_message
+            type: VARCHAR(512)
+        - column:
+            name: preflight_json
+            type: TEXT
+        - column:
+            name: summary_json
+            type: TEXT
+        - column:
+            name: metadata_json
+            type: TEXT
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: approval_record
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: change_plan_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: decision
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: actor
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: reason
+            type: VARCHAR(512)
+        - column:
+            name: decision_at
+            type: TIMESTAMP WITH TIME ZONE
+            constraints:
+              nullable: false
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: release_rollout
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: change_plan_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: stage
+            type: VARCHAR(64)
+            constraints:
+              nullable: false
+        - column:
+            name: status
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: message
+            type: VARCHAR(512)
+        - column:
+            name: started_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: completed_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: rollback_playbook
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: change_plan_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: recovery_checkpoint_id
+            type: BIGINT
+        - column:
+            name: rollback_release_artifact_id
+            type: BIGINT
+        - column:
+            name: status
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: trigger_conditions_json
+            type: TEXT
+        - column:
+            name: latest_rollback_plan_id
+            type: BIGINT
+        - column:
+            name: last_triggered_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: recovery_checkpoint
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: checkpoint_name
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: change_plan_id
+            type: BIGINT
+        - column:
+            name: status
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: metadata_snapshot_path
+            type: VARCHAR(1024)
+        - column:
+            name: runtime_snapshot_path
+            type: VARCHAR(1024)
+        - column:
+            name: data_snapshot_path
+            type: VARCHAR(1024)
+        - column:
+            name: manifest_json
+            type: TEXT
+        - column:
+            name: verification_status
+            type: VARCHAR(32)
+        - column:
+            name: verification_message
+            type: VARCHAR(512)
+        - column:
+            name: verified_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: verified_by
+            type: VARCHAR(128)
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: webhook_endpoint
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: endpoint_name
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: endpoint_url
+            type: VARCHAR(1024)
+            constraints:
+              nullable: false
+        - column:
+            name: secret_ciphertext
+            type: TEXT
+        - column:
+            name: secret_fingerprint
+            type: VARCHAR(128)
+        - column:
+            name: signing_mode
+            type: VARCHAR(32)
+            defaultValue: HMAC_SHA256
+            constraints:
+              nullable: false
+        - column:
+            name: timeout_ms
+            type: INT
+            defaultValueNumeric: 5000
+            constraints:
+              nullable: false
+        - column:
+            name: enabled
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: notification_channel
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: channel_name
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: channel_type
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: webhook_endpoint_id
+            type: BIGINT
+        - column:
+            name: email_to
+            type: VARCHAR(1024)
+        - column:
+            name: template_mode
+            type: VARCHAR(32)
+            defaultValue: DEFAULT
+            constraints:
+              nullable: false
+        - column:
+            name: enabled
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: runbook_link
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: link_name
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: event_type
+            type: VARCHAR(64)
+        - column:
+            name: entity_type
+            type: VARCHAR(64)
+        - column:
+            name: link_url
+            type: VARCHAR(1024)
+            constraints:
+              nullable: false
+        - column:
+            name: description
+            type: VARCHAR(512)
+        - column:
+            name: enabled
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: outbound_event_subscription
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: subscription_name
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: channel_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: event_type
+            type: VARCHAR(64)
+        - column:
+            name: severity
+            type: VARCHAR(16)
+        - column:
+            name: entity_type
+            type: VARCHAR(64)
+        - column:
+            name: provider_type
+            type: VARCHAR(32)
+        - column:
+            name: site_profile_id
+            type: BIGINT
+        - column:
+            name: enabled
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: outbound_delivery
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: event_id
+            type: VARCHAR(64)
+            constraints:
+              nullable: false
+        - column:
+            name: event_type
+            type: VARCHAR(64)
+            constraints:
+              nullable: false
+        - column:
+            name: channel_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: entity_type
+            type: VARCHAR(64)
+        - column:
+            name: entity_ref
+            type: VARCHAR(128)
+        - column:
+            name: request_id
+            type: VARCHAR(128)
+        - column:
+            name: gateway_resource_key
+            type: VARCHAR(128)
+        - column:
+            name: upstream_object_id
+            type: VARCHAR(128)
+        - column:
+            name: delivery_status
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: attempt_count
+            type: INT
+            defaultValueNumeric: 0
+            constraints:
+              nullable: false
+        - column:
+            name: next_retry_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: last_error
+            type: VARCHAR(1024)
+        - column:
+            name: response_code
+            type: INT
+        - column:
+            name: response_summary
+            type: VARCHAR(1024)
+        - column:
+            name: payload_json
+            type: TEXT
+            constraints:
+              nullable: false
+        - column:
+            name: occurred_at
+            type: TIMESTAMP WITH TIME ZONE
+            constraints:
+              nullable: false
+        - column:
+            name: delivered_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: gateway_user
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: email
+            type: VARCHAR(191)
+            constraints:
+              nullable: false
+        - column:
+            name: display_name
+            type: VARCHAR(128)
+        - column:
+            name: is_active
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: last_login_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: notes
+            type: TEXT
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            constraints:
+              nullable: false
+        - column:
+            name: password_hash
+            type: VARCHAR(256)
+        - column:
+            name: email_verified_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: totp_secret_ciphertext
+            type: VARCHAR(512)
+        - column:
+            name: totp_enabled
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: totp_verified_at
+            type: TIMESTAMP WITH TIME ZONE
+    - createTable:
+        tableName: subscription_plan
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: plan_name
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: description
+            type: TEXT
+        - column:
+            name: is_active
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: default_duration_days
+            type: INT
+            defaultValueNumeric: 30
+            constraints:
+              nullable: false
+        - column:
+            name: max_active_keys
+            type: INT
+            defaultValueNumeric: 3
+            constraints:
+              nullable: false
+        - column:
+            name: rpm_limit
+            type: INT
+            defaultValueNumeric: 60
+            constraints:
+              nullable: false
+        - column:
+            name: tpm_limit
+            type: INT
+            defaultValueNumeric: 120000
+            constraints:
+              nullable: false
+        - column:
+            name: concurrency_limit
+            type: INT
+            defaultValueNumeric: 2
+            constraints:
+              nullable: false
+        - column:
+            name: daily_token_limit
+            type: BIGINT
+            defaultValueNumeric: 1000000
+            constraints:
+              nullable: false
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: user_subscription
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: user_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: plan_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: status
+            type: VARCHAR(24)
+            defaultValue: ACTIVE
+            constraints:
+              nullable: false
+        - column:
+            name: starts_at
+            type: TIMESTAMP WITH TIME ZONE
+            constraints:
+              nullable: false
+        - column:
+            name: expires_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: auto_renew
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: notes
+            type: TEXT
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: announcement
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: title
+            type: VARCHAR(160)
+            constraints:
+              nullable: false
+        - column:
+            name: summary
+            type: VARCHAR(512)
+        - column:
+            name: body
+            type: TEXT
+        - column:
+            name: status
+            type: VARCHAR(24)
+            defaultValue: DRAFT
+            constraints:
+              nullable: false
+        - column:
+            name: audience_type
+            type: VARCHAR(24)
+            defaultValue: GLOBAL
+            constraints:
+              nullable: false
+        - column:
+            name: audience_user_id
+            type: BIGINT
+        - column:
+            name: audience_plan_id
+            type: BIGINT
+        - column:
+            name: published_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: expires_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            constraints:
+              nullable: false
+        - column:
+            name: audience_access_group_id
+            type: BIGINT
+    - createTable:
+        tableName: announcement_read_state
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: announcement_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: user_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: read_at
+            type: TIMESTAMP WITH TIME ZONE
+            constraints:
+              nullable: false
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: promo_campaign
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: campaign_name
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: description
+            type: TEXT
+        - column:
+            name: is_active
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: reward_token_credits
+            type: BIGINT
+            defaultValueNumeric: 0
+            constraints:
+              nullable: false
+        - column:
+            name: max_redemptions_per_user
+            type: INT
+            defaultValueNumeric: 1
+            constraints:
+              nullable: false
+        - column:
+            name: starts_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: expires_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: redeem_code
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: campaign_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: code
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: is_active
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: max_uses
+            type: INT
+            defaultValueNumeric: 1
+            constraints:
+              nullable: false
+        - column:
+            name: used_count
+            type: INT
+            defaultValueNumeric: 0
+            constraints:
+              nullable: false
+        - column:
+            name: expires_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: redeem_code_usage
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: redeem_code_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: campaign_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: user_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: used_at
+            type: TIMESTAMP WITH TIME ZONE
+            constraints:
+              nullable: false
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: gateway_user_balance_ledger
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: user_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: delta_token_credits
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: balance_after_token_credits
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: reason
+            type: VARCHAR(64)
+            constraints:
+              nullable: false
+        - column:
+            name: reference_type
+            type: VARCHAR(64)
+        - column:
+            name: reference_id
+            type: VARCHAR(128)
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: dashboard_external_app
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: app_name
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: slug
+            type: VARCHAR(96)
+            constraints:
+              nullable: false
+        - column:
+            name: iframe_url
+            type: VARCHAR(1024)
+            constraints:
+              nullable: false
+        - column:
+            name: allowed_origin
+            type: VARCHAR(512)
+            constraints:
+              nullable: false
+        - column:
+            name: sandbox_permissions
+            type: VARCHAR(512)
+        - column:
+            name: signing_secret_ciphertext
+            type: TEXT
+        - column:
+            name: signing_secret_fingerprint
+            type: VARCHAR(128)
+        - column:
+            name: enabled
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: nav_enabled
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: description
+            type: VARCHAR(512)
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: maintenance_run
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: run_type
+            type: VARCHAR(64)
+            constraints:
+              nullable: false
+        - column:
+            name: status
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: dry_run
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: confirm_required
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: confirmed
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: artifact_path
+            type: VARCHAR(1024)
+        - column:
+            name: artifact_checksum
+            type: VARCHAR(128)
+        - column:
+            name: actor
+            type: VARCHAR(128)
+        - column:
+            name: source_ref
+            type: VARCHAR(256)
+        - column:
+            name: duration_ms
+            type: BIGINT
+            defaultValueNumeric: 0
+            constraints:
+              nullable: false
+        - column:
+            name: detail_json
+            type: TEXT
+        - column:
+            name: error_message
+            type: VARCHAR(1024)
+        - column:
+            name: started_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: completed_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: ops_probe_run
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: probe_name
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: target_url
+            type: VARCHAR(1024)
+            constraints:
+              nullable: false
+        - column:
+            name: status
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: severity
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: source
+            type: VARCHAR(96)
+            constraints:
+              nullable: false
+        - column:
+            name: latency_ms
+            type: BIGINT
+            defaultValueNumeric: 0
+            constraints:
+              nullable: false
+        - column:
+            name: status_code
+            type: INT
+        - column:
+            name: error_message
+            type: VARCHAR(1024)
+        - column:
+            name: detail_json
+            type: TEXT
+        - column:
+            name: started_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: completed_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: ops_system_event
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: event_type
+            type: VARCHAR(96)
+            constraints:
+              nullable: false
+        - column:
+            name: severity
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: source
+            type: VARCHAR(96)
+            constraints:
+              nullable: false
+        - column:
+            name: entity_type
+            type: VARCHAR(96)
+        - column:
+            name: entity_ref
+            type: VARCHAR(256)
+        - column:
+            name: title
+            type: VARCHAR(256)
+            constraints:
+              nullable: false
+        - column:
+            name: detail_json
+            type: TEXT
+        - column:
+            name: occurred_at
+            type: TIMESTAMP WITH TIME ZONE
+            constraints:
+              nullable: false
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: cost_model
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: provider_type
+            type: VARCHAR(96)
+            constraints:
+              nullable: false
+        - column:
+            name: model_name
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: currency
+            type: VARCHAR(16)
+            defaultValue: USD
+            constraints:
+              nullable: false
+        - column:
+            name: input_token_micros
+            type: BIGINT
+            defaultValueNumeric: 100
+            constraints:
+              nullable: false
+        - column:
+            name: output_token_micros
+            type: BIGINT
+            defaultValueNumeric: 300
+            constraints:
+              nullable: false
+        - column:
+            name: cache_hit_token_micros
+            type: BIGINT
+            defaultValueNumeric: 20
+            constraints:
+              nullable: false
+        - column:
+            name: active
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: notes
+            type: VARCHAR(512)
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: access_group
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: group_name
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: description
+            type: TEXT
+        - column:
+            name: is_active
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: priority
+            type: INT
+            defaultValueNumeric: 100
+            constraints:
+              nullable: false
+        - column:
+            name: allowed_protocols_json
+            type: TEXT
+            defaultValue: '[]'
+            constraints:
+              nullable: false
+        - column:
+            name: allowed_models_json
+            type: TEXT
+            defaultValue: '[]'
+            constraints:
+              nullable: false
+        - column:
+            name: allowed_provider_types_json
+            type: TEXT
+            defaultValue: '[]'
+            constraints:
+              nullable: false
+        - column:
+            name: allowed_client_families_json
+            type: TEXT
+            defaultValue: '[]'
+            constraints:
+              nullable: false
+        - column:
+            name: rpm_limit
+            type: INT
+        - column:
+            name: tpm_limit
+            type: INT
+        - column:
+            name: concurrency_limit
+            type: INT
+        - column:
+            name: daily_token_limit
+            type: BIGINT
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: plan_access_group
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: plan_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: access_group_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: is_active
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: priority
+            type: INT
+            defaultValueNumeric: 100
+            constraints:
+              nullable: false
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: distributed_key_access_group_grant
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: distributed_key_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: access_group_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: grant_mode
+            type: VARCHAR(24)
+            defaultValue: INHERIT
+            constraints:
+              nullable: false
+        - column:
+            name: is_active
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: priority
+            type: INT
+            defaultValueNumeric: 100
+            constraints:
+              nullable: false
+        - column:
+            name: reason
+            type: VARCHAR(512)
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: payment_order
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: order_no
+            type: VARCHAR(96)
+            constraints:
+              nullable: false
+        - column:
+            name: user_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: provider
+            type: VARCHAR(64)
+            constraints:
+              nullable: false
+        - column:
+            name: amount_minor
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: currency
+            type: VARCHAR(16)
+            constraints:
+              nullable: false
+        - column:
+            name: token_credits
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: status
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: provider_trade_no
+            type: VARCHAR(128)
+        - column:
+            name: metadata_json
+            type: TEXT
+        - column:
+            name: paid_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: provider_instance_code
+            type: VARCHAR(96)
+        - column:
+            name: checkout_url
+            type: VARCHAR(1024)
+        - column:
+            name: checkout_method
+            type: VARCHAR(64)
+        - column:
+            name: provider_payload_json
+            type: TEXT
+        - column:
+            name: checkout_expires_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: refund_amount_minor
+            type: BIGINT
+            defaultValueNumeric: 0
+            constraints:
+              nullable: false
+        - column:
+            name: refunded_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: disputed_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: reconciled_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: reconcile_status
+            type: VARCHAR(64)
+    - createTable:
+        tableName: payment_audit_log
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: order_no
+            type: VARCHAR(96)
+            constraints:
+              nullable: false
+        - column:
+            name: provider
+            type: VARCHAR(64)
+            constraints:
+              nullable: false
+        - column:
+            name: event_type
+            type: VARCHAR(64)
+            constraints:
+              nullable: false
+        - column:
+            name: idempotency_key
+            type: VARCHAR(128)
+        - column:
+            name: payload_json
+            type: TEXT
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: portal_social_oauth_session
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: state
+            type: VARCHAR(96)
+            constraints:
+              nullable: false
+        - column:
+            name: provider
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: status
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: authorization_url
+            type: TEXT
+        - column:
+            name: redirect_path
+            type: VARCHAR(256)
+        - column:
+            name: code_verifier
+            type: VARCHAR(256)
+        - column:
+            name: metadata_json
+            type: TEXT
+        - column:
+            name: expires_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: gateway_user_social_identity
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: user_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: provider
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: external_subject
+            type: VARCHAR(191)
+            constraints:
+              nullable: false
+        - column:
+            name: email
+            type: VARCHAR(191)
+        - column:
+            name: display_name
+            type: VARCHAR(128)
+        - column:
+            name: last_login_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: metadata_json
+            type: TEXT
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: gateway_user_passkey_credential
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: user_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: credential_id
+            type: VARCHAR(256)
+            constraints:
+              nullable: false
+        - column:
+            name: credential_name
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: public_key_pem
+            type: TEXT
+            constraints:
+              nullable: false
+        - column:
+            name: rp_id
+            type: VARCHAR(191)
+            constraints:
+              nullable: false
+        - column:
+            name: origin
+            type: VARCHAR(256)
+            constraints:
+              nullable: false
+        - column:
+            name: transports_json
+            type: TEXT
+        - column:
+            name: metadata_json
+            type: TEXT
+        - column:
+            name: sign_count
+            type: BIGINT
+            defaultValueNumeric: 0
+            constraints:
+              nullable: false
+        - column:
+            name: is_active
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: last_used_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: client_instance
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: distributed_key_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: instance_id
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: display_name
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: client_family
+            type: VARCHAR(64)
+            constraints:
+              nullable: false
+        - column:
+            name: workspace_hint
+            type: VARCHAR(256)
+        - column:
+            name: plugin_name
+            type: VARCHAR(128)
+        - column:
+            name: plugin_version
+            type: VARCHAR(64)
+        - column:
+            name: deep_link_scheme
+            type: VARCHAR(64)
+        - column:
+            name: status
+            type: VARCHAR(32)
+            defaultValue: ACTIVE
+            constraints:
+              nullable: false
+        - column:
+            name: last_authorized_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: last_seen_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: last_request_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: last_request_id
+            type: VARCHAR(64)
+        - column:
+            name: disabled_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: revoked_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: metadata_json
+            type: TEXT
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: client_instance_grant
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: client_instance_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: token_hash
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: full_key_ciphertext
+            type: TEXT
+            constraints:
+              nullable: false
+        - column:
+            name: source
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: config_format
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: base_url
+            type: VARCHAR(512)
+            constraints:
+              nullable: false
+        - column:
+            name: expires_at
+            type: TIMESTAMP WITH TIME ZONE
+            constraints:
+              nullable: false
+        - column:
+            name: consumed_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: revoked_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: metadata_json
+            type: TEXT
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: distributed_key_secret_export_grant
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: distributed_key_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: token_hash
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: full_key_ciphertext
+            type: TEXT
+            constraints:
+              nullable: false
+        - column:
+            name: source_action
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: expires_at
+            type: TIMESTAMP WITH TIME ZONE
+            constraints:
+              nullable: false
+        - column:
+            name: consumed_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: revoked_at
+            type: TIMESTAMP WITH TIME ZONE
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - createTable:
+        tableName: openai_idempotency_record
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              nullable: false
+        - column:
+            name: distributed_key_id
+            type: BIGINT
+            constraints:
+              nullable: false
+        - column:
+            name: request_path
+            type: VARCHAR(256)
+            constraints:
+              nullable: false
+        - column:
+            name: idempotency_key
+            type: VARCHAR(256)
+            constraints:
+              nullable: false
+        - column:
+            name: request_fingerprint
+            type: VARCHAR(128)
+            constraints:
+              nullable: false
+        - column:
+            name: response_status
+            type: INT
+            constraints:
+              nullable: false
+        - column:
+            name: response_object_type
+            type: VARCHAR(128)
+        - column:
+            name: response_payload_json
+            type: TEXT
+            constraints:
+              nullable: false
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - update:
+        tableName: upstream_site_profile
+        columns:
+        - column:
+            name: profile_source
+            value: AUTO_DISCOVERED
+        where: description = '由凭证自动推断生成的站点档案。'
+    - sql:
+        sql: "INSERT INTO upstream_account_group (\n  group_name,\n  provider_type,\n  supported_models_json,\n  supported_protocols_json,\n\
+          \  allowed_client_families_json,\n  is_active,\n  description,\n  created_at,\n  updated_at\n) SELECT\n  'default',\n\
+          \  'OPENAI_OAUTH',\n  '[]',\n  '[\"openai\",\"responses\"]',\n  '[\"GENERIC_OPENAI\",\"CODEX\"]',\n  TRUE,\n  '系统默认账号分组',\n\
+          \  CURRENT_TIMESTAMP,\n  CURRENT_TIMESTAMP\nWHERE NOT EXISTS (\n  SELECT 1 FROM upstream_account_group WHERE lower(group_name)\
+          \ = 'default'\n);\n"
+    - sql:
+        sql: "UPDATE upstream_credential SET group_id = (\n  SELECT id\n  FROM upstream_account_group\n  WHERE lower(group_name)\
+          \ = 'default'\n  ORDER BY id\n  LIMIT 1\n) WHERE group_id IS NULL;\n"
+    - addUniqueConstraint:
+        tableName: system_setting
+        columnNames: setting_key
+        constraintName: uk_system_setting_setting_key
+    - addUniqueConstraint:
+        tableName: upstream_credential
+        columnNames: api_key_fingerprint
+        constraintName: uk_upstream_credential_api_key_fingerprint
+    - addUniqueConstraint:
+        tableName: distributed_key
+        columnNames: key_prefix
+        constraintName: uk_distributed_key_key_prefix
+    - addUniqueConstraint:
+        tableName: distributed_key_binding
+        columnNames: distributed_key_id,credential_id
+        constraintName: uk_distributed_key_binding_pair
+    - addUniqueConstraint:
+        tableName: model_alias
+        columnNames: alias_key
+        constraintName: uk_model_alias_alias_key
+    - addUniqueConstraint:
+        tableName: credential_model_catalog
+        columnNames: credential_id,model_key
+        constraintName: uk_credential_model_catalog_pair
+    - addUniqueConstraint:
+        tableName: upstream_cache_reference
+        columnNames: distributed_key_id,provider_type,model_group,prefix_hash
+        constraintName: uk_upstream_cache_reference_scope
+    - addUniqueConstraint:
+        tableName: gateway_file
+        columnNames: file_key
+        constraintName: uk_gateway_file_file_key
+    - addUniqueConstraint:
+        tableName: gateway_file_binding
+        columnNames: gateway_file_id,provider_type,external_file_id
+        constraintName: uk_gateway_file_binding_scope
+    - addUniqueConstraint:
+        tableName: gateway_async_resource
+        columnNames: resource_key
+        constraintName: uk_gateway_async_resource_resource_key
+    - addUniqueConstraint:
+        tableName: oauth_authorization_session
+        columnNames: session_key
+        constraintName: uk_oauth_authorization_session_session_key
+    - addUniqueConstraint:
+        tableName: site_model_capability
+        columnNames: site_profile_id,model_key
+        constraintName: uk_site_model_capability_profile_model_key
+    - addUniqueConstraint:
+        tableName: request_log
+        columnNames: request_id
+        constraintName: uk_request_log_request_id
+    - addUniqueConstraint:
+        tableName: usage_record
+        columnNames: request_id
+        constraintName: uk_usage_record_request_id
+    - addUniqueConstraint:
+        tableName: gateway_user
+        columnNames: email
+        constraintName: uk_gateway_user_email
+    - addUniqueConstraint:
+        tableName: subscription_plan
+        columnNames: plan_name
+        constraintName: uk_subscription_plan_name
+    - addUniqueConstraint:
+        tableName: announcement_read_state
+        columnNames: announcement_id,user_id
+        constraintName: uk_announcement_read_user
+    - addUniqueConstraint:
+        tableName: promo_campaign
+        columnNames: campaign_name
+        constraintName: uk_promo_campaign_name
+    - addUniqueConstraint:
+        tableName: redeem_code
+        columnNames: code
+        constraintName: uk_redeem_code_code
+    - addUniqueConstraint:
+        tableName: redeem_code_usage
+        columnNames: redeem_code_id,user_id
+        constraintName: uk_redeem_usage_code_user
+    - addUniqueConstraint:
+        tableName: dashboard_external_app
+        columnNames: slug
+        constraintName: uk_dashboard_external_app_slug
+    - addUniqueConstraint:
+        tableName: access_group
+        columnNames: group_name
+        constraintName: uk_access_group_name
+    - addUniqueConstraint:
+        tableName: plan_access_group
+        columnNames: plan_id,access_group_id
+        constraintName: uk_plan_access_group
+    - addUniqueConstraint:
+        tableName: distributed_key_access_group_grant
+        columnNames: distributed_key_id,access_group_id
+        constraintName: uk_distributed_key_access_group_grant
+    - addUniqueConstraint:
+        tableName: payment_order
+        columnNames: order_no
+        constraintName: uk_payment_order_order_no
+    - addUniqueConstraint:
+        tableName: portal_social_oauth_session
+        columnNames: state
+        constraintName: uk_portal_social_oauth_session_state
+    - addUniqueConstraint:
+        tableName: gateway_user_social_identity
+        columnNames: provider,external_subject
+        constraintName: uk_user_social_identity_provider_subject
+    - addUniqueConstraint:
+        tableName: gateway_user_passkey_credential
+        columnNames: credential_id
+        constraintName: uk_user_passkey_credential_id
+    - addUniqueConstraint:
+        tableName: client_instance
+        columnNames: distributed_key_id,instance_id
+        constraintName: uk_client_instance_key_instance
+    - addUniqueConstraint:
+        tableName: client_instance_grant
+        columnNames: token_hash
+        constraintName: uk_client_instance_grant_token_hash
+    - addUniqueConstraint:
+        tableName: distributed_key_secret_export_grant
+        columnNames: token_hash
+        constraintName: uk_key_secret_export_token_hash
+    - addUniqueConstraint:
+        tableName: openai_idempotency_record
+        columnNames: distributed_key_id,request_path,idempotency_key
+        constraintName: uk_openai_idempotency_scope
+    - addForeignKeyConstraint:
+        baseTableName: distributed_key_binding
+        baseColumnNames: distributed_key_id
+        referencedTableName: distributed_key
+        referencedColumnNames: id
+        constraintName: fk_distributed_key_binding_key
+    - addForeignKeyConstraint:
+        baseTableName: distributed_key_binding
+        baseColumnNames: credential_id
+        referencedTableName: upstream_credential
+        referencedColumnNames: id
+        constraintName: fk_distributed_key_binding_credential
+    - addForeignKeyConstraint:
+        baseTableName: model_alias_rule
+        baseColumnNames: alias_id
+        referencedTableName: model_alias
+        referencedColumnNames: id
+        constraintName: fk_model_alias_rule_alias
+    - addForeignKeyConstraint:
+        baseTableName: credential_model_catalog
+        baseColumnNames: credential_id
+        referencedTableName: upstream_credential
+        referencedColumnNames: id
+        constraintName: fk_credential_model_catalog_credential
+    - addForeignKeyConstraint:
+        baseTableName: upstream_credential
+        baseColumnNames: group_id
+        referencedTableName: upstream_account_group
+        referencedColumnNames: id
+        constraintName: fk_upstream_credential_group
+    - addForeignKeyConstraint:
+        baseTableName: user_subscription
+        baseColumnNames: user_id
+        referencedTableName: gateway_user
+        referencedColumnNames: id
+        constraintName: fk_user_subscription_user_id
+    - addForeignKeyConstraint:
+        baseTableName: user_subscription
+        baseColumnNames: plan_id
+        referencedTableName: subscription_plan
+        referencedColumnNames: id
+        constraintName: fk_user_subscription_plan_id
+    - addForeignKeyConstraint:
+        baseTableName: distributed_key
+        baseColumnNames: owner_user_id
+        referencedTableName: gateway_user
+        referencedColumnNames: id
+        constraintName: fk_distributed_key_owner_user_id
+    - addForeignKeyConstraint:
+        baseTableName: announcement
+        baseColumnNames: audience_user_id
+        referencedTableName: gateway_user
+        referencedColumnNames: id
+        constraintName: fk_announcement_audience_user_id
+    - addForeignKeyConstraint:
+        baseTableName: announcement
+        baseColumnNames: audience_plan_id
+        referencedTableName: subscription_plan
+        referencedColumnNames: id
+        constraintName: fk_announcement_audience_plan_id
+    - addForeignKeyConstraint:
+        baseTableName: announcement_read_state
+        baseColumnNames: announcement_id
+        referencedTableName: announcement
+        referencedColumnNames: id
+        constraintName: fk_announcement_read_announcement_id
+    - addForeignKeyConstraint:
+        baseTableName: announcement_read_state
+        baseColumnNames: user_id
+        referencedTableName: gateway_user
+        referencedColumnNames: id
+        constraintName: fk_announcement_read_user_id
+    - addForeignKeyConstraint:
+        baseTableName: redeem_code
+        baseColumnNames: campaign_id
+        referencedTableName: promo_campaign
+        referencedColumnNames: id
+        constraintName: fk_redeem_code_campaign_id
+    - addForeignKeyConstraint:
+        baseTableName: redeem_code_usage
+        baseColumnNames: redeem_code_id
+        referencedTableName: redeem_code
+        referencedColumnNames: id
+        constraintName: fk_redeem_usage_code_id
+    - addForeignKeyConstraint:
+        baseTableName: redeem_code_usage
+        baseColumnNames: campaign_id
+        referencedTableName: promo_campaign
+        referencedColumnNames: id
+        constraintName: fk_redeem_usage_campaign_id
+    - addForeignKeyConstraint:
+        baseTableName: redeem_code_usage
+        baseColumnNames: user_id
+        referencedTableName: gateway_user
+        referencedColumnNames: id
+        constraintName: fk_redeem_usage_user_id
+    - addForeignKeyConstraint:
+        baseTableName: gateway_user_balance_ledger
+        baseColumnNames: user_id
+        referencedTableName: gateway_user
+        referencedColumnNames: id
+        constraintName: fk_user_balance_ledger_user_id
+    - addForeignKeyConstraint:
+        baseTableName: plan_access_group
+        baseColumnNames: plan_id
+        referencedTableName: subscription_plan
+        referencedColumnNames: id
+        constraintName: fk_plan_access_group_plan_id
+    - addForeignKeyConstraint:
+        baseTableName: plan_access_group
+        baseColumnNames: access_group_id
+        referencedTableName: access_group
+        referencedColumnNames: id
+        constraintName: fk_plan_access_group_group_id
+    - addForeignKeyConstraint:
+        baseTableName: distributed_key_access_group_grant
+        baseColumnNames: distributed_key_id
+        referencedTableName: distributed_key
+        referencedColumnNames: id
+        constraintName: fk_key_access_group_key_id
+    - addForeignKeyConstraint:
+        baseTableName: distributed_key_access_group_grant
+        baseColumnNames: access_group_id
+        referencedTableName: access_group
+        referencedColumnNames: id
+        constraintName: fk_key_access_group_group_id
+    - addForeignKeyConstraint:
+        baseTableName: announcement
+        baseColumnNames: audience_access_group_id
+        referencedTableName: access_group
+        referencedColumnNames: id
+        constraintName: fk_announcement_audience_access_group_id
+    - addForeignKeyConstraint:
+        baseTableName: payment_order
+        baseColumnNames: user_id
+        referencedTableName: gateway_user
+        referencedColumnNames: id
+        constraintName: fk_payment_order_user
+    - addForeignKeyConstraint:
+        baseTableName: gateway_user_social_identity
+        baseColumnNames: user_id
+        referencedTableName: gateway_user
+        referencedColumnNames: id
+        constraintName: fk_user_social_identity_user
+    - addForeignKeyConstraint:
+        baseTableName: gateway_user_passkey_credential
+        baseColumnNames: user_id
+        referencedTableName: gateway_user
+        referencedColumnNames: id
+        constraintName: fk_user_passkey_credential_user
+    - addForeignKeyConstraint:
+        baseTableName: client_instance
+        baseColumnNames: distributed_key_id
+        referencedTableName: distributed_key
+        referencedColumnNames: id
+        constraintName: fk_client_instance_distributed_key
+        onDelete: CASCADE
+    - addForeignKeyConstraint:
+        baseTableName: client_instance_grant
+        baseColumnNames: client_instance_id
+        referencedTableName: client_instance
+        referencedColumnNames: id
+        constraintName: fk_client_instance_grant_instance
+        onDelete: CASCADE
+    - addForeignKeyConstraint:
+        baseTableName: distributed_key_secret_export_grant
+        baseColumnNames: distributed_key_id
+        referencedTableName: distributed_key
+        referencedColumnNames: id
+        constraintName: fk_key_secret_export_distributed_key
+        onDelete: CASCADE
+    - addForeignKeyConstraint:
+        baseTableName: openai_idempotency_record
+        baseColumnNames: distributed_key_id
+        referencedTableName: distributed_key
+        referencedColumnNames: id
+        constraintName: fk_openai_idempotency_distributed_key
+        onDelete: CASCADE
+    - createIndex:
+        tableName: system_setting
+        indexName: idx_system_setting_value_type
+        columns:
+        - column:
+            name: value_type
+    - createIndex:
+        tableName: system_setting
+        indexName: idx_system_setting_updated_at
+        columns:
+        - column:
+            name: updated_at
+    - createIndex:
+        tableName: upstream_credential
+        indexName: idx_upstream_credential_provider_active
+        columns:
+        - column:
+            name: provider_type
+        - column:
+            name: is_active
+    - createIndex:
+        tableName: upstream_credential
+        indexName: idx_upstream_credential_cooldown_until
+        columns:
+        - column:
+            name: cooldown_until
+    - createIndex:
+        tableName: upstream_credential
+        indexName: idx_upstream_credential_deleted_updated_at
+        columns:
+        - column:
+            name: deleted
+        - column:
+            name: updated_at
+    - createIndex:
+        tableName: distributed_key
+        indexName: idx_distributed_key_is_active
+        columns:
+        - column:
+            name: is_active
+    - createIndex:
+        tableName: distributed_key
+        indexName: idx_distributed_key_last_used_at
+        columns:
+        - column:
+            name: last_used_at
+    - createIndex:
+        tableName: distributed_key
+        indexName: idx_distributed_key_updated_at
+        columns:
+        - column:
+            name: updated_at
+    - createIndex:
+        tableName: distributed_key_binding
+        indexName: idx_distributed_key_binding_key_active
+        columns:
+        - column:
+            name: distributed_key_id
+        - column:
+            name: is_active
+    - createIndex:
+        tableName: distributed_key_binding
+        indexName: idx_distributed_key_binding_credential_active
+        columns:
+        - column:
+            name: credential_id
+        - column:
+            name: is_active
+    - createIndex:
+        tableName: model_alias
+        indexName: idx_model_alias_enabled
+        columns:
+        - column:
+            name: enabled
+    - createIndex:
+        tableName: model_alias
+        indexName: idx_model_alias_updated_at
+        columns:
+        - column:
+            name: updated_at
+    - createIndex:
+        tableName: model_alias_rule
+        indexName: idx_model_alias_rule_alias_enabled
+        columns:
+        - column:
+            name: alias_id
+        - column:
+            name: enabled
+    - createIndex:
+        tableName: model_alias_rule
+        indexName: idx_model_alias_rule_protocol_priority
+        columns:
+        - column:
+            name: protocol
+        - column:
+            name: priority
+    - createIndex:
+        tableName: model_alias_rule
+        indexName: idx_model_alias_rule_target_model_key
+        columns:
+        - column:
+            name: target_model_key
+    - createIndex:
+        tableName: credential_model_catalog
+        indexName: idx_credential_model_catalog_model_key
+        columns:
+        - column:
+            name: model_key
+    - createIndex:
+        tableName: credential_model_catalog
+        indexName: idx_credential_model_catalog_credential_active
+        columns:
+        - column:
+            name: credential_id
+        - column:
+            name: active
+    - createIndex:
+        tableName: credential_model_catalog
+        indexName: idx_credential_model_catalog_supports_chat
+        columns:
+        - column:
+            name: supports_chat
+    - createIndex:
+        tableName: route_decision_log
+        indexName: idx_route_decision_log_distributed_key_created
+        columns:
+        - column:
+            name: distributed_key_id
+        - column:
+            name: created_at
+    - createIndex:
+        tableName: route_decision_log
+        indexName: idx_route_decision_log_protocol_created
+        columns:
+        - column:
+            name: protocol
+        - column:
+            name: created_at
+    - createIndex:
+        tableName: route_decision_log
+        indexName: idx_route_decision_log_provider_created
+        columns:
+        - column:
+            name: selected_provider_type
+        - column:
+            name: created_at
+    - createIndex:
+        tableName: cache_hit_log
+        indexName: idx_cache_hit_log_distributed_key_created
+        columns:
+        - column:
+            name: distributed_key_id
+        - column:
+            name: created_at
+    - createIndex:
+        tableName: cache_hit_log
+        indexName: idx_cache_hit_log_provider_created
+        columns:
+        - column:
+            name: provider_type
+        - column:
+            name: created_at
+    - createIndex:
+        tableName: cache_hit_log
+        indexName: idx_cache_hit_log_model_group_created
+        columns:
+        - column:
+            name: model_group
+        - column:
+            name: created_at
+    - createIndex:
+        tableName: upstream_cache_reference
+        indexName: idx_upstream_cache_reference_provider_created
+        columns:
+        - column:
+            name: provider_type
+        - column:
+            name: created_at
+    - createIndex:
+        tableName: upstream_cache_reference
+        indexName: idx_upstream_cache_reference_status_expire
+        columns:
+        - column:
+            name: status
+        - column:
+            name: expire_at
+    - createIndex:
+        tableName: gateway_file
+        indexName: idx_gateway_file_distributed_key_created
+        columns:
+        - column:
+            name: distributed_key_id
+        - column:
+            name: created_at
+    - createIndex:
+        tableName: gateway_file
+        indexName: idx_gateway_file_status_created
+        columns:
+        - column:
+            name: status
+        - column:
+            name: created_at
+    - createIndex:
+        tableName: gateway_file_binding
+        indexName: idx_gateway_file_binding_file_created
+        columns:
+        - column:
+            name: gateway_file_id
+        - column:
+            name: created_at
+    - createIndex:
+        tableName: gateway_file_binding
+        indexName: idx_gateway_file_binding_credential_status
+        columns:
+        - column:
+            name: credential_id
+        - column:
+            name: status
+    - createIndex:
+        tableName: gateway_async_resource
+        indexName: idx_gateway_async_resource_scope
+        columns:
+        - column:
+            name: distributed_key_id
+        - column:
+            name: resource_type
+        - column:
+            name: created_at
+    - createIndex:
+        tableName: gateway_async_resource
+        indexName: idx_gateway_async_resource_status_created
+        columns:
+        - column:
+            name: status
+        - column:
+            name: created_at
+    - createIndex:
+        indexName: idx_upstream_site_profile_family_active
+        tableName: upstream_site_profile
+        columns:
+        - column:
+            name: provider_family
+        - column:
+            name: is_active
+    - createIndex:
+        indexName: idx_upstream_site_profile_kind_active
+        tableName: upstream_site_profile
+        columns:
+        - column:
+            name: site_kind
+        - column:
+            name: is_active
+    - createIndex:
+        indexName: idx_site_capability_snapshot_health_state
+        tableName: site_capability_snapshot
+        columns:
+        - column:
+            name: health_state
+    - createIndex:
+        indexName: idx_site_capability_snapshot_refreshed_at
+        tableName: site_capability_snapshot
+        columns:
+        - column:
+            name: refreshed_at
+    - createIndex:
+        indexName: idx_site_model_capability_model_key_active
+        tableName: site_model_capability
+        columns:
+        - column:
+            name: model_key
+        - column:
+            name: is_active
+    - createIndex:
+        indexName: idx_site_model_capability_site_profile
+        tableName: site_model_capability
+        columns:
+        - column:
+            name: site_profile_id
+    - createIndex:
+        tableName: request_log
+        indexName: idx_request_log_distributed_key_started
+        columns:
+        - column:
+            name: distributed_key_id
+        - column:
+            name: started_at
+    - createIndex:
+        tableName: request_log
+        indexName: idx_request_log_provider_started
+        columns:
+        - column:
+            name: provider_type
+        - column:
+            name: started_at
+    - createIndex:
+        tableName: request_log
+        indexName: idx_request_log_status_started
+        columns:
+        - column:
+            name: status
+        - column:
+            name: started_at
+    - createIndex:
+        tableName: usage_record
+        indexName: idx_usage_record_distributed_key_created
+        columns:
+        - column:
+            name: distributed_key_id
+        - column:
+            name: created_at
+    - createIndex:
+        tableName: usage_record
+        indexName: idx_usage_record_provider_created
+        columns:
+        - column:
+            name: provider_type
+        - column:
+            name: created_at
+    - createIndex:
+        tableName: usage_record
+        indexName: idx_usage_record_completeness_created
+        columns:
+        - column:
+            name: completeness
+        - column:
+            name: created_at
+    - createIndex:
+        tableName: audit_log
+        indexName: idx_audit_log_type_created
+        columns:
+        - column:
+            name: audit_type
+        - column:
+            name: created_at
+    - createIndex:
+        tableName: audit_log
+        indexName: idx_audit_log_request_created
+        columns:
+        - column:
+            name: request_id
+        - column:
+            name: created_at
+    - createIndex:
+        tableName: audit_log
+        indexName: idx_audit_log_target_created
+        columns:
+        - column:
+            name: target_type
+        - column:
+            name: target_id
+        - column:
+            name: created_at
+    - createIndex:
+        tableName: gateway_async_resource
+        indexName: idx_gateway_async_resource_upstream_object
+        columns:
+        - column:
+            name: distributed_key_id
+        - column:
+            name: resource_type
+        - column:
+            name: upstream_object_id
+    - createIndex:
+        tableName: slo_policy
+        indexName: idx_slo_policy_enabled
+        columns:
+        - column:
+            name: enabled
+    - createIndex:
+        tableName: slo_policy
+        indexName: idx_slo_policy_scope
+        columns:
+        - column:
+            name: scope_type
+        - column:
+            name: scope_ref
+    - createIndex:
+        tableName: alert_silence
+        indexName: idx_alert_silence_enabled
+        columns:
+        - column:
+            name: enabled
+    - createIndex:
+        tableName: alert_silence
+        indexName: idx_alert_silence_event
+        columns:
+        - column:
+            name: event_type
+        - column:
+            name: severity
+    - createIndex:
+        tableName: alert_silence
+        indexName: idx_alert_silence_entity
+        columns:
+        - column:
+            name: entity_type
+        - column:
+            name: entity_ref
+    - createIndex:
+        tableName: maintenance_window
+        indexName: idx_maintenance_window_active
+        columns:
+        - column:
+            name: enabled
+        - column:
+            name: starts_at
+        - column:
+            name: ends_at
+    - createIndex:
+        tableName: change_plan
+        indexName: idx_change_plan_status
+        columns:
+        - column:
+            name: status
+    - createIndex:
+        tableName: change_plan
+        indexName: idx_change_plan_type
+        columns:
+        - column:
+            name: plan_type
+        - column:
+            name: execution_class
+    - createIndex:
+        tableName: approval_record
+        indexName: idx_approval_record_plan
+        columns:
+        - column:
+            name: change_plan_id
+        - column:
+            name: decision_at
+    - createIndex:
+        tableName: release_rollout
+        indexName: idx_release_rollout_plan
+        columns:
+        - column:
+            name: change_plan_id
+        - column:
+            name: created_at
+    - createIndex:
+        tableName: rollback_playbook
+        indexName: idx_rollback_playbook_plan
+        columns:
+        - column:
+            name: change_plan_id
+    - createIndex:
+        tableName: recovery_checkpoint
+        indexName: idx_recovery_checkpoint_created
+        columns:
+        - column:
+            name: created_at
+    - createIndex:
+        tableName: webhook_endpoint
+        indexName: idx_webhook_endpoint_enabled
+        columns:
+        - column:
+            name: enabled
+    - createIndex:
+        tableName: notification_channel
+        indexName: idx_notification_channel_type
+        columns:
+        - column:
+            name: channel_type
+        - column:
+            name: enabled
+    - createIndex:
+        tableName: runbook_link
+        indexName: idx_runbook_link_lookup
+        columns:
+        - column:
+            name: event_type
+        - column:
+            name: entity_type
+        - column:
+            name: enabled
+    - createIndex:
+        tableName: outbound_event_subscription
+        indexName: idx_outbound_subscription_match
+        columns:
+        - column:
+            name: event_type
+        - column:
+            name: severity
+        - column:
+            name: entity_type
+        - column:
+            name: provider_type
+        - column:
+            name: site_profile_id
+        - column:
+            name: enabled
+    - createIndex:
+        tableName: outbound_delivery
+        indexName: idx_outbound_delivery_status
+        columns:
+        - column:
+            name: delivery_status
+        - column:
+            name: next_retry_at
+    - createIndex:
+        tableName: outbound_delivery
+        indexName: idx_outbound_delivery_event
+        columns:
+        - column:
+            name: event_type
+        - column:
+            name: occurred_at
+    - createIndex:
+        tableName: outbound_delivery
+        indexName: idx_outbound_delivery_request
+        columns:
+        - column:
+            name: request_id
+    - createIndex:
+        tableName: outbound_delivery
+        indexName: idx_outbound_delivery_entity
+        columns:
+        - column:
+            name: entity_type
+        - column:
+            name: entity_ref
+    - createIndex:
+        tableName: upstream_credential
+        indexName: idx_upstream_credential_group_deleted
+        columns:
+        - column:
+            name: group_id
+        - column:
+            name: deleted
+    - createIndex:
+        tableName: gateway_user
+        indexName: idx_gateway_user_is_active
+        columns:
+        - column:
+            name: is_active
+    - createIndex:
+        tableName: gateway_user
+        indexName: idx_gateway_user_created_at
+        columns:
+        - column:
+            name: created_at
+    - createIndex:
+        tableName: subscription_plan
+        indexName: idx_subscription_plan_is_active
+        columns:
+        - column:
+            name: is_active
+    - createIndex:
+        tableName: user_subscription
+        indexName: idx_user_subscription_user_id
+        columns:
+        - column:
+            name: user_id
+    - createIndex:
+        tableName: user_subscription
+        indexName: idx_user_subscription_plan_id
+        columns:
+        - column:
+            name: plan_id
+    - createIndex:
+        tableName: user_subscription
+        indexName: idx_user_subscription_status
+        columns:
+        - column:
+            name: status
+    - createIndex:
+        tableName: user_subscription
+        indexName: idx_user_subscription_created_at
+        columns:
+        - column:
+            name: created_at
+    - createIndex:
+        tableName: distributed_key
+        indexName: idx_distributed_key_owner_user_id
+        columns:
+        - column:
+            name: owner_user_id
+    - createIndex:
+        tableName: announcement
+        indexName: idx_announcement_status_published
+        columns:
+        - column:
+            name: status
+        - column:
+            name: published_at
+    - createIndex:
+        tableName: announcement
+        indexName: idx_announcement_audience
+        columns:
+        - column:
+            name: audience_type
+        - column:
+            name: audience_user_id
+        - column:
+            name: audience_plan_id
+    - createIndex:
+        tableName: announcement_read_state
+        indexName: idx_announcement_read_user_read
+        columns:
+        - column:
+            name: user_id
+        - column:
+            name: read_at
+    - createIndex:
+        tableName: promo_campaign
+        indexName: idx_promo_campaign_active
+        columns:
+        - column:
+            name: is_active
+    - createIndex:
+        tableName: redeem_code
+        indexName: idx_redeem_code_campaign
+        columns:
+        - column:
+            name: campaign_id
+    - createIndex:
+        tableName: redeem_code
+        indexName: idx_redeem_code_active
+        columns:
+        - column:
+            name: is_active
+    - createIndex:
+        tableName: redeem_code_usage
+        indexName: idx_redeem_usage_user_used
+        columns:
+        - column:
+            name: user_id
+        - column:
+            name: used_at
+    - createIndex:
+        tableName: redeem_code_usage
+        indexName: idx_redeem_usage_campaign_user
+        columns:
+        - column:
+            name: campaign_id
+        - column:
+            name: user_id
+    - createIndex:
+        tableName: gateway_user_balance_ledger
+        indexName: idx_user_balance_ledger_user_created
+        columns:
+        - column:
+            name: user_id
+        - column:
+            name: created_at
+    - createIndex:
+        tableName: dashboard_external_app
+        indexName: idx_dashboard_external_app_nav
+        columns:
+        - column:
+            name: enabled
+        - column:
+            name: nav_enabled
+    - createIndex:
+        tableName: maintenance_run
+        indexName: idx_maintenance_run_type_created
+        columns:
+        - column:
+            name: run_type
+        - column:
+            name: created_at
+    - createIndex:
+        tableName: ops_probe_run
+        indexName: idx_ops_probe_run_created
+        columns:
+        - column:
+            name: created_at
+    - createIndex:
+        tableName: ops_system_event
+        indexName: idx_ops_system_event_filter
+        columns:
+        - column:
+            name: severity
+        - column:
+            name: source
+        - column:
+            name: occurred_at
+    - createIndex:
+        tableName: cost_model
+        indexName: idx_cost_model_provider_model
+        columns:
+        - column:
+            name: provider_type
+        - column:
+            name: model_name
+        - column:
+            name: active
+    - createIndex:
+        tableName: access_group
+        indexName: idx_access_group_active
+        columns:
+        - column:
+            name: is_active
+    - createIndex:
+        tableName: access_group
+        indexName: idx_access_group_priority
+        columns:
+        - column:
+            name: priority
+    - createIndex:
+        tableName: plan_access_group
+        indexName: idx_plan_access_group_plan
+        columns:
+        - column:
+            name: plan_id
+    - createIndex:
+        tableName: plan_access_group
+        indexName: idx_plan_access_group_group
+        columns:
+        - column:
+            name: access_group_id
+    - createIndex:
+        tableName: plan_access_group
+        indexName: idx_plan_access_group_active
+        columns:
+        - column:
+            name: is_active
+    - createIndex:
+        tableName: distributed_key_access_group_grant
+        indexName: idx_key_access_group_key
+        columns:
+        - column:
+            name: distributed_key_id
+    - createIndex:
+        tableName: distributed_key_access_group_grant
+        indexName: idx_key_access_group_group
+        columns:
+        - column:
+            name: access_group_id
+    - createIndex:
+        tableName: distributed_key_access_group_grant
+        indexName: idx_key_access_group_mode
+        columns:
+        - column:
+            name: grant_mode
+    - createIndex:
+        tableName: announcement
+        indexName: idx_announcement_access_group
+        columns:
+        - column:
+            name: audience_access_group_id
+    - createIndex:
+        tableName: payment_order
+        indexName: idx_payment_order_user_created
+        columns:
+        - column:
+            name: user_id
+        - column:
+            name: created_at
+    - createIndex:
+        tableName: payment_order
+        indexName: idx_payment_order_status_created
+        columns:
+        - column:
+            name: status
+        - column:
+            name: created_at
+    - createIndex:
+        tableName: payment_audit_log
+        indexName: idx_payment_audit_order_created
+        columns:
+        - column:
+            name: order_no
+        - column:
+            name: created_at
+    - createIndex:
+        tableName: payment_audit_log
+        indexName: idx_payment_audit_idempotency
+        columns:
+        - column:
+            name: idempotency_key
+    - createIndex:
+        tableName: gateway_user_social_identity
+        indexName: idx_user_social_identity_user
+        columns:
+        - column:
+            name: user_id
+    - createIndex:
+        tableName: gateway_user
+        indexName: idx_gateway_user_totp_enabled
+        columns:
+        - column:
+            name: totp_enabled
+    - createIndex:
+        tableName: gateway_user_passkey_credential
+        indexName: idx_user_passkey_user_active
+        columns:
+        - column:
+            name: user_id
+        - column:
+            name: is_active
+    - createIndex:
+        tableName: gateway_user_passkey_credential
+        indexName: idx_user_passkey_created_at
+        columns:
+        - column:
+            name: created_at
+    - createIndex:
+        tableName: payment_order
+        indexName: idx_payment_order_provider_status_created
+        columns:
+        - column:
+            name: provider
+        - column:
+            name: status
+        - column:
+            name: created_at
+    - createIndex:
+        tableName: client_instance
+        indexName: idx_client_instance_key_status
+        columns:
+        - column:
+            name: distributed_key_id
+        - column:
+            name: status
+    - createIndex:
+        tableName: client_instance
+        indexName: idx_client_instance_family
+        columns:
+        - column:
+            name: client_family
+    - createIndex:
+        tableName: client_instance
+        indexName: idx_client_instance_last_seen
+        columns:
+        - column:
+            name: last_seen_at
+    - createIndex:
+        tableName: client_instance_grant
+        indexName: idx_client_instance_grant_instance
+        columns:
+        - column:
+            name: client_instance_id
+    - createIndex:
+        tableName: client_instance_grant
+        indexName: idx_client_instance_grant_expires
+        columns:
+        - column:
+            name: expires_at
+    - createIndex:
+        tableName: client_instance_grant
+        indexName: idx_client_instance_grant_consumed
+        columns:
+        - column:
+            name: consumed_at
+    - createIndex:
+        tableName: client_instance_grant
+        indexName: idx_client_instance_grant_revoked
+        columns:
+        - column:
+            name: revoked_at
+    - createIndex:
+        tableName: request_log
+        indexName: idx_request_log_client_instance_started
+        columns:
+        - column:
+            name: client_family
+        - column:
+            name: client_instance
+        - column:
+            name: started_at
+    - createIndex:
+        tableName: usage_record
+        indexName: idx_usage_record_client_instance_created
+        columns:
+        - column:
+            name: client_family
+        - column:
+            name: client_instance
+        - column:
+            name: created_at
+    - createIndex:
+        tableName: request_log
+        indexName: idx_request_log_session_affinity_started
+        columns:
+        - column:
+            name: session_affinity_key
+        - column:
+            name: started_at
+    - createIndex:
+        tableName: distributed_key_secret_export_grant
+        indexName: idx_key_secret_export_key
+        columns:
+        - column:
+            name: distributed_key_id
+    - createIndex:
+        tableName: distributed_key_secret_export_grant
+        indexName: idx_key_secret_export_expires_at
+        columns:
+        - column:
+            name: expires_at
+    - createIndex:
+        tableName: distributed_key_secret_export_grant
+        indexName: idx_key_secret_export_consumed_at
+        columns:
+        - column:
+            name: consumed_at
+    - createIndex:
+        tableName: distributed_key_secret_export_grant
+        indexName: idx_key_secret_export_revoked_at
+        columns:
+        - column:
+            name: revoked_at
+    - createIndex:
+        tableName: openai_idempotency_record
+        indexName: idx_openai_idempotency_key_created
+        columns:
+        - column:
+            name: distributed_key_id
+        - column:
+            name: created_at
+    - createIndex:
+        tableName: openai_idempotency_record
+        indexName: idx_openai_idempotency_path_created
+        columns:
+        - column:
+            name: request_path
+        - column:
+            name: created_at
+    - createIndex:
+        tableName: gateway_async_resource
+        indexName: idx_gateway_async_resource_chat_list
+        columns:
+        - column:
+            name: distributed_key_id
+        - column:
+            name: resource_type
+        - column:
+            name: resource_key
+        - column:
+            name: request_model
+        - column:
+            name: created_at
+        - column:
+            name: id

@@ -13,6 +13,8 @@ import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageCompleteness
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageView;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
 import com.prodigalgal.xaigateway.infra.persistence.entity.RequestLogEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UsageRecordEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.RequestLogRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountRepository;
@@ -81,6 +83,28 @@ public class GatewayRequestLifecycleService {
                 objectMapper,
                 null,
                 null,
+                asyncPersistenceService,
+                null
+        );
+    }
+
+    public GatewayRequestLifecycleService(
+            RequestLogRepository requestLogRepository,
+            UsageRecordRepository usageRecordRepository,
+            GatewayAuditLogService gatewayAuditLogService,
+            MeterRegistry meterRegistry,
+            ObjectMapper objectMapper,
+            UpstreamAccountRepository upstreamAccountRepository,
+            UpstreamCredentialRepository upstreamCredentialRepository,
+            GatewayObservabilityAsyncPersistenceService asyncPersistenceService) {
+        this(
+                requestLogRepository,
+                usageRecordRepository,
+                gatewayAuditLogService,
+                meterRegistry,
+                objectMapper,
+                upstreamAccountRepository,
+                upstreamCredentialRepository,
                 asyncPersistenceService,
                 null
         );
@@ -818,8 +842,7 @@ public class GatewayRequestLifecycleService {
             return false;
         }
         return resourceType == TranslationResourceType.RESPONSE
-                || resourceType == TranslationResourceType.UPLOAD
-                || resourceType == TranslationResourceType.REALTIME;
+                || resourceType == TranslationResourceType.UPLOAD;
     }
 
     private void saveUsageRecord(
@@ -925,40 +948,16 @@ public class GatewayRequestLifecycleService {
         if (credentialId == null || upstreamCredentialRepository == null) {
             return;
         }
+        GatewayObservabilityAsyncPersistenceService.RuntimeMetricSnapshot snapshot =
+                runtimeMetricSnapshot(credentialId, status, usage, durationMs, firstTokenLatencyMs, completedAt);
+        if (asyncPersistenceService != null && asyncPersistenceService.enqueueCredentialMetricsAccumulate(snapshot)) {
+            return;
+        }
         upstreamCredentialRepository.findById(credentialId).ifPresent(credential -> {
             if (credential.isDeleted()) {
                 return;
             }
-            credential.setTotalRequestCount(credential.getTotalRequestCount() + 1);
-            switch (status) {
-                case COMPLETED -> credential.setSuccessfulRequestCount(credential.getSuccessfulRequestCount() + 1);
-                case FAILED -> credential.setFailedRequestCount(credential.getFailedRequestCount() + 1);
-                case CANCELED -> credential.setCanceledRequestCount(credential.getCanceledRequestCount() + 1);
-                default -> {
-                }
-            }
-
-            long safeDuration = Math.max(0L, durationMs);
-            credential.setTotalDurationMs(credential.getTotalDurationMs() + safeDuration);
-            credential.setDurationSampleCount(credential.getDurationSampleCount() + 1);
-
-            if (usage != null) {
-                credential.setTotalTokenCount(credential.getTotalTokenCount() + Math.max(usage.totalTokens(), 0));
-                credential.setTotalCacheHitTokenCount(credential.getTotalCacheHitTokenCount() + Math.max(usage.cacheHitTokens(), 0));
-                credential.setTotalCacheWriteTokenCount(credential.getTotalCacheWriteTokenCount() + Math.max(usage.cacheWriteTokens(), 0));
-                credential.setTotalSavedInputTokenCount(credential.getTotalSavedInputTokenCount() + Math.max(usage.savedInputTokens(), 0));
-            }
-
-            if (firstTokenLatencyMs != null && firstTokenLatencyMs >= 0) {
-                long ttft = firstTokenLatencyMs;
-                credential.setTotalFirstTokenMs(credential.getTotalFirstTokenMs() + ttft);
-                credential.setFirstTokenSampleCount(credential.getFirstTokenSampleCount() + 1);
-                credential.setLastFirstTokenMs(ttft);
-                credential.setMinFirstTokenMs(credential.getMinFirstTokenMs() == null ? ttft : Math.min(credential.getMinFirstTokenMs(), ttft));
-                credential.setMaxFirstTokenMs(credential.getMaxFirstTokenMs() == null ? ttft : Math.max(credential.getMaxFirstTokenMs(), ttft));
-            }
-
-            credential.setLastUsedAt(completedAt);
+            applyCredentialMetricSnapshot(credential, snapshot);
             upstreamCredentialRepository.save(credential);
         });
     }
@@ -973,39 +972,108 @@ public class GatewayRequestLifecycleService {
         if (accountId == null || upstreamAccountRepository == null) {
             return;
         }
+        GatewayObservabilityAsyncPersistenceService.RuntimeMetricSnapshot snapshot =
+                runtimeMetricSnapshot(accountId, status, usage, durationMs, firstTokenLatencyMs, completedAt);
+        if (asyncPersistenceService != null && asyncPersistenceService.enqueueAccountMetricsAccumulate(snapshot)) {
+            return;
+        }
         upstreamAccountRepository.findById(accountId).ifPresent(account -> {
-            account.setTotalRequestCount(account.getTotalRequestCount() + 1);
-            switch (status) {
-                case COMPLETED -> account.setSuccessfulRequestCount(account.getSuccessfulRequestCount() + 1);
-                case FAILED -> account.setFailedRequestCount(account.getFailedRequestCount() + 1);
-                case CANCELED -> account.setCanceledRequestCount(account.getCanceledRequestCount() + 1);
-                default -> {
-                }
-            }
-
-            long safeDuration = Math.max(0L, durationMs);
-            account.setTotalDurationMs(account.getTotalDurationMs() + safeDuration);
-            account.setDurationSampleCount(account.getDurationSampleCount() + 1);
-
-            if (usage != null) {
-                account.setTotalTokenCount(account.getTotalTokenCount() + Math.max(usage.totalTokens(), 0));
-                account.setTotalCacheHitTokenCount(account.getTotalCacheHitTokenCount() + Math.max(usage.cacheHitTokens(), 0));
-                account.setTotalCacheWriteTokenCount(account.getTotalCacheWriteTokenCount() + Math.max(usage.cacheWriteTokens(), 0));
-                account.setTotalSavedInputTokenCount(account.getTotalSavedInputTokenCount() + Math.max(usage.savedInputTokens(), 0));
-            }
-
-            if (firstTokenLatencyMs != null && firstTokenLatencyMs >= 0) {
-                long ttft = firstTokenLatencyMs;
-                account.setTotalFirstTokenMs(account.getTotalFirstTokenMs() + ttft);
-                account.setFirstTokenSampleCount(account.getFirstTokenSampleCount() + 1);
-                account.setLastFirstTokenMs(ttft);
-                account.setMinFirstTokenMs(account.getMinFirstTokenMs() == null ? ttft : Math.min(account.getMinFirstTokenMs(), ttft));
-                account.setMaxFirstTokenMs(account.getMaxFirstTokenMs() == null ? ttft : Math.max(account.getMaxFirstTokenMs(), ttft));
-            }
-
-            account.setLastUsedAt(completedAt);
+            applyAccountMetricSnapshot(account, snapshot);
             upstreamAccountRepository.save(account);
         });
+    }
+
+    private GatewayObservabilityAsyncPersistenceService.RuntimeMetricSnapshot runtimeMetricSnapshot(
+            Long targetId,
+            GatewayRequestStatus status,
+            GatewayUsageView usage,
+            long durationMs,
+            Long firstTokenLatencyMs,
+            Instant completedAt) {
+        long successful = status == GatewayRequestStatus.COMPLETED ? 1L : 0L;
+        long failed = status == GatewayRequestStatus.FAILED ? 1L : 0L;
+        long canceled = status == GatewayRequestStatus.CANCELED ? 1L : 0L;
+        long safeDuration = Math.max(0L, durationMs);
+        long ttft = firstTokenLatencyMs != null && firstTokenLatencyMs >= 0 ? firstTokenLatencyMs : -1L;
+        return new GatewayObservabilityAsyncPersistenceService.RuntimeMetricSnapshot(
+                targetId,
+                1L,
+                successful,
+                failed,
+                canceled,
+                safeDuration,
+                1L,
+                usage == null ? 0L : Math.max(usage.totalTokens(), 0),
+                usage == null ? 0L : Math.max(usage.cacheHitTokens(), 0),
+                usage == null ? 0L : Math.max(usage.cacheWriteTokens(), 0),
+                usage == null ? 0L : Math.max(usage.savedInputTokens(), 0),
+                ttft >= 0 ? ttft : 0L,
+                ttft >= 0 ? 1L : 0L,
+                ttft >= 0 ? ttft : null,
+                ttft >= 0 ? ttft : null,
+                ttft >= 0 ? ttft : null,
+                completedAt
+        );
+    }
+
+    private void applyCredentialMetricSnapshot(
+            UpstreamCredentialEntity credential,
+            GatewayObservabilityAsyncPersistenceService.RuntimeMetricSnapshot snapshot) {
+        credential.setTotalRequestCount(credential.getTotalRequestCount() + snapshot.totalRequestCount());
+        credential.setSuccessfulRequestCount(credential.getSuccessfulRequestCount() + snapshot.successfulRequestCount());
+        credential.setFailedRequestCount(credential.getFailedRequestCount() + snapshot.failedRequestCount());
+        credential.setCanceledRequestCount(credential.getCanceledRequestCount() + snapshot.canceledRequestCount());
+        credential.setTotalDurationMs(credential.getTotalDurationMs() + snapshot.totalDurationMs());
+        credential.setDurationSampleCount(credential.getDurationSampleCount() + snapshot.durationSampleCount());
+        credential.setTotalTokenCount(credential.getTotalTokenCount() + snapshot.totalTokenCount());
+        credential.setTotalCacheHitTokenCount(credential.getTotalCacheHitTokenCount() + snapshot.totalCacheHitTokenCount());
+        credential.setTotalCacheWriteTokenCount(credential.getTotalCacheWriteTokenCount() + snapshot.totalCacheWriteTokenCount());
+        credential.setTotalSavedInputTokenCount(credential.getTotalSavedInputTokenCount() + snapshot.totalSavedInputTokenCount());
+        if (snapshot.firstTokenSampleCount() > 0) {
+            credential.setTotalFirstTokenMs(credential.getTotalFirstTokenMs() + snapshot.totalFirstTokenMs());
+            credential.setFirstTokenSampleCount(credential.getFirstTokenSampleCount() + snapshot.firstTokenSampleCount());
+            credential.setLastFirstTokenMs(snapshot.lastFirstTokenMs());
+            credential.setMinFirstTokenMs(minMetric(credential.getMinFirstTokenMs(), snapshot.minFirstTokenMs()));
+            credential.setMaxFirstTokenMs(maxMetric(credential.getMaxFirstTokenMs(), snapshot.maxFirstTokenMs()));
+        }
+        credential.setLastUsedAt(snapshot.lastUsedAt());
+    }
+
+    private void applyAccountMetricSnapshot(
+            UpstreamAccountEntity account,
+            GatewayObservabilityAsyncPersistenceService.RuntimeMetricSnapshot snapshot) {
+        account.setTotalRequestCount(account.getTotalRequestCount() + snapshot.totalRequestCount());
+        account.setSuccessfulRequestCount(account.getSuccessfulRequestCount() + snapshot.successfulRequestCount());
+        account.setFailedRequestCount(account.getFailedRequestCount() + snapshot.failedRequestCount());
+        account.setCanceledRequestCount(account.getCanceledRequestCount() + snapshot.canceledRequestCount());
+        account.setTotalDurationMs(account.getTotalDurationMs() + snapshot.totalDurationMs());
+        account.setDurationSampleCount(account.getDurationSampleCount() + snapshot.durationSampleCount());
+        account.setTotalTokenCount(account.getTotalTokenCount() + snapshot.totalTokenCount());
+        account.setTotalCacheHitTokenCount(account.getTotalCacheHitTokenCount() + snapshot.totalCacheHitTokenCount());
+        account.setTotalCacheWriteTokenCount(account.getTotalCacheWriteTokenCount() + snapshot.totalCacheWriteTokenCount());
+        account.setTotalSavedInputTokenCount(account.getTotalSavedInputTokenCount() + snapshot.totalSavedInputTokenCount());
+        if (snapshot.firstTokenSampleCount() > 0) {
+            account.setTotalFirstTokenMs(account.getTotalFirstTokenMs() + snapshot.totalFirstTokenMs());
+            account.setFirstTokenSampleCount(account.getFirstTokenSampleCount() + snapshot.firstTokenSampleCount());
+            account.setLastFirstTokenMs(snapshot.lastFirstTokenMs());
+            account.setMinFirstTokenMs(minMetric(account.getMinFirstTokenMs(), snapshot.minFirstTokenMs()));
+            account.setMaxFirstTokenMs(maxMetric(account.getMaxFirstTokenMs(), snapshot.maxFirstTokenMs()));
+        }
+        account.setLastUsedAt(snapshot.lastUsedAt());
+    }
+
+    private Long minMetric(Long current, Long next) {
+        if (next == null) {
+            return current;
+        }
+        return current == null ? next : Math.min(current, next);
+    }
+
+    private Long maxMetric(Long current, Long next) {
+        if (next == null) {
+            return current;
+        }
+        return current == null ? next : Math.max(current, next);
     }
 
     private String cacheKind(GatewayUsageView usage) {

@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +36,10 @@ public class ProviderCatalogLoader {
     public ProviderCatalogLoader(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
         this.marketplaceCurrentPath = null;
+    }
+
+    ObjectMapper objectMapper() {
+        return objectMapper;
     }
 
     public ProviderCatalogSnapshot load() {
@@ -109,6 +114,8 @@ public class ProviderCatalogLoader {
         return new ProviderPresetDefinition(
                 requiredText(node, "code"),
                 requiredText(node, "displayName"),
+                text(node, "vendorCode", null),
+                text(node, "vendorName", null),
                 UpstreamSiteKind.valueOf(requiredText(node, "siteKind")),
                 requiredText(node, "defaultBaseUrl"),
                 text(node, "description", ""),
@@ -123,7 +130,9 @@ public class ProviderCatalogLoader {
                 text(node, "supportStrategy", "cloud-openai-compatible"),
                 stringList(node.path("modelFamilies")),
                 text(node, "pricingMetadata", ""),
-                stringList(node.path("unsupportedFeatures"))
+                stringList(node.path("unsupportedFeatures")),
+                objectMap(node.path("conversationProfile")),
+                objectList(node.path("modelPolicies"))
         );
     }
 
@@ -131,11 +140,11 @@ public class ProviderCatalogLoader {
         String version = "2026.05.01-fallback";
         return new ProviderCatalogSnapshot(version, source, List.of(
                 preset("openai", "OpenAI", UpstreamSiteKind.OPENAI_DIRECT, "https://api.openai.com",
-                        "OpenAI 对话与 tools 功能性服务 API，覆盖 Chat、Responses、Embeddings、Audio、Images、Moderation、Files、Uploads、Models、Vector Stores 与 Realtime 基础面；官方非核心 API 不纳入当前公开范围。",
-                        List.of("chat", "responses", "embeddings", "audio", "images", "moderation", "files", "models", "vector_stores", "realtime"),
+                        "OpenAI 对话与 tools 功能性服务 API，覆盖 Chat、Responses、Embeddings、Audio、Images、Moderation、Files、Uploads、Models 与 Vector Stores 支撑面；官方非核心 API 不纳入当前公开范围。",
+                        List.of("chat", "responses", "embeddings", "audio", "images", "moderation", "files", "models", "vector_stores"),
                         "openai-public-pricing", "openai_error", version, source, List.of("chat.native", "responses.emulated", "files.native"),
                         "openai-native", "native-first",
-                        List.of("gpt-4.1", "gpt-4o", "o-series", "text-embedding", "gpt-image", "realtime"),
+                        List.of("gpt-4.1", "gpt-4o", "o-series", "text-embedding", "gpt-image"),
                         "public-list-price-openai", List.of()),
                 preset("azure_openai", "Azure OpenAI", UpstreamSiteKind.AZURE_OPENAI, "https://{resource}.openai.azure.com",
                         "Azure OpenAI deployment-style endpoint，需要按 deployment name 寻址。",
@@ -143,7 +152,7 @@ public class ProviderCatalogLoader {
                         "azure-openai-metered", "azure_openai_error", version, source, List.of("chat.native", "deployment-addressing.native"),
                         "openai-compatible-chat", "deployment-addressing-required",
                         List.of("gpt-4o", "gpt-4.1", "text-embedding"), "azure-metered-pricing",
-                        List.of("realtime_client_secret: Azure deployment surface not standardized in current gateway.")),
+                        List.of()),
                 preset("deepseek", "DeepSeek", UpstreamSiteKind.DEEPSEEK, "https://api.deepseek.com",
                         "DeepSeek OpenAI-compatible API，适合作为 OpenAI-style chat 与 reasoning 兼容站点。",
                         List.of("chat", "openai_compatible", "reasoning"),
@@ -157,7 +166,7 @@ public class ProviderCatalogLoader {
                         "aggregator-provider-pricing", "openai_error", version, source, List.of("chat.native", "aggregator.routing"),
                         "openai-compatible-chat", "aggregator-routing",
                         List.of("openrouter-auto", "byok-routing"), "aggregator-pass-through-pricing",
-                        List.of("realtime_client_secret: current gateway does not trust aggregated realtime surface.")),
+                        List.of()),
                 preset("anthropic", "Anthropic", UpstreamSiteKind.ANTHROPIC_DIRECT, "https://api.anthropic.com",
                         "Anthropic Messages API，仅按 OpenAI 标准功能区收紧为 chat/tools/thinking 入口，不追求 Anthropic 全量官方 API。",
                         List.of("chat", "tools", "thinking", "anthropic_native"),
@@ -173,9 +182,7 @@ public class ProviderCatalogLoader {
                         "gemini-public-pricing", "gemini_error", version, source, List.of("generate-content.native", "files.orchestrated"),
                         "google-native", "translation-layer",
                         List.of("gemini-2.5-pro", "gemini-2.5-flash", "text-embedding"), "public-list-price-gemini",
-                        List.of(
-                                "realtime_client_secret: Gemini live token is not equivalent to OpenAI realtime client_secret.",
-                                "non_core_provider_apis: provider-specific async/admin/eval APIs are outside the OpenAI standard functional zone."))
+                        List.of("non_core_provider_apis: provider-specific async/admin/eval APIs are outside the OpenAI standard functional zone."))
         ));
     }
 
@@ -199,6 +206,8 @@ public class ProviderCatalogLoader {
         return new ProviderPresetDefinition(
                 code,
                 displayName,
+                null,
+                null,
                 siteKind,
                 defaultBaseUrl,
                 description,
@@ -213,8 +222,30 @@ public class ProviderCatalogLoader {
                 supportStrategy,
                 modelFamilies,
                 pricingMetadata,
-                unsupportedFeatures
+                unsupportedFeatures,
+                Map.of(),
+                List.of()
         );
+    }
+
+    private Map<String, Object> objectMap(JsonNode node) {
+        if (node == null || node.isMissingNode() || node.isNull() || !node.isObject()) {
+            return Map.of();
+        }
+        return objectMapper.convertValue(node, Map.class);
+    }
+
+    private List<Map<String, Object>> objectList(JsonNode node) {
+        if (node == null || node.isMissingNode() || node.isNull() || !node.isArray()) {
+            return List.of();
+        }
+        List<Map<String, Object>> values = new ArrayList<>();
+        for (JsonNode item : node) {
+            if (item != null && item.isObject()) {
+                values.add(objectMapper.convertValue(item, Map.class));
+            }
+        }
+        return List.copyOf(values);
     }
 
     private String requiredText(JsonNode node, String fieldName) {

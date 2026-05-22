@@ -71,9 +71,9 @@ public class DistributedKeyEntity {
     private boolean active = true;
 
     @Convert(converter = StringListJsonConverter.class)
-    @Column(name = "allowed_protocols_json", nullable = false, columnDefinition = "text")
+    @Column(name = "allowed_protocol_suites_json", nullable = false, columnDefinition = "text")
     @Comment("允许的协议白名单，JSON 数组。")
-    private List<String> allowedProtocols = List.of();
+    private List<String> allowedProtocolSuites = List.of();
 
     @Convert(converter = StringListJsonConverter.class)
     @Column(name = "allowed_models_json", nullable = false, columnDefinition = "text")
@@ -196,12 +196,12 @@ public class DistributedKeyEntity {
         this.active = active;
     }
 
-    public List<String> getAllowedProtocols() {
-        return allowedProtocols;
+    public List<String> getAllowedProtocolSuites() {
+        return allowedProtocolSuites;
     }
 
-    public void setAllowedProtocols(List<String> allowedProtocols) {
-        this.allowedProtocols = allowedProtocols;
+    public void setAllowedProtocolSuites(List<String> allowedProtocolSuites) {
+        this.allowedProtocolSuites = allowedProtocolSuites;
     }
 
     public List<String> getAllowedModels() {

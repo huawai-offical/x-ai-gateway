@@ -3,7 +3,6 @@ package com.prodigalgal.xaigateway.admin.api;
 import com.prodigalgal.xaigateway.admin.application.OpsAlertService;
 import com.prodigalgal.xaigateway.admin.application.OpsCapacityService;
 import com.prodigalgal.xaigateway.admin.application.OpsDashboardService;
-import com.prodigalgal.xaigateway.admin.application.OpsProbeJobService;
 import com.prodigalgal.xaigateway.admin.application.OpsRuntimeLogService;
 import com.prodigalgal.xaigateway.admin.application.OpsSloService;
 import com.prodigalgal.xaigateway.testsupport.PermitAllSecurityTestConfig;
@@ -37,9 +36,6 @@ class OpsAdminControllerTests {
 
     @MockitoBean
     private OpsAlertService opsAlertService;
-
-    @MockitoBean
-    private OpsProbeJobService opsProbeJobService;
 
     @MockitoBean
     private OpsRuntimeLogService opsRuntimeLogService;
@@ -217,64 +213,4 @@ class OpsAdminControllerTests {
                 .jsonPath("$.eventType").isEqualTo("REQUEST_ERROR_RATIO");
     }
 
-    @Test
-    void shouldUpdateRunAndDeleteProbeJob() {
-        when(opsProbeJobService.save(eq(7L), any())).thenReturn(new OpsScheduledProbeJobResponse(
-                7L,
-                "proxy-health",
-                "NETWORK_PROXY",
-                "1",
-                60,
-                true,
-                null,
-                null,
-                null,
-                Instant.parse("2026-04-18T02:00:00Z"),
-                Instant.parse("2026-04-18T02:00:00Z")
-        ));
-        when(opsProbeJobService.trigger(7L)).thenReturn(new OpsScheduledProbeJobResponse(
-                7L,
-                "proxy-health",
-                "NETWORK_PROXY",
-                "1",
-                60,
-                true,
-                Instant.parse("2026-04-18T02:10:00Z"),
-                "SUCCESS",
-                null,
-                Instant.parse("2026-04-18T02:00:00Z"),
-                Instant.parse("2026-04-18T02:10:00Z")
-        ));
-
-        webTestClient.put()
-                .uri("/admin/ops/probes/7")
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue("""
-                        {
-                          "jobName":"proxy-health",
-                          "probeType":"NETWORK_PROXY",
-                          "targetRef":"1",
-                          "intervalSeconds":60,
-                          "enabled":true
-                        }
-                        """)
-                .exchange()
-                .expectStatus().isOk()
-                .expectBody()
-                .jsonPath("$.jobName").isEqualTo("proxy-health");
-
-        webTestClient.post()
-                .uri("/admin/ops/probes/7/run")
-                .exchange()
-                .expectStatus().isOk()
-                .expectBody()
-                .jsonPath("$.lastStatus").isEqualTo("SUCCESS");
-
-        webTestClient.delete()
-                .uri("/admin/ops/probes/7")
-                .exchange()
-                .expectStatus().isOk();
-
-        verify(opsProbeJobService).delete(7L);
-    }
 }

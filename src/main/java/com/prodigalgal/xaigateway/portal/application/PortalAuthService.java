@@ -7,7 +7,7 @@ import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeySecrets;
 import com.prodigalgal.xaigateway.gateway.core.shared.ModelIdNormalizer;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.account.UpstreamAccountProviderType;
-import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyAccountPoolBindingEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyAccountGroupBindingEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.AnnouncementEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.AnnouncementReadStateEntity;
@@ -20,11 +20,11 @@ import com.prodigalgal.xaigateway.infra.persistence.entity.RedeemCodeUsageEntity
 import com.prodigalgal.xaigateway.infra.persistence.entity.SiteCapabilitySnapshotEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamSiteProfileEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UsageRecordEntity;
-import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountPoolEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountGroupEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UserSubscriptionEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.AnnouncementReadStateRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.AnnouncementRepository;
-import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAccountPoolBindingRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAccountGroupBindingRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayUserBalanceLedgerRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayUserRepository;
@@ -32,7 +32,7 @@ import com.prodigalgal.xaigateway.infra.persistence.repository.PaymentOrderRepos
 import com.prodigalgal.xaigateway.infra.persistence.repository.RedeemCodeRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.RedeemCodeUsageRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.SiteCapabilitySnapshotRepository;
-import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountPoolRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountGroupRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamSiteProfileRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UsageRecordRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UserSubscriptionRepository;
@@ -76,7 +76,7 @@ public class PortalAuthService {
 
     private static final String PORTAL_USER_ID_SESSION_KEY = "portalUserId";
     private static final String PORTAL_AUTHENTICATED_AT_SESSION_KEY = "portalAuthenticatedAt";
-    private static final String DEFAULT_POOL_NAME = "default";
+    private static final String DEFAULT_GROUP_NAME = "default";
     private static final Duration PORTAL_SESSION_TTL = Duration.ofHours(12);
 
     private final GatewayUserRepository gatewayUserRepository;
@@ -91,8 +91,8 @@ public class PortalAuthService {
     private final UsageRecordRepository usageRecordRepository;
     private final UpstreamSiteProfileRepository upstreamSiteProfileRepository;
     private final SiteCapabilitySnapshotRepository siteCapabilitySnapshotRepository;
-    private final UpstreamAccountPoolRepository accountPoolRepository;
-    private final DistributedKeyAccountPoolBindingRepository keyPoolBindingRepository;
+    private final UpstreamAccountGroupRepository accountGroupRepository;
+    private final DistributedKeyAccountGroupBindingRepository keyGroupBindingRepository;
     private final DistributedKeySecretService distributedKeySecretService;
     private final PasswordEncoder passwordEncoder;
     private final AccessGroupEntitlementService accessGroupEntitlementService;
@@ -112,8 +112,8 @@ public class PortalAuthService {
             UsageRecordRepository usageRecordRepository,
             UpstreamSiteProfileRepository upstreamSiteProfileRepository,
             SiteCapabilitySnapshotRepository siteCapabilitySnapshotRepository,
-            UpstreamAccountPoolRepository accountPoolRepository,
-            DistributedKeyAccountPoolBindingRepository keyPoolBindingRepository,
+            UpstreamAccountGroupRepository accountGroupRepository,
+            DistributedKeyAccountGroupBindingRepository keyGroupBindingRepository,
             DistributedKeySecretService distributedKeySecretService,
             PasswordEncoder passwordEncoder,
             AccessGroupEntitlementService accessGroupEntitlementService,
@@ -130,8 +130,8 @@ public class PortalAuthService {
         this.usageRecordRepository = usageRecordRepository;
         this.upstreamSiteProfileRepository = upstreamSiteProfileRepository;
         this.siteCapabilitySnapshotRepository = siteCapabilitySnapshotRepository;
-        this.accountPoolRepository = accountPoolRepository;
-        this.keyPoolBindingRepository = keyPoolBindingRepository;
+        this.accountGroupRepository = accountGroupRepository;
+        this.keyGroupBindingRepository = keyGroupBindingRepository;
         this.distributedKeySecretService = distributedKeySecretService;
         this.passwordEncoder = passwordEncoder;
         this.accessGroupEntitlementService = accessGroupEntitlementService;
@@ -147,8 +147,8 @@ public class PortalAuthService {
             RedeemCodeRepository redeemCodeRepository,
             RedeemCodeUsageRepository redeemCodeUsageRepository,
             GatewayUserBalanceLedgerRepository balanceLedgerRepository,
-            UpstreamAccountPoolRepository accountPoolRepository,
-            DistributedKeyAccountPoolBindingRepository keyPoolBindingRepository,
+            UpstreamAccountGroupRepository accountGroupRepository,
+            DistributedKeyAccountGroupBindingRepository keyGroupBindingRepository,
             DistributedKeySecretService distributedKeySecretService,
             PasswordEncoder passwordEncoder,
             AccessGroupEntitlementService accessGroupEntitlementService) {
@@ -165,8 +165,8 @@ public class PortalAuthService {
                 null,
                 null,
                 null,
-                accountPoolRepository,
-                keyPoolBindingRepository,
+                accountGroupRepository,
+                keyGroupBindingRepository,
                 distributedKeySecretService,
                 passwordEncoder,
                 accessGroupEntitlementService,
@@ -183,8 +183,8 @@ public class PortalAuthService {
             RedeemCodeRepository redeemCodeRepository,
             RedeemCodeUsageRepository redeemCodeUsageRepository,
             GatewayUserBalanceLedgerRepository balanceLedgerRepository,
-            UpstreamAccountPoolRepository accountPoolRepository,
-            DistributedKeyAccountPoolBindingRepository keyPoolBindingRepository,
+            UpstreamAccountGroupRepository accountGroupRepository,
+            DistributedKeyAccountGroupBindingRepository keyGroupBindingRepository,
             DistributedKeySecretService distributedKeySecretService,
             PasswordEncoder passwordEncoder,
             AccessGroupEntitlementService accessGroupEntitlementService,
@@ -202,8 +202,8 @@ public class PortalAuthService {
                 null,
                 null,
                 null,
-                accountPoolRepository,
-                keyPoolBindingRepository,
+                accountGroupRepository,
+                keyGroupBindingRepository,
                 distributedKeySecretService,
                 passwordEncoder,
                 accessGroupEntitlementService,
@@ -296,7 +296,7 @@ public class PortalAuthService {
     public PortalKeyCreateResponse createKey(WebSession session, PortalKeyCreateRequest request) {
         GatewayUserEntity user = requireCurrentUser(session);
         portalSecurityService().ifPresent(service -> service.assertKeyCreationAllowed(user));
-        UpstreamAccountPoolEntity defaultPool = ensureDefaultPool();
+        UpstreamAccountGroupEntity defaultGroup = ensureDefaultGroup();
         DistributedKeySecrets secrets = distributedKeySecretService.generate();
 
         DistributedKeyEntity key = new DistributedKeyEntity();
@@ -304,20 +304,20 @@ public class PortalAuthService {
         key.setDescription("用户门户自助创建");
         key.setOwnerUser(user);
         key.setActive(true);
-        key.setAllowedProtocols(resolveProtocols(request.allowedProtocols(), defaultPool.getSupportedProtocols()));
-        key.setAllowedModels(resolveModels(request.allowedModels(), defaultPool.getSupportedModels()));
-        key.setAllowedProviderTypes(List.of(defaultPool.getProviderType().routeProviderType().name()));
+        key.setAllowedProtocolSuites(resolveProtocols(request.allowedProtocolSuites(), defaultGroup.getSupportedProtocols()));
+        key.setAllowedModels(resolveModels(request.allowedModels(), defaultGroup.getSupportedModels()));
+        key.setAllowedProviderTypes(List.of(defaultGroup.getProviderType().routeProviderType().name()));
         key.setRpmLimit(positiveOrDefault(request.rpmLimit(), 60));
         key.setTpmLimit(positiveOrDefault(request.tpmLimit(), 120_000));
         key.setConcurrencyLimit(positiveOrDefault(request.concurrencyLimit(), 2));
         key.setStickySessionTtlSeconds(1_800);
-        key.setAllowedClientFamilies(defaultPool.getAllowedClientFamilies());
+        key.setAllowedClientFamilies(defaultGroup.getAllowedClientFamilies());
         key.setKeyPrefix(secrets.keyPrefix());
         key.setSecretHash(secrets.secretHash());
         key.setMaskedKey(secrets.maskedKey());
 
         DistributedKeyEntity saved = distributedKeyRepository.save(key);
-        bindToDefaultPool(saved, defaultPool);
+        bindToDefaultGroup(saved, defaultGroup);
         return new PortalKeyCreateResponse(
                 toKeyResponse(saved),
                 secrets.fullKey(),
@@ -526,31 +526,31 @@ public class PortalAuthService {
         return key;
     }
 
-    private UpstreamAccountPoolEntity ensureDefaultPool() {
-        return accountPoolRepository.findByPoolNameIgnoreCase(DEFAULT_POOL_NAME)
+    private UpstreamAccountGroupEntity ensureDefaultGroup() {
+        return accountGroupRepository.findByGroupNameIgnoreCase(DEFAULT_GROUP_NAME)
                 .orElseGet(() -> {
-                    UpstreamAccountPoolEntity entity = new UpstreamAccountPoolEntity();
-                    entity.setPoolName(DEFAULT_POOL_NAME);
+                    UpstreamAccountGroupEntity entity = new UpstreamAccountGroupEntity();
+                    entity.setGroupName(DEFAULT_GROUP_NAME);
                     entity.setProviderType(UpstreamAccountProviderType.OPENAI_OAUTH);
                     entity.setSupportedModels(List.of());
                     entity.setSupportedProtocols(List.of("openai", "responses"));
                     entity.setAllowedClientFamilies(List.of("GENERIC_OPENAI", "CODEX"));
-                    entity.setDescription("系统默认账号池");
+                    entity.setDescription("系统默认账号分组");
                     entity.setActive(true);
-                    return accountPoolRepository.save(entity);
+                    return accountGroupRepository.save(entity);
                 });
     }
 
-    private void bindToDefaultPool(DistributedKeyEntity key, UpstreamAccountPoolEntity defaultPool) {
-        DistributedKeyAccountPoolBindingEntity binding = new DistributedKeyAccountPoolBindingEntity();
+    private void bindToDefaultGroup(DistributedKeyEntity key, UpstreamAccountGroupEntity defaultGroup) {
+        DistributedKeyAccountGroupBindingEntity binding = new DistributedKeyAccountGroupBindingEntity();
         binding.setDistributedKey(key);
-        binding.setPool(defaultPool);
-        binding.setProviderType(defaultPool.getProviderType() == null
+        binding.setGroup(defaultGroup);
+        binding.setProviderType(defaultGroup.getProviderType() == null
                 ? ProviderType.OPENAI_DIRECT
-                : defaultPool.getProviderType().routeProviderType());
+                : defaultGroup.getProviderType().routeProviderType());
         binding.setPriority(100);
         binding.setActive(true);
-        keyPoolBindingRepository.save(binding);
+        keyGroupBindingRepository.save(binding);
     }
 
     private Long readUserId(WebSession session) {
@@ -612,7 +612,7 @@ public class PortalAuthService {
                 entity.getKeyName(),
                 entity.getMaskedKey(),
                 entity.isActive(),
-                entity.getAllowedProtocols(),
+                entity.getAllowedProtocolSuites(),
                 entity.getAllowedModels(),
                 entity.getExpiresAt(),
                 entity.getRpmLimit(),
@@ -824,8 +824,8 @@ public class PortalAuthService {
         return value == null || value <= 0 ? fallback : value;
     }
 
-    private List<String> resolveProtocols(List<String> requested, List<String> poolProtocols) {
-        List<String> available = normalizePlainList(poolProtocols).stream()
+    private List<String> resolveProtocols(List<String> requested, List<String> groupProtocols) {
+        List<String> available = normalizePlainList(groupProtocols).stream()
                 .map(value -> value.toLowerCase(Locale.ROOT))
                 .toList();
         List<String> selected = normalizePlainList(requested).stream()
@@ -835,19 +835,19 @@ public class PortalAuthService {
             return available.isEmpty() ? List.of("openai") : available;
         }
         if (!available.isEmpty() && !available.containsAll(selected)) {
-            throw new IllegalArgumentException("存在默认账号池不支持的协议。");
+            throw new IllegalArgumentException("存在默认账号分组不支持的协议。");
         }
         return selected;
     }
 
-    private List<String> resolveModels(List<String> requested, List<String> poolModels) {
-        List<String> available = normalizeModels(poolModels);
+    private List<String> resolveModels(List<String> requested, List<String> groupModels) {
+        List<String> available = normalizeModels(groupModels);
         List<String> selected = normalizeModels(requested);
         if (selected.isEmpty()) {
             return available;
         }
         if (!available.isEmpty() && !available.containsAll(selected)) {
-            throw new IllegalArgumentException("存在默认账号池不支持的模型。");
+            throw new IllegalArgumentException("存在默认账号分组不支持的模型。");
         }
         return selected;
     }

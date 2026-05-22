@@ -12,7 +12,7 @@ public record DistributedKeyResponse(
         Long ownerUserId,
         String ownerUserEmail,
         boolean active,
-        List<String> allowedProtocols,
+        List<String> allowedProtocolSuites,
         List<String> allowedModels,
         List<String> allowedProviderTypes,
         Instant expiresAt,

@@ -21,11 +21,13 @@ import com.prodigalgal.xaigateway.gateway.core.shared.ProviderFamily;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
 import com.prodigalgal.xaigateway.infra.persistence.entity.RouteGuardPolicyEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamSiteProfileEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.AutoActionRuleRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.QuarantineRecordRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.RouteGuardPolicyRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamSiteProfileRepository;
 import java.time.Instant;
@@ -232,6 +234,56 @@ class GovernanceAdminServiceTests {
         assertEquals(63, response.sites().getFirst().score());
         assertEquals(2, response.sites().getFirst().activeCredentialCount());
         assertEquals(1, response.sites().getFirst().blockedCredentialCount());
+    }
+
+    @Test
+    void shouldIncludeAccountCredentialsInHealthScores() {
+        RouteGuardPolicyRepository routeGuardPolicyRepository = Mockito.mock(RouteGuardPolicyRepository.class);
+        AutoActionRuleRepository autoActionRuleRepository = Mockito.mock(AutoActionRuleRepository.class);
+        QuarantineRecordRepository quarantineRecordRepository = Mockito.mock(QuarantineRecordRepository.class);
+        UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        UpstreamAccountRepository upstreamAccountRepository = Mockito.mock(UpstreamAccountRepository.class);
+        UpstreamSiteProfileRepository upstreamSiteProfileRepository = Mockito.mock(UpstreamSiteProfileRepository.class);
+        HealthStateStore healthStateStore = Mockito.mock(HealthStateStore.class);
+        GovernancePolicyEngine governancePolicyEngine = Mockito.mock(GovernancePolicyEngine.class);
+        GovernanceAdminService service = new GovernanceAdminService(
+                routeGuardPolicyRepository,
+                autoActionRuleRepository,
+                quarantineRecordRepository,
+                upstreamCredentialRepository,
+                upstreamAccountRepository,
+                upstreamSiteProfileRepository,
+                healthStateStore,
+                governancePolicyEngine,
+                Mockito.mock(OpsAuditService.class),
+                new ObjectMapper(),
+                Mockito.mock(PlatformEventPublisher.class),
+                null,
+                null
+        );
+
+        UpstreamAccountEntity codex = new UpstreamAccountEntity();
+        ReflectionTestUtils.setField(codex, "id", 701L);
+        codex.setAccountName("codex-auth-json");
+        codex.setProviderType(com.prodigalgal.xaigateway.gateway.core.account.UpstreamAccountProviderType.CODEX_OAUTH);
+        codex.setActive(true);
+        codex.setFrozen(false);
+        codex.setHealthy(true);
+        codex.setSiteProfileId(1L);
+        Mockito.when(upstreamCredentialRepository.findAllByDeletedFalseOrderByCreatedAtDesc()).thenReturn(List.of());
+        Mockito.when(upstreamAccountRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(codex));
+        Mockito.when(upstreamSiteProfileRepository.findAll()).thenReturn(List.of());
+        Mockito.when(quarantineRecordRepository.findAllByStatusOrderByStartedAtDesc(Mockito.any())).thenReturn(List.of());
+        Mockito.when(governancePolicyEngine.evaluate(Mockito.argThat(context -> context != null && Long.valueOf(701L).equals(context.accountId()))))
+                .thenReturn(GovernanceDecision.allow());
+
+        GovernanceHealthScoreResponse response = service.listHealthScores();
+
+        assertEquals(1, response.credentials().size());
+        assertEquals("AUTH_JSON_ACCOUNT", response.credentials().getFirst().sourceType());
+        assertEquals(701L, response.credentials().getFirst().accountId());
+        assertEquals("codex-auth-json", response.credentials().getFirst().displayName());
+        assertEquals(100, response.credentials().getFirst().score());
     }
 
     private ArgumentMatcher<com.prodigalgal.xaigateway.gateway.core.governance.GovernanceContext> matchesCredential(Long credentialId) {

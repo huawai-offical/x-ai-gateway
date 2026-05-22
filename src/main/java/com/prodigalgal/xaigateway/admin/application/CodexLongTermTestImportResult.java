@@ -5,7 +5,7 @@ import java.util.Map;
 
 public record CodexLongTermTestImportResult(
         Long accountId,
-        Long poolId,
+        Long groupId,
         String accountName,
         String externalAccountId,
         String status,

@@ -7,7 +7,7 @@ public record DistributedKeyView(
         String keyName,
         String keyPrefix,
         String maskedKey,
-        List<String> allowedProtocols,
+        List<String> allowedProtocolSuites,
         List<String> allowedModels,
         List<String> allowedProviderTypes,
         java.time.Instant expiresAt,
@@ -26,7 +26,7 @@ public record DistributedKeyView(
             String keyName,
             String keyPrefix,
             String maskedKey,
-            List<String> allowedProtocols,
+            List<String> allowedProtocolSuites,
             List<String> allowedModels,
             List<DistributedCredentialBindingView> bindings) {
         this(
@@ -34,7 +34,7 @@ public record DistributedKeyView(
                 keyName,
                 keyPrefix,
                 maskedKey,
-                allowedProtocols,
+                allowedProtocolSuites,
                 allowedModels,
                 List.of(),
                 null,

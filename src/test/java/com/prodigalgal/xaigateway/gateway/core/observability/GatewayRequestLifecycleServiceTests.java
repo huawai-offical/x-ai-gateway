@@ -30,6 +30,7 @@ import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
 import com.prodigalgal.xaigateway.infra.persistence.entity.RequestLogEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UsageRecordEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.RequestLogRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UsageRecordRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
@@ -425,94 +426,6 @@ class GatewayRequestLifecycleServiceTests {
         assertEquals("created", entity.getResponseStatus());
     }
 
-    @Test
-    void shouldPersistNoRouteFailureDetails() {
-        RequestLogRepository requestLogRepository = Mockito.mock(RequestLogRepository.class);
-        UsageRecordRepository usageRecordRepository = Mockito.mock(UsageRecordRepository.class);
-        GatewayAuditLogService gatewayAuditLogService = Mockito.mock(GatewayAuditLogService.class);
-        AtomicReference<RequestLogEntity> stored = new AtomicReference<>();
-        Mockito.when(requestLogRepository.save(Mockito.any(RequestLogEntity.class)))
-                .thenAnswer(invocation -> {
-                    RequestLogEntity entity = invocation.getArgument(0);
-                    stored.set(entity);
-                    return entity;
-                });
-        Mockito.when(requestLogRepository.findByRequestId("req-realtime-1"))
-                .thenAnswer(invocation -> Optional.ofNullable(stored.get()));
-
-        GatewayRequestLifecycleService service = new GatewayRequestLifecycleService(
-                requestLogRepository,
-                usageRecordRepository,
-                gatewayAuditLogService,
-                new SimpleMeterRegistry(),
-                new tools.jackson.databind.ObjectMapper()
-        );
-
-        CanonicalResourceRequest request = new CanonicalResourceRequest(
-                "sk-gw-test",
-                CanonicalIngressProtocol.OPENAI,
-                "POST",
-                "/v1/realtime/client_secrets",
-                "/v1/realtime/client_secrets",
-                Map.of(),
-                "resource-orchestration",
-                TranslationResourceType.REALTIME,
-                TranslationOperation.REALTIME_CLIENT_SECRET_CREATE,
-                null,
-                Map.of(),
-                List.of(),
-                false,
-                false
-        );
-        CanonicalExecutionPlan plan = new CanonicalExecutionPlan(
-                false,
-                CanonicalIngressProtocol.OPENAI,
-                "/v1/realtime/client_secrets",
-                "/v1/realtime/client_secrets",
-                "realtime",
-                "resource-orchestration",
-                "resource-orchestration",
-                "resource-orchestration",
-                TranslationResourceType.REALTIME,
-                TranslationOperation.REALTIME_CLIENT_SECRET_CREATE,
-                ExecutionKind.NATIVE,
-                ExecutionBackend.ORCHESTRATION,
-                SupportStatus.BLOCKED,
-                "gateway-object-lineage",
-                List.of(ExecutionBackend.ORCHESTRATION),
-                "blocked_by_policy",
-                InteropCapabilityLevel.UNSUPPORTED,
-                InteropCapabilityLevel.UNSUPPORTED,
-                InteropCapabilityLevel.UNSUPPORTED,
-                InteropCapabilityLevel.UNSUPPORTED,
-                List.of("realtime blocked"),
-                List.of(),
-                Map.of(),
-                List.of(),
-                List.of("realtime blocked")
-        );
-        Instant startedAt = Instant.now();
-
-        service.startRequest("req-realtime-1", 1L, "sk-gw-test", "openai", request, plan, false, startedAt);
-        service.failRequest(
-                "req-realtime-1",
-                1L,
-                "sk-gw-test",
-                "openai",
-                request,
-                plan,
-                false,
-                new IllegalStateException("realtime blocked"),
-                startedAt
-        );
-
-        RequestLogEntity entity = stored.get();
-        assertEquals(GatewayRequestStatus.FAILED, entity.getStatus());
-        assertEquals("IllegalStateException", entity.getErrorCode());
-        assertEquals("realtime blocked", entity.getErrorMessage());
-        assertEquals("BLOCKED", entity.getSupportStatus());
-        assertEquals("UNSUPPORTED", entity.getDegradationLevel());
-    }
 
     @Test
     void shouldFallbackToSynchronousPersistenceWhenAsyncEnqueueFails() {
@@ -520,12 +433,15 @@ class GatewayRequestLifecycleServiceTests {
         UsageRecordRepository usageRecordRepository = Mockito.mock(UsageRecordRepository.class);
         GatewayAuditLogService gatewayAuditLogService = Mockito.mock(GatewayAuditLogService.class);
         GatewayObservabilityAsyncPersistenceService asyncPersistenceService = Mockito.mock(GatewayObservabilityAsyncPersistenceService.class);
+        UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
         AtomicReference<RequestLogEntity> storedRequest = new AtomicReference<>();
         AtomicReference<UsageRecordEntity> storedUsage = new AtomicReference<>();
 
         Mockito.when(asyncPersistenceService.enqueueRequestLogStart(Mockito.any())).thenReturn(false);
         Mockito.when(asyncPersistenceService.enqueueRequestLogFinish(Mockito.any())).thenReturn(false);
         Mockito.when(asyncPersistenceService.enqueueUsageRecordUpsert(Mockito.any())).thenReturn(false);
+        Mockito.when(asyncPersistenceService.enqueueCredentialMetricsAccumulate(Mockito.any())).thenReturn(false);
+        Mockito.when(asyncPersistenceService.enqueueAccountMetricsAccumulate(Mockito.any())).thenReturn(false);
         Mockito.when(requestLogRepository.save(Mockito.any(RequestLogEntity.class)))
                 .thenAnswer(invocation -> {
                     RequestLogEntity entity = invocation.getArgument(0);
@@ -542,6 +458,8 @@ class GatewayRequestLifecycleServiceTests {
                 });
         Mockito.when(usageRecordRepository.findByRequestId("req-fallback"))
                 .thenReturn(Optional.empty());
+        Mockito.when(upstreamCredentialRepository.findById(101L))
+                .thenReturn(Optional.empty());
 
         GatewayRequestLifecycleService service = new GatewayRequestLifecycleService(
                 requestLogRepository,
@@ -549,6 +467,8 @@ class GatewayRequestLifecycleServiceTests {
                 gatewayAuditLogService,
                 new SimpleMeterRegistry(),
                 new tools.jackson.databind.ObjectMapper(),
+                null,
+                upstreamCredentialRepository,
                 asyncPersistenceService
         );
 
@@ -589,6 +509,7 @@ class GatewayRequestLifecycleServiceTests {
         Mockito.verify(asyncPersistenceService).enqueueRequestLogStart(Mockito.any());
         Mockito.verify(asyncPersistenceService).enqueueRequestLogFinish(Mockito.any());
         Mockito.verify(asyncPersistenceService).enqueueUsageRecordUpsert(Mockito.any());
+        Mockito.verify(asyncPersistenceService).enqueueCredentialMetricsAccumulate(Mockito.any());
         assertNotNull(storedRequest.get());
         assertEquals(GatewayRequestStatus.COMPLETED, storedRequest.get().getStatus());
         assertNotNull(storedUsage.get());
@@ -599,6 +520,7 @@ class GatewayRequestLifecycleServiceTests {
     void shouldSettleCompletedUsageWhenPersistingUsageRecord() {
         RequestLogRepository requestLogRepository = Mockito.mock(RequestLogRepository.class);
         UsageRecordRepository usageRecordRepository = Mockito.mock(UsageRecordRepository.class);
+        UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
         GatewayAuditLogService gatewayAuditLogService = Mockito.mock(GatewayAuditLogService.class);
         CostRoutingService costRoutingService = Mockito.mock(CostRoutingService.class);
 
@@ -610,6 +532,8 @@ class GatewayRequestLifecycleServiceTests {
                 .thenReturn(Optional.empty());
         Mockito.when(usageRecordRepository.save(Mockito.any(UsageRecordEntity.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
+        Mockito.when(upstreamCredentialRepository.findById(101L))
+                .thenReturn(Optional.empty());
 
         GatewayRequestLifecycleService service = new GatewayRequestLifecycleService(
                 requestLogRepository,
@@ -618,7 +542,7 @@ class GatewayRequestLifecycleServiceTests {
                 new SimpleMeterRegistry(),
                 new tools.jackson.databind.ObjectMapper(),
                 null,
-                null,
+                upstreamCredentialRepository,
                 null,
                 costRoutingService
         );

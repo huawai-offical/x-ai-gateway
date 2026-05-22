@@ -116,8 +116,15 @@ public record OpenAiChatCompletionRequest(
             String role,
             JsonNode content,
             @JsonProperty("tool_call_id")
-            String toolCallId
+            String toolCallId,
+            @JsonProperty("tool_calls")
+            JsonNode toolCalls,
+            @JsonProperty("reasoning_content")
+            String reasoningContent
     ) {
+        public Message(String role, JsonNode content, String toolCallId) {
+            this(role, content, toolCallId, null, null);
+        }
     }
 
     public record Tool(

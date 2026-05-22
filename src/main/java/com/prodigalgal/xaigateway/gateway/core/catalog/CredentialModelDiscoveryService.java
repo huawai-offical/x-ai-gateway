@@ -6,12 +6,15 @@ import com.prodigalgal.xaigateway.admin.application.ProviderSiteRegistryService;
 import com.prodigalgal.xaigateway.gateway.core.credential.CredentialAuthKind;
 import com.prodigalgal.xaigateway.gateway.core.credential.CredentialMaterialResolver;
 import com.prodigalgal.xaigateway.gateway.core.credential.ResolvedCredentialMaterial;
+import com.prodigalgal.xaigateway.gateway.core.model.ModelPolicyScopeType;
 import com.prodigalgal.xaigateway.gateway.core.shared.ModelIdNormalizer;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.shared.ReasoningTransport;
 import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
 import com.prodigalgal.xaigateway.gateway.core.site.UpstreamSitePolicyService;
+import com.prodigalgal.xaigateway.infra.persistence.entity.ModelPolicyEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
+import com.prodigalgal.xaigateway.infra.persistence.repository.ModelPolicyRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import java.net.URI;
 import java.time.Duration;
@@ -44,6 +47,7 @@ public class CredentialModelDiscoveryService {
     private final ProviderSiteRegistryService providerSiteRegistryService;
     private final UpstreamSitePolicyService upstreamSitePolicyService;
     private final CredentialMaterialResolver credentialMaterialResolver;
+    private final ModelPolicyRepository modelPolicyRepository;
     private final WebClient.Builder webClientBuilder;
 
     public CredentialModelDiscoveryService(
@@ -62,6 +66,7 @@ public class CredentialModelDiscoveryService {
                         null,
                         null
                 ), credentialCryptoService, new tools.jackson.databind.ObjectMapper()),
+                null,
                 webClientBuilder
         );
     }
@@ -73,12 +78,14 @@ public class CredentialModelDiscoveryService {
             ProviderSiteRegistryService providerSiteRegistryService,
             UpstreamSitePolicyService upstreamSitePolicyService,
             CredentialMaterialResolver credentialMaterialResolver,
+            ModelPolicyRepository modelPolicyRepository,
             WebClient.Builder webClientBuilder) {
         this.upstreamCredentialRepository = upstreamCredentialRepository;
         this.credentialCryptoService = credentialCryptoService;
         this.providerSiteRegistryService = providerSiteRegistryService;
         this.upstreamSitePolicyService = upstreamSitePolicyService;
         this.credentialMaterialResolver = credentialMaterialResolver;
+        this.modelPolicyRepository = modelPolicyRepository;
         this.webClientBuilder = webClientBuilder;
     }
 
@@ -102,7 +109,7 @@ public class CredentialModelDiscoveryService {
                 secret,
                 metadata
         );
-        List<DiscoveredModelDefinition> models = discover(providerType, baseUrl, credentialMaterial);
+        List<DiscoveredModelDefinition> models = deduplicateByModelKey(discover(providerType, baseUrl, credentialMaterial));
         long latency = Duration.between(startedAt, Instant.now()).toMillis();
         return new CredentialConnectivityProbe(providerType, baseUrl, latency, models);
     }
@@ -110,7 +117,7 @@ public class CredentialModelDiscoveryService {
     public CredentialRefreshResult refreshCredential(Long credentialId) {
         UpstreamCredentialEntity credential = getRequiredCredential(credentialId);
         ResolvedCredentialMaterial credentialMaterial = credentialMaterialResolver.resolveStored(credential);
-        List<DiscoveredModelDefinition> models = discover(credential.getProviderType(), credential.getBaseUrl(), credentialMaterial);
+        List<DiscoveredModelDefinition> models = deduplicateByModelKey(discover(credential.getProviderType(), credential.getBaseUrl(), credentialMaterial));
         if (credential.getSiteProfileId() == null) {
             credential.setSiteProfileId(providerSiteRegistryService.ensureSiteProfile(
                     credential.getProviderType(),
@@ -132,8 +139,140 @@ public class CredentialModelDiscoveryService {
         credential.setCooldownUntil(null);
         credential.setLastUsedAt(Instant.now());
         upstreamCredentialRepository.save(credential);
+        refreshDiscoveredModelPolicies(credential, models);
 
         return new CredentialRefreshResult(credentialId, models, Instant.now());
+    }
+
+    private void refreshDiscoveredModelPolicies(
+            UpstreamCredentialEntity credential,
+            List<DiscoveredModelDefinition> models) {
+        if (modelPolicyRepository == null || credential.getId() == null || models == null || models.isEmpty()) {
+            return;
+        }
+        List<DiscoveredModelDefinition> normalizedModels = deduplicateByModelKey(models);
+        if (normalizedModels.isEmpty()) {
+            return;
+        }
+        Map<String, ModelPolicyEntity> existing = modelPolicyRepository
+                .findAllByScopeTypeAndScopeIdAndEnabledTrueOrderByPriorityAscCreatedAtAsc(
+                        ModelPolicyScopeType.CREDENTIAL,
+                        credential.getId()
+                )
+                .stream()
+                .filter(policy -> "discovered".equalsIgnoreCase(policy.getMappingSource()))
+                .collect(java.util.stream.Collectors.toMap(
+                        ModelPolicyEntity::getPublicModelKey,
+                        java.util.function.Function.identity(),
+                        (left, right) -> left,
+                        LinkedHashMap::new
+                ));
+        for (DiscoveredModelDefinition model : normalizedModels) {
+            ModelPolicyEntity policy = existing.getOrDefault(model.modelKey(), new ModelPolicyEntity());
+            policy.setScopeType(ModelPolicyScopeType.CREDENTIAL);
+            policy.setScopeId(credential.getId());
+            policy.setPolicyKind("DISCOVERED");
+            policy.setPublicModel(model.modelName());
+            policy.setPublicModelKey(model.modelKey());
+            policy.setUpstreamModel(model.modelName());
+            policy.setUpstreamModelKey(model.modelKey());
+            policy.setSupportedProtocols(model.supportedProtocols());
+            policy.setEnabled(true);
+            policy.setDeny(false);
+            policy.setPriority(200);
+            policy.setWeight(100);
+            policy.setMappingSource("discovered");
+            policy.setDescription("由上游模型探测自动刷新。");
+            modelPolicyRepository.save(policy);
+            existing.put(model.modelKey(), policy);
+        }
+    }
+
+    private List<DiscoveredModelDefinition> deduplicateByModelKey(List<DiscoveredModelDefinition> models) {
+        Map<String, DiscoveredModelDefinition> values = new LinkedHashMap<>();
+        for (DiscoveredModelDefinition model : models) {
+            String modelKey = normalizeModelKey(model);
+            if (modelKey == null) {
+                continue;
+            }
+            DiscoveredModelDefinition normalized = new DiscoveredModelDefinition(
+                    model.modelName() == null || model.modelName().isBlank() ? modelKey : model.modelName().trim(),
+                    modelKey,
+                    normalizeProtocols(model.supportedProtocols()),
+                    model.supportsChat(),
+                    model.supportsTools(),
+                    model.supportsImageInput(),
+                    model.supportsEmbeddings(),
+                    model.supportsCache(),
+                    model.supportsThinking(),
+                    model.supportsVisibleReasoning(),
+                    model.supportsReasoningReuse(),
+                    model.reasoningTransport() == null ? ReasoningTransport.NONE : model.reasoningTransport()
+            );
+            values.merge(modelKey, normalized, this::mergeModel);
+        }
+        return List.copyOf(values.values());
+    }
+
+    private DiscoveredModelDefinition mergeModel(DiscoveredModelDefinition left, DiscoveredModelDefinition right) {
+        return new DiscoveredModelDefinition(
+                firstText(left.modelName(), right.modelName()),
+                left.modelKey(),
+                mergeProtocols(left.supportedProtocols(), right.supportedProtocols()),
+                left.supportsChat() || right.supportsChat(),
+                left.supportsTools() || right.supportsTools(),
+                left.supportsImageInput() || right.supportsImageInput(),
+                left.supportsEmbeddings() || right.supportsEmbeddings(),
+                left.supportsCache() || right.supportsCache(),
+                left.supportsThinking() || right.supportsThinking(),
+                left.supportsVisibleReasoning() || right.supportsVisibleReasoning(),
+                left.supportsReasoningReuse() || right.supportsReasoningReuse(),
+                mergeReasoningTransport(left.reasoningTransport(), right.reasoningTransport())
+        );
+    }
+
+    private String normalizeModelKey(DiscoveredModelDefinition model) {
+        if (model == null) {
+            return null;
+        }
+        String value = model.modelKey() == null || model.modelKey().isBlank()
+                ? model.modelName()
+                : model.modelKey();
+        String normalized = ModelIdNormalizer.normalize(value);
+        return normalized == null || normalized.isBlank() ? null : normalized;
+    }
+
+    private String firstText(String left, String right) {
+        if (left != null && !left.isBlank()) {
+            return left.trim();
+        }
+        return right == null ? null : right.trim();
+    }
+
+    private ReasoningTransport mergeReasoningTransport(ReasoningTransport left, ReasoningTransport right) {
+        if (left != null && left != ReasoningTransport.NONE) {
+            return left;
+        }
+        return right == null ? ReasoningTransport.NONE : right;
+    }
+
+    private List<String> normalizeProtocols(List<String> protocols) {
+        if (protocols == null || protocols.isEmpty()) {
+            return List.of();
+        }
+        Set<String> values = new java.util.LinkedHashSet<>();
+        for (String protocol : protocols) {
+            if (protocol != null && !protocol.isBlank()) {
+                values.add(protocol.trim().toLowerCase(Locale.ROOT));
+            }
+        }
+        return List.copyOf(values);
+    }
+
+    private List<String> mergeProtocols(List<String> left, List<String> right) {
+        Set<String> values = new java.util.LinkedHashSet<>(normalizeProtocols(left));
+        values.addAll(normalizeProtocols(right));
+        return List.copyOf(values);
     }
 
     private UpstreamCredentialEntity getRequiredCredential(Long credentialId) {

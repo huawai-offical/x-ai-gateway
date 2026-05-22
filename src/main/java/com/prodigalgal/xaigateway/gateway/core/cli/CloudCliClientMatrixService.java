@@ -43,7 +43,7 @@ public class CloudCliClientMatrixService {
                 List.of(
                         "直接连接云端 x-ai-gateway endpoint。",
                         "不需要在用户机器上部署本地 proxy 或 agent。",
-                        "route policy、账号池、request filter 与模型映射均在云端生效。"
+                        "route policy、账号分组、request filter 与模型映射均在云端生效。"
                 )
         );
     }

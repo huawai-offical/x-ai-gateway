@@ -82,9 +82,6 @@ public class SiteCapabilitySnapshotEntity {
     @Comment("是否支持 uploads。")
     private boolean supportsUploads;
 
-    @Column(name = "supports_realtime", nullable = false)
-    @Comment("是否支持 realtime。")
-    private boolean supportsRealtime;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "auth_strategy", nullable = false, length = 32)
@@ -205,14 +202,6 @@ public class SiteCapabilitySnapshotEntity {
 
     public void setSupportsUploads(boolean supportsUploads) {
         this.supportsUploads = supportsUploads;
-    }
-
-    public boolean isSupportsRealtime() {
-        return supportsRealtime;
-    }
-
-    public void setSupportsRealtime(boolean supportsRealtime) {
-        this.supportsRealtime = supportsRealtime;
     }
 
     public AuthStrategy getAuthStrategy() {

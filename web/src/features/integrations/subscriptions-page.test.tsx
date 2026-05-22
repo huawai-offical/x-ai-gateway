@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-import '@testing-library/jest-dom/vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -22,6 +21,9 @@ mockedApiRequest.mockImplementation(async (url: string, init?: RequestInit) => {
     }
     return [{ id: 1, subscriptionName: 'budget-exceeded', channelId: 1, eventType: 'BUDGET_EXCEEDED', severity: 'HIGH', entityType: 'DISTRIBUTED_KEY', enabled: true }]
   }
+  if (url === '/admin/integrations/subscriptions/1' && init?.method === 'DELETE') {
+    return null
+  }
   throw new Error(`unexpected url: ${url}`)
 })
 
@@ -37,11 +39,13 @@ describe('SubscriptionsPage', () => {
       </QueryClientProvider>,
     )
 
-    expect(await screen.findByText('事件订阅')).toBeInTheDocument()
+    expect(await screen.findByText('订阅列表')).toBeInTheDocument()
     expect(await screen.findByText('budget-exceeded')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '创建订阅' }))
 
-    fireEvent.change(screen.getByPlaceholderText('subscription name'), { target: { value: 'alert-opened' } })
-    fireEvent.change(screen.getByLabelText('channel id'), { target: { value: '1' } })
+    fireEvent.change(screen.getByPlaceholderText('请输入订阅名称'), { target: { value: 'alert-opened' } })
+    fireEvent.click(screen.getByRole('combobox', { name: '通知通道' }))
+    fireEvent.click(await screen.findByText('ops-webhook'))
     fireEvent.click(screen.getByRole('button', { name: '创建订阅' }))
 
     await waitFor(() => {
@@ -51,5 +55,15 @@ describe('SubscriptionsPage', () => {
       expect(call).toBeTruthy()
       expect(JSON.parse(call?.[1]?.body as string).subscriptionName).toBe('alert-opened')
     })
+
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    fireEvent.click(await screen.findByRole('button', { name: '删除' }))
+    await waitFor(() => {
+      expect(mockedApiRequest).toHaveBeenCalledWith(
+        '/admin/integrations/subscriptions/1',
+        expect.objectContaining({ method: 'DELETE' }),
+      )
+    })
+    confirmSpy.mockRestore()
   })
 })

@@ -5,9 +5,9 @@ import com.prodigalgal.xaigateway.gateway.core.account.UpstreamAccountProviderTy
 import com.prodigalgal.xaigateway.infra.config.GatewayProperties;
 import com.prodigalgal.xaigateway.infra.persistence.entity.OauthAuthorizationSessionEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountEntity;
-import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountPoolEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountGroupEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.OauthAuthorizationSessionRepository;
-import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountPoolRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountGroupRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,30 +23,30 @@ import java.util.UUID;
 public class OAuthConnectionService {
 
     private final OauthAuthorizationSessionRepository oauthAuthorizationSessionRepository;
-    private final UpstreamAccountPoolRepository upstreamAccountPoolRepository;
+    private final UpstreamAccountGroupRepository upstreamAccountGroupRepository;
     private final UpstreamAccountRepository upstreamAccountRepository;
     private final CredentialCryptoService credentialCryptoService;
     private final GatewayProperties gatewayProperties;
 
     public OAuthConnectionService(
             OauthAuthorizationSessionRepository oauthAuthorizationSessionRepository,
-            UpstreamAccountPoolRepository upstreamAccountPoolRepository,
+            UpstreamAccountGroupRepository upstreamAccountGroupRepository,
             UpstreamAccountRepository upstreamAccountRepository,
             CredentialCryptoService credentialCryptoService,
             GatewayProperties gatewayProperties) {
         this.oauthAuthorizationSessionRepository = oauthAuthorizationSessionRepository;
-        this.upstreamAccountPoolRepository = upstreamAccountPoolRepository;
+        this.upstreamAccountGroupRepository = upstreamAccountGroupRepository;
         this.upstreamAccountRepository = upstreamAccountRepository;
         this.credentialCryptoService = credentialCryptoService;
         this.gatewayProperties = gatewayProperties;
     }
 
-    public OauthStartResponse start(UpstreamAccountProviderType providerType, Long poolId, String redirectPath) {
+    public OauthStartResponse start(UpstreamAccountProviderType providerType, Long groupId, String redirectPath) {
         OauthAuthorizationSessionEntity session = new OauthAuthorizationSessionEntity();
         String sessionKey = "oas_" + UUID.randomUUID().toString().replace("-", "");
         session.setSessionKey(sessionKey);
         session.setProviderType(providerType);
-        session.setPoolId(poolId);
+        session.setGroupId(groupId);
         session.setStatus("started");
         session.setCodeVerifier("cv_" + UUID.randomUUID().toString().replace("-", ""));
         session.setRedirectPath(redirectPath == null || redirectPath.isBlank()
@@ -75,13 +75,13 @@ public class OAuthConnectionService {
             throw new IllegalArgumentException("OAuth 会话已过期。");
         }
 
-        UpstreamAccountPoolEntity pool = session.getPoolId() == null
+        UpstreamAccountGroupEntity group = session.getGroupId() == null
                 ? null
-                : upstreamAccountPoolRepository.findById(session.getPoolId())
-                .orElseThrow(() -> new IllegalArgumentException("未找到账号池。"));
+                : upstreamAccountGroupRepository.findById(session.getGroupId())
+                .orElseThrow(() -> new IllegalArgumentException("未找到账号分组。"));
 
         UpstreamAccountEntity account = new UpstreamAccountEntity();
-        account.setPool(pool);
+        account.setGroup(group);
         account.setProviderType(providerType);
         account.setAccountName(providerType.name().toLowerCase() + "-" + code);
         account.setExternalAccountId(providerType.name().toLowerCase() + ":" + code);

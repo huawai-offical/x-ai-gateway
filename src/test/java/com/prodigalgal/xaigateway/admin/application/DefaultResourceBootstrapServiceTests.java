@@ -1,7 +1,7 @@
 package com.prodigalgal.xaigateway.admin.application;
 
 import com.prodigalgal.xaigateway.gateway.core.account.UpstreamAccountProviderType;
-import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountPoolEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountGroupEntity;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -9,16 +9,18 @@ import org.springframework.test.util.ReflectionTestUtils;
 class DefaultResourceBootstrapServiceTests {
 
     @Test
-    void shouldEnsureDefaultPoolAtStartup() {
-        AccountPoolAdminService accountPoolAdminService = Mockito.mock(AccountPoolAdminService.class);
-        UpstreamAccountPoolEntity defaultPool = new UpstreamAccountPoolEntity();
-        ReflectionTestUtils.setField(defaultPool, "id", 1L);
-        defaultPool.setPoolName(AccountPoolAdminService.DEFAULT_POOL_NAME);
-        defaultPool.setProviderType(UpstreamAccountProviderType.OPENAI_OAUTH);
-        Mockito.when(accountPoolAdminService.ensureDefaultPool()).thenReturn(defaultPool);
+    void shouldEnsureDefaultGroupAtStartup() {
+        AccountGroupAdminService accountGroupAdminService = Mockito.mock(AccountGroupAdminService.class);
+        UpstreamAccountGroupEntity defaultGroup = new UpstreamAccountGroupEntity();
+        ReflectionTestUtils.setField(defaultGroup, "id", 1L);
+        defaultGroup.setGroupName(AccountGroupAdminService.DEFAULT_GROUP_NAME);
+        defaultGroup.setProviderType(UpstreamAccountProviderType.OPENAI_OAUTH);
+        Mockito.when(accountGroupAdminService.ensureDefaultGroup()).thenReturn(defaultGroup);
+        NetworkGovernanceService networkGovernanceService = Mockito.mock(NetworkGovernanceService.class);
 
-        new DefaultResourceBootstrapService(accountPoolAdminService).bootstrapDefaults();
+        new DefaultResourceBootstrapService(accountGroupAdminService, networkGovernanceService).bootstrapDefaults();
 
-        Mockito.verify(accountPoolAdminService).ensureDefaultPool();
+        Mockito.verify(accountGroupAdminService).ensureDefaultGroup();
+        Mockito.verify(networkGovernanceService).ensureDefaultTlsProfiles();
     }
 }

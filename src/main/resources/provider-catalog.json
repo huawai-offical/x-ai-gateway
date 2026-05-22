@@ -7,8 +7,19 @@
       "displayName": "OpenAI",
       "siteKind": "OPENAI_DIRECT",
       "defaultBaseUrl": "https://api.openai.com",
-      "description": "OpenAI 对话与 tools 功能性服务 API，覆盖 Chat、Responses、Responses file_search 本地绑定、Conversations、Vector Stores 本地 lifecycle、文件 attachment、本地 chunk ingestion、本地文本 search 与 file batch、Webhooks、Embeddings、Audio、Images、Moderation、Files、Uploads 与 Realtime 基础面；不再声明官方非核心 API。",
-      "capabilityTags": ["chat", "responses", "conversations", "vector_stores", "webhooks", "embeddings", "audio", "images", "moderation", "files", "realtime"],
+      "description": "OpenAI 对话与 tools 功能性服务 API，覆盖 Chat、Responses、Responses file_search 本地绑定、Conversations、Vector Stores 本地 lifecycle、文件 attachment、本地 chunk ingestion、本地文本 search 与 file batch、Webhooks、Embeddings、Audio、Images、Moderation、Files 与 Uploads 支撑面；不再声明官方非核心 API。",
+      "capabilityTags": [
+        "chat",
+        "responses",
+        "conversations",
+        "vector_stores",
+        "webhooks",
+        "embeddings",
+        "audio",
+        "images",
+        "moderation",
+        "files"
+      ],
       "costProfile": "openai-public-pricing",
       "errorMode": "openai_error",
       "deprecated": false,
@@ -32,7 +43,6 @@
         "openai.vector-store-file-batches-local-lifecycle",
         "openai.webhooks-ingress-event-persistence",
         "files.native",
-        "openai.realtime-websocket-ingress",
         "openai.direct-smoke-certification",
         "openai.direct-smoke-record-replay-fixture",
         "openai.direct-smoke-record-replay-ci-verifier",
@@ -40,13 +50,18 @@
       ],
       "compatibilitySurface": "openai-native",
       "supportStrategy": "native-first",
-      "modelFamilies": ["gpt-4.1", "gpt-4o", "o-series", "text-embedding", "gpt-image", "realtime"],
+      "modelFamilies": [
+        "gpt-4.1",
+        "gpt-4o",
+        "o-series",
+        "text-embedding",
+        "gpt-image"
+      ],
       "pricingMetadata": "public-list-price-openai",
       "unsupportedFeatures": [
         "responses_non_function_tools: Responses function tools are supported; file_search can bind gateway-local vector_store_ids and inject local search context; other hosted/MCP/custom/code_interpreter/computer_use/image_generation/shell/apply_patch tools are explicitly rejected instead of silently skipped.",
         "vector_stores_child_resources: Vector Stores local lifecycle create/list/retrieve/update/delete, local file attachments, local chunk ingestion artifacts, file content read, local text search, Responses file_search local binding and local file_batches create/retrieve/cancel/list files are available; real embedding/vector index ingestion and semantic search remain TASK-20260514-023.",
         "non_core_official_apis_out_of_scope: official non-core APIs are outside the current conversation/tools product scope per REQ-20260518-005.",
-        "realtime_full_calls_webrtc_sip: current gateway exposes client secrets and a WebSocket ingress baseline, but full calls/WebRTC/SIP/translation/transcription sessions are not complete.",
         "codex_non_responses_apis_out_of_scope: OpenAI Codex is designated as a Responses Smoke/Proxy boundary for ChatGPT official accounts. All non-responses Codex internal endpoints, including Fine-tuning, Batches, Evals, and administrative tasks, are strictly unsupported and rejected."
       ]
     },
@@ -56,16 +71,28 @@
       "siteKind": "AZURE_OPENAI",
       "defaultBaseUrl": "https://{resource}.openai.azure.com",
       "description": "Azure OpenAI deployment-style endpoint，需要按 deployment name 寻址。",
-      "capabilityTags": ["chat", "responses", "azure_api_key", "deployment_name"],
+      "capabilityTags": [
+        "chat",
+        "responses",
+        "azure_api_key",
+        "deployment_name"
+      ],
       "costProfile": "azure-openai-metered",
       "errorMode": "azure_openai_error",
       "deprecated": false,
-      "conformanceChecks": ["chat.native", "deployment-addressing.native"],
+      "conformanceChecks": [
+        "chat.native",
+        "deployment-addressing.native"
+      ],
       "compatibilitySurface": "openai-compatible-chat",
       "supportStrategy": "deployment-addressing-required",
-      "modelFamilies": ["gpt-4o", "gpt-4.1", "text-embedding"],
+      "modelFamilies": [
+        "gpt-4o",
+        "gpt-4.1",
+        "text-embedding"
+      ],
       "pricingMetadata": "azure-metered-pricing",
-      "unsupportedFeatures": ["realtime_client_secret: Azure deployment surface is not standardized in current gateway."]
+      "unsupportedFeatures": []
     },
     {
       "code": "openai_compatible_generic",
@@ -73,18 +100,121 @@
       "siteKind": "OPENAI_COMPATIBLE_GENERIC",
       "defaultBaseUrl": "https://provider.example.com/v1",
       "description": "通用 OpenAI-compatible provider 预设，适用于私有代理、聚合层或尚未建专属 site kind 的兼容站点。",
-      "capabilityTags": ["chat", "responses", "openai_compatible", "generic"],
+      "capabilityTags": [
+        "chat",
+        "responses",
+        "openai_compatible",
+        "generic"
+      ],
       "costProfile": "provider-compatible",
       "errorMode": "openai_error",
       "deprecated": false,
-      "conformanceChecks": ["chat.native", "openai-compatible.surface"],
+      "conformanceChecks": [
+        "chat.native",
+        "openai-compatible.surface"
+      ],
       "compatibilitySurface": "openai-compatible-chat",
       "supportStrategy": "generic-openai-compatible",
-      "modelFamilies": ["provider-specific"],
+      "modelFamilies": [
+        "provider-specific"
+      ],
       "pricingMetadata": "operator-configured-pricing",
       "unsupportedFeatures": [
-        "file_object: current gateway does not generalize OpenAI-compatible object lifecycle.",
-        "realtime_client_secret: compatibility surface is not trusted as a generic contract."
+        "file_object: current gateway does not generalize OpenAI-compatible object lifecycle."
+      ]
+    },
+    {
+      "code": "xiaomi_mimo",
+      "displayName": "Xiaomi MiMo",
+      "vendorCode": "xiaomi_mimo",
+      "vendorName": "小米 MiMo",
+      "siteKind": "OPENAI_COMPATIBLE_GENERIC",
+      "defaultBaseUrl": "https://token-plan-sgp.xiaomimimo.com/v1",
+      "description": "小米 MiMo OpenAI-compatible API。Codex/Responses 入口通过 Chat Completions 转译接入；thinking mode 下多轮工具调用历史必须回放 assistant reasoning_content。",
+      "capabilityTags": [
+        "chat",
+        "responses",
+        "openai_compatible",
+        "reasoning",
+        "tools",
+        "mimo"
+      ],
+      "costProfile": "provider-compatible",
+      "errorMode": "openai_error",
+      "deprecated": false,
+      "conformanceChecks": [
+        "chat.native",
+        "openai-compatible.surface",
+        "responses.emulated",
+        "reasoning_content.history-replay"
+      ],
+      "compatibilitySurface": "openai-compatible-chat",
+      "supportStrategy": "responses-to-chat-completions-translation",
+      "modelFamilies": [
+        "mimo-v2.5",
+        "mimo-v2"
+      ],
+      "pricingMetadata": "provider-console-pricing",
+      "conversationProfile": {
+        "ingressProtocol": "responses",
+        "upstreamSurface": "chat_completions",
+        "responsesCompatibility": {
+          "mode": "emulate_with_chat_completions"
+        },
+        "reasoning": {
+          "requestField": "extra_body.thinking",
+          "requestEnabledValue": {
+            "type": "enabled"
+          },
+          "assistantReasoningField": "reasoning_content",
+          "historyReplayPolicy": "required_when_tool_calls"
+        }
+      },
+      "modelPolicies": [
+        {
+          "policyKind": "MAP",
+          "publicModel": "gpt-5-codex",
+          "upstreamModel": "mimo-v2.5-pro",
+          "modelFamily": "coder",
+          "supportedProtocols": [
+            "responses"
+          ],
+          "priority": 20,
+          "weight": 100,
+          "requestOverrides": {
+            "extra_body": {
+              "thinking": {
+                "type": "enabled"
+              }
+            }
+          },
+          "responseOverrides": {
+            "assistantReasoningField": "reasoning_content"
+          },
+          "runtimePolicy": {
+            "fallbackChain": [
+              "mimo-v2.5-pro",
+              "mimo-v2-pro"
+            ]
+          }
+        },
+        {
+          "policyKind": "ALLOW",
+          "publicModel": "mimo-v2.5-pro",
+          "upstreamModel": "mimo-v2.5-pro",
+          "modelFamily": "reasoning",
+          "supportedProtocols": [
+            "openai",
+            "responses"
+          ],
+          "priority": 50,
+          "weight": 100
+        }
+      ],
+      "unsupportedFeatures": [
+        "responses_native: MiMo preset receives Codex/OpenAI Responses ingress through Chat Completions emulation, not upstream native Responses.",
+        "reasoning_content_history_missing: thinking mode plus historical assistant tool_calls requires reasoning_content replay; requests missing it are rejected before upstream dispatch.",
+        "file_object: current gateway does not generalize OpenAI-compatible object lifecycle."
       ]
     },
     {
@@ -93,16 +223,54 @@
       "siteKind": "DEEPSEEK",
       "defaultBaseUrl": "https://api.deepseek.com",
       "description": "DeepSeek OpenAI-compatible API，适合作为 OpenAI-style chat 与 reasoning 兼容站点。",
-      "capabilityTags": ["chat", "openai_compatible", "reasoning"],
+      "capabilityTags": [
+        "chat",
+        "openai_compatible",
+        "reasoning"
+      ],
       "costProfile": "provider-compatible",
       "errorMode": "openai_error",
       "deprecated": false,
-      "conformanceChecks": ["chat.native", "openai-compatible.surface"],
+      "conformanceChecks": [
+        "chat.native",
+        "openai-compatible.surface"
+      ],
       "compatibilitySurface": "openai-compatible-chat",
       "supportStrategy": "cloud-openai-compatible",
-      "modelFamilies": ["deepseek-chat", "deepseek-reasoner"],
+      "modelFamilies": [
+        "deepseek-chat",
+        "deepseek-reasoner"
+      ],
       "pricingMetadata": "provider-console-pricing",
-      "unsupportedFeatures": ["file_object: current gateway does not generalize OpenAI-compatible object lifecycle."]
+      "modelPolicies": [
+        {
+          "policyKind": "ALLOW",
+          "publicModel": "deepseek-chat",
+          "upstreamModel": "deepseek-chat",
+          "modelFamily": "chat",
+          "supportedProtocols": [
+            "openai",
+            "responses"
+          ],
+          "priority": 50,
+          "weight": 100
+        },
+        {
+          "policyKind": "ALLOW",
+          "publicModel": "deepseek-reasoner",
+          "upstreamModel": "deepseek-reasoner",
+          "modelFamily": "reasoning",
+          "supportedProtocols": [
+            "openai",
+            "responses"
+          ],
+          "priority": 50,
+          "weight": 100
+        }
+      ],
+      "unsupportedFeatures": [
+        "file_object: current gateway does not generalize OpenAI-compatible object lifecycle."
+      ]
     },
     {
       "code": "qwen",
@@ -110,18 +278,32 @@
       "siteKind": "QWEN",
       "defaultBaseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
       "description": "Qwen 通过 DashScope compatible mode 暴露 OpenAI-compatible surface，适合作为 chat/reasoning provider。",
-      "capabilityTags": ["chat", "responses", "openai_compatible", "reasoning", "qwen"],
+      "capabilityTags": [
+        "chat",
+        "responses",
+        "openai_compatible",
+        "reasoning",
+        "qwen"
+      ],
       "costProfile": "provider-compatible",
       "errorMode": "openai_error",
       "deprecated": false,
-      "conformanceChecks": ["chat.native", "openai-compatible.surface", "responses.emulated"],
+      "conformanceChecks": [
+        "chat.native",
+        "openai-compatible.surface",
+        "responses.emulated"
+      ],
       "compatibilitySurface": "openai-compatible-chat",
       "supportStrategy": "cloud-openai-compatible",
-      "modelFamilies": ["qwen-max", "qwen-plus", "qwen3", "qwen-vl"],
+      "modelFamilies": [
+        "qwen-max",
+        "qwen-plus",
+        "qwen3",
+        "qwen-vl"
+      ],
       "pricingMetadata": "provider-console-pricing",
       "unsupportedFeatures": [
-        "file_object: current gateway does not generalize OpenAI-compatible object lifecycle.",
-        "realtime_client_secret: no stable generic realtime contract is assumed."
+        "file_object: current gateway does not generalize OpenAI-compatible object lifecycle."
       ]
     },
     {
@@ -130,16 +312,30 @@
       "siteKind": "MOONSHOT",
       "defaultBaseUrl": "https://api.moonshot.cn/v1",
       "description": "Moonshot/Kimi OpenAI-compatible API，适合作为中文长上下文 chat provider。",
-      "capabilityTags": ["chat", "responses", "openai_compatible", "long_context"],
+      "capabilityTags": [
+        "chat",
+        "responses",
+        "openai_compatible",
+        "long_context"
+      ],
       "costProfile": "provider-compatible",
       "errorMode": "openai_error",
       "deprecated": false,
-      "conformanceChecks": ["chat.native", "openai-compatible.surface"],
+      "conformanceChecks": [
+        "chat.native",
+        "openai-compatible.surface"
+      ],
       "compatibilitySurface": "openai-compatible-chat",
       "supportStrategy": "cloud-openai-compatible",
-      "modelFamilies": ["kimi-k2", "moonshot-v1-8k", "moonshot-v1-128k"],
+      "modelFamilies": [
+        "kimi-k2",
+        "moonshot-v1-8k",
+        "moonshot-v1-128k"
+      ],
       "pricingMetadata": "provider-console-pricing",
-      "unsupportedFeatures": ["file_object: current gateway does not generalize OpenAI-compatible object lifecycle."]
+      "unsupportedFeatures": [
+        "file_object: current gateway does not generalize OpenAI-compatible object lifecycle."
+      ]
     },
     {
       "code": "siliconflow",
@@ -147,16 +343,31 @@
       "siteKind": "SILICONFLOW",
       "defaultBaseUrl": "https://api.siliconflow.cn/v1",
       "description": "SiliconFlow 提供多模型聚合的 OpenAI-compatible endpoint，适合作为 BYOK 与区域化推理站点。",
-      "capabilityTags": ["chat", "responses", "openai_compatible", "aggregator"],
+      "capabilityTags": [
+        "chat",
+        "responses",
+        "openai_compatible",
+        "aggregator"
+      ],
       "costProfile": "aggregator-provider-pricing",
       "errorMode": "openai_error",
       "deprecated": false,
-      "conformanceChecks": ["chat.native", "openai-compatible.surface"],
+      "conformanceChecks": [
+        "chat.native",
+        "openai-compatible.surface"
+      ],
       "compatibilitySurface": "openai-compatible-chat",
       "supportStrategy": "cloud-openai-compatible",
-      "modelFamilies": ["deepseek", "qwen", "hunyuan", "doubao"],
+      "modelFamilies": [
+        "deepseek",
+        "qwen",
+        "hunyuan",
+        "doubao"
+      ],
       "pricingMetadata": "provider-console-pricing",
-      "unsupportedFeatures": ["file_object: current gateway does not generalize OpenAI-compatible object lifecycle."]
+      "unsupportedFeatures": [
+        "file_object: current gateway does not generalize OpenAI-compatible object lifecycle."
+      ]
     },
     {
       "code": "volcengine",
@@ -164,18 +375,29 @@
       "siteKind": "VOLCENGINE",
       "defaultBaseUrl": "https://ark.cn-beijing.volces.com/api/v3",
       "description": "Volcengine Ark 提供 Doubao/Seed 等模型的 OpenAI-compatible 接入面，路径通常是 /api/v3。",
-      "capabilityTags": ["chat", "responses", "openai_compatible", "doubao"],
+      "capabilityTags": [
+        "chat",
+        "responses",
+        "openai_compatible",
+        "doubao"
+      ],
       "costProfile": "provider-compatible",
       "errorMode": "openai_error",
       "deprecated": false,
-      "conformanceChecks": ["chat.native", "openai-compatible.surface", "provider-path-adapter"],
+      "conformanceChecks": [
+        "chat.native",
+        "openai-compatible.surface",
+        "provider-path-adapter"
+      ],
       "compatibilitySurface": "openai-compatible-chat",
       "supportStrategy": "path-adapter-required",
-      "modelFamilies": ["doubao", "seed"],
+      "modelFamilies": [
+        "doubao",
+        "seed"
+      ],
       "pricingMetadata": "provider-console-pricing",
       "unsupportedFeatures": [
-        "file_object: current gateway does not generalize OpenAI-compatible object lifecycle.",
-        "realtime_client_secret: Ark realtime compatibility is not assumed as a generic contract."
+        "file_object: current gateway does not generalize OpenAI-compatible object lifecycle."
       ]
     },
     {
@@ -184,16 +406,29 @@
       "siteKind": "MINIMAX",
       "defaultBaseUrl": "https://api.minimax.chat/v1",
       "description": "MiniMax OpenAI-compatible endpoint，适合作为中文 chat provider 的兼容接入。",
-      "capabilityTags": ["chat", "responses", "openai_compatible", "minimax"],
+      "capabilityTags": [
+        "chat",
+        "responses",
+        "openai_compatible",
+        "minimax"
+      ],
       "costProfile": "provider-compatible",
       "errorMode": "openai_error",
       "deprecated": false,
-      "conformanceChecks": ["chat.native", "openai-compatible.surface"],
+      "conformanceChecks": [
+        "chat.native",
+        "openai-compatible.surface"
+      ],
       "compatibilitySurface": "openai-compatible-chat",
       "supportStrategy": "cloud-openai-compatible",
-      "modelFamilies": ["abab", "minimax-m1"],
+      "modelFamilies": [
+        "abab",
+        "minimax-m1"
+      ],
       "pricingMetadata": "provider-console-pricing",
-      "unsupportedFeatures": ["file_object: current gateway does not generalize OpenAI-compatible object lifecycle."]
+      "unsupportedFeatures": [
+        "file_object: current gateway does not generalize OpenAI-compatible object lifecycle."
+      ]
     },
     {
       "code": "dify",
@@ -201,14 +436,26 @@
       "siteKind": "DIFY",
       "defaultBaseUrl": "https://api.dify.ai/v1",
       "description": "Dify 的 OpenAI-compatible surface 主要用于 workflow/chat 接入，不等价于全量 OpenAI object lifecycle。",
-      "capabilityTags": ["chat", "workflow", "openai_compatible", "agent"],
+      "capabilityTags": [
+        "chat",
+        "workflow",
+        "openai_compatible",
+        "agent"
+      ],
       "costProfile": "operator-configured-pricing",
       "errorMode": "openai_error",
       "deprecated": false,
-      "conformanceChecks": ["chat.native", "workflow-compatible.surface"],
+      "conformanceChecks": [
+        "chat.native",
+        "workflow-compatible.surface"
+      ],
       "compatibilitySurface": "dify-compatible",
       "supportStrategy": "workflow-openai-compatible",
-      "modelFamilies": ["chatflow", "workflow-app", "agent-app"],
+      "modelFamilies": [
+        "chatflow",
+        "workflow-app",
+        "agent-app"
+      ],
       "pricingMetadata": "operator-configured-pricing",
       "unsupportedFeatures": [
         "responses: Dify preset is treated as chat/workflow compatible instead of generic responses object lifecycle.",
@@ -221,16 +468,26 @@
       "siteKind": "OPENROUTER",
       "defaultBaseUrl": "https://openrouter.ai/api/v1",
       "description": "OpenRouter 聚合站 OpenAI-compatible API，可承载多供应商模型路由与成本 metadata。",
-      "capabilityTags": ["chat", "openai_compatible", "aggregator"],
+      "capabilityTags": [
+        "chat",
+        "openai_compatible",
+        "aggregator"
+      ],
       "costProfile": "aggregator-provider-pricing",
       "errorMode": "openai_error",
       "deprecated": false,
-      "conformanceChecks": ["chat.native", "aggregator.routing"],
+      "conformanceChecks": [
+        "chat.native",
+        "aggregator.routing"
+      ],
       "compatibilitySurface": "openai-compatible-chat",
       "supportStrategy": "aggregator-routing",
-      "modelFamilies": ["byok-routing", "multi-provider"],
+      "modelFamilies": [
+        "byok-routing",
+        "multi-provider"
+      ],
       "pricingMetadata": "aggregator-pass-through-pricing",
-      "unsupportedFeatures": ["realtime_client_secret: current gateway does not trust aggregated realtime surface."]
+      "unsupportedFeatures": []
     },
     {
       "code": "xai",
@@ -238,14 +495,30 @@
       "siteKind": "GROK",
       "defaultBaseUrl": "https://api.x.ai/v1",
       "description": "xAI Grok REST API 以 OpenAI-compatible chat/responses 作为主兼容面，专有能力按 xAI adapter 边界单独声明。",
-      "capabilityTags": ["chat", "responses", "openai_compatible", "reasoning", "vision", "xai"],
+      "capabilityTags": [
+        "chat",
+        "responses",
+        "openai_compatible",
+        "reasoning",
+        "vision",
+        "xai"
+      ],
       "costProfile": "xai-public-pricing",
       "errorMode": "openai_error",
       "deprecated": false,
-      "conformanceChecks": ["chat.native", "openai-compatible.surface", "responses.emulated"],
+      "conformanceChecks": [
+        "chat.native",
+        "openai-compatible.surface",
+        "responses.emulated"
+      ],
       "compatibilitySurface": "openai-compatible-chat",
       "supportStrategy": "cloud-openai-compatible",
-      "modelFamilies": ["grok-4.3", "grok-4", "grok-3", "grok-2"],
+      "modelFamilies": [
+        "grok-4.3",
+        "grok-4",
+        "grok-3",
+        "grok-2"
+      ],
       "pricingMetadata": "public-list-price-xai",
       "unsupportedFeatures": [
         "deprecated_model_redirect: xAI retires grok-4-1-fast-reasoning, grok-4-1-fast-non-reasoning, grok-4-fast-reasoning, grok-4-fast-non-reasoning, grok-4-0709, grok-code-fast-1, grok-3 and grok-imagine-image-pro on 2026-05-15 12:00 PT with grok-4.3/image redirects.",
@@ -259,19 +532,32 @@
       "siteKind": "PERPLEXITY",
       "defaultBaseUrl": "https://api.perplexity.ai",
       "description": "Perplexity OpenAI SDK compatible chat/search API，作为 web-grounded search provider 单独建模，不泛化为全量 OpenAI-compatible lifecycle。",
-      "capabilityTags": ["chat", "openai_compatible", "web_search", "citations", "perplexity"],
+      "capabilityTags": [
+        "chat",
+        "openai_compatible",
+        "web_search",
+        "citations",
+        "perplexity"
+      ],
       "costProfile": "perplexity-public-pricing",
       "errorMode": "openai_error",
       "deprecated": false,
-      "conformanceChecks": ["chat.native", "openai-compatible.surface", "web-search.adapter-boundary"],
+      "conformanceChecks": [
+        "chat.native",
+        "openai-compatible.surface",
+        "web-search.adapter-boundary"
+      ],
       "compatibilitySurface": "openai-compatible-web-search",
       "supportStrategy": "web-search-openai-compatible",
-      "modelFamilies": ["sonar", "sonar-pro", "sonar-reasoning"],
+      "modelFamilies": [
+        "sonar",
+        "sonar-pro",
+        "sonar-reasoning"
+      ],
       "pricingMetadata": "public-list-price-perplexity",
       "unsupportedFeatures": [
         "responses: Perplexity preset is modeled as Chat Completions compatible search, not generic OpenAI Responses.",
-        "file_object: Perplexity is not treated as an object lifecycle provider.",
-        "realtime_client_secret: Perplexity does not expose an OpenAI-equivalent realtime session contract."
+        "file_object: Perplexity is not treated as an object lifecycle provider."
       ]
     },
     {
@@ -280,18 +566,30 @@
       "siteKind": "COHERE",
       "defaultBaseUrl": "https://api.cohere.ai/compatibility/v1",
       "description": "Cohere 既可通过 compatibility API 参与 chat/embeddings，也作为 dedicated rerank provider 接入。",
-      "capabilityTags": ["chat", "embeddings", "rerank", "openai_compatible"],
+      "capabilityTags": [
+        "chat",
+        "embeddings",
+        "rerank",
+        "openai_compatible"
+      ],
       "costProfile": "cohere-public-pricing",
       "errorMode": "openai_error",
       "deprecated": false,
-      "conformanceChecks": ["chat.native", "embeddings.native", "rerank.native"],
+      "conformanceChecks": [
+        "chat.native",
+        "embeddings.native",
+        "rerank.native"
+      ],
       "compatibilitySurface": "rerank-native",
       "supportStrategy": "native-rerank",
-      "modelFamilies": ["command", "embed-v4", "rerank-v3.5"],
+      "modelFamilies": [
+        "command",
+        "embed-v4",
+        "rerank-v3.5"
+      ],
       "pricingMetadata": "public-list-price-cohere",
       "unsupportedFeatures": [
-        "file_object: Cohere compatibility API is not treated as a stable object lifecycle provider.",
-        "realtime_client_secret: Cohere does not provide an OpenAI-equivalent realtime session contract."
+        "file_object: Cohere compatibility API is not treated as a stable object lifecycle provider."
       ]
     },
     {
@@ -300,14 +598,24 @@
       "siteKind": "JINA",
       "defaultBaseUrl": "https://api.jina.ai/v1",
       "description": "Jina 在本仓库中主要作为 embeddings/rerank provider 建模，不把它当作通用 chat provider 事实源。",
-      "capabilityTags": ["embeddings", "rerank", "jina"],
+      "capabilityTags": [
+        "embeddings",
+        "rerank",
+        "jina"
+      ],
       "costProfile": "provider-compatible",
       "errorMode": "openai_error",
       "deprecated": false,
-      "conformanceChecks": ["embeddings.native", "rerank.native"],
+      "conformanceChecks": [
+        "embeddings.native",
+        "rerank.native"
+      ],
       "compatibilitySurface": "rerank-native",
       "supportStrategy": "native-rerank",
-      "modelFamilies": ["jina-embeddings", "jina-reranker"],
+      "modelFamilies": [
+        "jina-embeddings",
+        "jina-reranker"
+      ],
       "pricingMetadata": "provider-console-pricing",
       "unsupportedFeatures": [
         "chat: current gateway does not treat Jina as a stable general chat provider.",
@@ -320,16 +628,30 @@
       "siteKind": "TOGETHER",
       "defaultBaseUrl": "https://api.together.xyz/v1",
       "description": "Together OpenAI-compatible API，可承载多模型推理与 embeddings。",
-      "capabilityTags": ["chat", "responses", "openai_compatible", "aggregator"],
+      "capabilityTags": [
+        "chat",
+        "responses",
+        "openai_compatible",
+        "aggregator"
+      ],
       "costProfile": "provider-compatible",
       "errorMode": "openai_error",
       "deprecated": false,
-      "conformanceChecks": ["chat.native", "openai-compatible.surface"],
+      "conformanceChecks": [
+        "chat.native",
+        "openai-compatible.surface"
+      ],
       "compatibilitySurface": "openai-compatible-chat",
       "supportStrategy": "cloud-openai-compatible",
-      "modelFamilies": ["llama", "qwen", "deepseek"],
+      "modelFamilies": [
+        "llama",
+        "qwen",
+        "deepseek"
+      ],
       "pricingMetadata": "provider-console-pricing",
-      "unsupportedFeatures": ["file_object: current gateway does not generalize OpenAI-compatible object lifecycle."]
+      "unsupportedFeatures": [
+        "file_object: current gateway does not generalize OpenAI-compatible object lifecycle."
+      ]
     },
     {
       "code": "fireworks",
@@ -337,16 +659,30 @@
       "siteKind": "FIREWORKS",
       "defaultBaseUrl": "https://api.fireworks.ai/inference/v1",
       "description": "Fireworks OpenAI-compatible API，适合作为推理和 embeddings 兼容站点。",
-      "capabilityTags": ["chat", "responses", "openai_compatible", "embeddings"],
+      "capabilityTags": [
+        "chat",
+        "responses",
+        "openai_compatible",
+        "embeddings"
+      ],
       "costProfile": "provider-compatible",
       "errorMode": "openai_error",
       "deprecated": false,
-      "conformanceChecks": ["chat.native", "openai-compatible.surface"],
+      "conformanceChecks": [
+        "chat.native",
+        "openai-compatible.surface"
+      ],
       "compatibilitySurface": "openai-compatible-chat",
       "supportStrategy": "cloud-openai-compatible",
-      "modelFamilies": ["llama", "deepseek", "embedding"],
+      "modelFamilies": [
+        "llama",
+        "deepseek",
+        "embedding"
+      ],
       "pricingMetadata": "provider-console-pricing",
-      "unsupportedFeatures": ["file_object: current gateway does not generalize OpenAI-compatible object lifecycle."]
+      "unsupportedFeatures": [
+        "file_object: current gateway does not generalize OpenAI-compatible object lifecycle."
+      ]
     },
     {
       "code": "mistral",
@@ -354,16 +690,30 @@
       "siteKind": "MISTRAL",
       "defaultBaseUrl": "https://api.mistral.ai/v1",
       "description": "Mistral 通过 OpenAI-compatible path 参与 gateway，但部分路径需要专门 path adapter 处理。",
-      "capabilityTags": ["chat", "responses", "openai_compatible", "path_adapter"],
+      "capabilityTags": [
+        "chat",
+        "responses",
+        "openai_compatible",
+        "path_adapter"
+      ],
       "costProfile": "provider-compatible",
       "errorMode": "openai_error",
       "deprecated": false,
-      "conformanceChecks": ["chat.native", "provider-path-adapter"],
+      "conformanceChecks": [
+        "chat.native",
+        "provider-path-adapter"
+      ],
       "compatibilitySurface": "openai-compatible-chat",
       "supportStrategy": "path-adapter-required",
-      "modelFamilies": ["mistral-large", "ministral", "codestral"],
+      "modelFamilies": [
+        "mistral-large",
+        "ministral",
+        "codestral"
+      ],
       "pricingMetadata": "provider-console-pricing",
-      "unsupportedFeatures": ["file_object: current gateway does not generalize OpenAI-compatible object lifecycle."]
+      "unsupportedFeatures": [
+        "file_object: current gateway does not generalize OpenAI-compatible object lifecycle."
+      ]
     },
     {
       "code": "anthropic",
@@ -371,14 +721,24 @@
       "siteKind": "ANTHROPIC_DIRECT",
       "defaultBaseUrl": "https://api.anthropic.com",
       "description": "Anthropic Messages API，仅按 OpenAI 标准功能区收紧为 chat/tools/thinking 入口，不追求 Anthropic 全量官方 API。",
-      "capabilityTags": ["chat", "tools", "thinking", "anthropic_native"],
+      "capabilityTags": [
+        "chat",
+        "tools",
+        "thinking",
+        "anthropic_native"
+      ],
       "costProfile": "anthropic-public-pricing",
       "errorMode": "anthropic_error",
       "deprecated": false,
-      "conformanceChecks": ["messages.native"],
+      "conformanceChecks": [
+        "messages.native"
+      ],
       "compatibilitySurface": "anthropic-native",
       "supportStrategy": "translation-layer",
-      "modelFamilies": ["claude-sonnet", "claude-opus"],
+      "modelFamilies": [
+        "claude-sonnet",
+        "claude-opus"
+      ],
       "pricingMetadata": "public-list-price-anthropic",
       "unsupportedFeatures": [
         "embeddings: Anthropic stable embeddings API is not exposed in current gateway.",
@@ -391,17 +751,28 @@
       "siteKind": "GEMINI_DIRECT",
       "defaultBaseUrl": "https://generativelanguage.googleapis.com",
       "description": "Google Gemini API，仅按 OpenAI 标准功能区收紧为 generateContent、embeddings 与 files 支撑面，不追求 Gemini 全量官方 API。",
-      "capabilityTags": ["chat", "embeddings", "files", "google_native"],
+      "capabilityTags": [
+        "chat",
+        "embeddings",
+        "files",
+        "google_native"
+      ],
       "costProfile": "gemini-public-pricing",
       "errorMode": "gemini_error",
       "deprecated": false,
-      "conformanceChecks": ["generate-content.native", "files.orchestrated"],
+      "conformanceChecks": [
+        "generate-content.native",
+        "files.orchestrated"
+      ],
       "compatibilitySurface": "google-native",
       "supportStrategy": "translation-layer",
-      "modelFamilies": ["gemini-2.5-pro", "gemini-2.5-flash", "text-embedding"],
+      "modelFamilies": [
+        "gemini-2.5-pro",
+        "gemini-2.5-flash",
+        "text-embedding"
+      ],
       "pricingMetadata": "public-list-price-gemini",
       "unsupportedFeatures": [
-        "realtime_client_secret: Gemini live token is not equivalent to OpenAI realtime client_secret.",
         "non_core_provider_apis_out_of_scope: Gemini provider-specific async/admin/eval APIs are outside REQ-20260518-005."
       ]
     },
@@ -411,18 +782,33 @@
       "siteKind": "VERTEX_AI",
       "defaultBaseUrl": "https://{location}-aiplatform.googleapis.com",
       "description": "Google Vertex AI Gemini API，仅按 OpenAI 标准功能区收紧为 generateContent、embeddings 与 files 支撑面；project/location 只作为寻址和凭证边界，不扩展到 Vertex 全量 AI Platform API。",
-      "capabilityTags": ["chat", "embeddings", "files", "google_native", "vertex", "project_location"],
+      "capabilityTags": [
+        "chat",
+        "embeddings",
+        "files",
+        "google_native",
+        "vertex",
+        "project_location"
+      ],
       "costProfile": "vertex-ai-public-pricing",
       "errorMode": "gemini_error",
       "deprecated": false,
-      "conformanceChecks": ["generate-content.native", "vertex.project-location", "files.orchestrated"],
+      "conformanceChecks": [
+        "generate-content.native",
+        "vertex.project-location",
+        "files.orchestrated"
+      ],
       "compatibilitySurface": "google-native",
       "supportStrategy": "vertex-google-native",
-      "modelFamilies": ["gemini-2.5-pro", "gemini-2.5-flash", "text-embedding", "veo"],
+      "modelFamilies": [
+        "gemini-2.5-pro",
+        "gemini-2.5-flash",
+        "text-embedding",
+        "veo"
+      ],
       "pricingMetadata": "public-list-price-vertex-ai",
       "unsupportedFeatures": [
         "ai_studio_key: Vertex requires Google Cloud project/location bearer credentials instead of AI Studio API keys.",
-        "realtime_client_secret: Vertex live token is not equivalent to OpenAI realtime client_secret.",
         "non_core_provider_apis_out_of_scope: Vertex provider-specific async/admin/eval APIs are outside REQ-20260518-005."
       ]
     }

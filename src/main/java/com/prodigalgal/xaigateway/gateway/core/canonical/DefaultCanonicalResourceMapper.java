@@ -74,7 +74,7 @@ public class DefaultCanonicalResourceMapper implements CanonicalResourceMapper {
 
     private String resolveJsonResponseKind(TranslationOperation operation, JsonNode rawBody) {
         return switch (operation == null ? TranslationOperation.UNKNOWN : operation) {
-            case EMBEDDING_CREATE, IMAGE_GENERATION, IMAGE_EDIT, IMAGE_VARIATION, FILE_LIST -> "list";
+            case EMBEDDING_CREATE, IMAGE_GENERATION, FILE_LIST -> "list";
             default -> rawBody != null && rawBody.path("data").isArray() ? "list" : "object";
         };
     }
@@ -87,12 +87,10 @@ public class DefaultCanonicalResourceMapper implements CanonicalResourceMapper {
         String defaultObjectType = switch (operation == null ? TranslationOperation.UNKNOWN : operation) {
             case EMBEDDING_CREATE -> "embedding.list";
             case AUDIO_TRANSCRIPTION -> "audio.transcription";
-            case AUDIO_TRANSLATION -> "audio.translation";
-            case IMAGE_GENERATION, IMAGE_EDIT, IMAGE_VARIATION -> "image.list";
+            case IMAGE_GENERATION -> "image.list";
             case MODERATION_CREATE -> "moderation";
             case FILE_CREATE, FILE_GET, FILE_DELETE, FILE_LIST, FILE_CONTENT_GET -> "file";
             case UPLOAD_CREATE, UPLOAD_GET, UPLOAD_PART_ADD, UPLOAD_COMPLETE, UPLOAD_CANCEL -> "upload";
-            case REALTIME_CLIENT_SECRET_CREATE -> "realtime.client_secret";
             case RERANK_CREATE -> "rerank";
             case VIDEO_GENERATION_CREATE, VIDEO_GENERATION_GET, VIDEO_GENERATION_CANCEL -> "video.generation";
             case MUSIC_GENERATION_CREATE, MUSIC_GENERATION_GET, MUSIC_GENERATION_CANCEL -> "music.generation";
@@ -137,8 +135,8 @@ public class DefaultCanonicalResourceMapper implements CanonicalResourceMapper {
                     VIDEO_GENERATION_GET, VIDEO_GENERATION_CANCEL,
                     MUSIC_GENERATION_GET, MUSIC_GENERATION_CANCEL,
                     TASK_GET, TASK_CANCEL -> "in_progress";
-            case AUDIO_TRANSCRIPTION, AUDIO_TRANSLATION, EMBEDDING_CREATE, IMAGE_GENERATION, IMAGE_EDIT, IMAGE_VARIATION, MODERATION_CREATE,
-                    FILE_CREATE, FILE_LIST, FILE_GET, FILE_DELETE, FILE_CONTENT_GET, REALTIME_CLIENT_SECRET_CREATE,
+            case AUDIO_TRANSCRIPTION, EMBEDDING_CREATE, IMAGE_GENERATION, MODERATION_CREATE,
+                    FILE_CREATE, FILE_LIST, FILE_GET, FILE_DELETE, FILE_CONTENT_GET,
                     RERANK_CREATE, WEB_SEARCH_CREATE -> "completed";
             default -> rawBody == null || rawBody.isMissingNode() || rawBody.isNull() ? null : "completed";
         };

@@ -10,7 +10,7 @@ public record DistributedKeyRequest(
         String description,
         Long ownerUserId,
         Boolean active,
-        List<String> allowedProtocols,
+        List<String> allowedProtocolSuites,
         List<String> allowedModels,
         List<String> allowedProviderTypes,
         Instant expiresAt,

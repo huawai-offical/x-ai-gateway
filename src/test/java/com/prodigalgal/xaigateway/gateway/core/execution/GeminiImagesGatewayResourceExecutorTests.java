@@ -45,7 +45,7 @@ class GeminiImagesGatewayResourceExecutorTests {
         TestGeminiImagesExecutor executor = new TestGeminiImagesExecutor(singleImageResponse(new byte[] {1, 2, 3}));
 
         assertTrue(executor.supports(request("/v1/images/generations", TranslationOperation.IMAGE_GENERATION), candidate(UpstreamSiteKind.GEMINI_DIRECT)));
-        assertFalse(executor.supports(request("/v1/images/edits", TranslationOperation.IMAGE_EDIT), candidate(UpstreamSiteKind.GEMINI_DIRECT)));
+        assertFalse(executor.supports(request("/v1/moderations", TranslationOperation.MODERATION_CREATE), candidate(UpstreamSiteKind.GEMINI_DIRECT)));
         assertTrue(executor.supports(request("/v1/images/generations", TranslationOperation.IMAGE_GENERATION), candidate(UpstreamSiteKind.VERTEX_AI)));
     }
 
@@ -93,7 +93,7 @@ class GeminiImagesGatewayResourceExecutorTests {
 
         IllegalArgumentException error = assertThrows(
                 IllegalArgumentException.class,
-                () -> executor.executeJson(context(TranslationOperation.IMAGE_EDIT, "/v1/images/edits"), payload, "gemini-2.0-flash-preview-image-generation")
+                () -> executor.executeJson(context(TranslationOperation.MODERATION_CREATE, "/v1/moderations"), payload, "gemini-2.0-flash-preview-image-generation")
         );
 
         assertEquals("Gemini images executor 当前仅支持 /v1/images/generations。", error.getMessage());

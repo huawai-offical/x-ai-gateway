@@ -22,17 +22,14 @@ class OpenAiDirectResourceSmokeHttpClient {
     static final String RESPONSES = "RESPONSES";
     static final String FILES = "FILES";
     static final String VECTOR_STORES = "VECTOR_STORES";
-    static final String REALTIME_CLIENT_SECRET = "REALTIME_CLIENT_SECRET";
 
     private static final String DEFAULT_OPENAI_BASE_URL = "https://api.openai.com";
     private static final String DEFAULT_GENERATION_MODEL = "gpt-4o-mini";
-    private static final String DEFAULT_REALTIME_MODEL = "gpt-realtime-mini";
     private static final List<String> DEFAULT_FAMILIES = List.of(
             CHAT_COMPLETIONS,
             RESPONSES,
             FILES,
-            VECTOR_STORES,
-            REALTIME_CLIENT_SECRET
+            VECTOR_STORES
     );
 
     private final ObjectMapper objectMapper;
@@ -220,7 +217,6 @@ class OpenAiDirectResourceSmokeHttpClient {
             case RESPONSES -> plan(normalizedBase, "POST", "/v1/responses", "responses_billable_generation", true, false);
             case FILES -> plan(normalizedBase, "GET", "/v1/files?limit=1", "read_only_list", false, false);
             case VECTOR_STORES -> plan(normalizedBase, "GET", "/v1/vector_stores?limit=1", "read_only_list", false, false);
-            case REALTIME_CLIENT_SECRET -> plan(normalizedBase, "POST", "/v1/realtime/client_secrets", "write_client_secret", false, true);
             default -> throw new IllegalArgumentException("未知 OpenAI resource smoke family：" + family);
         };
     }
@@ -302,10 +298,6 @@ class OpenAiDirectResourceSmokeHttpClient {
         if (usage instanceof Map<?, ?> usageMap) {
             result.put("usageFields", usageMap.keySet().stream().map(String::valueOf).toList());
         }
-        Object clientSecret = body.get("client_secret");
-        if (clientSecret instanceof Map<?, ?>) {
-            result.put("clientSecretReturned", true);
-        }
         Object data = body.get("data");
         if (data instanceof List<?> list) {
             result.put("itemsSeen", list.size());
@@ -342,19 +334,6 @@ class OpenAiDirectResourceSmokeHttpClient {
                     "input", "ping",
                     "max_output_tokens", 1,
                     "store", false
-            );
-            case "write_client_secret" -> Map.of(
-                    "expires_after", Map.of(
-                            "anchor", "created_at",
-                            "seconds", 60
-                    ),
-                    "session", Map.of(
-                            "type", "realtime",
-                            "model", DEFAULT_REALTIME_MODEL,
-                            "output_modalities", List.of("text"),
-                            "max_output_tokens", 1,
-                            "instructions", "Smoke probe."
-                    )
             );
             default -> null;
         };

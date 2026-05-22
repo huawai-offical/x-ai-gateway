@@ -1,10 +1,10 @@
 # TASK-20260515-015 OpenAI Protocol Path Matcher 覆盖防遗漏基线
 
-状态：Done  
-优先级：Critical  
-类型：子任务  
-父任务：[TASK-20260514-030](../backlog/TASK-20260514-030-openai-cross-cutting-protocol-compatibility.md)  
-上游来源：[TASK-20260514-016](../backlog/TASK-20260514-016-openai-full-api-coverage-parent.md)
+状态：Done
+优先级：Critical
+类型：子任务
+父任务：[TASK-20260514-030](../done/TASK-20260514-030-openai-cross-cutting-protocol-compatibility.md)
+上游来源：[TASK-20260514-016](../backlog/TASK-20260514-016-functional-service-api-coverage-parent.md)
 
 ## 背景
 
@@ -66,7 +66,7 @@ OpenAI-style error envelope、429 headers 与部分横切协议行为依赖 `Glo
 
 ## 关联文档
 
-- [TASK-20260514-030](../backlog/TASK-20260514-030-openai-cross-cutting-protocol-compatibility.md)
+- [TASK-20260514-030](../done/TASK-20260514-030-openai-cross-cutting-protocol-compatibility.md)
 - [REP-20260514 OpenAI 全量覆盖任务拆解](../../docs/reports/REP-20260514-openai-full-api-coverage-task-breakdown.md)
 
 ## 实现结果

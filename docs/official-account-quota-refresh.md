@@ -4,11 +4,11 @@
 关联需求：[REQ-20260506-017 AI IDE/CLI 官方账号导入与配额刷新](requirements/REQ-20260506-017-official-account-import-quota-refresh.md)  
 关联任务：[TASK-20260506-021 AI IDE/CLI 官方账号导入与配额刷新](../tasks/done/TASK-20260506-021-ai-ide-account-import-quota-refresh.md)
 
-> 当前状态：控制台中的 `官方账号运行态` 入口已下线；本文仅保留 `POST /admin/accounts/official/import`、`POST /admin/accounts/{id}/official/quota-refresh`、`GET /admin/accounts/{id}/official/quota` 等后端/Admin 事实说明，不再表示这是当前产品主入口。
+> 当前状态：控制台中的 `官方账号运行态` 入口已下线；本文仅保留 `POST /admin/accounts/official/import` 与 `POST /admin/accounts/{id}/official/quota-refresh` 的后端/Admin 事实说明。独立 `GET /admin/accounts/{id}/official/quota` 已收口，不再作为现役接口保留。
 
 ## 背景
 
-Codex、GitHub Copilot、Gemini CLI 这类 AI IDE/CLI 官方账号仍有后端导入、加密保存和配额运维需求。系统已有 `UpstreamAccountEntity` 的 token 密文字段、quota 字段和 refresh 状态字段，本文记录当前暂保留的官方账号专用 Admin API。
+Codex、GitHub Copilot、Gemini CLI 这类 AI IDE/CLI 官方账号仍有后端导入、加密保存和配额运维需求。系统已有 `UpstreamAccountEntity` 的 token 密文字段、quota 字段和 refresh 状态字段，本文记录当前暂保留的官方账号专用写入型 Admin API，以及仍保留在账号详情中的 quota 状态字段。
 
 ## 支持账号类型
 
@@ -50,11 +50,14 @@ Codex、GitHub Copilot、Gemini CLI 这类 AI IDE/CLI 官方账号仍有后端�
 | `quotaWindowSeconds`、`quotaRemainingTokens`、`quotaRemainingRequests`、`quotaResetAt` | 配额刷新结果。 |
 | `quotaError`、`forceFailure` | 写入可解释失败、`nextRefreshAfter` 和冷却时间。 |
 
-### 查询官方账号配额
+### 当前配额查看方式
 
-`GET /admin/accounts/{id}/official/quota`
+独立 `GET /admin/accounts/{id}/official/quota` 已在 2026-05-21 收口。当前如需查看 quota 状态，应通过：
 
-响应 `OfficialAccountQuotaResponse` 会返回账号类型、provider type、模型列表、plan/subscription tier、quota window、reset time、remaining、last refresh、next refresh、健康状态、`routeEligible` 与 `routeBlockReason`。
+- `GET /admin/accounts/{id}` 查看账号明细中的 quota/refresh/runtime 字段
+- `GET /admin/accounts/group/{groupId}` 查看账号分组视图中的汇总状态
+
+`POST /admin/accounts/official/import` 与 `POST /admin/accounts/{id}/official/quota-refresh` 的响应仍会返回 `OfficialAccountQuotaResponse`，用于导入或刷新完成后的即时反馈。
 
 ## 安全边界
 

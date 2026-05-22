@@ -810,58 +810,6 @@ class GatewayAsyncResourceServiceTests {
         assertEquals("已取消的 Upload 不允许继续完成 Upload。", error.getMessage());
     }
 
-    @Test
-    void shouldExplainGeminiRealtimeAsBlockedWhenNoNativeTargetExists() throws Exception {
-        GatewayAsyncResourceRepository gatewayAsyncResourceRepository = Mockito.mock(GatewayAsyncResourceRepository.class);
-        DistributedKeyQueryService distributedKeyQueryService = Mockito.mock(DistributedKeyQueryService.class);
-        UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
-        UpstreamSiteProfileRepository upstreamSiteProfileRepository = Mockito.mock(UpstreamSiteProfileRepository.class);
-        SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
-        CredentialMaterialResolver credentialMaterialResolver = Mockito.mock(CredentialMaterialResolver.class);
-        GatewayAsyncResourceService service = new GatewayAsyncResourceService(
-                gatewayAsyncResourceRepository,
-                distributedKeyQueryService,
-                upstreamCredentialRepository,
-                upstreamSiteProfileRepository,
-                snapshotRepository,
-                Mockito.mock(GatewayFileRepository.class),
-                Mockito.mock(GatewayFileBindingRepository.class),
-                Mockito.mock(com.prodigalgal.xaigateway.gateway.core.file.GatewayFileService.class),
-                Mockito.mock(CredentialCryptoService.class),
-                credentialMaterialResolver,
-                new SiteCapabilityTruthService(new UpstreamSitePolicyService(), snapshotRepository),
-                new ObjectMapper(),
-                Clock.systemUTC(),
-                WebClient.builder()
-        );
-
-        UpstreamCredentialEntity credential = credential(201L, ProviderType.GEMINI_DIRECT, 2L, "https://generativelanguage.googleapis.com");
-        Mockito.when(distributedKeyQueryService.findActiveById(1L))
-                .thenReturn(Optional.of(distributedKey(ProviderType.GEMINI_DIRECT, 201L, credential.getBaseUrl())));
-        Mockito.when(upstreamCredentialRepository.findAllByIdInAndDeletedFalse(List.of(201L)))
-                .thenReturn(List.of(credential));
-        Mockito.when(upstreamSiteProfileRepository.findById(2L)).thenReturn(Optional.of(geminiSiteProfile(2L)));
-        Mockito.when(snapshotRepository.findBySiteProfile_Id(2L))
-                .thenReturn(Optional.of(snapshot(
-                        true,
-                        true,
-                        AuthStrategy.API_KEY_QUERY,
-                        PathStrategy.GEMINI_V1BETA_MODELS
-                )));
-        Mockito.when(credentialMaterialResolver.resolveStored(credential)).thenReturn(resolvedMaterial(201L, 2L, "api-key"));
-
-        IllegalArgumentException error = assertThrows(IllegalArgumentException.class, () -> service.createRealtimeClientSecret(
-                1L,
-                new ObjectMapper().readTree("""
-                        {
-                          "model":"gemini-2.5-flash-live"
-                        }
-                        """),
-                201L
-        ));
-
-        assertTrue(error.getMessage().contains("Gemini ephemeral/live token"));
-    }
 
     @Test
     void shouldAddUploadPartUsingBoundUpstreamMetadata() {

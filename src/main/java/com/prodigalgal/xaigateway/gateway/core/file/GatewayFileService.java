@@ -74,6 +74,9 @@ import reactor.core.publisher.Mono;
 @Transactional
 public class GatewayFileService {
 
+    private static final int DEFAULT_FILE_LIST_LIMIT = 20;
+    private static final int MAX_FILE_LIST_LIMIT = 100;
+
     private final GatewayFileRepository gatewayFileRepository;
     private final GatewayFileBindingRepository gatewayFileBindingRepository;
     private final DistributedKeyQueryService distributedKeyQueryService;
@@ -304,11 +307,36 @@ public class GatewayFileService {
 
     @Transactional(readOnly = true)
     public List<GatewayFileResponse> listFiles(Long distributedKeyId) {
-        return gatewayFileRepository.findTop100ByDistributedKeyIdAndDeletedFalseOrderByCreatedAtDesc(distributedKeyId)
+        return listFilesPage(distributedKeyId, null, null, DEFAULT_FILE_LIST_LIMIT, "desc").data();
+    }
+
+    @Transactional(readOnly = true)
+    public GatewayFileListPage listFilesPage(
+            Long distributedKeyId,
+            String purpose,
+            String after,
+            Integer limit,
+            String order) {
+        int normalizedLimit = normalizeFileListLimit(limit);
+        boolean ascending = normalizeFileListAscending(order);
+        String normalizedPurpose = trimToNull(purpose);
+        List<GatewayFileEntity> visibleFiles = gatewayFileRepository.findAllByDistributedKeyIdAndDeletedFalseOrderByCreatedAtDesc(distributedKeyId)
                 .stream()
-                .sorted(Comparator.comparing(GatewayFileEntity::getCreatedAt).reversed())
+                .filter(file -> normalizedPurpose == null || normalizedPurpose.equals(file.getPurpose()))
+                .sorted(fileListComparator(ascending))
+                .toList();
+        List<GatewayFileEntity> remaining = applyAfterCursor(visibleFiles, trimToNull(after));
+        boolean hasMore = remaining.size() > normalizedLimit;
+        List<GatewayFileResponse> data = remaining.stream()
+                .limit(normalizedLimit)
                 .map(this::toResponse)
                 .toList();
+        return new GatewayFileListPage(
+                data,
+                hasMore,
+                data.isEmpty() ? null : data.getFirst().id(),
+                data.isEmpty() ? null : data.getLast().id()
+        );
     }
 
     @Transactional(readOnly = true)
@@ -1009,6 +1037,54 @@ public class GatewayFileService {
                 entity.getCreatedAt(),
                 entity.getStatus()
         );
+    }
+
+    private int normalizeFileListLimit(Integer limit) {
+        if (limit == null) {
+            return DEFAULT_FILE_LIST_LIMIT;
+        }
+        if (limit < 1 || limit > MAX_FILE_LIST_LIMIT) {
+            throw new IllegalArgumentException("limit 必须在 1 到 100 之间。");
+        }
+        return limit;
+    }
+
+    private boolean normalizeFileListAscending(String order) {
+        String normalized = trimToNull(order);
+        if (normalized == null || "desc".equalsIgnoreCase(normalized)) {
+            return false;
+        }
+        if ("asc".equalsIgnoreCase(normalized)) {
+            return true;
+        }
+        throw new IllegalArgumentException("order 必须是 asc 或 desc。");
+    }
+
+    private Comparator<GatewayFileEntity> fileListComparator(boolean ascending) {
+        Comparator<GatewayFileEntity> comparator = Comparator
+                .comparing(GatewayFileEntity::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(GatewayFileEntity::getFileKey, Comparator.nullsLast(String::compareTo));
+        return ascending ? comparator : comparator.reversed();
+    }
+
+    private List<GatewayFileEntity> applyAfterCursor(List<GatewayFileEntity> files, String after) {
+        if (after == null) {
+            return files;
+        }
+        for (int index = 0; index < files.size(); index++) {
+            if (after.equals(files.get(index).getFileKey())) {
+                return files.subList(index + 1, files.size());
+            }
+        }
+        throw new IllegalArgumentException("after 指向的 file 不存在或不可见。");
+    }
+
+    private String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private Path ensureStorageDirectory() {

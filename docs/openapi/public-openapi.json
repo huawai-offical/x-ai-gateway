@@ -2,7 +2,7 @@
   "openapi" : "3.1.0",
   "info" : {
     "title" : "x-ai-gateway Public API",
-    "version" : "2026.05.18",
+    "version" : "2026.05.21",
     "description" : "公开接入面的最小 OpenAPI 事实源，按 OpenAI 标准功能区覆盖 docs、OpenAI-compatible、Claude/Gemini/Vertex 功能性入口、Codex Responses smoke 边界和 Media provider matrix。"
   },
   "servers" : [ {
@@ -795,6 +795,255 @@
         } ]
       }
     },
+    "/v1/embeddings" : {
+      "post" : {
+        "summary" : "Create embeddings for functional RAG support",
+        "operationId" : "post_v1_embeddings",
+        "tags" : [ "gateway" ],
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        },
+        "description" : "Creates embeddings through provider-governed routing for retrieval and RAG support. This is a functional supporting surface, not a promise of every upstream embedding parameter.",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "required" : [ "model", "input" ],
+                "properties" : {
+                  "model" : {
+                    "type" : "string",
+                    "description" : "Embedding model name or gateway model alias."
+                  },
+                  "input" : {
+                    "type" : "object",
+                    "description" : "Input string, token array or batched inputs to embed."
+                  },
+                  "encoding_format" : {
+                    "type" : "string",
+                    "description" : "Optional encoding format such as float or base64 when supported by the routed provider."
+                  },
+                  "dimensions" : {
+                    "type" : "integer",
+                    "description" : "Optional output dimension hint when supported by the routed provider."
+                  },
+                  "user" : {
+                    "type" : "string",
+                    "description" : "Optional end-user identifier for abuse monitoring."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/audio/transcriptions" : {
+      "post" : {
+        "summary" : "Create audio transcription for multimodal input",
+        "operationId" : "post_v1_audio_transcriptions",
+        "tags" : [ "gateway" ],
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        },
+        "description" : "Transcribes an uploaded audio file through provider-governed routing as part of the multimodal conversation support surface.",
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "type" : "object",
+                "required" : [ "file", "model" ],
+                "properties" : {
+                  "file" : {
+                    "type" : "string",
+                    "format" : "binary",
+                    "description" : "Audio file to transcribe."
+                  },
+                  "model" : {
+                    "type" : "string",
+                    "description" : "Transcription model name or gateway model alias."
+                  },
+                  "language" : {
+                    "type" : "string",
+                    "description" : "Optional input language hint."
+                  },
+                  "prompt" : {
+                    "type" : "string",
+                    "description" : "Optional transcription prompt."
+                  },
+                  "response_format" : {
+                    "type" : "string",
+                    "description" : "Optional response format when supported by the routed provider."
+                  },
+                  "temperature" : {
+                    "type" : "string",
+                    "description" : "Optional temperature, accepted as multipart text."
+                  },
+                  "timestamp_granularities[]" : {
+                    "type" : "array",
+                    "description" : "Optional timestamp granularity hints preserved as multipart text values."
+                  },
+                  "include[]" : {
+                    "type" : "array",
+                    "description" : "Optional extra response fields preserved as multipart text values when supported by the routed provider."
+                  },
+                  "stream" : {
+                    "type" : "string",
+                    "description" : "Optional streaming flag accepted as multipart text; provider support is route-dependent."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/audio/speech" : {
+      "post" : {
+        "summary" : "Create speech audio for multimodal output",
+        "operationId" : "post_v1_audio_speech",
+        "tags" : [ "gateway" ],
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        },
+        "description" : "Generates speech audio through provider-governed routing for multimodal response output.",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "required" : [ "model", "input", "voice" ],
+                "properties" : {
+                  "model" : {
+                    "type" : "string",
+                    "description" : "Speech model name or gateway model alias."
+                  },
+                  "input" : {
+                    "type" : "string",
+                    "description" : "Text input used to generate speech audio."
+                  },
+                  "voice" : {
+                    "type" : "string",
+                    "description" : "Voice identifier supported by the routed provider."
+                  },
+                  "response_format" : {
+                    "type" : "string",
+                    "description" : "Optional audio format such as mp3, wav or opus."
+                  },
+                  "speed" : {
+                    "type" : "number",
+                    "description" : "Optional playback speed hint when supported."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/images/generations" : {
+      "post" : {
+        "summary" : "Create image generation for multimodal output",
+        "operationId" : "post_v1_images_generations",
+        "tags" : [ "gateway" ],
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        },
+        "description" : "Creates image generations through provider-governed routing for the multimodal output surface.",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "required" : [ "prompt" ],
+                "properties" : {
+                  "model" : {
+                    "type" : "string",
+                    "description" : "Image model name or gateway model alias."
+                  },
+                  "prompt" : {
+                    "type" : "string",
+                    "description" : "Image generation prompt."
+                  },
+                  "size" : {
+                    "type" : "string",
+                    "description" : "Optional image size supported by the routed provider."
+                  },
+                  "quality" : {
+                    "type" : "string",
+                    "description" : "Optional quality hint supported by the routed provider."
+                  },
+                  "n" : {
+                    "type" : "integer",
+                    "description" : "Optional number of images."
+                  },
+                  "response_format" : {
+                    "type" : "string",
+                    "description" : "Optional response format such as url or b64_json."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/moderations" : {
+      "post" : {
+        "summary" : "Create moderation classification",
+        "operationId" : "post_v1_moderations",
+        "tags" : [ "gateway" ],
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        },
+        "description" : "Runs moderation classification for conversation safety and governance support.",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "required" : [ "input" ],
+                "properties" : {
+                  "input" : {
+                    "type" : "object",
+                    "description" : "Text, image or structured input to classify."
+                  },
+                  "model" : {
+                    "type" : "string",
+                    "description" : "Moderation model name or gateway model alias."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/conversations" : {
       "post" : {
         "summary" : "Create a local OpenAI Conversation",
@@ -1085,6 +1334,324 @@
           "in" : "path",
           "required" : true,
           "description" : "Local Conversation item id.",
+          "schema" : {
+            "type" : "string"
+          }
+        } ]
+      }
+    },
+    "/v1/files" : {
+      "get" : {
+        "summary" : "List gateway-local Files",
+        "operationId" : "get_v1_files",
+        "tags" : [ "gateway" ],
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        },
+        "description" : "Lists gateway-local file objects owned by the current Distributed Key for conversation context, RAG and upload support.",
+        "parameters" : [ {
+          "name" : "purpose",
+          "in" : "query",
+          "required" : false,
+          "description" : "Optional gateway-local purpose filter.",
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "required" : false,
+          "description" : "Number of Files to return, from 1 to 100. Defaults to 20.",
+          "schema" : {
+            "type" : "integer"
+          }
+        }, {
+          "name" : "after",
+          "in" : "query",
+          "required" : false,
+          "description" : "Cursor id of the last File from the previous page.",
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "order",
+          "in" : "query",
+          "required" : false,
+          "description" : "Sort by creation time: asc or desc. Defaults to desc.",
+          "schema" : {
+            "type" : "string"
+          }
+        } ]
+      },
+      "post" : {
+        "summary" : "Create a gateway-local File",
+        "operationId" : "post_v1_files",
+        "tags" : [ "gateway" ],
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        },
+        "description" : "Creates a gateway-local file object from multipart upload. Files support local content read and Vector Store attachment; this does not imply every upstream Files lifecycle feature.",
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "type" : "object",
+                "required" : [ "file" ],
+                "properties" : {
+                  "file" : {
+                    "type" : "string",
+                    "format" : "binary",
+                    "description" : "File content to store in gateway-local file storage."
+                  },
+                  "purpose" : {
+                    "type" : "string",
+                    "description" : "Optional purpose such as assistants or batch; stored as metadata only for the functional service scope."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/files/{fileId}" : {
+      "get" : {
+        "summary" : "Retrieve a gateway-local File",
+        "operationId" : "get_v1_files_fileId",
+        "tags" : [ "gateway" ],
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        },
+        "parameters" : [ {
+          "name" : "fileId",
+          "in" : "path",
+          "required" : true,
+          "description" : "Gateway-local File id.",
+          "schema" : {
+            "type" : "string"
+          }
+        } ]
+      },
+      "delete" : {
+        "summary" : "Delete a gateway-local File",
+        "operationId" : "delete_v1_files_fileId",
+        "tags" : [ "gateway" ],
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        },
+        "parameters" : [ {
+          "name" : "fileId",
+          "in" : "path",
+          "required" : true,
+          "description" : "Gateway-local File id.",
+          "schema" : {
+            "type" : "string"
+          }
+        } ]
+      }
+    },
+    "/v1/files/{fileId}/content" : {
+      "get" : {
+        "summary" : "Retrieve gateway-local File content",
+        "operationId" : "get_v1_files_fileId_content",
+        "tags" : [ "gateway" ],
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        },
+        "description" : "Returns raw gateway-local file content for downstream RAG or inspection flows.",
+        "parameters" : [ {
+          "name" : "fileId",
+          "in" : "path",
+          "required" : true,
+          "description" : "Gateway-local File id.",
+          "schema" : {
+            "type" : "string"
+          }
+        } ]
+      }
+    },
+    "/v1/uploads" : {
+      "post" : {
+        "summary" : "Create gateway-local Upload orchestration",
+        "operationId" : "post_v1_uploads",
+        "tags" : [ "gateway" ],
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        },
+        "description" : "Creates a gateway-local Upload orchestration object for multipart file assembly. This surface exists to support conversation/RAG file workflows, not generic provider batch upload parity.",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "filename" : {
+                    "type" : "string",
+                    "description" : "Original file name for the upload orchestration."
+                  },
+                  "purpose" : {
+                    "type" : "string",
+                    "description" : "Upload purpose used by downstream conversation/RAG workflows."
+                  },
+                  "bytes" : {
+                    "type" : "integer",
+                    "description" : "Expected total bytes when known."
+                  },
+                  "mime_type" : {
+                    "type" : "string",
+                    "description" : "Optional MIME type for assembled content."
+                  },
+                  "model" : {
+                    "type" : "string",
+                    "description" : "Optional route hint; resource-orchestration is used when omitted."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/uploads/{uploadId}" : {
+      "get" : {
+        "summary" : "Retrieve gateway-local Upload orchestration",
+        "operationId" : "get_v1_uploads_uploadId",
+        "tags" : [ "gateway" ],
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        },
+        "parameters" : [ {
+          "name" : "uploadId",
+          "in" : "path",
+          "required" : true,
+          "description" : "Gateway-local Upload orchestration id.",
+          "schema" : {
+            "type" : "string"
+          }
+        } ]
+      }
+    },
+    "/v1/uploads/{uploadId}/parts" : {
+      "post" : {
+        "summary" : "Add part to gateway-local Upload",
+        "operationId" : "post_v1_uploads_uploadId_parts",
+        "tags" : [ "gateway" ],
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        },
+        "description" : "Adds a multipart binary part to a gateway-local Upload orchestration object.",
+        "parameters" : [ {
+          "name" : "uploadId",
+          "in" : "path",
+          "required" : true,
+          "description" : "Gateway-local Upload orchestration id.",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "type" : "object",
+                "required" : [ "data" ],
+                "properties" : {
+                  "data" : {
+                    "type" : "string",
+                    "format" : "binary",
+                    "description" : "Binary upload part data."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/uploads/{uploadId}/complete" : {
+      "post" : {
+        "summary" : "Complete gateway-local Upload",
+        "operationId" : "post_v1_uploads_uploadId_complete",
+        "tags" : [ "gateway" ],
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        },
+        "description" : "Completes a gateway-local Upload orchestration and makes the assembled file available to supporting workflows.",
+        "parameters" : [ {
+          "name" : "uploadId",
+          "in" : "path",
+          "required" : true,
+          "description" : "Gateway-local Upload orchestration id.",
+          "schema" : {
+            "type" : "string"
+          }
+        } ]
+      }
+    },
+    "/v1/uploads/{uploadId}/cancel" : {
+      "post" : {
+        "summary" : "Cancel gateway-local Upload",
+        "operationId" : "post_v1_uploads_uploadId_cancel",
+        "tags" : [ "gateway" ],
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        },
+        "description" : "Cancels a gateway-local Upload orchestration before completion.",
+        "parameters" : [ {
+          "name" : "uploadId",
+          "in" : "path",
+          "required" : true,
+          "description" : "Gateway-local Upload orchestration id.",
           "schema" : {
             "type" : "string"
           }
@@ -1779,6 +2346,41 @@
         }
       }
     },
+    "/v1/realtime/client_secrets" : {
+      "post" : {
+        "summary" : "Create Realtime client secret baseline",
+        "operationId" : "post_v1_realtime_client_secrets",
+        "tags" : [ "gateway" ],
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        },
+        "description" : "Creates a short-lived Realtime client secret through gateway-local orchestration. This is the functional text/session baseline and does not claim full WebRTC, SIP or calls parity.",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "session" : {
+                    "type" : "object",
+                    "description" : "Realtime session configuration such as model, modalities and instructions."
+                  },
+                  "expires_after" : {
+                    "type" : "object",
+                    "description" : "Optional expiry policy for the short-lived client secret."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/models" : {
       "get" : {
         "summary" : "List accessible OpenAI-compatible models",
@@ -1861,6 +2463,47 @@
         "responses" : {
           "200" : {
             "description" : "OK"
+          }
+        },
+        "description" : "Accepts Gemini generateContent-style requests for conversation, streaming and tools-capable provider adapters within the functional service API scope.",
+        "parameters" : [ {
+          "name" : "model",
+          "in" : "path",
+          "required" : true,
+          "description" : "Model id or gateway model alias.",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "contents" : {
+                    "type" : "array",
+                    "description" : "Gemini contents array."
+                  },
+                  "tools" : {
+                    "type" : "array",
+                    "description" : "Gemini function calling tools."
+                  },
+                  "toolConfig" : {
+                    "type" : "object",
+                    "description" : "Gemini tool configuration."
+                  },
+                  "generationConfig" : {
+                    "type" : "object",
+                    "description" : "Gemini generation configuration."
+                  },
+                  "systemInstruction" : {
+                    "type" : "object",
+                    "description" : "Gemini system instruction."
+                  }
+                }
+              }
+            }
           }
         }
       }

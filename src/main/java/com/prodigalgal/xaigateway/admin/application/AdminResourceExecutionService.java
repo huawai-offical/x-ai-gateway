@@ -157,7 +157,7 @@ public class AdminResourceExecutionService {
                         json.objectNode().put("model", "gpt-4o-mini").put("input", "用一句话介绍 x-ai-gateway。"),
                         java.util.List.of(), java.util.List.of(), java.util.List.of("requestId", "routeSelection", "usage")),
                 template("image", "generate", "resource_execute", "openai", "POST", "/v1/images/generations", "gpt-image-1",
-                        "图片生成调试入口，适合验证模型、账号池、错误规则和二进制/JSON 返回。",
+                        "图片生成调试入口，适合验证模型、账号分组、错误规则和二进制/JSON 返回。",
                         json.objectNode().put("model", "gpt-image-1").put("prompt", "一只在星图上巡航的机械猫。").put("size", "1024x1024"),
                         java.util.List.of(), java.util.List.of(), java.util.List.of("requestId", "canonicalResponse", "usage")),
                 template("audio", "transcribe", "resource_execute", "openai", "POST", "/v1/audio/transcriptions", "whisper-1",
@@ -213,9 +213,6 @@ public class AdminResourceExecutionService {
         boolean hasMultipartPayload = request.fileRefs() != null && !request.fileRefs().isEmpty()
                 || request.formFields() != null && !request.formFields().isEmpty();
         return hasMultipartPayload && ("/v1/audio/transcriptions".equals(request.requestPath())
-                || "/v1/audio/translations".equals(request.requestPath())
-                || "/v1/images/edits".equals(request.requestPath())
-                || "/v1/images/variations".equals(request.requestPath())
                 || "/v1/files".equals(request.requestPath())
                 || request.requestPath().matches("^/v1/uploads/[^/]+/parts$"));
     }

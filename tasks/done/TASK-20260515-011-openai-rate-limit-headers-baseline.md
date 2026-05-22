@@ -1,9 +1,9 @@
 # TASK-20260515-011 OpenAI Rate Limit Headers 与 429 错误基线
 
-状态：Done  
-优先级：Critical  
-类型：子任务  
-父任务：[TASK-20260514-030](../backlog/TASK-20260514-030-openai-cross-cutting-protocol-compatibility.md)  
+状态：Done
+优先级：Critical
+类型：子任务
+父任务：[TASK-20260514-030](../done/TASK-20260514-030-openai-cross-cutting-protocol-compatibility.md)
 上游来源：[REQ-20260514-009](../../docs/requirements/REQ-20260514-009-openai-full-api-coverage-task-system.md)、[TASK-20260515-001](../done/TASK-20260515-001-openai-error-request-id-foundation.md)
 
 ## 背景
@@ -99,5 +99,5 @@ OpenAI 客户端和 SDK 会依赖 HTTP 429、`rate_limit_error`、`rate_limit_ex
 ## 关联文档
 
 - [REQ-20260514-009](../../docs/requirements/REQ-20260514-009-openai-full-api-coverage-task-system.md)
-- [TASK-20260514-030](../backlog/TASK-20260514-030-openai-cross-cutting-protocol-compatibility.md)
+- [TASK-20260514-030](../done/TASK-20260514-030-openai-cross-cutting-protocol-compatibility.md)
 - [REP-20260514 OpenAI 全量覆盖任务拆解](../../docs/reports/REP-20260514-openai-full-api-coverage-task-breakdown.md)

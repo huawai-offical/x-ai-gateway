@@ -1,9 +1,9 @@
 # TASK-20260515-012 OpenAI Idempotency-Key TTL 与清理策略
 
-状态：Done  
-优先级：Critical  
-类型：子任务  
-父任务：[TASK-20260514-030](../backlog/TASK-20260514-030-openai-cross-cutting-protocol-compatibility.md)  
+状态：Done
+优先级：Critical
+类型：子任务
+父任务：[TASK-20260514-030](../done/TASK-20260514-030-openai-cross-cutting-protocol-compatibility.md)
 上游来源：[TASK-20260515-009](../done/TASK-20260515-009-openai-idempotency-key-response-replay.md)
 
 ## 背景
@@ -93,4 +93,4 @@
 ## 关联文档
 
 - [TASK-20260515-009](../done/TASK-20260515-009-openai-idempotency-key-response-replay.md)
-- [TASK-20260514-030](../backlog/TASK-20260514-030-openai-cross-cutting-protocol-compatibility.md)
+- [TASK-20260514-030](../done/TASK-20260514-030-openai-cross-cutting-protocol-compatibility.md)

@@ -3,7 +3,7 @@
 状态：Done
 优先级：Critical
 类型：子任务
-父任务：[TASK-20260514-029](../in-progress/TASK-20260514-029-openai-openapi-catalog-conformance-sdk.md)
+父任务：[TASK-20260514-029](TASK-20260514-029-openai-openapi-catalog-conformance-sdk.md)
 上游来源：[ADR-0010](../../docs/decisions/ADR-0010-functional-service-api-scope.md)、[REQ-20260518-005](../../docs/requirements/REQ-20260518-005-functional-service-api-scope.md)、[REQ-20260519-002](../../docs/requirements/REQ-20260519-002-codex-priority-functional-service-api.md)
 
 ## 背景

@@ -35,7 +35,7 @@ public class GoogleNativeUploadNamespaceController {
     public ResponseEntity<?> unsupported() {
         return ResponseEntity.status(501).body(java.util.Map.of(
                 "error", "NATIVE_PATH_UNSUPPORTED",
-                "message", "该 Google upload native path 尚未显式兼容；当前支持 /google/upload/v1beta/files，更多路径请查看 /admin/native-compatibility/matrix。"
+                "message", "该 Google upload native path 尚未显式兼容；当前支持 /google/upload/v1beta/files，更多路径请查看 /public/docs/compatibility。"
         ));
     }
 }

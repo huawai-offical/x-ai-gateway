@@ -47,8 +47,8 @@ public class AccessGroupEntity {
     private int priority = 100;
 
     @Convert(converter = StringListJsonConverter.class)
-    @Column(name = "allowed_protocols_json", nullable = false, columnDefinition = "text")
-    private List<String> allowedProtocols = List.of();
+    @Column(name = "allowed_protocol_suites_json", nullable = false, columnDefinition = "text")
+    private List<String> allowedProtocolSuites = List.of();
 
     @Convert(converter = StringListJsonConverter.class)
     @Column(name = "allowed_models_json", nullable = false, columnDefinition = "text")
@@ -118,12 +118,12 @@ public class AccessGroupEntity {
         this.priority = priority;
     }
 
-    public List<String> getAllowedProtocols() {
-        return allowedProtocols;
+    public List<String> getAllowedProtocolSuites() {
+        return allowedProtocolSuites;
     }
 
-    public void setAllowedProtocols(List<String> allowedProtocols) {
-        this.allowedProtocols = allowedProtocols;
+    public void setAllowedProtocolSuites(List<String> allowedProtocolSuites) {
+        this.allowedProtocolSuites = allowedProtocolSuites;
     }
 
     public List<String> getAllowedModels() {

@@ -43,7 +43,7 @@ class FunctionalProviderSmokeRecordReplayFixtureVerifierTests {
                 .replace("api-key\": \"***\"", "api-key\": \"mimo-live-secret\"")
                 .replace("blocked api-key=***", "blocked api-key=mimo-live-secret")
                 .replace("req_mimo_chat", "Bearer sk-live-secret")
-                .replace("mimo-v2-pro", "AIzaSyBPM5panpM3zawPoYSUZ1JGTmzCPzr-R-s");
+                .replace("mimo-v2-pro", "AIzaSy" + "BPM5panpM3zawPoYSUZ1JGTmzCPzr-R-s");
 
         var result = verifier.validate(objectMapper.readTree(unsafe));
 

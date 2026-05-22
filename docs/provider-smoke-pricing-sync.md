@@ -65,7 +65,7 @@ build/reports/xag-smoke/gemini-ai-studio.md
 
 ```powershell
 .\gradlew.bat test --tests "com.prodigalgal.xaigateway.admin.application.ProviderCatalogLoaderTests" --tests "com.prodigalgal.xaigateway.protocol.ingress.publicapi.PublicDocsBundleServiceTests"
-.\gradlew.bat test --tests "com.prodigalgal.xaigateway.admin.application.ProviderPricingSnapshotServiceTests" --tests "com.prodigalgal.xaigateway.admin.application.ProviderReferenceGapServiceTests" --tests "com.prodigalgal.xaigateway.admin.api.ProviderReferenceGapAdminControllerTests"
+.\gradlew.bat test --tests "com.prodigalgal.xaigateway.admin.application.ProviderPricingSnapshotServiceTests"
 ```
 
 ## 后续扩展

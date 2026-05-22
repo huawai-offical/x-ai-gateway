@@ -19,7 +19,7 @@ public class OAuthConnectionController {
     @PostMapping("/{provider}/start")
     public OauthStartResponse start(@PathVariable String provider, @RequestBody(required = false) OauthStartRequest request) {
         OauthStartRequest safeRequest = request == null ? new OauthStartRequest(null, null) : request;
-        return oauthConnectionService.start(UpstreamAccountProviderType.valueOf(provider.toUpperCase()), safeRequest.poolId(), safeRequest.redirectPath());
+        return oauthConnectionService.start(UpstreamAccountProviderType.valueOf(provider.toUpperCase()), safeRequest.groupId(), safeRequest.redirectPath());
     }
 
     @GetMapping("/{provider}/callback")

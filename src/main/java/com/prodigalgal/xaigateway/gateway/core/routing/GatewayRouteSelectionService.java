@@ -27,6 +27,9 @@ import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
 import com.prodigalgal.xaigateway.gateway.core.interop.NonChatRoutePolicyDecision;
 import com.prodigalgal.xaigateway.gateway.core.interop.NonChatRoutePolicyService;
 import com.prodigalgal.xaigateway.gateway.core.interop.SiteCapabilityTruthService;
+import com.prodigalgal.xaigateway.gateway.core.model.ModelPolicyCandidateDecision;
+import com.prodigalgal.xaigateway.gateway.core.model.ModelPolicyResolvedModel;
+import com.prodigalgal.xaigateway.gateway.core.model.ModelPolicyResolver;
 import com.prodigalgal.xaigateway.gateway.core.shared.ModelIdNormalizer;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.infra.persistence.repository.NetworkProxyRepository;
@@ -68,6 +71,7 @@ public class GatewayRouteSelectionService {
     private final HealthStateStore healthStateStore;
     private final CostRoutingService costRoutingService;
     private final RoutingPolicyRuntimeEnforcementService routingPolicyRuntimeEnforcementService;
+    private final ModelPolicyResolver modelPolicyResolver;
 
     @Autowired
     public GatewayRouteSelectionService(
@@ -86,7 +90,8 @@ public class GatewayRouteSelectionService {
             RouteCacheStore routeCacheStore,
             HealthStateStore healthStateStore,
             CostRoutingService costRoutingService,
-            RoutingPolicyRuntimeEnforcementService routingPolicyRuntimeEnforcementService) {
+            RoutingPolicyRuntimeEnforcementService routingPolicyRuntimeEnforcementService,
+            ModelPolicyResolver modelPolicyResolver) {
         this.distributedKeyQueryService = distributedKeyQueryService;
         this.modelCatalogQueryService = modelCatalogQueryService;
         this.promptFingerprintService = promptFingerprintService;
@@ -103,6 +108,45 @@ public class GatewayRouteSelectionService {
         this.healthStateStore = healthStateStore;
         this.costRoutingService = costRoutingService;
         this.routingPolicyRuntimeEnforcementService = routingPolicyRuntimeEnforcementService;
+        this.modelPolicyResolver = modelPolicyResolver;
+    }
+
+    public GatewayRouteSelectionService(
+            DistributedKeyQueryService distributedKeyQueryService,
+            ModelCatalogQueryService modelCatalogQueryService,
+            PromptFingerprintService promptFingerprintService,
+            AffinityCacheService affinityCacheService,
+            DistributedKeyGovernanceService distributedKeyGovernanceService,
+            UpstreamCredentialRepository upstreamCredentialRepository,
+            NetworkProxyRepository networkProxyRepository,
+            AccountSelectionService accountSelectionService,
+            GatewayRequestFeatureService gatewayRequestFeatureService,
+            SiteCapabilityTruthService siteCapabilityTruthService,
+            NonChatRoutePolicyService nonChatRoutePolicyService,
+            GovernancePolicyEngine governancePolicyEngine,
+            RouteCacheStore routeCacheStore,
+            HealthStateStore healthStateStore,
+            CostRoutingService costRoutingService,
+            RoutingPolicyRuntimeEnforcementService routingPolicyRuntimeEnforcementService) {
+        this(
+                distributedKeyQueryService,
+                modelCatalogQueryService,
+                promptFingerprintService,
+                affinityCacheService,
+                distributedKeyGovernanceService,
+                upstreamCredentialRepository,
+                networkProxyRepository,
+                accountSelectionService,
+                gatewayRequestFeatureService,
+                siteCapabilityTruthService,
+                nonChatRoutePolicyService,
+                governancePolicyEngine,
+                routeCacheStore,
+                healthStateStore,
+                costRoutingService,
+                routingPolicyRuntimeEnforcementService,
+                null
+        );
     }
 
     public GatewayRouteSelectionService(
@@ -289,7 +333,9 @@ public class GatewayRouteSelectionService {
                 request.requestPath(),
                 request.requestBody() instanceof tools.jackson.databind.JsonNode jsonNode ? jsonNode : null
         );
-        RoutePlanSnapshot snapshot = routeCacheStore
+        RoutePlanSnapshot snapshot = modelPoliciesEnabled()
+                ? buildAndCacheStaticPlan(distributedKey, normalizedProtocol, request, semantics)
+                : routeCacheStore
                 .get(distributedKey.id(), normalizedProtocol, request.requestPath(), request.requestedModel(), semantics)
                 .orElseGet(() -> buildAndCacheStaticPlan(distributedKey, normalizedProtocol, request, semantics));
 
@@ -343,7 +389,7 @@ public class GatewayRouteSelectionService {
                 distributedKey.keyPrefix(),
                 request.requestedModel(),
                 snapshot.publicModel(),
-                snapshot.resolvedModelKey(),
+                selectedEvaluation.candidate().candidate().modelKey(),
                 normalizedProtocol,
                 prefixHash,
                 fingerprint,
@@ -362,6 +408,9 @@ public class GatewayRouteSelectionService {
 
     public void recordSuccessfulSelection(RouteSelectionResult selectionResult) {
         RouteCandidateView selected = selectionResult.selectedCandidate();
+        if (modelPolicyResolver != null) {
+            modelPolicyResolver.recordSuccess(selectionResult);
+        }
         healthStateStore.clear(selected.candidate().credentialId());
         affinityCacheService.bindPrefixAffinity(
                 selectionResult.distributedKeyId(),
@@ -425,9 +474,7 @@ public class GatewayRouteSelectionService {
             String normalizedProtocol,
             RouteSelectionRequest request,
             GatewayRequestSemantics semantics) {
-        ResolvedModelView resolved = modelCatalogQueryService
-                .resolveRequestedModel(request.requestedModel(), normalizedProtocol)
-                .orElseThrow(() -> new IllegalArgumentException("当前请求模型没有可用候选。"));
+        ModelPolicyResolvedModel resolved = resolveRequestedModel(distributedKey, normalizedProtocol, request.requestedModel());
 
         if (!isModelAllowed(distributedKey, request.requestedModel(), resolved.publicModel(), resolved.resolvedModelKey())) {
             throw new IllegalArgumentException("当前 DistributedKey 不允许访问该模型。");
@@ -439,7 +486,18 @@ public class GatewayRouteSelectionService {
         }
 
         List<StaticCandidateResolution> resolutions = mergedCandidates.stream()
-                .map(candidate -> resolveStaticCandidate(distributedKey, normalizedProtocol, request, candidate, semantics))
+                .map(candidate -> {
+                    ModelPolicyCandidateDecision policyDecision = modelPolicyResolver == null
+                            ? new ModelPolicyCandidateDecision(candidate, true, List.of(), List.of())
+                            : modelPolicyResolver.evaluateCandidate(
+                                    distributedKey,
+                                    normalizedProtocol,
+                                    request.requestedModel(),
+                                    resolved.publicModel(),
+                                    candidate
+                            );
+                    return resolveStaticCandidate(distributedKey, normalizedProtocol, request, policyDecision, semantics);
+                })
                 .toList();
 
         boolean anyProviderAllowed = resolutions.stream().anyMatch(item -> !item.providerBlocked());
@@ -463,19 +521,43 @@ public class GatewayRouteSelectionService {
         RoutePlanSnapshot snapshot = new RoutePlanSnapshot(
                 resolved.publicModel(),
                 resolved.resolvedModelKey(),
-                resolved.resolvedModelKey(),
+                resolved.modelGroup(),
                 evaluations
         );
-        routeCacheStore.put(distributedKey.id(), normalizedProtocol, request.requestPath(), request.requestedModel(), semantics, snapshot, null);
+        if (!modelPoliciesEnabled()) {
+            routeCacheStore.put(distributedKey.id(), normalizedProtocol, request.requestPath(), request.requestedModel(), semantics, snapshot, null);
+        }
         return snapshot;
+    }
+
+    private ModelPolicyResolvedModel resolveRequestedModel(
+            DistributedKeyView distributedKey,
+            String normalizedProtocol,
+            String requestedModel) {
+        if (modelPolicyResolver != null) {
+            return modelPolicyResolver.resolveRequestedModel(distributedKey, normalizedProtocol, requestedModel);
+        }
+        ResolvedModelView resolved = modelCatalogQueryService
+                .resolveRequestedModel(requestedModel, normalizedProtocol)
+                .orElseThrow(() -> new IllegalArgumentException("当前请求模型没有可用候选。"));
+        return new ModelPolicyResolvedModel(
+                resolved.requestedModel(),
+                resolved.publicModel(),
+                resolved.resolvedModelKey(),
+                resolved.resolvedModelKey(),
+                resolved.alias(),
+                resolved.candidates(),
+                List.of()
+        );
     }
 
     private StaticCandidateResolution resolveStaticCandidate(
             DistributedKeyView distributedKey,
             String normalizedProtocol,
             RouteSelectionRequest request,
-            RouteCandidateView candidate,
+            ModelPolicyCandidateDecision modelPolicyDecision,
             GatewayRequestSemantics semantics) {
+        RouteCandidateView candidate = modelPolicyDecision.candidate();
         boolean providerBlocked = !isProviderAllowed(distributedKey, candidate);
         NonChatRoutePolicyDecision policyDecision = providerBlocked
                 ? null
@@ -522,12 +604,14 @@ public class GatewayRouteSelectionService {
                 providerBlocked,
                 featureBlocked,
                 renderBlocked,
-                renderLevel
+                renderLevel,
+                modelPolicyDecision.exclusionReasons(),
+                modelPolicyDecision.scoreNotes()
         );
     }
 
     private RouteCandidateEvaluation toStaticEvaluation(StaticCandidateResolution resolution, int bestCapabilityRank) {
-        List<String> exclusionReasons = new ArrayList<>();
+        List<String> exclusionReasons = new ArrayList<>(resolution.modelPolicyExclusionReasons());
         if (resolution.providerBlocked()) {
             exclusionReasons.add("provider_not_allowed");
         } else if (resolution.renderBlocked()) {
@@ -546,7 +630,7 @@ public class GatewayRouteSelectionService {
                 false,
                 RouteSelectionSource.WEIGHTED_HASH,
                 0.0,
-                List.of(),
+                resolution.modelPolicyScoreNotes(),
                 List.copyOf(exclusionReasons)
         );
     }
@@ -640,7 +724,8 @@ public class GatewayRouteSelectionService {
         }
 
         ScoreComponents scoreComponents = scoreComponents(staticEvaluation.candidate(), selectionSource, fingerprint, costEstimate);
-        List<String> scoreBreakdown = buildScoreBreakdown(staticEvaluation.candidate(), selectionSource, healthState, costEstimate, scoreComponents);
+        List<String> scoreBreakdown = new ArrayList<>(staticEvaluation.scoreBreakdown());
+        scoreBreakdown.addAll(buildScoreBreakdown(staticEvaluation.candidate(), selectionSource, healthState, costEstimate, scoreComponents));
         double totalScore = exclusionReasons.isEmpty()
                 ? scoreComponents.totalScore()
                 : Double.NEGATIVE_INFINITY;
@@ -846,7 +931,7 @@ public class GatewayRouteSelectionService {
         }
     }
 
-    private List<RouteCandidateView> mergeCandidates(DistributedKeyView distributedKey, ResolvedModelView resolved) {
+    private List<RouteCandidateView> mergeCandidates(DistributedKeyView distributedKey, ModelPolicyResolvedModel resolved) {
         Map<Long, DistributedCredentialBindingView> bindingMap = distributedKey.bindings().stream()
                 .collect(Collectors.toMap(DistributedCredentialBindingView::credentialId, Function.identity()));
 
@@ -869,7 +954,7 @@ public class GatewayRouteSelectionService {
     }
 
     private boolean isProtocolAllowed(DistributedKeyView distributedKey, String protocol) {
-        return distributedKey.allowedProtocols().isEmpty() || distributedKey.allowedProtocols().contains(protocol);
+        return distributedKey.allowedProtocolSuites().isEmpty() || distributedKey.allowedProtocolSuites().contains(protocol);
     }
 
     private boolean isModelAllowed(DistributedKeyView distributedKey, String requestedModel, String publicModel, String resolvedModelKey) {
@@ -899,7 +984,7 @@ public class GatewayRouteSelectionService {
             return true;
         }
         return networkProxyRepository.findById(credential.getProxyId())
-                .map(proxy -> proxy.isActive() && !"FAILED".equalsIgnoreCase(proxy.getLastStatus()))
+                .map(com.prodigalgal.xaigateway.infra.persistence.entity.NetworkProxyEntity::isActive)
                 .orElse(false);
     }
 
@@ -923,12 +1008,18 @@ public class GatewayRouteSelectionService {
         return protocol == null ? "openai" : protocol.trim().toLowerCase();
     }
 
+    private boolean modelPoliciesEnabled() {
+        return modelPolicyResolver != null && modelPolicyResolver.hasEnabledPolicies();
+    }
+
     private record StaticCandidateResolution(
             RouteCandidateView candidate,
             boolean providerBlocked,
             boolean featureBlocked,
             boolean renderBlocked,
-            InteropCapabilityLevel renderLevel
+            InteropCapabilityLevel renderLevel,
+            List<String> modelPolicyExclusionReasons,
+            List<String> modelPolicyScoreNotes
     ) {
         int capabilityRank() {
             return candidate.capabilityRank();

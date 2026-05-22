@@ -31,7 +31,7 @@ class OAuthConnectionControllerTests {
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("""
                         {
-                          "poolId":1
+                          "groupId":1
                         }
                         """)
                 .exchange()

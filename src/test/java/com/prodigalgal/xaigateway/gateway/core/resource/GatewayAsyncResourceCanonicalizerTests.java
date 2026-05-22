@@ -19,42 +19,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GatewayAsyncResourceCanonicalizerTests {
 
-    @Test
-    void shouldNormalizeLifecycleAcrossAsyncResourceFamilies() {
-        GatewayFileBindingRepository gatewayFileBindingRepository = Mockito.mock(GatewayFileBindingRepository.class);
-        GatewayFileRepository gatewayFileRepository = Mockito.mock(GatewayFileRepository.class);
-        GatewayAsyncResourceCanonicalizer canonicalizer = new GatewayAsyncResourceCanonicalizer(
-                gatewayFileBindingRepository,
-                gatewayFileRepository,
-                new ObjectMapper()
-        );
-
-        List<GatewayAsyncResourceEntity> entities = List.of(
-                entity(GatewayAsyncResourceType.RESPONSE, "resp_1", "completed", """
-                        {"object_mode":"gateway_response_object","events":[{"type":"stored","status":"completed","at":1713150000}]}
-                        """),
-                entity(GatewayAsyncResourceType.UPLOAD, "upload_1", "created", """
-                        {"object_mode":"upstream_object_with_local_lineage","events":[{"type":"created","status":"created","at":1713150000}]}
-                        """),
-                entity(GatewayAsyncResourceType.VIDEO, "video_1", "validating", """
-                        {"object_mode":"upstream_object_with_local_lineage","events":[{"type":"synced","status":"validating","at":1713150000}]}
-                        """),
-                entity(GatewayAsyncResourceType.MUSIC, "music_1", "cancelled", """
-                        {"object_mode":"upstream_object_with_local_lineage","events":[{"type":"status_changed","status":"cancelled","at":1713150000}]}
-                        """),
-                entity(GatewayAsyncResourceType.REALTIME_SESSION, "sess_1", "failed", """
-                        {"object_mode":"upstream_object_with_local_lineage","failure_reason":"expired","events":[{"type":"synced","status":"failed","at":1713150000}]}
-                        """)
-        );
-
-        assertEquals("completed", canonicalizer.toLifecycle(entities.get(0)).normalizedStatus());
-        assertEquals("created", canonicalizer.toLifecycle(entities.get(1)).normalizedStatus());
-        assertEquals("in_progress", canonicalizer.toLifecycle(entities.get(2)).normalizedStatus());
-        assertEquals("cancelled", canonicalizer.toLifecycle(entities.get(3)).normalizedStatus());
-        assertEquals("failed", canonicalizer.toLifecycle(entities.get(4)).normalizedStatus());
-        assertEquals("expired", canonicalizer.toLifecycle(entities.get(4)).failureReason());
-        assertEquals("synced", canonicalizer.toTransitions(entities.get(4)).get(0).eventType());
-    }
 
     @Test
     void shouldBuildUploadLineageAndArtifactsFromMetadata() {

@@ -2,16 +2,22 @@ package com.prodigalgal.xaigateway.admin.application;
 
 import com.prodigalgal.xaigateway.admin.api.ExportedClientConfigResponse;
 import com.prodigalgal.xaigateway.admin.api.AccountImportAuthJsonRequest;
+import com.prodigalgal.xaigateway.admin.api.AccountModelRefreshResponse;
+import com.prodigalgal.xaigateway.admin.api.OfficialAccountType;
 import com.prodigalgal.xaigateway.admin.api.ProgrammingAccountIdentityResponse;
 import com.prodigalgal.xaigateway.admin.api.UpstreamAccountResponse;
 import com.prodigalgal.xaigateway.gateway.core.account.UpstreamAccountProviderType;
-import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountPoolEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountGroupEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountEntity;
-import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountPoolRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountGroupRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.Map;
@@ -26,7 +32,7 @@ import tools.jackson.databind.ObjectMapper;
 public class AccountAdminService {
 
     private final UpstreamAccountRepository upstreamAccountRepository;
-    private final UpstreamAccountPoolRepository upstreamAccountPoolRepository;
+    private final UpstreamAccountGroupRepository upstreamAccountGroupRepository;
     private final CredentialCryptoService credentialCryptoService;
     private final SupportedModelCatalogService supportedModelCatalogService;
     private final OAuthSessionRefreshService oauthSessionRefreshService;
@@ -36,13 +42,13 @@ public class AccountAdminService {
 
     public AccountAdminService(
             UpstreamAccountRepository upstreamAccountRepository,
-            UpstreamAccountPoolRepository upstreamAccountPoolRepository,
+            UpstreamAccountGroupRepository upstreamAccountGroupRepository,
             CredentialCryptoService credentialCryptoService,
             SupportedModelCatalogService supportedModelCatalogService,
             OAuthSessionRefreshService oauthSessionRefreshService,
             ObjectMapper objectMapper) {
         this.upstreamAccountRepository = upstreamAccountRepository;
-        this.upstreamAccountPoolRepository = upstreamAccountPoolRepository;
+        this.upstreamAccountGroupRepository = upstreamAccountGroupRepository;
         this.credentialCryptoService = credentialCryptoService;
         this.supportedModelCatalogService = supportedModelCatalogService;
         this.oauthSessionRefreshService = oauthSessionRefreshService;
@@ -52,16 +58,16 @@ public class AccountAdminService {
     }
 
     @Transactional(readOnly = true)
-    public List<UpstreamAccountResponse> list(Long poolId) {
-        if (poolId == null) {
+    public List<UpstreamAccountResponse> list(Long groupId) {
+        if (groupId == null) {
             return upstreamAccountRepository.findAllByOrderByCreatedAtDesc().stream().map(this::toResponse).toList();
         }
-        return listByPool(poolId);
+        return listByGroup(groupId);
     }
 
     @Transactional(readOnly = true)
-    public List<UpstreamAccountResponse> listByPool(Long poolId) {
-        return upstreamAccountRepository.findAllByPool_IdOrderByCreatedAtDesc(poolId).stream().map(this::toResponse).toList();
+    public List<UpstreamAccountResponse> listByGroup(Long groupId) {
+        return upstreamAccountRepository.findAllByGroup_IdOrderByCreatedAtDesc(groupId).stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
@@ -94,6 +100,25 @@ public class AccountAdminService {
             entity.setRefreshStatus("READY");
         }
         return toResponse(upstreamAccountRepository.save(entity));
+    }
+
+    public AccountModelRefreshResponse refreshModels(Long id) {
+        UpstreamAccountEntity entity = getRequired(id);
+        List<String> models = supportedModelCatalogService.listByUpstreamProvider(entity.getProviderType());
+        if (entity.getProviderType() == UpstreamAccountProviderType.CODEX_OAUTH) {
+            models = mergeModels(models, OfficialAccountType.CODEX.defaultModels());
+        }
+        if (models.isEmpty()) {
+            models = supportedModelCatalogService.normalize(entity.getSupportedModels());
+        }
+        entity.setSupportedModels(models);
+        UpstreamAccountEntity saved = upstreamAccountRepository.save(entity);
+        return new AccountModelRefreshResponse(
+                saved.getId(),
+                models.size(),
+                models.stream().limit(10).toList(),
+                Instant.now()
+        );
     }
 
     public UpstreamAccountResponse updateNetwork(Long id, Long proxyId, Long tlsFingerprintProfileId) {
@@ -166,11 +191,9 @@ public class AccountAdminService {
     }
 
     public UpstreamAccountResponse importAuthJson(AccountImportAuthJsonRequest request) {
-        UpstreamAccountPoolEntity pool = resolvePool(request.poolId());
-        UpstreamAccountProviderType providerType = pool != null
-                ? pool.getProviderType()
-                : UpstreamAccountProviderType.OPENAI_OAUTH;
-        String metadataJson = request.metadataJson() == null || request.metadataJson().isBlank() ? "{}" : request.metadataJson().trim();
+        UpstreamAccountGroupEntity group = resolveGroup(request.groupId());
+        UpstreamAccountProviderType providerType = group.getProviderType();
+        String metadataJson = resolveImportMetadataJson(request);
         JsonNode metadata = readMetadata(metadataJson);
         CodexAuthJsonParser.ParsedCodexAuthJson parsedCodexAuth = tryParseCodexAuthJson(providerType, metadataJson);
 
@@ -189,11 +212,11 @@ public class AccountAdminService {
 
         UpstreamAccountEntity entity = resolveExistingImportedAccount(providerType, parsedCodexAuth, externalAccountId)
                 .orElseGet(UpstreamAccountEntity::new);
-        entity.setPool(pool);
+        entity.setGroup(group);
         entity.setProviderType(providerType);
         entity.setAccountName(resolveAccountName(
                 firstNonBlank(request.accountName(), parsedCodexAuth == null ? null : parsedCodexAuth.accountName()),
-                pool == null ? null : pool.getPoolName()
+                group == null ? null : group.getGroupName()
         ));
         entity.setExternalAccountId(externalAccountId);
         entity.setAccessTokenCiphertext(credentialCryptoService.encrypt(accessToken.trim()));
@@ -205,7 +228,7 @@ public class AccountAdminService {
         entity.setHealthy(true);
         entity.setLastRefreshAt(Instant.now());
         entity.setMetadataJson(buildSanitizedImportMetadata(metadataJson, parsedCodexAuth, providerType));
-        entity.setSupportedModels(supportedModelCatalogService.resolveForAccountImport(pool, request.supportedModels()));
+        entity.setSupportedModels(supportedModelCatalogService.resolveForAccountImport(group, request.supportedModels()));
         entity.setProxyId(request.proxyId());
         entity.setTlsFingerprintProfileId(request.tlsFingerprintProfileId());
         entity.setSiteProfileId(request.siteProfileId());
@@ -226,6 +249,41 @@ public class AccountAdminService {
         entity.setLastRefreshResultJson(sensitiveJsonSanitizer.sanitizeJson(resolveJsonSnapshot(request.lastRefreshResultJson(), metadata, List.of("last_refresh_result", "lastRefreshResult", "refresh_result", "refreshResult"))));
 
         return toResponse(upstreamAccountRepository.save(entity));
+    }
+
+    private String resolveImportMetadataJson(AccountImportAuthJsonRequest request) {
+        String explicitAuthJson = firstNonBlank(request.authJsonContent(), request.metadataJson());
+        if (explicitAuthJson != null) {
+            return explicitAuthJson.trim();
+        }
+
+        String pathText = firstNonBlank(request.authJsonFilePath(), firstPath(request.authJsonFilePaths()));
+        if (pathText == null) {
+            return "{}";
+        }
+        try {
+            Path path = Path.of(pathText.trim()).toAbsolutePath().normalize();
+            if (!Files.isRegularFile(path)) {
+                throw new IllegalArgumentException("auth.json 文件不存在或不可读取。");
+            }
+            return Files.readString(path).trim();
+        } catch (InvalidPathException exception) {
+            throw new IllegalArgumentException("auth.json 文件路径无效。", exception);
+        } catch (IOException exception) {
+            throw new IllegalArgumentException("auth.json 文件读取失败。", exception);
+        }
+    }
+
+    private String firstPath(List<String> paths) {
+        if (paths == null) {
+            return null;
+        }
+        for (String path : paths) {
+            if (path != null && !path.isBlank()) {
+                return path;
+            }
+        }
+        return null;
     }
 
     private CodexAuthJsonParser.ParsedCodexAuthJson tryParseCodexAuthJson(
@@ -331,19 +389,26 @@ public class AccountAdminService {
                 .orElseThrow(() -> new IllegalArgumentException("未找到指定账号。"));
     }
 
-    private UpstreamAccountPoolEntity resolvePool(Long poolId) {
-        if (poolId == null) {
-            return null;
-        }
-        return upstreamAccountPoolRepository.findById(poolId)
-                .orElseThrow(() -> new IllegalArgumentException("未找到指定账号池。"));
+    private List<String> mergeModels(List<String> primary, List<String> fallback) {
+        java.util.LinkedHashSet<String> models = new java.util.LinkedHashSet<>();
+        models.addAll(supportedModelCatalogService.normalize(primary));
+        models.addAll(supportedModelCatalogService.normalize(fallback));
+        return supportedModelCatalogService.normalize(List.copyOf(models));
     }
 
-    private String resolveAccountName(String accountName, String poolName) {
+    private UpstreamAccountGroupEntity resolveGroup(Long groupId) {
+        if (groupId == null) {
+            throw new IllegalArgumentException("上游账号必须归入一个账号分组。");
+        }
+        return upstreamAccountGroupRepository.findById(groupId)
+                .orElseThrow(() -> new IllegalArgumentException("未找到指定账号分组。"));
+    }
+
+    private String resolveAccountName(String accountName, String groupName) {
         if (accountName != null && !accountName.isBlank()) {
             return accountName.trim();
         }
-        String namePrefix = poolName == null || poolName.isBlank() ? "unassigned" : poolName;
+        String namePrefix = groupName == null || groupName.isBlank() ? "unassigned" : groupName;
         return namePrefix + "-" + Instant.now().toEpochMilli();
     }
 
@@ -363,7 +428,7 @@ public class AccountAdminService {
         long firstTokenSamples = entity.getFirstTokenSampleCount();
         return new UpstreamAccountResponse(
                 entity.getId(),
-                entity.getPool() == null ? null : entity.getPool().getId(),
+                entity.getGroup() == null ? null : entity.getGroup().getId(),
                 entity.getAccountName(),
                 entity.getProviderType(),
                 supportedModelCatalogService.normalize(entity.getSupportedModels()),
@@ -572,9 +637,9 @@ public class AccountAdminService {
         if (entity.getQuotaRemainingRequests() != null && entity.getQuotaRemainingRequests() <= 0) {
             return "QUOTA_REQUESTS_EXHAUSTED";
         }
-        List<String> allowedFamilies = entity.getPool() == null || entity.getPool().getAllowedClientFamilies() == null
+        List<String> allowedFamilies = entity.getGroup() == null || entity.getGroup().getAllowedClientFamilies() == null
                 ? List.of()
-                : entity.getPool().getAllowedClientFamilies().stream()
+                : entity.getGroup().getAllowedClientFamilies().stream()
                         .filter(value -> value != null && !value.isBlank())
                         .map(value -> value.trim().toUpperCase(Locale.ROOT))
                         .toList();

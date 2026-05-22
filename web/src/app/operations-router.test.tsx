@@ -1,54 +1,197 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest'
-import { render, screen } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { RouterProvider, createMemoryRouter } from 'react-router-dom'
-import { describe, expect, it, vi } from 'vitest'
-import { AppLayout } from './layout'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { AppProviders } from './providers'
+import { appRoutes } from './router'
 
-vi.mock('../features/keys/keys-page', () => ({ KeysPage: () => <div>keys</div> }))
-vi.mock('../features/accounts/account-pools-page', () => ({ AccountPoolsPage: () => <div>account pools</div> }))
-vi.mock('../features/accounts/account-pool-detail-page', () => ({ AccountPoolDetailPage: () => <div>account pool detail</div> }))
-vi.mock('../features/accounts/oauth-connect-page', () => ({ OauthConnectPage: () => <div>oauth connect</div> }))
-vi.mock('../features/accounts/oauth-callback-page', () => ({ OauthCallbackPage: () => <div>oauth callback</div> }))
-vi.mock('../features/accounts/account-detail-page', () => ({ AccountDetailPage: () => <div>account detail</div> }))
-vi.mock('../features/network/proxies-page', () => ({ ProxiesPage: () => <div>proxies</div> }))
-vi.mock('../features/network/proxy-detail-page', () => ({ ProxyDetailPage: () => <div>proxy detail</div> }))
-vi.mock('../features/network/tls-profiles-page', () => ({ TlsProfilesPage: () => <div>tls</div> }))
-vi.mock('../features/network/probes-page', () => ({ ProbesPage: () => <div>probes</div> }))
-vi.mock('../features/ops/ops-page', () => ({ OpsPage: () => <div>ops</div> }))
-vi.mock('../features/ops/ops-alerts-page', () => ({ OpsAlertsPage: () => <div>alerts</div> }))
-vi.mock('../features/ops/ops-probes-page', () => ({ OpsProbesPage: () => <div>ops probes</div> }))
-vi.mock('../features/ops/ops-logs-page', () => ({ OpsLogsPage: () => <div>ops logs</div> }))
-vi.mock('../features/error-rules/error-rules-page', () => ({ ErrorRulesPage: () => <div>error rules</div> }))
-vi.mock('../features/operations/install-page', () => ({ InstallPage: () => <div>install</div> }))
-vi.mock('../features/operations/changes-page', () => ({ ChangesPage: () => <div>changes page</div> }))
-vi.mock('../features/operations/windows-page', () => ({ WindowsPage: () => <div>windows page</div> }))
-vi.mock('../features/operations/checkpoints-page', () => ({ CheckpointsPage: () => <div>checkpoints page</div> }))
-vi.mock('../features/provider-sites/provider-sites-page', () => ({ ProviderSitesPage: () => <div>provider sites</div> }))
-vi.mock('../features/provider-sites/provider-site-detail-page', () => ({ ProviderSiteDetailPage: () => <div>provider site detail</div> }))
-vi.mock('../features/provider-sites/capability-matrix-page', () => ({ CapabilityMatrixPage: () => <div>capability matrix</div> }))
-vi.mock('../features/provider-sites/translation-debug-page', () => ({ TranslationDebugPage: () => <div>translation debug</div> }))
+vi.mock('../features/ops/ops-page', () => ({
+  OpsPage: () => <div>ops page</div>,
+}))
+
+const fetchMock = vi.fn<typeof fetch>()
 
 describe('operations router', () => {
-  it('redirects legacy operations routes to the unified changes page', async () => {
-    const router = createMemoryRouter(
-      [
-        {
-          path: '/',
-          element: <AppLayout />,
-          children: [
-            { path: 'operations/changes', element: <div>changes page</div> },
-            { path: 'operations/backups', element: <div>legacy route</div> },
-          ],
-        },
-      ],
-      {
-        initialEntries: ['/operations/backups'],
-      },
+  beforeEach(() => {
+    fetchMock.mockReset()
+    vi.stubGlobal('fetch', fetchMock)
+  })
+
+  afterEach(() => {
+    cleanup()
+    window.localStorage.clear()
+    window.sessionStorage.clear()
+    vi.unstubAllGlobals()
+  })
+
+  it('redirects unauthenticated users to login before loading protected routes', async () => {
+    fetchMock.mockImplementation(async (input) => {
+      const pathname = new URL(String(input), 'http://localhost').pathname
+      if (pathname === '/admin/auth/session') {
+        return new Response(
+          JSON.stringify({
+            authenticated: false,
+            username: null,
+            authenticatedAt: null,
+            expiresAt: null,
+          }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        )
+      }
+      if (pathname === '/admin/auth/challenge') {
+        return new Response(
+          JSON.stringify({
+            challengeId: 'challenge-redirect',
+            mathPrompt: '1 + 1 = ?',
+            issuedAt: '2026-04-20T12:00:00Z',
+            expiresAt: '2026-04-20T12:05:00Z',
+            powAlgorithm: 'SHA-256',
+            powSalt: 'salt-redirect',
+            powDifficulty: 0,
+          }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        )
+      }
+
+      throw new Error(`Unhandled fetch request: ${pathname}`)
+    })
+
+    const router = createMemoryRouter(appRoutes, {
+      initialEntries: ['/console/operations/backups'],
+    })
+
+    render(
+      <AppProviders>
+        <RouterProvider router={router} />
+      </AppProviders>,
     )
 
-    render(<RouterProvider router={router} />)
+    expect(await screen.findByText('登录控制台')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/login')
+      expect(router.state.location.search).toContain('redirect=')
+      expect(decodeURIComponent(router.state.location.search)).toContain('/console/operations/backups')
+    })
+  })
 
-    expect(await screen.findByText('legacy route')).toBeInTheDocument()
+  it.each([
+    ['/console/operations/backups'],
+    ['/console/operations/upgrades'],
+    ['/console/operations/rollbacks'],
+  ])('redirects retired operations route %s to ops overview', async (initialPath) => {
+    fetchMock.mockImplementation(async (input) => {
+      const pathname = new URL(String(input), 'http://localhost').pathname
+      if (pathname === '/admin/auth/session') {
+        return new Response(
+          JSON.stringify({
+            authenticated: true,
+            username: 'console-admin',
+            authenticatedAt: '2026-04-20T12:00:00Z',
+            expiresAt: '2026-04-20T14:00:00Z',
+          }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        )
+      }
+
+      throw new Error(`Unhandled fetch request: ${pathname}`)
+    })
+
+    const router = createMemoryRouter(appRoutes, {
+      initialEntries: [initialPath],
+    })
+
+    render(
+      <AppProviders>
+        <RouterProvider router={router} />
+      </AppProviders>,
+    )
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/console/ops')
+    })
+    expect(await screen.findByText('ops page')).toBeInTheDocument()
+  })
+
+  it('redirects the console root to intelligent ops overview', async () => {
+    fetchMock.mockImplementation(async (input) => {
+      const pathname = new URL(String(input), 'http://localhost').pathname
+      if (pathname === '/admin/auth/session') {
+        return new Response(
+          JSON.stringify({
+            authenticated: true,
+            username: 'console-admin',
+            authenticatedAt: '2026-04-20T12:00:00Z',
+            expiresAt: '2026-04-20T14:00:00Z',
+          }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        )
+      }
+
+      throw new Error(`Unhandled fetch request: ${pathname}`)
+    })
+
+    const router = createMemoryRouter(appRoutes, {
+      initialEntries: ['/console'],
+    })
+
+    render(
+      <AppProviders>
+        <RouterProvider router={router} />
+      </AppProviders>,
+    )
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/console/ops')
+    })
+  })
+
+  it('redirects legacy console routes into the /console namespace', async () => {
+    fetchMock.mockImplementation(async (input) => {
+      const pathname = new URL(String(input), 'http://localhost').pathname
+      if (pathname === '/admin/auth/session') {
+        return new Response(
+          JSON.stringify({
+            authenticated: true,
+            username: 'console-admin',
+            authenticatedAt: '2026-04-20T12:00:00Z',
+            expiresAt: '2026-04-20T14:00:00Z',
+          }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        )
+      }
+
+      throw new Error(`Unhandled fetch request: ${pathname}`)
+    })
+
+    const router = createMemoryRouter(appRoutes, {
+      initialEntries: ['/operations/backups?from=legacy'],
+    })
+
+    render(
+      <AppProviders>
+        <RouterProvider router={router} />
+      </AppProviders>,
+    )
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/console/ops')
+    })
+    expect(await screen.findByText('ops page')).toBeInTheDocument()
   })
 })

@@ -24,7 +24,10 @@ import org.hibernate.annotations.UpdateTimestamp;
 @Table(
         name = "upstream_credential",
         uniqueConstraints = {
-                @UniqueConstraint(name = "uk_upstream_credential_api_key_fingerprint", columnNames = "api_key_fingerprint")
+                @UniqueConstraint(
+                        name = "uk_upstream_credential_scope_fingerprint",
+                        columnNames = {"api_key_fingerprint", "provider_type", "base_url", "site_profile_id"}
+                )
         },
         indexes = {
                 @Index(name = "idx_upstream_credential_provider_active", columnList = "provider_type,is_active"),
@@ -172,9 +175,9 @@ public class UpstreamCredentialEntity {
     @Comment("绑定的站点档案 ID。")
     private Long siteProfileId;
 
-    @Column(name = "pool_id", nullable = true)
-    @Comment("账号池 ID。")
-    private Long poolId;
+    @Column(name = "group_id", nullable = true)
+    @Comment("账号分组 ID。")
+    private Long groupId;
 
     @Column(name = "deleted", nullable = false)
     @Comment("逻辑删除标记。")
@@ -450,12 +453,12 @@ public class UpstreamCredentialEntity {
         this.siteProfileId = siteProfileId;
     }
 
-    public Long getPoolId() {
-        return poolId;
+    public Long getGroupId() {
+        return groupId;
     }
 
-    public void setPoolId(Long poolId) {
-        this.poolId = poolId;
+    public void setGroupId(Long groupId) {
+        this.groupId = groupId;
     }
 
     public boolean isDeleted() {

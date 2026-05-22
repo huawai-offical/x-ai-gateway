@@ -1,7 +1,6 @@
 package com.prodigalgal.xaigateway.admin.api;
 
 import com.prodigalgal.xaigateway.admin.application.ProviderSiteAdminService;
-import com.prodigalgal.xaigateway.admin.application.ProviderSiteDossierService;
 import com.prodigalgal.xaigateway.gateway.core.catalog.SurfaceCapabilityView;
 import com.prodigalgal.xaigateway.gateway.core.interop.CapabilityResolutionView;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
@@ -22,11 +21,10 @@ import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webflux.test.autoconfigure.WebFluxTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
-@WebFluxTest(controllers = {ProviderSiteAdminController.class, CapabilityMatrixAdminController.class})
+@WebFluxTest(controllers = ProviderSiteAdminController.class)
 @Import(PermitAllSecurityTestConfig.class)
 class ProviderSiteAdminControllerTests {
 
@@ -35,9 +33,6 @@ class ProviderSiteAdminControllerTests {
 
     @MockitoBean
     private ProviderSiteAdminService providerSiteAdminService;
-
-    @MockitoBean
-    private ProviderSiteDossierService providerSiteDossierService;
 
     @Test
     void shouldListProviderSites() {
@@ -53,140 +48,34 @@ class ProviderSiteAdminControllerTests {
     }
 
     @Test
-    void shouldExposeProviderSiteDossier() {
-        Mockito.when(providerSiteDossierService.get(1L)).thenReturn(new ProviderSiteDossierResponse(
-                sampleSite(),
+    void shouldExposeSiteCapabilities() {
+        Mockito.when(providerSiteAdminService.listCapabilities(1L)).thenReturn(List.of(new SiteModelCapabilityResponse(
+                5L,
+                "gpt-4o",
+                "gpt-4o",
+                List.of("openai", "responses"),
+                true,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                null,
+                InteropCapabilityLevel.EMULATED,
+                null,
                 List.of(),
-                List.of(new SurfaceDossierItemResponse(
-                        "file_create",
-                        "FILE_CREATE",
-                        "/v1/files",
-                        "BLOCKED",
-                        "UNSUPPORTED",
-                        "UNSUPPORTED",
-                        List.of("accepted exception"),
-                        List.of()
-                )),
-                List.of(),
-                List.of(),
-                List.of("打开 Workbench")
-        ));
-
+                java.util.Map.of(),
+                Instant.parse("2026-05-21T00:00:00Z")
+        )));
         webTestClient.get()
-                .uri("/admin/provider-sites/1/dossier")
+                .uri("/admin/provider-sites/1/capabilities")
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
-                .jsonPath("$.site.profileCode").isEqualTo("site:openai_direct")
-                .jsonPath("$.blockedSurfaces[0].surfaceKey").isEqualTo("file_create")
-                .jsonPath("$.recommendedActions[0]").isEqualTo("打开 Workbench");
-    }
-
-    @Test
-    void shouldExposeCapabilityMatrix() {
-        Mockito.when(providerSiteAdminService.capabilityMatrix()).thenReturn(List.of(
-                new CapabilityMatrixRowResponse(
-                        1L,
-                        "site:openai_direct",
-                        "OPENAI_DIRECT",
-                        ProviderFamily.OPENAI,
-                        UpstreamSiteKind.OPENAI_DIRECT,
-                        SiteProfileSource.MANUAL,
-                        AuthStrategy.BEARER,
-                        PathStrategy.OPENAI_V1,
-                        ErrorSchemaStrategy.OPENAI_ERROR,
-                        "READY",
-                        null,
-                        List.of("openai", "responses"),
-                        "openai",
-                        List.of("api_key"),
-                        "sse",
-                        "provider-native",
-                        1,
-                        Instant.parse("2026-04-13T03:00:00Z"),
-                        2L,
-                        true,
-                        3,
-                        Instant.parse("2026-04-13T03:30:00Z"),
-                        java.util.Map.of(
-                                "response_object",
-                                new CapabilityResolutionView("emulated", "emulated", "emulated", List.of(), List.of())
-                        ),
-                        java.util.Map.of(
-                                "response_create",
-                                new SurfaceCapabilityView(
-                                        TranslationResourceType.RESPONSE,
-                                        TranslationOperation.RESPONSE_CREATE,
-                                        InteropCapabilityLevel.EMULATED,
-                                        InteropCapabilityLevel.EMULATED,
-                                        InteropCapabilityLevel.EMULATED,
-                                        List.of("response_object"),
-                                        java.util.Map.of(
-                                                "response_object",
-                                                new CapabilityResolutionView("emulated", "emulated", "emulated", List.of(), List.of())
-                                        )
-                                )
-                        ),
-                        true,
-                        true,
-                        true,
-                        true,
-                        true,
-                        true,
-                        true,
-                        true
-                )
-        ));
-
-        webTestClient.get()
-                .uri("/admin/capability-matrix")
-                .exchange()
-                .expectStatus().isOk()
-                .expectBody()
-                .jsonPath("$[0].supportsResponses").isEqualTo(true)
-                .jsonPath("$[0].profileSource").isEqualTo("MANUAL")
-                .jsonPath("$[0].streamTransport").isEqualTo("sse")
-                .jsonPath("$[0].fallbackStrategy").isEqualTo("provider-native")
-                .jsonPath("$[0].cooldownCredentialCount").isEqualTo(1)
-                .jsonPath("$[0].linkedCredentialCount").isEqualTo(2)
-                .jsonPath("$[0].hasSnapshot").isEqualTo(true)
-                .jsonPath("$[0].features.response_object.effectiveLevel").isEqualTo("emulated")
-                .jsonPath("$[0].features.response_object.supportStatus").isEqualTo("degraded")
-                .jsonPath("$[0].features.response_object.degradationLevel").isEqualTo("emulated")
-                .jsonPath("$[0].surfaces.response_create.overallCapabilityLevel").isEqualTo("EMULATED")
-                .jsonPath("$[0].surfaces.response_create.surface").isEqualTo("responses")
-                .jsonPath("$[0].surfaces.response_create.normalizedPath").isEqualTo("/v1/responses")
-                .jsonPath("$[0].surfaces.response_create.supportStatus").isEqualTo("DEGRADED")
-                .jsonPath("$[0].surfaces.response_create.degradationLevel").isEqualTo("EMULATED")
-                .jsonPath("$[0].supportsRealtime").isEqualTo(true);
-    }
-
-    @Test
-    void shouldRefreshSelectedProviderSites() {
-        Mockito.when(providerSiteAdminService.refreshCapabilities(List.of(1L, 2L)))
-                .thenReturn(List.of(sampleSite()));
-
-        webTestClient.post()
-                .uri("/admin/provider-sites/refresh-capabilities")
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue("""
-                        {"siteProfileIds":[1,2]}
-                        """)
-                .exchange()
-                .expectStatus().isOk()
-                .expectBody()
-                .jsonPath("$[0].profileCode").isEqualTo("site:openai_direct")
-                .jsonPath("$[0].cooldownCredentialCount").isEqualTo(1);
-    }
-
-    @Test
-    void shouldDeleteProviderSite() {
-        webTestClient.delete()
-                .uri("/admin/provider-sites/5")
-                .exchange()
-                .expectStatus().isOk();
-
-        Mockito.verify(providerSiteAdminService).delete(5L);
+                .jsonPath("$[0].modelKey").isEqualTo("gpt-4o")
+                .jsonPath("$[0].supportedProtocols[0]").isEqualTo("openai");
     }
 
     private ProviderSiteResponse sampleSite() {

@@ -1,12 +1,19 @@
 package com.prodigalgal.xaigateway.admin.application;
 
-import com.prodigalgal.xaigateway.admin.api.OpenAiDirectSmokeRequest;
 import com.prodigalgal.xaigateway.admin.api.FunctionalProviderSmokeRequest;
+import com.prodigalgal.xaigateway.admin.api.CredentialRequest;
+import com.prodigalgal.xaigateway.admin.api.CredentialResponse;
+import com.prodigalgal.xaigateway.admin.api.OpenAiDirectSmokeRequest;
 import com.prodigalgal.xaigateway.admin.api.OpenAiDirectResourceSmokeRequest;
+import com.prodigalgal.xaigateway.gateway.core.account.UpstreamAccountProviderType;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CredentialModelDiscoveryService;
+import com.prodigalgal.xaigateway.gateway.core.credential.CredentialAuthKind;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
+import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountGroupEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
-import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountPoolRepository;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamSiteProfileEntity;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountGroupRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -15,6 +22,7 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
@@ -28,6 +36,148 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CredentialAdminServiceTests {
+
+    @Test
+    void shouldRestoreSoftDeletedCredentialWhenFingerprintAlreadyExists() {
+        UpstreamCredentialRepository credentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        CredentialCryptoService cryptoService = Mockito.mock(CredentialCryptoService.class);
+        SupportedModelCatalogService modelCatalogService = Mockito.mock(SupportedModelCatalogService.class);
+        UpstreamAccountGroupRepository groupRepository = Mockito.mock(UpstreamAccountGroupRepository.class);
+        ProviderSiteRegistryService siteRegistryService = Mockito.mock(ProviderSiteRegistryService.class);
+        CredentialAdminService service = service(
+                credentialRepository,
+                cryptoService,
+                modelCatalogService,
+                groupRepository,
+                siteRegistryService
+        );
+        UpstreamAccountGroupEntity group = new UpstreamAccountGroupEntity();
+        ReflectionTestUtils.setField(group, "id", 3L);
+        group.setGroupName("Gemini AI Studio");
+        group.setProviderType(UpstreamAccountProviderType.GEMINI_OAUTH);
+        UpstreamCredentialEntity deleted = credential(31L, ProviderType.GEMINI_DIRECT);
+        deleted.setDeleted(true);
+        deleted.setActive(false);
+        UpstreamSiteProfileEntity siteProfile = siteProfile(9L);
+
+        Mockito.when(cryptoService.fingerprint("gemini-secret")).thenReturn("fp-gemini");
+        Mockito.when(cryptoService.encrypt("gemini-secret")).thenReturn("enc-gemini-secret");
+        Mockito.when(credentialRepository.findFirstByApiKeyFingerprintAndProviderTypeAndBaseUrlAndSiteProfileIdOrderByUpdatedAtDesc(
+                        "fp-gemini",
+                        ProviderType.GEMINI_DIRECT,
+                        "https://generativelanguage.googleapis.com",
+                        9L
+                ))
+                .thenReturn(Optional.of(deleted));
+        Mockito.when(groupRepository.findById(3L)).thenReturn(Optional.of(group));
+        Mockito.when(modelCatalogService.resolveForCredentialImport(
+                Mockito.eq(ProviderType.GEMINI_DIRECT),
+                Mockito.eq(group),
+                Mockito.eq(List.of("gemini-2.5-pro"))
+        )).thenReturn(List.of("gemini-2.5-pro"));
+        Mockito.when(modelCatalogService.normalize(Mockito.anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+        Mockito.when(siteRegistryService.ensureSiteProfile(ProviderType.GEMINI_DIRECT, "https://generativelanguage.googleapis.com", null))
+                .thenReturn(siteProfile);
+        Mockito.when(credentialRepository.save(Mockito.any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CredentialResponse response = service.create(new CredentialRequest(
+                "Gemini AI Studio 01",
+                ProviderType.GEMINI_DIRECT,
+                "https://generativelanguage.googleapis.com",
+                CredentialAuthKind.API_KEY,
+                "gemini-secret",
+                null,
+                Map.of("source", "user_import"),
+                true,
+                null,
+                null,
+                null,
+                3L,
+                List.of("gemini-2.5-pro")
+        ));
+
+        assertEquals(31L, response.id());
+        assertFalse(deleted.isDeleted());
+        assertTrue(deleted.isActive());
+        assertEquals("Gemini AI Studio 01", deleted.getCredentialName());
+        assertEquals("fp-gemini", deleted.getApiKeyFingerprint());
+        Mockito.verify(credentialRepository).save(deleted);
+    }
+
+    @Test
+    void shouldAllowSameSecretAcrossDifferentProviderSurfaces() {
+        UpstreamCredentialRepository credentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        CredentialCryptoService cryptoService = Mockito.mock(CredentialCryptoService.class);
+        SupportedModelCatalogService modelCatalogService = Mockito.mock(SupportedModelCatalogService.class);
+        UpstreamAccountGroupRepository groupRepository = Mockito.mock(UpstreamAccountGroupRepository.class);
+        ProviderSiteRegistryService siteRegistryService = Mockito.mock(ProviderSiteRegistryService.class);
+        CredentialAdminService service = service(
+                credentialRepository,
+                cryptoService,
+                modelCatalogService,
+                groupRepository,
+                siteRegistryService
+        );
+        UpstreamAccountGroupEntity openAiGroup = new UpstreamAccountGroupEntity();
+        ReflectionTestUtils.setField(openAiGroup, "id", 4L);
+        openAiGroup.setProviderType(UpstreamAccountProviderType.OPENAI_OAUTH);
+        UpstreamSiteProfileEntity openAiSite = siteProfile(41L);
+
+        Mockito.when(cryptoService.fingerprint("shared-secret")).thenReturn("fp-shared");
+        Mockito.when(cryptoService.encrypt("shared-secret")).thenReturn("enc-shared");
+        Mockito.when(groupRepository.findById(4L)).thenReturn(Optional.of(openAiGroup));
+        Mockito.when(siteRegistryService.ensureSiteProfile(ProviderType.OPENAI_COMPATIBLE, "https://api.deepseek.com", null))
+                .thenReturn(openAiSite);
+        Mockito.when(credentialRepository.findFirstByApiKeyFingerprintAndProviderTypeAndBaseUrlAndSiteProfileIdOrderByUpdatedAtDesc(
+                        "fp-shared",
+                        ProviderType.OPENAI_COMPATIBLE,
+                        "https://api.deepseek.com",
+                        41L
+                ))
+                .thenReturn(Optional.empty());
+        Mockito.when(credentialRepository.findByApiKeyFingerprintAndProviderTypeAndBaseUrlAndSiteProfileIdAndDeletedFalse(
+                        "fp-shared",
+                        ProviderType.OPENAI_COMPATIBLE,
+                        "https://api.deepseek.com",
+                        41L
+                ))
+                .thenReturn(Optional.empty());
+        Mockito.when(modelCatalogService.resolveForCredentialImport(
+                Mockito.eq(ProviderType.OPENAI_COMPATIBLE),
+                Mockito.eq(openAiGroup),
+                Mockito.eq(List.of("deepseek-chat"))
+        )).thenReturn(List.of("deepseek-chat"));
+        Mockito.when(modelCatalogService.normalize(Mockito.anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+        Mockito.when(credentialRepository.save(Mockito.any())).thenAnswer(invocation -> {
+            UpstreamCredentialEntity entity = invocation.getArgument(0);
+            ReflectionTestUtils.setField(entity, "id", 100L);
+            return entity;
+        });
+
+        CredentialResponse response = service.create(new CredentialRequest(
+                "DeepSeek OpenAI",
+                ProviderType.OPENAI_COMPATIBLE,
+                "https://api.deepseek.com",
+                CredentialAuthKind.API_KEY,
+                "shared-secret",
+                null,
+                Map.of(),
+                true,
+                null,
+                null,
+                null,
+                4L,
+                List.of("deepseek-chat")
+        ));
+
+        assertEquals(100L, response.id());
+        Mockito.verify(credentialRepository).findFirstByApiKeyFingerprintAndProviderTypeAndBaseUrlAndSiteProfileIdOrderByUpdatedAtDesc(
+                "fp-shared",
+                ProviderType.OPENAI_COMPATIBLE,
+                "https://api.deepseek.com",
+                41L
+        );
+    }
 
     @Test
     void shouldBuildOpenAiDirectSmokeDryRunWithoutDecryptingSecret() {
@@ -151,35 +301,6 @@ class CredentialAdminServiceTests {
         Mockito.verify(cryptoService, Mockito.never()).decrypt(Mockito.anyString());
     }
 
-    @Test
-    void shouldBuildOpenAiDirectResourceSmokeDryRunForAllFamiliesWithoutDecryptingSecret() {
-        UpstreamCredentialRepository credentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
-        CredentialCryptoService cryptoService = Mockito.mock(CredentialCryptoService.class);
-        CredentialAdminService service = service(credentialRepository, cryptoService);
-        UpstreamCredentialEntity credential = credential(12L, ProviderType.OPENAI_DIRECT);
-        Mockito.when(credentialRepository.findById(12L)).thenReturn(Optional.of(credential));
-
-        var response = service.openAiDirectResourceSmoke(12L, new OpenAiDirectResourceSmokeRequest(
-                true,
-                null,
-                null,
-                "org-real",
-                "proj-real",
-                null
-        ));
-
-        assertEquals("DRY_RUN_READY", response.status());
-        assertEquals("SKIPPED", response.classification());
-        assertEquals("DRY_RUN", response.skippedReason());
-        assertEquals(5, response.items().size());
-        assertEquals(5, response.summary().get("SKIPPED"));
-        assertTrue(response.items().stream().anyMatch(item -> "CHAT_COMPLETIONS".equals(item.resourceFamily()) && item.billable()));
-        assertTrue(response.items().stream().anyMatch(item -> "REALTIME_CLIENT_SECRET".equals(item.resourceFamily()) && item.writeOperation()));
-        assertFalse(response.toString().contains("org-real"));
-        assertFalse(response.toString().contains("proj-real"));
-        Mockito.verify(cryptoService, Mockito.never()).decrypt(Mockito.anyString());
-        Mockito.verify(credentialRepository, Mockito.never()).save(Mockito.any());
-    }
 
     @Test
     void shouldExecuteOpenAiDirectResourceReadOnlyProbesAndBlockBillableFamilies() throws IOException {
@@ -213,7 +334,7 @@ class CredentialAdminServiceTests {
             assertEquals("LIVE_SMOKE_COMPLETED", response.status());
             assertEquals("NO_PERMISSION", response.classification());
             assertEquals(1, response.summary().get("PASS"));
-            assertEquals(3, response.summary().get("BUDGET_BLOCKED"));
+            assertEquals(2, response.summary().get("BUDGET_BLOCKED"));
             assertEquals(1, response.summary().get("NO_PERMISSION"));
             assertTrue(response.items().stream().anyMatch(item -> "FILES".equals(item.resourceFamily()) && "PASS".equals(item.classification())));
             assertTrue(response.items().stream().anyMatch(item -> "VECTOR_STORES".equals(item.resourceFamily()) && "NO_PERMISSION".equals(item.classification())));
@@ -226,59 +347,6 @@ class CredentialAdminServiceTests {
         }
     }
 
-    @Test
-    void shouldPropagateExplicitBillableAndWriteProbeAllowFlags() throws IOException {
-        HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
-        AtomicReference<String> chatBody = new AtomicReference<>();
-        AtomicReference<String> realtimeBody = new AtomicReference<>();
-        server.createContext("/v1/chat/completions", exchange -> {
-            chatBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-            sendJson(exchange, 200, """
-                    {"id":"chatcmpl_1","object":"chat.completion","model":"gpt-4o-mini","usage":{"completion_tokens":1}}
-                    """);
-        });
-        server.createContext("/v1/realtime/client_secrets", exchange -> {
-            realtimeBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-            sendJson(exchange, 200, """
-                    {"client_secret":{"value":"ek_secret","expires_at":1893456000},"session":{"type":"realtime","model":"gpt-realtime-mini"}}
-                    """);
-        });
-        server.start();
-        try {
-            UpstreamCredentialRepository credentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
-            CredentialCryptoService cryptoService = Mockito.mock(CredentialCryptoService.class);
-            CredentialAdminService service = service(credentialRepository, cryptoService);
-            UpstreamCredentialEntity credential = credential(16L, ProviderType.OPENAI_DIRECT);
-            credential.setBaseUrl("http://127.0.0.1:" + server.getAddress().getPort());
-            Mockito.when(credentialRepository.findById(16L)).thenReturn(Optional.of(credential));
-            Mockito.when(credentialRepository.save(Mockito.any())).thenAnswer(invocation -> invocation.getArgument(0));
-            Mockito.when(cryptoService.decrypt("cipher-openai")).thenReturn("sk-live-secret");
-
-            var response = service.openAiDirectResourceSmoke(16L, new OpenAiDirectResourceSmokeRequest(
-                    false,
-                    null,
-                    3,
-                    null,
-                    null,
-                    List.of("chat_completions", "realtime_client_secret"),
-                    true,
-                    true
-            ));
-
-            assertEquals("LIVE_SMOKE_COMPLETED", response.status());
-            assertEquals("PASS", response.classification());
-            assertEquals(2, response.summary().get("PASS"));
-            assertNotNull(chatBody.get());
-            assertNotNull(realtimeBody.get());
-            assertTrue(chatBody.get().contains("\"max_completion_tokens\":1"));
-            assertTrue(realtimeBody.get().contains("\"seconds\":60"));
-            assertFalse(response.toString().contains("sk-live-secret"));
-            Mockito.verify(cryptoService).decrypt("cipher-openai");
-            Mockito.verify(credentialRepository).save(credential);
-        } finally {
-            server.stop(0);
-        }
-    }
 
     @Test
     void shouldPersistOpenAiDirectResourceSmokeCertificationMetadataForLiveRun() throws IOException {
@@ -534,14 +602,29 @@ class CredentialAdminServiceTests {
     private CredentialAdminService service(
             UpstreamCredentialRepository credentialRepository,
             CredentialCryptoService cryptoService) {
+        return service(
+                credentialRepository,
+                cryptoService,
+                Mockito.mock(SupportedModelCatalogService.class),
+                Mockito.mock(UpstreamAccountGroupRepository.class),
+                Mockito.mock(ProviderSiteRegistryService.class)
+        );
+    }
+
+    private CredentialAdminService service(
+            UpstreamCredentialRepository credentialRepository,
+            CredentialCryptoService cryptoService,
+            SupportedModelCatalogService modelCatalogService,
+            UpstreamAccountGroupRepository accountGroupRepository,
+            ProviderSiteRegistryService siteRegistryService) {
         return new CredentialAdminService(
                 credentialRepository,
                 cryptoService,
                 Mockito.mock(CredentialModelDiscoveryService.class),
-                Mockito.mock(ProviderSiteRegistryService.class),
-                Mockito.mock(UpstreamAccountPoolRepository.class),
+                siteRegistryService,
+                accountGroupRepository,
                 new ObjectMapper(),
-                Mockito.mock(SupportedModelCatalogService.class)
+                modelCatalogService
         );
     }
 
@@ -557,6 +640,15 @@ class CredentialAdminServiceTests {
         entity.setApiKeyFingerprint("fingerprint-openai");
         entity.setActive(true);
         entity.setDeleted(false);
+        return entity;
+    }
+
+    private UpstreamSiteProfileEntity siteProfile(Long id) {
+        UpstreamSiteProfileEntity entity = new UpstreamSiteProfileEntity();
+        ReflectionTestUtils.setField(entity, "id", id);
+        entity.setProfileCode("site:gemini_direct");
+        entity.setDisplayName("GEMINI_DIRECT");
+        entity.setSiteKind(UpstreamSiteKind.GEMINI_DIRECT);
         return entity;
     }
 

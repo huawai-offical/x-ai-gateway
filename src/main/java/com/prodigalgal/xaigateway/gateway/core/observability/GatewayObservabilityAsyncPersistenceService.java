@@ -10,10 +10,14 @@ import com.prodigalgal.xaigateway.infra.config.GatewayProperties;
 import com.prodigalgal.xaigateway.infra.persistence.entity.CacheHitLogEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.RequestLogEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.RouteDecisionLogEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UsageRecordEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.CacheHitLogRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.RequestLogRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.RouteDecisionLogRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UsageRecordRepository;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -37,6 +41,8 @@ public class GatewayObservabilityAsyncPersistenceService {
     static final String USAGE_RECORD_UPSERT = "usage-record-upsert";
     static final String ROUTE_DECISION_LOG_INSERT = "route-decision-log-insert";
     static final String CACHE_HIT_LOG_INSERT = "cache-hit-log-insert";
+    static final String CREDENTIAL_METRICS_ACCUMULATE = "credential-metrics-accumulate";
+    static final String ACCOUNT_METRICS_ACCUMULATE = "account-metrics-accumulate";
 
     private static final Logger log = LoggerFactory.getLogger(GatewayObservabilityAsyncPersistenceService.class);
 
@@ -46,6 +52,8 @@ public class GatewayObservabilityAsyncPersistenceService {
     private final UsageRecordRepository usageRecordRepository;
     private final RouteDecisionLogRepository routeDecisionLogRepository;
     private final CacheHitLogRepository cacheHitLogRepository;
+    private final UpstreamCredentialRepository upstreamCredentialRepository;
+    private final UpstreamAccountRepository upstreamAccountRepository;
     private final GatewayProperties gatewayProperties;
     private final TransactionTemplate transactionTemplate;
 
@@ -56,6 +64,8 @@ public class GatewayObservabilityAsyncPersistenceService {
             UsageRecordRepository usageRecordRepository,
             RouteDecisionLogRepository routeDecisionLogRepository,
             CacheHitLogRepository cacheHitLogRepository,
+            UpstreamCredentialRepository upstreamCredentialRepository,
+            UpstreamAccountRepository upstreamAccountRepository,
             GatewayProperties gatewayProperties,
             PlatformTransactionManager transactionManager) {
         this.stringRedisTemplate = stringRedisTemplate;
@@ -64,6 +74,8 @@ public class GatewayObservabilityAsyncPersistenceService {
         this.usageRecordRepository = usageRecordRepository;
         this.routeDecisionLogRepository = routeDecisionLogRepository;
         this.cacheHitLogRepository = cacheHitLogRepository;
+        this.upstreamCredentialRepository = upstreamCredentialRepository;
+        this.upstreamAccountRepository = upstreamAccountRepository;
         this.gatewayProperties = gatewayProperties;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
@@ -86,6 +98,14 @@ public class GatewayObservabilityAsyncPersistenceService {
 
     public boolean enqueueCacheHitLogInsert(CacheHitLogSnapshot snapshot) {
         return enqueue(CACHE_HIT_LOG_INSERT, snapshot);
+    }
+
+    public boolean enqueueCredentialMetricsAccumulate(RuntimeMetricSnapshot snapshot) {
+        return enqueue(CREDENTIAL_METRICS_ACCUMULATE, snapshot);
+    }
+
+    public boolean enqueueAccountMetricsAccumulate(RuntimeMetricSnapshot snapshot) {
+        return enqueue(ACCOUNT_METRICS_ACCUMULATE, snapshot);
     }
 
     public void persistRequestLogStart(RequestLogSnapshot snapshot) {
@@ -217,6 +237,16 @@ public class GatewayObservabilityAsyncPersistenceService {
                         envelope.type(),
                         objectMapper.treeToValue(envelope.payload(), CacheHitLogSnapshot.class)
                 );
+                case CREDENTIAL_METRICS_ACCUMULATE -> new ParsedEvent(
+                        serializedEntry,
+                        envelope.type(),
+                        objectMapper.treeToValue(envelope.payload(), RuntimeMetricSnapshot.class)
+                );
+                case ACCOUNT_METRICS_ACCUMULATE -> new ParsedEvent(
+                        serializedEntry,
+                        envelope.type(),
+                        objectMapper.treeToValue(envelope.payload(), RuntimeMetricSnapshot.class)
+                );
                 default -> {
                     log.error("忽略未知 observability 队列消息类型：{}。", envelope.type());
                     yield null;
@@ -234,6 +264,8 @@ public class GatewayObservabilityAsyncPersistenceService {
         List<UsageRecordSnapshot> usageSnapshots = new ArrayList<>();
         List<RouteDecisionLogSnapshot> routeDecisionSnapshots = new ArrayList<>();
         List<CacheHitLogSnapshot> cacheHitSnapshots = new ArrayList<>();
+        List<RuntimeMetricSnapshot> credentialMetricSnapshots = new ArrayList<>();
+        List<RuntimeMetricSnapshot> accountMetricSnapshots = new ArrayList<>();
 
         for (ParsedEvent parsedEvent : parsedEvents) {
             switch (parsedEvent.type()) {
@@ -242,6 +274,8 @@ public class GatewayObservabilityAsyncPersistenceService {
                 case USAGE_RECORD_UPSERT -> usageSnapshots.add((UsageRecordSnapshot) parsedEvent.payload());
                 case ROUTE_DECISION_LOG_INSERT -> routeDecisionSnapshots.add((RouteDecisionLogSnapshot) parsedEvent.payload());
                 case CACHE_HIT_LOG_INSERT -> cacheHitSnapshots.add((CacheHitLogSnapshot) parsedEvent.payload());
+                case CREDENTIAL_METRICS_ACCUMULATE -> credentialMetricSnapshots.add((RuntimeMetricSnapshot) parsedEvent.payload());
+                case ACCOUNT_METRICS_ACCUMULATE -> accountMetricSnapshots.add((RuntimeMetricSnapshot) parsedEvent.payload());
                 default -> throw new IllegalStateException("不支持的 observability 队列消息类型：" + parsedEvent.type());
             }
         }
@@ -293,6 +327,9 @@ public class GatewayObservabilityAsyncPersistenceService {
         if (!cacheHitSnapshots.isEmpty()) {
             cacheHitLogRepository.saveAll(cacheHitSnapshots.stream().map(this::toCacheHitLogEntity).toList());
         }
+
+        persistCredentialMetricBatch(credentialMetricSnapshots);
+        persistAccountMetricBatch(accountMetricSnapshots);
     }
 
     private void requeue(List<String> serializedEntries) {
@@ -458,6 +495,121 @@ public class GatewayObservabilityAsyncPersistenceService {
         entity.setCachedContentRef(snapshot.cachedContentRef());
         entity.setTotalTokens(snapshot.totalTokens());
         entity.setNativeUsagePayloadJson(snapshot.nativeUsagePayloadJson());
+    }
+
+    private void persistCredentialMetricBatch(List<RuntimeMetricSnapshot> snapshots) {
+        if (snapshots.isEmpty() || upstreamCredentialRepository == null) {
+            return;
+        }
+        for (RuntimeMetricSnapshot snapshot : mergeRuntimeMetrics(snapshots).values()) {
+            upstreamCredentialRepository.findById(snapshot.targetId()).ifPresent(credential -> {
+                if (credential.isDeleted()) {
+                    return;
+                }
+                applyCredentialMetrics(credential, snapshot);
+                upstreamCredentialRepository.save(credential);
+            });
+        }
+    }
+
+    private void persistAccountMetricBatch(List<RuntimeMetricSnapshot> snapshots) {
+        if (snapshots.isEmpty() || upstreamAccountRepository == null) {
+            return;
+        }
+        for (RuntimeMetricSnapshot snapshot : mergeRuntimeMetrics(snapshots).values()) {
+            upstreamAccountRepository.findById(snapshot.targetId()).ifPresent(account -> {
+                applyAccountMetrics(account, snapshot);
+                upstreamAccountRepository.save(account);
+            });
+        }
+    }
+
+    private Map<Long, RuntimeMetricSnapshot> mergeRuntimeMetrics(List<RuntimeMetricSnapshot> snapshots) {
+        Map<Long, RuntimeMetricSnapshot> merged = new LinkedHashMap<>();
+        for (RuntimeMetricSnapshot snapshot : snapshots) {
+            if (snapshot == null || snapshot.targetId() == null) {
+                continue;
+            }
+            merged.merge(snapshot.targetId(), snapshot, RuntimeMetricSnapshot::merge);
+        }
+        return merged;
+    }
+
+    private void applyCredentialMetrics(UpstreamCredentialEntity credential, RuntimeMetricSnapshot snapshot) {
+        credential.setTotalRequestCount(credential.getTotalRequestCount() + snapshot.totalRequestCount());
+        credential.setSuccessfulRequestCount(credential.getSuccessfulRequestCount() + snapshot.successfulRequestCount());
+        credential.setFailedRequestCount(credential.getFailedRequestCount() + snapshot.failedRequestCount());
+        credential.setCanceledRequestCount(credential.getCanceledRequestCount() + snapshot.canceledRequestCount());
+        credential.setTotalDurationMs(credential.getTotalDurationMs() + snapshot.totalDurationMs());
+        credential.setDurationSampleCount(credential.getDurationSampleCount() + snapshot.durationSampleCount());
+        credential.setTotalTokenCount(credential.getTotalTokenCount() + snapshot.totalTokenCount());
+        credential.setTotalCacheHitTokenCount(credential.getTotalCacheHitTokenCount() + snapshot.totalCacheHitTokenCount());
+        credential.setTotalCacheWriteTokenCount(credential.getTotalCacheWriteTokenCount() + snapshot.totalCacheWriteTokenCount());
+        credential.setTotalSavedInputTokenCount(credential.getTotalSavedInputTokenCount() + snapshot.totalSavedInputTokenCount());
+        applyCredentialFirstTokenMetrics(credential, snapshot);
+        if (snapshot.lastUsedAt() != null) {
+            credential.setLastUsedAt(laterInstant(credential.getLastUsedAt(), snapshot.lastUsedAt()));
+        }
+    }
+
+    private void applyAccountMetrics(UpstreamAccountEntity account, RuntimeMetricSnapshot snapshot) {
+        account.setTotalRequestCount(account.getTotalRequestCount() + snapshot.totalRequestCount());
+        account.setSuccessfulRequestCount(account.getSuccessfulRequestCount() + snapshot.successfulRequestCount());
+        account.setFailedRequestCount(account.getFailedRequestCount() + snapshot.failedRequestCount());
+        account.setCanceledRequestCount(account.getCanceledRequestCount() + snapshot.canceledRequestCount());
+        account.setTotalDurationMs(account.getTotalDurationMs() + snapshot.totalDurationMs());
+        account.setDurationSampleCount(account.getDurationSampleCount() + snapshot.durationSampleCount());
+        account.setTotalTokenCount(account.getTotalTokenCount() + snapshot.totalTokenCount());
+        account.setTotalCacheHitTokenCount(account.getTotalCacheHitTokenCount() + snapshot.totalCacheHitTokenCount());
+        account.setTotalCacheWriteTokenCount(account.getTotalCacheWriteTokenCount() + snapshot.totalCacheWriteTokenCount());
+        account.setTotalSavedInputTokenCount(account.getTotalSavedInputTokenCount() + snapshot.totalSavedInputTokenCount());
+        applyAccountFirstTokenMetrics(account, snapshot);
+        if (snapshot.lastUsedAt() != null) {
+            account.setLastUsedAt(laterInstant(account.getLastUsedAt(), snapshot.lastUsedAt()));
+        }
+    }
+
+    private void applyCredentialFirstTokenMetrics(UpstreamCredentialEntity credential, RuntimeMetricSnapshot snapshot) {
+        if (snapshot.firstTokenSampleCount() <= 0) {
+            return;
+        }
+        credential.setTotalFirstTokenMs(credential.getTotalFirstTokenMs() + snapshot.totalFirstTokenMs());
+        credential.setFirstTokenSampleCount(credential.getFirstTokenSampleCount() + snapshot.firstTokenSampleCount());
+        credential.setLastFirstTokenMs(snapshot.lastFirstTokenMs());
+        credential.setMinFirstTokenMs(minNullable(credential.getMinFirstTokenMs(), snapshot.minFirstTokenMs()));
+        credential.setMaxFirstTokenMs(maxNullable(credential.getMaxFirstTokenMs(), snapshot.maxFirstTokenMs()));
+    }
+
+    private void applyAccountFirstTokenMetrics(UpstreamAccountEntity account, RuntimeMetricSnapshot snapshot) {
+        if (snapshot.firstTokenSampleCount() <= 0) {
+            return;
+        }
+        account.setTotalFirstTokenMs(account.getTotalFirstTokenMs() + snapshot.totalFirstTokenMs());
+        account.setFirstTokenSampleCount(account.getFirstTokenSampleCount() + snapshot.firstTokenSampleCount());
+        account.setLastFirstTokenMs(snapshot.lastFirstTokenMs());
+        account.setMinFirstTokenMs(minNullable(account.getMinFirstTokenMs(), snapshot.minFirstTokenMs()));
+        account.setMaxFirstTokenMs(maxNullable(account.getMaxFirstTokenMs(), snapshot.maxFirstTokenMs()));
+    }
+
+    private Long minNullable(Long current, Long next) {
+        if (next == null) {
+            return current;
+        }
+        return current == null ? next : Math.min(current, next);
+    }
+
+    private Long maxNullable(Long current, Long next) {
+        if (next == null) {
+            return current;
+        }
+        return current == null ? next : Math.max(current, next);
+    }
+
+    private Instant laterInstant(Instant current, Instant next) {
+        if (current == null) {
+            return next;
+        }
+        return next.isAfter(current) ? next : current;
     }
 
     private boolean isAsyncEnabled() {
@@ -666,5 +818,76 @@ public class GatewayObservabilityAsyncPersistenceService {
             int cacheWriteTokens,
             int savedInputTokens,
             String cachedContentRef) {
+    }
+
+    public record RuntimeMetricSnapshot(
+            Long targetId,
+            long totalRequestCount,
+            long successfulRequestCount,
+            long failedRequestCount,
+            long canceledRequestCount,
+            long totalDurationMs,
+            long durationSampleCount,
+            long totalTokenCount,
+            long totalCacheHitTokenCount,
+            long totalCacheWriteTokenCount,
+            long totalSavedInputTokenCount,
+            long totalFirstTokenMs,
+            long firstTokenSampleCount,
+            Long lastFirstTokenMs,
+            Long minFirstTokenMs,
+            Long maxFirstTokenMs,
+            Instant lastUsedAt) {
+        RuntimeMetricSnapshot merge(RuntimeMetricSnapshot other) {
+            return new RuntimeMetricSnapshot(
+                    targetId,
+                    totalRequestCount + other.totalRequestCount,
+                    successfulRequestCount + other.successfulRequestCount,
+                    failedRequestCount + other.failedRequestCount,
+                    canceledRequestCount + other.canceledRequestCount,
+                    totalDurationMs + other.totalDurationMs,
+                    durationSampleCount + other.durationSampleCount,
+                    totalTokenCount + other.totalTokenCount,
+                    totalCacheHitTokenCount + other.totalCacheHitTokenCount,
+                    totalCacheWriteTokenCount + other.totalCacheWriteTokenCount,
+                    totalSavedInputTokenCount + other.totalSavedInputTokenCount,
+                    totalFirstTokenMs + other.totalFirstTokenMs,
+                    firstTokenSampleCount + other.firstTokenSampleCount,
+                    other.lastFirstTokenMs != null ? other.lastFirstTokenMs : lastFirstTokenMs,
+                    minMetric(minFirstTokenMs, other.minFirstTokenMs),
+                    maxMetric(maxFirstTokenMs, other.maxFirstTokenMs),
+                    latestMetricTime(lastUsedAt, other.lastUsedAt)
+            );
+        }
+
+        private static Long minMetric(Long left, Long right) {
+            if (left == null) {
+                return right;
+            }
+            if (right == null) {
+                return left;
+            }
+            return Math.min(left, right);
+        }
+
+        private static Long maxMetric(Long left, Long right) {
+            if (left == null) {
+                return right;
+            }
+            if (right == null) {
+                return left;
+            }
+            return Math.max(left, right);
+        }
+
+        private static Instant latestMetricTime(Instant left, Instant right) {
+            if (left == null) {
+                return right;
+            }
+            if (right == null) {
+                return left;
+            }
+            return right.isAfter(left) ? right : left;
+        }
     }
 }

@@ -1,9 +1,9 @@
 # TASK-20260514-031 OpenAI 真实 Smoke 与认证成本防护
 
-状态：Backlog  
-优先级：Critical  
-类型：子任务  
-父任务：[TASK-20260514-016](TASK-20260514-016-openai-full-api-coverage-parent.md)  
+状态：Backlog
+优先级：Critical
+类型：子任务
+父任务：[TASK-20260514-016](TASK-20260514-016-functional-service-api-coverage-parent.md)
 上游来源：[TASK-20260514-015](TASK-20260514-015-openai-openapi-conformance-truth-source-hardening.md)
 
 ## 背景

@@ -1,10 +1,10 @@
 # TASK-20260516-014 OpenAI Responses Tools Registry 与非 function Tool 显式边界
 
-状态：Done  
-优先级：High  
-类型：子任务切片  
-父任务：[TASK-20260514-019](../backlog/TASK-20260514-019-openai-conversations-webhooks-tools.md)  
-上游来源：[REQ-20260516-014](../../docs/requirements/REQ-20260516-014-openai-responses-tool-registry-boundary.md)、[TASK-20260514-013](../backlog/TASK-20260514-013-openai-chat-responses-native-parity.md)
+状态：Done
+优先级：High
+类型：子任务切片
+父任务：[TASK-20260514-019](../done/TASK-20260514-019-openai-conversations-webhooks-tools.md)
+上游来源：[REQ-20260516-014](../../docs/requirements/REQ-20260516-014-openai-responses-tool-registry-boundary.md)、[TASK-20260514-013](../done/TASK-20260514-013-openai-chat-responses-native-parity.md)
 
 ## 背景
 
@@ -49,7 +49,7 @@ OpenAI Responses 官方 `tools` 支持 function、built-in tools、MCP tools、c
 - `docs/openapi/public-openapi.json`
 - `docs/public-api-compatibility.md`
 - `docs/openai-responses-tools-compatibility.md`
-- `tasks/backlog/TASK-20260514-019-openai-conversations-webhooks-tools.md`
+- `tasks/done/TASK-20260514-019-openai-conversations-webhooks-tools.md`
 
 ## 依赖
 
@@ -79,7 +79,7 @@ OpenAI Responses 官方 `tools` 支持 function、built-in tools、MCP tools、c
 ## 关联文档
 
 - [REQ-20260516-014](../../docs/requirements/REQ-20260516-014-openai-responses-tool-registry-boundary.md)
-- [TASK-20260514-019](../backlog/TASK-20260514-019-openai-conversations-webhooks-tools.md)
+- [TASK-20260514-019](../done/TASK-20260514-019-openai-conversations-webhooks-tools.md)
 - [docs/openai-responses-tools-compatibility.md](../../docs/openai-responses-tools-compatibility.md)
 - OpenAI Responses create API Reference：`https://developers.openai.com/api/reference/resources/responses/methods/create`
 

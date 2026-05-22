@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-import '@testing-library/jest-dom/vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
@@ -44,9 +43,10 @@ describe('DeliveriesPage', () => {
     )
 
     expect(await screen.findByText('投递记录、重试与重放')).toBeInTheDocument()
-    expect(await screen.findByText('timeout')).toBeInTheDocument()
+    expect(await screen.findByText(/响应摘要：timeout/)).toBeInTheDocument()
 
-    fireEvent.change(screen.getByLabelText('test channel'), { target: { value: '1' } })
+    fireEvent.click(screen.getByRole('combobox', { name: 'test channel' }))
+    fireEvent.click(await screen.findByText('ops-webhook'))
     fireEvent.click(screen.getByRole('button', { name: '发送测试投递' }))
     fireEvent.click(screen.getByRole('button', { name: '重放' }))
 

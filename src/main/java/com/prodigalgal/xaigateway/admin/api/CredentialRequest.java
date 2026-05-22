@@ -22,7 +22,7 @@ public record CredentialRequest(
         Long proxyId,
         Long tlsFingerprintProfileId,
         Long siteProfileId,
-        Long poolId,
+        Long groupId,
         List<String> supportedModels
 ) {
     public String resolvedSecret() {

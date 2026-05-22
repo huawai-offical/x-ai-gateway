@@ -6,19 +6,72 @@
 - In Progress：进行中，位于 `tasks/in-progress/`
 - Done：已完成，位于 `tasks/done/`
 
-## 当前最高优先级：Codex 功能性服务 API
+## 当前最高优先级：Codex + UI/UX 功能性服务 API
 
-用户已要求先不做测试、全速推进项目任务，并将 Codex 相关任务提升到最高优先。当前 Codex 队列只围绕对话、streaming、tools、Responses、多模态与必要支撑能力推进，不恢复 Fine-tuning、Batches、Evals、Admin 或非 Responses Codex 内部 API。
+用户已要求先不做测试、全速推进项目任务，并将 Codex 相关任务提升到最高优先。2026-05-21 进度复核后，Codex 与 UI/UX 相关任务继续作为最高优先队列：Codex 队列只围绕对话、streaming、tools、Responses、多模态与必要支撑能力推进，不恢复 Fine-tuning、Batches、Evals、Admin 或非 Responses Codex 内部 API；UI/UX 已归档成果作为后续控制台与门户交互验收基线。
 
 | 排期 | 任务 | 状态 | 执行定位 |
 | --- | --- | --- | --- |
 | P0-CODEX-01 | [TASK-20260519-002 Codex 功能性服务 API 最高优先推进](done/TASK-20260519-002-codex-priority-functional-service-api.md) | Done | Codex-first 父任务与执行队列已归档 |
 | P0-CODEX-02 | [TASK-20260519-002-01 Codex 功能性服务 API 事实源优先收紧](done/TASK-20260519-002-01-codex-functional-truth-source-priority.md) | Done | 第一执行切片已归档；测试按用户当前策略延后 |
-| P0-CODEX-03 | [TASK-20260514-029 对话与 Tools OpenAPI、Catalog、Conformance 与 SDK 事实源统一](in-progress/TASK-20260514-029-openai-openapi-catalog-conformance-sdk.md) | In Progress | `TASK-20260514-029-01` 已归档，后续派生 OpenAPI/catalog/docs |
+| P0-CODEX-03 | [TASK-20260514-029 对话与 Tools OpenAPI、Catalog、Conformance 与 SDK 事实源统一](done/TASK-20260514-029-openai-openapi-catalog-conformance-sdk.md) | Done | `TASK-20260514-029-01/02/03/04` 已全部归档 |
 | P0-CODEX-03a | [TASK-20260514-029-02 Codex OpenAPI, Catalog & Conformance 深度融合](done/TASK-20260514-029-02-codex-openapi-catalog-conformance.md) | Done | Codex OpenAPI/Catalog 收敛与本地配置最佳实践 |
 | P0-CODEX-03b | [TASK-20260514-029-03 Codex 运营控制台体验对标与 Session 恢复桥接](done/TASK-20260514-029-03-codex-console-session-recovery.md) | Done | 终端 CLI 恢复指令 API 及前端审计/详情面板与运行态专区 UI 闭环 |
+| P0-CODEX-03c | [TASK-20260514-029-04 OpenAPI 路径补全与 SDK 三模式示例归口](done/TASK-20260514-029-04-openapi-coverage-sdk-finalization.md) | Done | 已收尾 public OpenAPI、SDK 示例与 coverage matrix 派生状态 |
 | P0-CODEX-04 | [TASK-20260519-002-02 Codex Smoke、Record/Replay 与成本防护复核](done/TASK-20260519-002-02-codex-smoke-record-replay-priority.md) | Done | 第二执行切片已归档；测试按用户当前策略延后 |
-| P0-CODEX-05 | [TASK-20260514-031 OpenAI 真实 Smoke 与认证成本防护](backlog/TASK-20260514-031-openai-real-smoke-certification-harness.md) | Backlog | Critical；承接 Codex/OpenAI-compatible smoke 机制 |
+| P0-UI-UX-01 | [TASK-20260520-001 UI/UX 体验专项硬化与增强计划](done/TASK-20260520-001-ui-ux-console-portal-experience.md) | Done | Critical；对标并硬化所有前端 UI/UX 控制台及沙盒视图交互已归口归档 |
+| P0-SCOPE-01 | [TASK-20260521-001 功能性服务 API Backlog 收口与优先级清理](done/TASK-20260521-001-functional-scope-backlog-closeout.md) | Done | 已清理旧 full parity/full stack backlog 口径，保留可执行功能性支撑任务 |
+| P0-SCOPE-02 | [TASK-20260521-002 上游凭证与账号分组收敛](done/TASK-20260521-002-upstream-credentials-group-live-scope.md) | Done | 上游凭证弹窗编辑、Codex 归入接入、账号分组文案和 Live/Realtime 下线已完成 |
+| P0-SCOPE-03 | [TASK-20260521-003 Liquibase 新 Baseline 重建](done/TASK-20260521-003-liquibase-baseline-rebuild.md) | Done | 清库重建 baseline，旧增量 changelog 已清理为单一入口 |
+| P0-SCOPE-04 | [TASK-20260521-004 上游凭证入口统一与官方账号概念澄清](in-progress/TASK-20260521-004-upstream-credential-entry-and-official-account-clarity.md) | In Progress | 统一新增入口，并把官方账号收敛为后端运行态管理概念，不恢复独立控制台产品面 |
+| P0-SCOPE-05 | [TASK-20260521-005 控制台重复功能下线与向量能力范围收窄](in-progress/TASK-20260521-005-console-feature-retirement-and-vector-scope-prune.md) | In Progress | 父任务：统一收口删除边界，并编排前端下线与后端/API 清理 |
+| P0-SCOPE-05a | [TASK-20260521-005-01 控制台重复功能前端下线](done/TASK-20260521-005-01-console-feature-retirement-frontend-surface-prune.md) | Done | 已完成前端入口、页面、文案和测试清理；高风险后端/API 仍暂保留 |
+| P0-SCOPE-05b | [TASK-20260521-005-02 官方账号与向量 API 后端清理边界审计](backlog/TASK-20260521-005-02-official-account-vector-api-eradication-boundary.md) | Backlog | 历史边界审计保留；`vector/files/file_search` 主线支撑已确认保留，仅继续复核官方账号其余非主路径后端面 |
+| P0-SCOPE-05c | [TASK-20260521-005-03 任务索引下线能力清理与边界补充](in-progress/TASK-20260521-005-03-task-index-retirement-and-boundary-cleanup.md) | In Progress | 清理 tasks 现役引用，并为保留的后端/API 任务补充退役边界说明 |
+| P0-SCOPE-06 | [TASK-20260521-006 冗余接口清理与清库前 Baseline 重建](in-progress/TASK-20260521-006-redundant-api-eradication-and-baseline-refresh.md) | In Progress | 审视并清理多余接口，在用户清库前重建最终 baseline |
+| P0-SCOPE-06a | [TASK-20260521-006-01 冗余 Admin 接口审计与清理](in-progress/TASK-20260521-006-01-admin-api-prune-and-alignment.md) | In Progress | 收口只服务于已下线控制台或与主线重复的 Admin API |
+| P0-SCOPE-06b | [TASK-20260521-006-02 冗余协议接口与向量能力边界清理](in-progress/TASK-20260521-006-02-protocol-vector-boundary-prune.md) | In Progress | 审视 protocol/public API 冗余面，排除 `vector/files/file_search` 主线支撑后收口旧协议说明入口 |
+| P0-SCOPE-06c | [TASK-20260521-006-03 清理后 Liquibase Baseline 重建](in-progress/TASK-20260521-006-03-baseline-regenerate-after-api-prune.md) | In Progress | 基于清理后的 schema 重建 baseline，供用户清库后初始化 |
+| P0-UI-UX-02 | [TASK-20260521-007 现役 UI 全界面汉化与说明性文案收口](in-progress/TASK-20260521-007-ui-chinese-only-localization.md) | In Progress | 深度汉化、解释性文案删除与中文单语界面收口 |
+| P0-UI-UX-02a | [TASK-20260521-007-01 Console/Admin 界面汉化](in-progress/TASK-20260521-007-01-console-admin-ui-chinese-localization.md) | In Progress | Console/Admin 范围深度汉化与解释文案清理 |
+| P0-UI-UX-02b | [TASK-20260521-007-02 Portal/Public/Workbench 界面汉化](in-progress/TASK-20260521-007-02-portal-public-workbench-ui-chinese-localization.md) | In Progress | Portal/Public/Workbench 范围深度汉化与说明收口 |
+| P0-UI-UX-02c | [TASK-20260521-007-03 运维观测链路界面汉化](done/TASK-20260521-007-03-ops-observability-ui-chinese-localization.md) | Done | 运维观测链路第二轮深度汉化与说明性正文删除 |
+| P0-UI-UX-03 | [TASK-20260521-008 系统默认深色主题与深浅双样式支持](done/TASK-20260521-008-system-theme-dark-default-light-dual-mode.md) | Done | 默认 `dark` 与 `dark/light` 双主题支持 |
+| P0-UI-UX-04 | [TASK-20260521-009 智能运维总览导航整合与重复面板收口](done/TASK-20260521-009-ops-overview-navigation-consolidation.md) | Done | 收敛总览导航，并把重复总览信息并入智能运维总览 |
+| P0-UI-UX-04a | [TASK-20260521-009-01 智能运维总览页面合并与导航收口](done/TASK-20260521-009-01-ops-overview-surface-merge.md) | Done | `/dashboard`、`/ops`、`/incidents` 合并与导航去重 |
+| P0-UI-UX-05 | [TASK-20260521-010 控制台导航可读性、系统参数汉化与 Codex auth.json 导入保活](done/TASK-20260521-010-console-navigation-settings-codex-auth-import-refresh.md) | Done | 修复侧栏可读性、重分组导航、系统参数汉化，并把 Codex auth.json 文件/粘贴导入收敛到上游凭证创建入口 |
+| P0-UI-UX-05a | [TASK-20260521-010-01 Console 侧栏可读性与导航重分组](done/TASK-20260521-010-01-console-sidebar-navigation-restyle-and-regroup.md) | Done | 侧栏 dark/light 对比度与一二级导航归并 |
+| P0-UI-UX-05b | [TASK-20260521-010-02 系统参数页面深度汉化](done/TASK-20260521-010-02-system-settings-localization.md) | Done | 系统参数页面英文和内部字段名汉化 |
+| P0-UI-UX-05c | [TASK-20260521-010-03 上游凭证入口 Codex auth.json 导入与保活口径](done/TASK-20260521-010-03-codex-auth-json-import-and-refresh-ui.md) | Done | 创建上游凭证支持 Codex auth.json 文件路径批量导入和粘贴导入，RT 可选有则保活 |
+| P0-UI-UX-06 | [TASK-20260521-011 控制台瘦身、品牌 Logo、上游凭证统一与热数据缓存](done/TASK-20260521-011-console-surface-prune-logo-credential-redis.md) | Done | 已删除重复运维/公开入口，接入 Logo，统一上游凭证列表与选择器，并落地 Redis 热数据增强 |
+| P0-UI-UX-06a | [TASK-20260521-011-01 控制台与公开重复入口下线](done/TASK-20260521-011-01-console-public-route-prune.md) | Done | 已下线变更维护、公开状态/价格/文档和重复错误规则入口 |
+| P0-UI-UX-06b | [TASK-20260521-011-02 品牌 Logo 与 favicon 接入](done/TASK-20260521-011-02-brand-logo-favicon-console-public.md) | Done | 已绘制并接入 favicon、公开首页和控制台 Logo |
+| P0-UI-UX-06c | [TASK-20260521-011-03 上游凭证统一列表与可搜索选择器](done/TASK-20260521-011-03-upstream-credential-unified-list-selectors.md) | Done | API Key 凭证与 Codex auth.json 账号统一展示，模型/代理/TLS 改为搜索选择 |
+| P0-UI-UX-06d | [TASK-20260521-011-04 请求日志 Codex 独立面板删除](done/TASK-20260521-011-04-request-log-codex-panel-prune.md) | Done | 已删除 Codex 请求独立面板，回到统一请求日志 |
+| P0-ARCH-01 | [TASK-20260521-011-05 Redis 热数据增强与 PostgreSQL 回写边界](done/TASK-20260521-011-05-redis-hot-data-writeback.md) | Done | 已将凭证/账号运行指标接入 Redis 队列并批量回写 PG |
+| P0-UI-UX-07 | [TASK-20260521-012 控制台健康评分、Codex 模型、TLS 画像与调试台体验修正](done/TASK-20260521-012-console-health-codex-model-tls-workbench-ux.md) | Done | 健康评分表格、Codex 模型刷新、账号分组/治理表格收敛、TLS 默认画像与白盒调试台间距 |
+| P0-UI-UX-07a | [TASK-20260521-012-01 健康评分统一表格](done/TASK-20260521-012-01-health-score-unified-table.md) | Done | 健康评分覆盖静态凭证与账号类凭证 |
+| P0-UI-UX-07b | [TASK-20260521-012-02 Codex 模型刷新入口](done/TASK-20260521-012-02-codex-model-refresh-entry.md) | Done | Codex 类型账号刷新支持模型 |
+| P0-UI-UX-07c | [TASK-20260521-012-03 账号分组与治理表格操作收敛](done/TASK-20260521-012-03-account-groups-governance-table-detail-actions.md) | Done | 表格主行保持扁平，复杂操作进入详情 |
+| P0-UI-UX-07d | [TASK-20260521-012-04 TLS 默认画像与键值对 Header 编辑](done/TASK-20260521-012-04-tls-default-profiles-key-value-editor.md) | Done | 默认常用 TLS/header 画像与键值对编辑器 |
+| P0-UI-UX-07e | [TASK-20260521-012-05 白盒调试工作台 Tab 间距优化](done/TASK-20260521-012-05-workbench-tabs-spacing.md) | Done | 调试台 tab 和内容布局间距修正 |
+| P0-UI-UX-08 | [TASK-20260521-013 全局表格分页](done/TASK-20260521-013-global-table-pagination.md) | Done | 所有列表表格默认每页 50 条并支持切换每页条数 |
+| P0-UI-UX-09 | [TASK-20260522-001 账号分组详情入口统一](done/TASK-20260522-001-account-group-detail-entry-unification.md) | Done | 统一凭证详情与账号分组列表进入的完整账号分组详情页 |
+| P0-UI-UX-10 | [TASK-20260522-002 网络代理拨测功能下线](done/TASK-20260522-002-network-proxy-probe-retirement.md) | Done | 删除网络代理拨测页面、任务、接口和 baseline 表 |
+| P0-UI-UX-11 | [TASK-20260522-003 提示气泡化与超大文件组件化拆分](done/TASK-20260522-003-toast-feedback-and-component-splitting.md) | Done | `InlineError` 改为左上角 toast，调试工作台拆出预设和展示组件 |
+| P1-UI-UX-12 | [TASK-20260522-004 原生确认弹窗与通知入口统一](backlog/TASK-20260522-004-confirm-dialog-notification-unification.md) | Backlog | 迁移 18 处 `window.confirm` 到统一确认弹窗 |
+| P1-ARCH-02 | [TASK-20260522-005 超大文件分批组件化与服务拆分](backlog/TASK-20260522-005-giant-file-decomposition-roadmap.md) | Backlog | 按 P0/P1 清单继续拆前端巨页和后端超级服务 |
+| P2-INFRA-01 | [TASK-20260522-006 .gitignore 通配符化整理](done/TASK-20260522-006-gitignore-wildcard-cleanup.md) | Done | 将逐文件缓存 ignore 清单归并为目录级和通配符规则 |
+| P0-CODEX-06 | [TASK-20260522-007 Model Policy 分层收敛父任务](done/TASK-20260522-007-model-policy-layered-resolution-parent.md) | Done | 覆盖模型策略表、逐层收缩、Admin API、自动探测、健康裁剪、模型级限流、fallback chain 与灰度路由 |
+| P0-CODEX-06a | [TASK-20260522-007-01 Model Policy 策略表与运行时解析](done/TASK-20260522-007-01-model-policy-runtime-resolution.md) | Done | 策略 schema、resolver、路由模型解析与候选裁剪 |
+| P0-CODEX-06b | [TASK-20260522-007-02 Model Policy 管理端、预览与冲突检测](done/TASK-20260522-007-02-model-policy-admin-preview-conflict.md) | Done | `/admin/model-policies` CRUD、preview、conflicts 与 preset 导入 |
+| P0-CODEX-06c | [TASK-20260522-007-03 Model Policy 第三阶段运行态治理](done/TASK-20260522-007-03-model-policy-runtime-governance.md) | Done | discovery policy、健康/额度裁剪、模型级 rpm、fallback chain 与 canary weight |
+| P0-CODEX-06d | [TASK-20260522-008 模型刷新幂等性修复](done/TASK-20260522-008-model-refresh-idempotency.md) | Done | 修复重复点击刷新模型触发 `site_model_capability` 唯一约束冲突，并关闭 Redis Repository 扫描噪音 |
+| P0-CODEX-06e | [TASK-20260522-009 分发 Key 协议簇授权迁移](in-progress/TASK-20260522-009-protocol-suite-authorization-migration.md) | In Progress | 将 Key/访问组的 `allowedProtocols` 直接迁移为厂商协议簇 `allowedProtocolSuites`，不保留旧字段兼容 |
+| P0-FUNC-01 | [TASK-20260514-020 OpenAI 多模态支撑参数边界收紧](done/TASK-20260514-020-openai-multimodal-supporting-parameters.md) | Done | 已清理 Audio translations 与 Images edits/variations 残留，并固定多模态支撑参数 |
+| P0-FUNC-02 | [TASK-20260514-021 OpenAI Files、Uploads、Models 功能性支撑面](done/TASK-20260514-021-openai-files-uploads-models-functional-support.md) | Done | 已补 Files list 参数与 envelope，并确认 Batches/Fine-tuning 不回到公开支持面 |
+| P0-CODEX-05 | [TASK-20260514-031 OpenAI 真实 Smoke 与认证成本防护](backlog/TASK-20260514-031-openai-real-smoke-certification-harness.md) | Backlog | Critical；承接 Codex/OpenAI-compatible smoke 机制，等待恢复测试或真实 key 执行窗口 |
+
 
 ## 当前 Backlog 优先级队列
 
@@ -30,16 +83,13 @@
 | P0-01 | [TASK-20260507-002 Codex CLI 请求保真、Session 粘性与反向代理兼容](done/TASK-20260507-002-codex-cli-request-fidelity-sticky-session.md) | Done | Codex 反代协议地基 |
 | P0-02 | [TASK-20260507-009 Portal/Admin 路由、身份与产品面边界基线](done/TASK-20260507-009-portal-admin-route-identity-boundary.md) | Done | 产品面边界地基 |
 | P0-03 | [TASK-20260507-013 Portal/Admin API 权限隔离、审计与越权回归](done/TASK-20260507-013-portal-admin-permission-audit-regression.md) | Done | 安全边界地基 |
-| P0-04 | [TASK-20260507-001 Codex 官方账号真实适配、配额刷新与反代 Smoke](done/TASK-20260507-001-codex-official-account-real-adapter-smoke.md) | Done | 真实账号闭环 |
+| P0-04 | [TASK-20260507-001 Codex 官方账号真实适配、配额刷新与反代 Smoke](done/TASK-20260507-001-codex-official-account-real-adapter-smoke.md) | Done | 官方账号后端导入、quota 与 smoke 基线；不代表保留独立控制台运行态页面 |
 | P1-05 | [TASK-20260507-014 Portal/Console UI/UX 验收体系与组件硬化](done/TASK-20260507-014-portal-console-ux-acceptance-system.md) | Done | UI 验收基线 |
-| P1-06 | [TASK-20260507-011 Admin Console 命名空间迁移与旧路由兼容](done/TASK-20260507-011-admin-console-namespace-legacy-route-migration.md) | Done | Console 路由骨架 |
 | P0-05 | [TASK-20260507-016 Codex 真实 auth.json 长期测试账号入库与详测](done/TASK-20260507-016-codex-real-auth-db-long-term-test.md) | Done | 真实测试账号基线 |
 | P1-07 | [TASK-20260507-006 管理端 UI 信息架构与角色化工作台重整](done/TASK-20260507-006-admin-ui-information-architecture-workbench.md) | Done | Admin UI 父级收口 |
 | P1-08 | [TASK-20260507-012 Admin Console 角色化工作台与导航体系](done/TASK-20260507-012-admin-console-role-workbench-navigation.md) | Done | Admin UI 具体落地 |
 | P1-09 | [TASK-20260507-005 Codex 接入向导、Client Instance 与 Deep Link UI 闭环](done/TASK-20260507-005-codex-onboarding-client-instance-deeplink-ui.md) | Done | Codex 接入主路径 |
 | P1-10 | [TASK-20260507-010 Community Portal Codex 自助接入与个人用量界面](done/TASK-20260507-010-community-portal-codex-self-service-surface.md) | Done | 社区用户主路径 |
-| P2-11 | [TASK-20260507-003 Codex 账号池热切换、负载均衡与失败恢复 UI](done/TASK-20260507-003-codex-account-pool-hot-switch-failover-ui.md) | Done | 管理员运营效率 |
-| P2-12 | [TASK-20260507-004 Codex 实时请求、Usage 与过滤命中观测台](done/TASK-20260507-004-codex-realtime-usage-filter-observability.md) | Done | 排障与观测效率 |
 | P2-13 | [TASK-20260507-017 Codex Runtime 批量预检与脱敏审计闭环](done/TASK-20260507-017-codex-runtime-batch-preflight-audit.md) | Done | 批量操作可信性 |
 | P3-14 | [TASK-20260507-007 前端可用性验收、表单友好性与移动端体验硬化](done/TASK-20260507-007-frontend-usability-form-mobile-hardening.md) | Done | 全局体验收口 |
 
@@ -98,13 +148,12 @@
 
 | 任务 | 状态 | 优先级 | 来源 |
 | --- | --- | --- | --- |
-| [TASK-20260506-009 Provider 生态广度与 Conformance 完善](done/TASK-20260506-009-provider-ecosystem-conformance.md) | Done | High | REP-20260506 |
 | [TASK-20260506-010 支付生产闭环完善](done/TASK-20260506-010-production-payment-closure.md) | Done | High | REP-20260506 |
 | [TASK-20260506-011 Realtime 与 Media 生产硬化](done/TASK-20260506-011-realtime-media-production-hardening.md) | Done | High | REP-20260506 |
 | [TASK-20260506-012 CLI/客户端生态与云端接入工具链补齐](done/TASK-20260506-012-cloud-cli-client-access-tooling.md) | Done | High | REP-20260506 |
 | [TASK-20260506-013 文档、i18n 与 OpenAPI 事实源修复](done/TASK-20260506-013-docs-i18n-openapi-truth-source.md) | Done | Medium | REP-20260506 |
 | [TASK-20260506-014 CLI 云端代理接入、热切换、过滤与模型路由](done/TASK-20260506-014-cloud-cli-proxy-access-hot-switch-filtering.md) | Done | High | REP-20260506 五项目深度分析 |
-| [TASK-20260506-015 AI IDE/CLI 云端账号配额、多实例与插件联动运营面](done/TASK-20260506-015-ai-ide-account-quota-instance-operator-plane.md) | Done | High | REP-20260506 五项目深度分析 |
+| [TASK-20260506-015 AI IDE/CLI 云端账号配额、多实例与插件联动运营面](done/TASK-20260506-015-ai-ide-account-quota-instance-operator-plane.md) | Done | High | REP-20260506 五项目深度分析；旧 account pool 运营面历史方案，现仅保留后端语义参考 |
 
 ## 再次深度复核任务
 
@@ -120,7 +169,7 @@
 | [TASK-20260506-018 支付定时对账、订阅发票与跨币种结算](done/TASK-20260506-018-payment-scheduled-reconcile-invoice-currency.md) | Done | High | REP-20260506 深度再复核 |
 | [TASK-20260506-019 Realtime 长连接池与专有 Media Adapter](done/TASK-20260506-019-realtime-pool-media-adapters.md) | Done | High | REP-20260506 深度再复核 |
 | [TASK-20260506-020 云端 Request Filter 高级规则、审计与 UI](done/TASK-20260506-020-cloud-request-filter-audit-ui.md) | Done | High | REP-20260506 深度再复核 |
-| [TASK-20260506-021 AI IDE/CLI 官方账号导入与配额刷新](done/TASK-20260506-021-ai-ide-account-import-quota-refresh.md) | Done | High | REP-20260506 深度再复核 |
+| [TASK-20260506-021 AI IDE/CLI 官方账号导入与配额刷新](done/TASK-20260506-021-ai-ide-account-import-quota-refresh.md) | Done | High | REP-20260506 深度再复核；保留后端导入与 quota 边界，不代表保留独立官方账号控制台 |
 | [TASK-20260506-022 Client Instance 管理与插件/Deep Link 授权下发](done/TASK-20260506-022-client-instance-plugin-deeplink.md) | Done | Medium | REP-20260506 深度再复核 |
 | [TASK-20260506-023 OpenAPI 自动生成、SDK 示例与前端 i18n 抽取](done/TASK-20260506-023-openapi-sdk-frontend-i18n.md) | Done | Medium | REP-20260506 深度再复核 |
 | [TASK-20260506-024 Linux/systemd 部署、数据管理与迁移兼容](done/TASK-20260506-024-linux-systemd-data-migration.md) | Done | Medium | REP-20260506 深度再复核 |
@@ -131,10 +180,8 @@
 | 任务 | 状态 | 优先级 | 来源 |
 | --- | --- | --- | --- |
 | [TASK-20260507-000 Codex 账户反代与 UI/UX 深度差距分析](done/TASK-20260507-000-codex-proxy-uiux-gap-analysis.md) | Done | High | User Request |
-| [TASK-20260507-001 Codex 官方账号真实适配、配额刷新与反代 Smoke](done/TASK-20260507-001-codex-official-account-real-adapter-smoke.md) | Done | High | REP-20260507 |
+| [TASK-20260507-001 Codex 官方账号真实适配、配额刷新与反代 Smoke](done/TASK-20260507-001-codex-official-account-real-adapter-smoke.md) | Done | High | REP-20260507；保留后端导入、quota 与 smoke 基线 |
 | [TASK-20260507-002 Codex CLI 请求保真、Session 粘性与反向代理兼容](done/TASK-20260507-002-codex-cli-request-fidelity-sticky-session.md) | Done | High | REP-20260507 |
-| [TASK-20260507-003 Codex 账号池热切换、负载均衡与失败恢复 UI](done/TASK-20260507-003-codex-account-pool-hot-switch-failover-ui.md) | Done | High | REP-20260507 |
-| [TASK-20260507-004 Codex 实时请求、Usage 与过滤命中观测台](done/TASK-20260507-004-codex-realtime-usage-filter-observability.md) | Done | Medium | REP-20260507 |
 | [TASK-20260507-005 Codex 接入向导、Client Instance 与 Deep Link UI 闭环](done/TASK-20260507-005-codex-onboarding-client-instance-deeplink-ui.md) | Done | High | REP-20260507 |
 | [TASK-20260507-006 管理端 UI 信息架构与角色化工作台重整](done/TASK-20260507-006-admin-ui-information-architecture-workbench.md) | Done | High | REP-20260507 |
 | [TASK-20260507-007 前端可用性验收、表单友好性与移动端体验硬化](done/TASK-20260507-007-frontend-usability-form-mobile-hardening.md) | Done | Medium | REP-20260507 |
@@ -167,10 +214,8 @@
 
 | 任务 | 状态 | 优先级 | 来源 |
 | --- | --- | --- | --- |
-| [TASK-20260513-002 主流 API 翻译 Conformance Matrix 与缺口硬化](done/TASK-20260513-002-mainstream-api-translation-conformance-matrix.md) | Done | High | REQ-20260513-002 |
 | [TASK-20260513-003 Admin Console 菜单精简与无效运维能力下线](done/TASK-20260513-003-admin-console-menu-simplification-ops-prune.md) | Done | High | REQ-20260513-002 |
 | [TASK-20260513-004 客户门户完整度补齐](done/TASK-20260513-004-portal-customer-completeness-hardening.md) | Done | High | REQ-20260513-002 |
-| [TASK-20260513-005 Provider/Media/价格同步参考差距补齐](done/TASK-20260513-005-provider-media-pricing-reference-gap-closure.md) | Done | Medium | REQ-20260513-003 |
 | [TASK-20260513-006 Public Site、Docs、Pricing、Status 客户入口](done/TASK-20260513-006-public-site-docs-pricing-status-surface.md) | Done | Medium | REQ-20260513-003 |
 
 ## 2026-05-14 质量硬化任务
@@ -207,27 +252,29 @@
 | [TASK-20260519-002 Codex 功能性服务 API 最高优先推进](done/TASK-20260519-002-codex-priority-functional-service-api.md) | Done | Critical | REQ-20260519-002 |
 | [TASK-20260519-002-01 Codex 功能性服务 API 事实源优先收紧](done/TASK-20260519-002-01-codex-functional-truth-source-priority.md) | Done | Critical | TASK-20260519-002 / TASK-20260514-029 |
 | [TASK-20260519-002-02 Codex Smoke、Record/Replay 与成本防护复核](done/TASK-20260519-002-02-codex-smoke-record-replay-priority.md) | Done | Critical | TASK-20260519-002 / TASK-20260514-031 |
-| [TASK-20260514-016 对话与 Tools 功能性 API 覆盖总控父任务](backlog/TASK-20260514-016-openai-full-api-coverage-parent.md) | Backlog | Critical | REQ-20260514-009 / REQ-20260518-005 |
-| [TASK-20260514-013 OpenAI Chat/Responses 参数全量保真与原生 Responses 边界](backlog/TASK-20260514-013-openai-chat-responses-native-parity.md) | Backlog | High | TASK-20260514-016 / REP-20260518 |
-| [TASK-20260514-017 OpenAI Chat Completions 全参数与对象生命周期](backlog/TASK-20260514-017-openai-chat-completions-full-parity.md) | Backlog | Critical | TASK-20260514-016 / 013 |
-| [TASK-20260514-018 OpenAI Responses 原生执行器与生命周期](backlog/TASK-20260514-018-openai-responses-native-lifecycle.md) | Backlog | Critical | TASK-20260514-016 / 013 |
-| [TASK-20260514-019 OpenAI Conversations、Webhooks 与 Responses 工具生态](backlog/TASK-20260514-019-openai-conversations-webhooks-tools.md) | Backlog | High | TASK-20260514-016 / 013 |
-| [TASK-20260514-020 OpenAI Audio、Images、Embeddings、Moderations 参数 parity](backlog/TASK-20260514-020-openai-audio-images-embeddings-moderations-parity.md) | Backlog | High | TASK-20260514-016 / 014 |
-| [TASK-20260514-021 OpenAI Files、Uploads、Models 对话支撑最小生命周期](backlog/TASK-20260514-021-openai-files-uploads-batches-models-lifecycle.md) | Backlog | High | TASK-20260514-016 / 014 |
-| [TASK-20260514-023 OpenAI Vector Stores 对话 RAG 支撑面](backlog/TASK-20260514-023-openai-vector-stores-full-stack.md) | Backlog | High | TASK-20260514-016 / 014 |
-| [TASK-20260517-003 OpenAI Vector Stores 本地 Lifecycle 基线](done/TASK-20260517-003-openai-vector-stores-local-lifecycle-baseline.md) | Done | High | TASK-20260514-023 |
-| [TASK-20260517-004 OpenAI Vector Store Files 本地 Attachment Lifecycle 基线](done/TASK-20260517-004-openai-vector-store-files-local-attachment-lifecycle.md) | Done | High | TASK-20260514-023 |
-| [TASK-20260517-005 OpenAI Vector Store File Batches 本地 Lifecycle 基线](done/TASK-20260517-005-openai-vector-store-file-batches-local-lifecycle.md) | Done | High | TASK-20260514-023 |
-| [TASK-20260518-001 OpenAI Vector Store File Content 本地读取基线](done/TASK-20260518-001-openai-vector-store-file-content-local-read-baseline.md) | Done | High | TASK-20260514-023 |
-| [TASK-20260518-002 OpenAI Vector Store Search 本地文本检索基线](done/TASK-20260518-002-openai-vector-store-search-local-text-baseline.md) | Done | High | TASK-20260514-023 |
-| [TASK-20260518-003 OpenAI Responses File Search 本地 Vector Store 绑定基线](done/TASK-20260518-003-openai-responses-file-search-local-vector-store-binding.md) | Done | High | TASK-20260514-023 |
-| [TASK-20260518-004 OpenAI Vector Store 本地 Ingestion 产物基线](done/TASK-20260518-004-openai-vector-store-local-ingestion-artifact-baseline.md) | Done | High | TASK-20260514-023 |
-| [TASK-20260514-029 对话与 Tools OpenAPI、Catalog、Conformance 与 SDK 事实源统一](in-progress/TASK-20260514-029-openai-openapi-catalog-conformance-sdk.md) | In Progress | Critical | TASK-20260514-016 / 015 / TASK-20260519-002 |
+| [TASK-20260514-016 对话与 Tools 功能性 API 覆盖总控父任务](backlog/TASK-20260514-016-functional-service-api-coverage-parent.md) | Backlog | Critical | REQ-20260514-009 / REQ-20260518-005 |
+| [TASK-20260514-013 OpenAI Chat/Responses 参数保真与原生 Responses 边界](done/TASK-20260514-013-openai-chat-responses-native-parity.md) | Done | High | TASK-20260514-016 / REP-20260518 |
+| [TASK-20260514-017 OpenAI Chat Completions 参数与对象生命周期](done/TASK-20260514-017-openai-chat-completions-full-parity.md) | Done | Critical | TASK-20260514-016 / 013 |
+| [TASK-20260514-018 OpenAI Responses 原生执行器与生命周期](done/TASK-20260514-018-openai-responses-native-lifecycle.md) | Done | Critical | TASK-20260514-016 / 013 |
+| [TASK-20260514-019 OpenAI Conversations、Webhooks 与 Responses 工具生态](done/TASK-20260514-019-openai-conversations-webhooks-tools.md) | Done | High | TASK-20260514-016 / 013 |
+| [TASK-20260514-020 OpenAI 多模态支撑参数边界收紧](done/TASK-20260514-020-openai-multimodal-supporting-parameters.md) | Done | High | TASK-20260514-016 / 014 / REP-20260521 |
+| [TASK-20260514-021 OpenAI Files、Uploads、Models 功能性支撑面](done/TASK-20260514-021-openai-files-uploads-models-functional-support.md) | Done | High | TASK-20260514-016 / 014 / REP-20260521 |
+| [TASK-20260514-023 OpenAI Vector Stores 对话 RAG 支撑面](done/TASK-20260514-023-openai-vector-stores-full-stack.md) | Done | High | TASK-20260514-016 / 014；仅保留 Responses file_search/RAG 后端支撑，不代表保留独立向量控制台 |
+| [TASK-20260517-003 OpenAI Vector Stores 本地 Lifecycle 基线](done/TASK-20260517-003-openai-vector-stores-local-lifecycle-baseline.md) | Done | High | TASK-20260514-023；控制台已下线，后端支撑面暂保留 |
+| [TASK-20260517-004 OpenAI Vector Store Files 本地 Attachment Lifecycle 基线](done/TASK-20260517-004-openai-vector-store-files-local-attachment-lifecycle.md) | Done | High | TASK-20260514-023；控制台已下线，后端支撑面暂保留 |
+| [TASK-20260517-005 OpenAI Vector Store File Batches 本地 Lifecycle 基线](done/TASK-20260517-005-openai-vector-store-file-batches-local-lifecycle.md) | Done | High | TASK-20260514-023；控制台已下线，后端支撑面暂保留 |
+| [TASK-20260518-001 OpenAI Vector Store File Content 本地读取基线](done/TASK-20260518-001-openai-vector-store-file-content-local-read-baseline.md) | Done | High | TASK-20260514-023；控制台已下线，后端支撑面暂保留 |
+| [TASK-20260518-002 OpenAI Vector Store Search 本地文本检索基线](done/TASK-20260518-002-openai-vector-store-search-local-text-baseline.md) | Done | High | TASK-20260514-023；控制台已下线，后端支撑面暂保留 |
+| [TASK-20260518-003 OpenAI Responses File Search 本地 Vector Store 绑定基线](done/TASK-20260518-003-openai-responses-file-search-local-vector-store-binding.md) | Done | High | TASK-20260514-023；保留 Responses file_search 绑定，不代表保留向量调试沙盒 |
+| [TASK-20260518-004 OpenAI Vector Store 本地 Ingestion 产物基线](done/TASK-20260518-004-openai-vector-store-local-ingestion-artifact-baseline.md) | Done | High | TASK-20260514-023；控制台已下线，后端支撑面暂保留 |
+| [TASK-20260514-029 对话与 Tools OpenAPI、Catalog、Conformance 与 SDK 事实源统一](done/TASK-20260514-029-openai-openapi-catalog-conformance-sdk.md) | Done | Critical | TASK-20260514-016 / 015 / TASK-20260519-002 |
 | [TASK-20260514-029-01 功能性服务 API Coverage Matrix Source](done/TASK-20260514-029-01-functional-service-api-coverage-matrix-source.md) | Done | Critical | TASK-20260514-029 |
 | [TASK-20260514-029-02 Codex OpenAPI, Catalog & Conformance 深度融合](done/TASK-20260514-029-02-codex-openapi-catalog-conformance.md) | Done | Critical | TASK-20260514-029 |
 | [TASK-20260514-029-03 Codex 运营控制台体验对标与 Session 恢复桥接](done/TASK-20260514-029-03-codex-console-session-recovery.md) | Done | Critical | TASK-20260514-029 |
-| [TASK-20260514-030 OpenAI 横切协议兼容](backlog/TASK-20260514-030-openai-cross-cutting-protocol-compatibility.md) | Backlog | Critical | TASK-20260514-016 |
+| [TASK-20260514-029-04 OpenAPI 路径补全与 SDK 三模式示例归口](done/TASK-20260514-029-04-openapi-coverage-sdk-finalization.md) | Done | Critical | TASK-20260514-029 / REP-20260521 |
+| [TASK-20260514-030 OpenAI 横切协议兼容](done/TASK-20260514-030-openai-cross-cutting-protocol-compatibility.md) | Done | Critical | TASK-20260514-016 |
 | [TASK-20260514-031 OpenAI 真实 Smoke 与认证成本防护](backlog/TASK-20260514-031-openai-real-smoke-certification-harness.md) | Backlog | Critical | TASK-20260514-016 / 015 |
+| [TASK-20260521-001 功能性服务 API Backlog 收口与优先级清理](done/TASK-20260521-001-functional-scope-backlog-closeout.md) | Done | Critical | REP-20260521 |
 | [TASK-20260519-001-01 Smoke 范围矩阵与 Provider Auth 设计](done/TASK-20260519-001-01-smoke-scope-provider-auth-design.md) | Done | Critical | TASK-20260519-001 |
 | [TASK-20260519-001-02 Gemini/MiMo Provider-aware Smoke Runner](done/TASK-20260519-001-02-gemini-mimo-provider-aware-smoke-runner.md) | Done | Critical | TASK-20260519-001 |
 | [TASK-20260519-001-03 Record/Replay、脱敏与成本防护验证](done/TASK-20260519-001-03-smoke-record-replay-redaction-budget.md) | Done | High | TASK-20260519-001 |
@@ -283,6 +330,17 @@
 | [TASK-20260507-013 Portal/Admin API 权限隔离、审计与越权回归](done/TASK-20260507-013-portal-admin-permission-audit-regression.md) | Done | High | REQ-20260507-001 |
 | [TASK-20260507-014 Portal/Console UI/UX 验收体系与组件硬化](done/TASK-20260507-014-portal-console-ux-acceptance-system.md) | Done | Medium | REQ-20260507-001 |
 | [TASK-20260507-016 Codex 真实 auth.json 长期测试账号入库与详测](done/TASK-20260507-016-codex-real-auth-db-long-term-test.md) | Done | High | User Request |
+
+## 已下线控制台能力历史归档
+
+| 任务 | 状态 | 优先级 | 来源 |
+| --- | --- | --- | --- |
+| [TASK-20260507-003 Codex 账号分组热切换、负载均衡与失败恢复 UI](done/TASK-20260507-003-codex-account-group-hot-switch-failover-ui.md) | Done | High | REP-20260507；旧控制台账号分组运行态历史实现，当前不再作为现役产品面 |
+| [TASK-20260507-004 Codex 实时请求、Usage 与过滤命中观测台](done/TASK-20260507-004-codex-realtime-usage-filter-observability.md) | Done | Medium | REP-20260507；`live/realtime` 观测台历史实现，现仅保留实现证据 |
+| [TASK-20260507-011 Admin Console 命名空间迁移与旧路由兼容](done/TASK-20260507-011-admin-console-namespace-legacy-route-migration.md) | Done | High | REQ-20260507-001；旧控制台路由迁移历史记录，不再代表现役能力入口 |
+| [TASK-20260506-009 Provider 生态广度与 Conformance 完善](done/TASK-20260506-009-provider-ecosystem-conformance.md) | Done | High | REP-20260506；涉及 provider-sites、capability matrix、站点档案的历史实现归档 |
+| [TASK-20260513-002 主流 API 翻译 Conformance Matrix 与缺口硬化](done/TASK-20260513-002-mainstream-api-translation-conformance-matrix.md) | Done | High | REQ-20260513-002；Native Compatibility 控制台展示已退役，保留后端翻译边界证据 |
+| [TASK-20260513-005 Provider/Media/价格同步参考差距补齐](done/TASK-20260513-005-provider-media-pricing-reference-gap-closure.md) | Done | Medium | REQ-20260513-003；`provider-reference-gap` 控制台与 API 历史能力归档 |
 
 ## 排期管理任务
 

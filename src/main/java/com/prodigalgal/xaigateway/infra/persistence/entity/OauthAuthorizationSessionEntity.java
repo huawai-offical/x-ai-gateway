@@ -21,8 +21,8 @@ public class OauthAuthorizationSessionEntity {
     @Column(name = "provider_type", nullable = false, length = 32)
     private UpstreamAccountProviderType providerType;
 
-    @Column(name = "pool_id")
-    private Long poolId;
+    @Column(name = "group_id")
+    private Long groupId;
 
     @Column(name = "status", nullable = false, length = 32)
     private String status;
@@ -55,8 +55,8 @@ public class OauthAuthorizationSessionEntity {
     public void setSessionKey(String sessionKey) { this.sessionKey = sessionKey; }
     public UpstreamAccountProviderType getProviderType() { return providerType; }
     public void setProviderType(UpstreamAccountProviderType providerType) { this.providerType = providerType; }
-    public Long getPoolId() { return poolId; }
-    public void setPoolId(Long poolId) { this.poolId = poolId; }
+    public Long getGroupId() { return groupId; }
+    public void setGroupId(Long groupId) { this.groupId = groupId; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
     public String getAuthorizationUrl() { return authorizationUrl; }

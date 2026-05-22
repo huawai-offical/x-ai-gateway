@@ -27,7 +27,6 @@ public final class OpenAiProtocolPathMatcher {
                 || path.startsWith("/v1/uploads/")
                 || path.equals("/v1/models")
                 || path.startsWith("/v1/models/")
-                || path.startsWith("/v1/vector_stores")
-                || path.startsWith("/v1/realtime");
+                || path.startsWith("/v1/vector_stores");
     }
 }

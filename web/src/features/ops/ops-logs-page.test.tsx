@@ -57,7 +57,7 @@ describe('OpsLogsPage', () => {
     expect(await screen.findByText('gateway.runtime')).toBeInTheDocument()
     expect(await screen.findByText('req-1')).toBeInTheDocument()
     expect(await screen.findByText('PREFIX_AFFINITY')).toBeInTheDocument()
-    expect(screen.getByText(/providerType · OPENAI_DIRECT/)).toBeInTheDocument()
+    expect(screen.getByText(/提供方类型 · OPENAI_DIRECT/)).toBeInTheDocument()
   })
 
   it('can submit a manual trace query', async () => {
@@ -69,10 +69,10 @@ describe('OpsLogsPage', () => {
       </QueryClientProvider>,
     )
 
-    fireEvent.change(screen.getByPlaceholderText('输入 requestId'), {
+    fireEvent.change(screen.getByPlaceholderText('输入请求 ID'), {
       target: { value: 'req-1' },
     })
-    fireEvent.click(screen.getByRole('button', { name: '查询 Trace' }))
+    fireEvent.click(screen.getByRole('button', { name: '查询链路' }))
 
     await screen.findByText(/prompt_cache/)
     expect(screen.getAllByText('batch_1').length).toBeGreaterThan(0)

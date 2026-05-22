@@ -3,12 +3,24 @@ package com.prodigalgal.xaigateway.gateway.core.catalog;
 import com.prodigalgal.xaigateway.admin.application.CredentialCryptoService;
 import com.prodigalgal.xaigateway.admin.application.ProviderSiteRegistryService;
 import com.prodigalgal.xaigateway.gateway.core.credential.CredentialAuthKind;
+import com.prodigalgal.xaigateway.gateway.core.credential.CredentialMaterialResolver;
+import com.prodigalgal.xaigateway.gateway.core.credential.ResolvedCredentialMaterial;
+import com.prodigalgal.xaigateway.gateway.core.model.ModelPolicyScopeType;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.shared.ReasoningTransport;
+import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
+import com.prodigalgal.xaigateway.infra.persistence.entity.ModelPolicyEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamSiteProfileEntity;
+import com.prodigalgal.xaigateway.infra.persistence.repository.ModelPolicyRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
+import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -182,5 +194,63 @@ class CredentialModelDiscoveryServiceTests {
         assertEquals(2, probe.models().size());
         assertTrue(probe.models().stream().anyMatch(model -> model.modelName().equals("gemini-2.5-pro")));
         assertTrue(probe.models().stream().allMatch(model -> model.supportedProtocols().contains("google_native")));
+    }
+
+    @Test
+    void shouldDeduplicateDiscoveredPoliciesWhenRefreshingCredentialModels() {
+        UpstreamCredentialRepository credentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        ProviderSiteRegistryService providerSiteRegistryService = Mockito.mock(ProviderSiteRegistryService.class);
+        CredentialMaterialResolver credentialMaterialResolver = Mockito.mock(CredentialMaterialResolver.class);
+        ModelPolicyRepository modelPolicyRepository = Mockito.mock(ModelPolicyRepository.class);
+        ExchangeFunction exchangeFunction = request -> Mono.just(ClientResponse.create(HttpStatus.OK)
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .body("""
+                        {
+                          "data": [
+                            {"id":"mimo-v2-omni"},
+                            {"id":"MIMO-V2-OMNI"}
+                          ]
+                        }
+                        """)
+                .build());
+        CredentialModelDiscoveryService service = new CredentialModelDiscoveryService(
+                credentialRepository,
+                Mockito.mock(CredentialCryptoService.class),
+                providerSiteRegistryService,
+                new com.prodigalgal.xaigateway.gateway.core.site.UpstreamSitePolicyService(),
+                credentialMaterialResolver,
+                modelPolicyRepository,
+                WebClient.builder().exchangeFunction(exchangeFunction)
+        );
+        UpstreamCredentialEntity credential = new UpstreamCredentialEntity();
+        ReflectionTestUtils.setField(credential, "id", 101L);
+        credential.setProviderType(ProviderType.OPENAI_COMPATIBLE);
+        credential.setBaseUrl("https://token-plan-sgp.xiaomimimo.com/v1");
+        credential.setApiKeyCiphertext("cipher");
+        credential.setApiKeyFingerprint("fp");
+        credential.setSiteProfileId(2L);
+        UpstreamSiteProfileEntity site = new UpstreamSiteProfileEntity();
+        ReflectionTestUtils.setField(site, "id", 2L);
+        site.setSiteKind(UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC);
+
+        Mockito.when(credentialRepository.findById(101L)).thenReturn(Optional.of(credential));
+        Mockito.when(credentialRepository.save(Mockito.any(UpstreamCredentialEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        Mockito.when(credentialMaterialResolver.resolveStored(credential))
+                .thenReturn(new ResolvedCredentialMaterial(101L, 2L, CredentialAuthKind.API_KEY, "secret", "fp", java.util.Map.of(), null, "credential"));
+        Mockito.when(providerSiteRegistryService.ensureSiteProfile(ProviderType.OPENAI_COMPATIBLE, credential.getBaseUrl(), 2L))
+                .thenReturn(site);
+        Mockito.when(modelPolicyRepository.findAllByScopeTypeAndScopeIdAndEnabledTrueOrderByPriorityAscCreatedAtAsc(
+                ModelPolicyScopeType.CREDENTIAL,
+                101L
+        )).thenReturn(List.of());
+        Mockito.when(modelPolicyRepository.save(Mockito.any(ModelPolicyEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.refreshCredential(101L);
+
+        ArgumentCaptor<ModelPolicyEntity> policyCaptor = ArgumentCaptor.forClass(ModelPolicyEntity.class);
+        Mockito.verify(modelPolicyRepository, Mockito.times(1)).save(policyCaptor.capture());
+        assertEquals("mimo-v2-omni", policyCaptor.getValue().getPublicModelKey());
+        assertTrue(policyCaptor.getValue().getSupportedProtocols().contains("openai"));
+        assertTrue(policyCaptor.getValue().getSupportedProtocols().contains("responses"));
     }
 }

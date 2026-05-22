@@ -4,6 +4,7 @@ import tools.jackson.databind.JsonNode;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthenticationService;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileResponse;
+import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileListPage;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayResourceExecutionService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 
@@ -34,9 +36,21 @@ public class OpenAiFilesController {
     }
 
     @GetMapping
-    public OpenAiListResponse<GatewayFileResponse> list(@RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
+    public OpenAiListResponse<GatewayFileResponse> list(
+            @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
+            @RequestParam(value = "purpose", required = false) String purpose,
+            @RequestParam(value = "after", required = false) String after,
+            @RequestParam(value = "limit", required = false) Integer limit,
+            @RequestParam(value = "order", required = false) String order) {
         AuthenticatedDistributedKey distributedKey = distributedKeyAuthenticationService.authenticateBearerToken(authorization);
-        return OpenAiListResponse.of(gatewayResourceExecutionService.listFiles(distributedKey.id()));
+        GatewayFileListPage page = gatewayResourceExecutionService.listFilesPage(
+                distributedKey.id(),
+                purpose,
+                after,
+                limit,
+                order
+        );
+        return OpenAiListResponse.of(page.data(), page.hasMore(), GatewayFileResponse::id);
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

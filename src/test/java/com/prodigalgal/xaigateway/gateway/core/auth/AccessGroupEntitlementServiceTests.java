@@ -51,7 +51,7 @@ class AccessGroupEntitlementServiceTests {
         ResolvedAccessPolicy policy = service.resolveForDistributedKey(key);
 
         assertEquals(List.of("starter-access"), policy.sourceAccessGroups());
-        assertEquals(List.of("openai"), policy.allowedProtocols());
+        assertEquals(List.of("openai"), policy.allowedProtocolSuites());
         assertEquals(List.of("gpt-5-mini"), policy.allowedModels());
         assertEquals(60, policy.rpmLimit());
     }
@@ -75,7 +75,7 @@ class AccessGroupEntitlementServiceTests {
         ResolvedAccessPolicy policy = service.resolveForDistributedKey(key);
 
         assertEquals(List.of("key-override"), policy.sourceAccessGroups());
-        assertEquals(List.of("anthropic"), policy.allowedProtocols());
+        assertEquals(List.of("anthropic"), policy.allowedProtocolSuites());
         assertEquals(List.of("claude-sonnet-4"), policy.allowedModels());
         assertEquals(30, policy.rpmLimit());
     }
@@ -93,7 +93,7 @@ class AccessGroupEntitlementServiceTests {
         ReflectionTestUtils.setField(key, "id", id);
         key.setKeyName("portal-key");
         key.setOwnerUser(user);
-        key.setAllowedProtocols(List.of());
+        key.setAllowedProtocolSuites(List.of());
         key.setAllowedModels(List.of());
         key.setAllowedProviderTypes(List.of());
         key.setAllowedClientFamilies(List.of());
@@ -113,7 +113,7 @@ class AccessGroupEntitlementServiceTests {
         group.setGroupName(name);
         group.setActive(true);
         group.setPriority(100);
-        group.setAllowedProtocols(protocols);
+        group.setAllowedProtocolSuites(protocols);
         group.setAllowedModels(models);
         group.setAllowedProviderTypes(List.of());
         group.setAllowedClientFamilies(List.of());

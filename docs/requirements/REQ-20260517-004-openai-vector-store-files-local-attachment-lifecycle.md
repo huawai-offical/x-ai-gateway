@@ -2,7 +2,7 @@
 
 状态：Done
 日期：2026-05-17
-来源任务：[TASK-20260514-023](../../tasks/backlog/TASK-20260514-023-openai-vector-stores-full-stack.md)
+来源任务：[TASK-20260514-023](../../tasks/done/TASK-20260514-023-openai-vector-stores-full-stack.md)
 
 ## 背景
 
@@ -43,7 +43,7 @@
 - `PublicDocsBundleService`
 - `docs/openapi/public-openapi.json`
 - `provider-catalog.json`
-- `tasks/backlog/TASK-20260514-023-openai-vector-stores-full-stack.md`
+- `tasks/done/TASK-20260514-023-openai-vector-stores-full-stack.md`
 - OpenAI 覆盖报告
 
 ## 风险

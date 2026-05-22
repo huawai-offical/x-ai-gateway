@@ -1,10 +1,10 @@
 # TASK-20260515-020 OpenAI Responses input_tokens 与 compact 本地基线
 
-状态：Done  
-优先级：Critical  
-类型：子任务切片  
-父任务：[TASK-20260514-018](../backlog/TASK-20260514-018-openai-responses-native-lifecycle.md)  
-上游来源：[TASK-20260514-018](../backlog/TASK-20260514-018-openai-responses-native-lifecycle.md)、OpenAI Responses API Reference
+状态：Done
+优先级：Critical
+类型：子任务切片
+父任务：[TASK-20260514-018](../done/TASK-20260514-018-openai-responses-native-lifecycle.md)
+上游来源：[TASK-20260514-018](../done/TASK-20260514-018-openai-responses-native-lifecycle.md)、OpenAI Responses API Reference
 
 ## 背景
 

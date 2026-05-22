@@ -4,6 +4,7 @@ type QueryOptions<TData> = {
   queryKey: readonly unknown[]
   queryFn: () => Promise<TData>
   enabled?: boolean
+  refetchInterval?: number
 }
 
 type MutationOptions<TData, TVariables> = {
@@ -20,7 +21,9 @@ export type TypedQueryResult<TData> = {
 
 export type TypedMutationResult<TData, TVariables> = {
   data?: TData
+  error?: unknown
   isPending: boolean
+  variables?: TVariables
   mutate: (variables: TVariables) => void
   mutateAsync: (variables: TVariables) => Promise<TData>
   reset: () => void

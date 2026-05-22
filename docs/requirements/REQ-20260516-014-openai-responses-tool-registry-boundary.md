@@ -20,7 +20,7 @@ OpenAI Responses API 的 `tools` 不只包含 `function`，官方文档还列出
 - 不实现 MCP server 调用、审批、结果回填或 connector 授权。
 - 不实现 custom tool call 的完整输出生命周期。
 - 不实现 Conversations/Items lifecycle，仍归属 `TASK-20260514-019` 后续切片。
-- 不实现 Vector Stores 或 Containers，分别归属 `TASK-20260514-023` 与 `TASK-20260514-024`。
+- 不实现 Vector Stores 或 Containers；Vector Stores 已由 `TASK-20260514-023` 收口，Containers 不属于当前功能性服务 API 必做范围。
 
 ## 范围
 
@@ -60,9 +60,9 @@ OpenAI Responses API 的 `tools` 不只包含 `function`，官方文档还列出
 ## 关联任务
 
 - [TASK-20260516-014](../../tasks/done/TASK-20260516-014-openai-responses-tool-registry-boundary.md)
-- [TASK-20260514-019 OpenAI Conversations、Webhooks 与 Responses 工具生态](../../tasks/backlog/TASK-20260514-019-openai-conversations-webhooks-tools.md)
-- [TASK-20260514-023 OpenAI Vector Stores 全栈兼容](../../tasks/backlog/TASK-20260514-023-openai-vector-stores-full-stack.md)
-- [TASK-20260514-024 OpenAI Containers 与 Code Interpreter 文件](../../tasks/backlog/TASK-20260514-024-openai-containers-code-interpreter-files.md)
+- [TASK-20260514-019 OpenAI Conversations、Webhooks 与 Responses 工具生态](../../tasks/done/TASK-20260514-019-openai-conversations-webhooks-tools.md)
+- [TASK-20260514-023 OpenAI Vector Stores 全栈兼容](../../tasks/done/TASK-20260514-023-openai-vector-stores-full-stack.md)
+- Containers 与 Code Interpreter 文件：当前按 [ADR-0010](../decisions/ADR-0010-functional-service-api-scope.md) 判定为非核心官方 API，不再保留独立 Backlog 任务。
 
 ## 当前状态
 

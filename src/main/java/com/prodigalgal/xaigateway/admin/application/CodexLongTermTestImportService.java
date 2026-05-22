@@ -3,8 +3,8 @@ package com.prodigalgal.xaigateway.admin.application;
 import com.prodigalgal.xaigateway.admin.api.OfficialAccountType;
 import com.prodigalgal.xaigateway.gateway.core.account.UpstreamAccountProviderType;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountEntity;
-import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountPoolEntity;
-import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountPoolRepository;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountGroupEntity;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountGroupRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountRepository;
 import java.time.Instant;
 import java.util.Collections;
@@ -22,10 +22,10 @@ import tools.jackson.databind.ObjectMapper;
 public class CodexLongTermTestImportService {
 
     private static final String ADAPTER_NAME = "codex-long-term-test-import";
-    private static final String DEFAULT_POOL_DESCRIPTION = "Codex 真实 auth.json 长期测试账号池。";
+    private static final String DEFAULT_GROUP_DESCRIPTION = "Codex 真实 auth.json 长期测试账号分组。";
 
     private final UpstreamAccountRepository accountRepository;
-    private final UpstreamAccountPoolRepository poolRepository;
+    private final UpstreamAccountGroupRepository groupRepository;
     private final CredentialCryptoService credentialCryptoService;
     private final SupportedModelCatalogService supportedModelCatalogService;
     private final ObjectMapper objectMapper;
@@ -34,12 +34,12 @@ public class CodexLongTermTestImportService {
 
     public CodexLongTermTestImportService(
             UpstreamAccountRepository accountRepository,
-            UpstreamAccountPoolRepository poolRepository,
+            UpstreamAccountGroupRepository groupRepository,
             CredentialCryptoService credentialCryptoService,
             SupportedModelCatalogService supportedModelCatalogService,
             ObjectMapper objectMapper) {
         this.accountRepository = accountRepository;
-        this.poolRepository = poolRepository;
+        this.groupRepository = groupRepository;
         this.credentialCryptoService = credentialCryptoService;
         this.supportedModelCatalogService = supportedModelCatalogService;
         this.objectMapper = objectMapper;
@@ -48,15 +48,15 @@ public class CodexLongTermTestImportService {
     }
 
     @Transactional
-    public CodexLongTermTestImportResult importAuthJson(String rawJson, String requestedPoolName) {
+    public CodexLongTermTestImportResult importAuthJson(String rawJson, String requestedGroupName) {
         CodexAuthJsonParser.ParsedCodexAuthJson parsed = codexAuthJsonParser.parse(rawJson);
         Instant now = Instant.now();
-        UpstreamAccountPoolEntity pool = resolvePool(requestedPoolName);
+        UpstreamAccountGroupEntity group = resolveGroup(requestedGroupName);
         String externalAccountId = parsed.identityKey();
         UpstreamAccountEntity entity = resolveExistingAccount(parsed, externalAccountId).orElseGet(UpstreamAccountEntity::new);
         boolean created = entity.getId() == null;
 
-        entity.setPool(pool);
+        entity.setGroup(group);
         entity.setProviderType(UpstreamAccountProviderType.CODEX_OAUTH);
         entity.setAccountName(parsed.accountName());
         entity.setExternalAccountId(externalAccountId);
@@ -125,7 +125,7 @@ public class CodexLongTermTestImportService {
         String routeBlockReason = routeBlockReason(saved);
         return new CodexLongTermTestImportResult(
                 saved.getId(),
-                pool.getId(),
+                group.getId(),
                 saved.getAccountName(),
                 saved.getExternalAccountId(),
                 created ? "CREATED" : "UPDATED",
@@ -188,20 +188,20 @@ public class CodexLongTermTestImportService {
         return null;
     }
 
-    private UpstreamAccountPoolEntity resolvePool(String requestedPoolName) {
-        String poolName = requestedPoolName == null || requestedPoolName.isBlank()
+    private UpstreamAccountGroupEntity resolveGroup(String requestedGroupName) {
+        String groupName = requestedGroupName == null || requestedGroupName.isBlank()
                 ? "codex-long-term-test"
-                : requestedPoolName.trim();
-        return poolRepository.findByPoolNameIgnoreCase(poolName).orElseGet(() -> {
-            UpstreamAccountPoolEntity pool = new UpstreamAccountPoolEntity();
-            pool.setPoolName(poolName);
-            pool.setProviderType(UpstreamAccountProviderType.CODEX_OAUTH);
-            pool.setSupportedModels(supportedModelCatalogService.normalize(OfficialAccountType.CODEX.defaultModels()));
-            pool.setSupportedProtocols(List.of("responses", "chat_completions"));
-            pool.setAllowedClientFamilies(List.of("CODEX"));
-            pool.setActive(true);
-            pool.setDescription(DEFAULT_POOL_DESCRIPTION);
-            return poolRepository.save(pool);
+                : requestedGroupName.trim();
+        return groupRepository.findByGroupNameIgnoreCase(groupName).orElseGet(() -> {
+            UpstreamAccountGroupEntity group = new UpstreamAccountGroupEntity();
+            group.setGroupName(groupName);
+            group.setProviderType(UpstreamAccountProviderType.CODEX_OAUTH);
+            group.setSupportedModels(supportedModelCatalogService.normalize(OfficialAccountType.CODEX.defaultModels()));
+            group.setSupportedProtocols(List.of("responses", "chat_completions"));
+            group.setAllowedClientFamilies(List.of("CODEX"));
+            group.setActive(true);
+            group.setDescription(DEFAULT_GROUP_DESCRIPTION);
+            return groupRepository.save(group);
         });
     }
 

@@ -1,6 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
-import { apiRequest } from '../../lib/api'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { EmptyState } from '@/components/app/empty-state'
+import { InfoGrid } from '@/components/app/info-grid'
+import { InlineError } from '@/components/app/inline-error'
+import { PageSection } from '@/components/app/page-section'
+import { PageSkeleton } from '@/components/app/page-skeleton'
+import { StatusBadge } from '@/components/app/status-badge'
+import { apiRequest } from '@/lib/api'
 import type { OutboundDelivery } from '../integrations/types'
 
 type MaintenanceWindow = {
@@ -197,156 +206,248 @@ export function ChangesPage() {
   )
 
   return (
-    <section className="page-grid">
-      <div className="panel panel-wide">
-        <div className="panel-head">
-          <p className="panel-kicker">Change Plan</p>
-          <h2>统一变更编排</h2>
-        </div>
-        <p className="panel-copy">
-          所有快照、升级、恢复和回滚都统一通过 ChangePlan 进入申请、审批、执行、核验与审计闭环。
-        </p>
-        <div className="inline-form">
-          <input value={planName} onChange={(event) => setPlanName(event.target.value)} placeholder="plan name" />
-          <select value={planType} onChange={(event) => setPlanType(event.target.value)} aria-label="plan type">
-            <option value="SNAPSHOT">SNAPSHOT</option>
-            <option value="UPGRADE">UPGRADE</option>
-            <option value="RESTORE">RESTORE</option>
-            <option value="ROLLBACK">ROLLBACK</option>
-          </select>
-          <select value={executionClass} onChange={(event) => setExecutionClass(event.target.value)} aria-label="execution class">
-            <option value="DRY_RUN">DRY_RUN</option>
-            <option value="MANUAL">MANUAL</option>
-            <option value="AUTO_TRIGGERED">AUTO_TRIGGERED</option>
-          </select>
-          <input value={requestedBy} onChange={(event) => setRequestedBy(event.target.value)} placeholder="requested by" />
-        </div>
-        <div className="inline-form">
-          <input
-            value={releaseArtifactId}
-            onChange={(event) => setReleaseArtifactId(event.target.value)}
-            placeholder="release artifact id"
-            disabled={planType !== 'UPGRADE' && planType !== 'ROLLBACK'}
-          />
-          <input
-            value={recoveryCheckpointId}
-            onChange={(event) => setRecoveryCheckpointId(event.target.value)}
-            placeholder="checkpoint id"
-            disabled={planType !== 'RESTORE' && planType !== 'ROLLBACK'}
-          />
-          <input
-            value={maintenanceWindowId}
-            onChange={(event) => setMaintenanceWindowId(event.target.value)}
-            placeholder="maintenance window id"
-            disabled={planType !== 'UPGRADE'}
-          />
-        </div>
-        <div className="inline-form">
-          <input
-            value={emergencyReason}
-            onChange={(event) => setEmergencyReason(event.target.value)}
-            placeholder="emergency reason"
-            disabled={planType !== 'RESTORE' && planType !== 'ROLLBACK'}
-          />
-          <input value={overrideReason} onChange={(event) => setOverrideReason(event.target.value)} placeholder="override reason" />
-          <button type="button" onClick={() => createMutation.mutate()} disabled={!planName}>
-            创建变更计划
-          </button>
-        </div>
-        <div className="detail-card-grid">
-          <div className="detail-card">
-            <strong>维护窗口</strong>
-            <span>{windowsQuery.data?.length ?? 0} 个</span>
-          </div>
-          <div className="detail-card">
-            <strong>Checkpoint</strong>
-            <span>{checkpointsQuery.data?.length ?? 0} 个</span>
-          </div>
-          <div className="detail-card">
-            <strong>Release Artifacts</strong>
-            <span>{releaseArtifactsQuery.data?.length ?? 0} 个</span>
-          </div>
-        </div>
-      </div>
+    <div className="flex flex-col gap-6">
+      <PageSection
+        kicker="变更编排"
+        title="统一变更编排"
+      >
+        <InfoGrid
+          items={[
+            { key: 'windows', label: '维护窗口', value: `${windowsQuery.data?.length ?? 0} 个` },
+            { key: 'checkpoints', label: '恢复快照', value: `${checkpointsQuery.data?.length ?? 0} 个` },
+            { key: 'releases', label: '发布制品', value: `${releaseArtifactsQuery.data?.length ?? 0} 个` },
+          ]}
+          columnsClassName="md:grid-cols-3"
+        />
 
-      <div className="panel panel-wide">
-        <div className="panel-head">
-          <p className="panel-kicker">Plans</p>
-          <h2>变更计划列表</h2>
-        </div>
-        <div className="card-list">
-          {changePlansQuery.data?.map((plan: ChangePlan) => {
-            const window = plan.maintenanceWindowId ? windowsById.get(plan.maintenanceWindowId) : null
-            const checkpoint = plan.recoveryCheckpointId ? checkpointsById.get(plan.recoveryCheckpointId) : null
-            const release = plan.releaseArtifactId ? releasesById.get(plan.releaseArtifactId) : null
-            const needsApproval = plan.executionClass === 'MANUAL' && ['UPGRADE', 'RESTORE', 'ROLLBACK'].includes(plan.planType)
-
-            return (
-              <div key={plan.id} className="detail-card">
-                <strong>{plan.planName}</strong>
-                <span>{plan.planType} / {plan.executionClass}</span>
-                <span>{STATUS_TEXT[plan.status] ?? plan.status}</span>
-                <span>风险等级：{plan.riskLevel ?? '-'}</span>
-                <span>当前阶段：{plan.currentStage ?? '-'}</span>
-                <span>当前说明：{plan.currentMessage ?? '-'}</span>
-                <span>审批要求：{needsApproval ? '需要审批' : '无需审批'}</span>
-                <span>维护窗口：{window ? `${window.windowName}${window.activeNow ? '（命中）' : '（未命中）'}` : '-'}</span>
-                <span>Checkpoint：{checkpoint ? `${checkpoint.checkpointName} / ${checkpoint.verificationStatus ?? '-'}` : '-'}</span>
-                <span>Release：{release ? release.versionName : '-'}</span>
-                <div className="inline-actions">
-                  {plan.status === 'PENDING_APPROVAL' ? (
-                    <button type="button" onClick={() => approveMutation.mutate(plan.id)}>审批通过</button>
-                  ) : null}
-                  {['READY', 'APPROVED', 'FAILED'].includes(plan.status) ? (
-                    <button type="button" onClick={() => executeMutation.mutate(plan.id)}>执行计划</button>
-                  ) : null}
-                  {!['COMPLETED', 'CANCELED', 'ROLLED_BACK'].includes(plan.status) ? (
-                    <button type="button" onClick={() => cancelMutation.mutate(plan.id)}>取消计划</button>
-                  ) : null}
-                </div>
-                <details>
-                  <summary>策略与阶段明细</summary>
-                  <ul className="compact-list">
-                    {plan.preflightChecks.map((item: PreflightCheck) => (
-                      <li key={`${plan.id}-${item.checkName}`}>{item.checkName}: {item.status} / {item.message}</li>
-                    ))}
-                    {plan.rolloutStages.map((item: RolloutStage) => (
-                      <li key={item.id}>{item.stage}: {item.status}{item.message ? ` / ${item.message}` : ''}</li>
-                    ))}
-                    {plan.approvals.map((item: ApprovalRecord) => (
-                      <li key={item.id}>审批记录：{item.decision} / {item.actor}{item.reason ? ` / ${item.reason}` : ''}</li>
-                    ))}
-                    {plan.rollbackPlaybook ? (
-                      <li>
-                        rollback playbook #{plan.rollbackPlaybook.id} / {plan.rollbackPlaybook.status}
-                        {plan.rollbackPlaybook.latestRollbackPlanId ? ` / rollback #${plan.rollbackPlaybook.latestRollbackPlanId}` : ''}
-                      </li>
-                    ) : null}
-                  </ul>
-                </details>
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.22fr)_minmax(19rem,0.78fr)]">
+          <div className="grid gap-5">
+            <div className="rounded-3xl border border-border/60 bg-background/90 p-6 shadow-sm">
+              <div className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">基础参数</div>
+              <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <label className="flex flex-col gap-2">
+                  <span className="text-sm font-medium text-foreground">计划名称</span>
+                  <Input value={planName} onChange={(event) => setPlanName(event.target.value)} placeholder="例如：主站升级窗口" />
+                </label>
+                <label className="flex flex-col gap-2">
+                  <span className="text-sm font-medium text-foreground">计划类型</span>
+                  <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={planType} onChange={(event) => setPlanType(event.target.value)} aria-label="计划类型">
+                    <option value="SNAPSHOT">{planTypeLabel('SNAPSHOT')}</option>
+                    <option value="UPGRADE">{planTypeLabel('UPGRADE')}</option>
+                    <option value="RESTORE">{planTypeLabel('RESTORE')}</option>
+                    <option value="ROLLBACK">{planTypeLabel('ROLLBACK')}</option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-2">
+                  <span className="text-sm font-medium text-foreground">执行类别</span>
+                  <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={executionClass} onChange={(event) => setExecutionClass(event.target.value)} aria-label="执行类别">
+                    <option value="DRY_RUN">{executionClassLabel('DRY_RUN')}</option>
+                    <option value="MANUAL">{executionClassLabel('MANUAL')}</option>
+                    <option value="AUTO_TRIGGERED">{executionClassLabel('AUTO_TRIGGERED')}</option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-2">
+                  <span className="text-sm font-medium text-foreground">发起人</span>
+                  <Input value={requestedBy} onChange={(event) => setRequestedBy(event.target.value)} placeholder="例如：console" />
+                </label>
               </div>
-            )
-          })}
-        </div>
-      </div>
-
-      <div className="panel panel-wide">
-        <div className="panel-head">
-          <p className="panel-kicker">Outbound delivery</p>
-          <h2>变更外发状态</h2>
-        </div>
-        <div className="card-list">
-          {(outboundDeliveriesQuery.data ?? []).slice(0, 5).map((delivery: OutboundDelivery) => (
-            <div key={delivery.id} className="detail-card">
-              <strong>{delivery.eventType}</strong>
-              <span>{delivery.deliveryStatus} / attempt {delivery.attemptCount}</span>
-              <span>{delivery.entityRef ?? 'CHANGE_PLAN'} / channel #{delivery.channelId}</span>
-              <span>{delivery.responseSummary ?? delivery.lastError ?? '等待投递结果'}</span>
             </div>
-          ))}
-          {!outboundDeliveriesQuery.data?.length ? <p className="empty-state">当前没有变更外发记录。</p> : null}
+
+            <div className="rounded-3xl border border-border/60 bg-muted/20 p-6">
+              <div className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">发布约束与恢复参数</div>
+              <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <label className="flex flex-col gap-2">
+                  <span className="text-sm font-medium text-foreground">发布制品 ID</span>
+                  <Input value={releaseArtifactId} onChange={(event) => setReleaseArtifactId(event.target.value)} placeholder="仅升级/回滚使用" disabled={planType !== 'UPGRADE' && planType !== 'ROLLBACK'} />
+                </label>
+                <label className="flex flex-col gap-2">
+                  <span className="text-sm font-medium text-foreground">恢复快照 ID</span>
+                  <Input value={recoveryCheckpointId} onChange={(event) => setRecoveryCheckpointId(event.target.value)} placeholder="仅恢复/回滚使用" disabled={planType !== 'RESTORE' && planType !== 'ROLLBACK'} />
+                </label>
+                <label className="flex flex-col gap-2">
+                  <span className="text-sm font-medium text-foreground">维护窗口 ID</span>
+                  <Input value={maintenanceWindowId} onChange={(event) => setMaintenanceWindowId(event.target.value)} placeholder="仅升级使用" disabled={planType !== 'UPGRADE'} />
+                </label>
+                <label className="flex flex-col gap-2">
+                  <span className="text-sm font-medium text-foreground">应急原因</span>
+                  <Input value={emergencyReason} onChange={(event) => setEmergencyReason(event.target.value)} placeholder="仅恢复/回滚使用" disabled={planType !== 'RESTORE' && planType !== 'ROLLBACK'} />
+                </label>
+                <label className="flex flex-col gap-2 md:col-span-2 xl:col-span-4">
+                  <span className="text-sm font-medium text-foreground">人工覆写原因</span>
+                  <Input value={overrideReason} onChange={(event) => setOverrideReason(event.target.value)} placeholder="如需人工覆写，请记录原因" />
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-border/60 bg-card/92 p-6 shadow-sm">
+            <div className="flex flex-col gap-5">
+              <div className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">创建动作</div>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                <CompactFact label="计划类型" value={planTypeLabel(planType)} />
+                <CompactFact label="执行类别" value={executionClassLabel(executionClass)} />
+                <CompactFact label="维护窗口" value={maintenanceWindowId || '未指定'} />
+                <CompactFact label="人工覆写" value={overrideReason ? '已填写' : '未填写'} />
+              </div>
+              <div className="border-t border-border/60 pt-4">
+                <Button type="button" className="w-full" onClick={() => createMutation.mutate()} disabled={!planName}>
+                  创建变更计划
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
-    </section>
+
+        {(createMutation.error || changePlansQuery.error || windowsQuery.error || checkpointsQuery.error || releaseArtifactsQuery.error) ? (
+          <InlineError
+            error={createMutation.error ?? changePlansQuery.error ?? windowsQuery.error ?? checkpointsQuery.error ?? releaseArtifactsQuery.error}
+            title="变更编排操作失败"
+          />
+        ) : null}
+      </PageSection>
+
+      <PageSection kicker="计划列表" title="变更计划列表">
+        {changePlansQuery.isPending ? (
+          <PageSkeleton count={1} />
+        ) : changePlansQuery.data?.length ? (
+          <div className="grid gap-5">
+            {changePlansQuery.data.map((plan: ChangePlan) => {
+              const window = plan.maintenanceWindowId ? windowsById.get(plan.maintenanceWindowId) : null
+              const checkpoint = plan.recoveryCheckpointId ? checkpointsById.get(plan.recoveryCheckpointId) : null
+              const release = plan.releaseArtifactId ? releasesById.get(plan.releaseArtifactId) : null
+              const needsApproval = plan.executionClass === 'MANUAL' && ['UPGRADE', 'RESTORE', 'ROLLBACK'].includes(plan.planType)
+
+              return (
+                <Card key={plan.id} className="border-border/60 bg-card/92 shadow-sm">
+                  <CardHeader className="gap-2 border-b border-border/60">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <CardTitle className="text-base">{plan.planName}</CardTitle>
+                        <div className="text-sm text-muted-foreground">{planTypeLabel(plan.planType)} / {executionClassLabel(plan.executionClass)}</div>
+                      </div>
+                      <StatusBadge tone={plan.status === 'COMPLETED' ? 'success' : plan.status === 'FAILED' ? 'danger' : 'warning'}>
+                        {STATUS_TEXT[plan.status] ?? plan.status}
+                      </StatusBadge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="flex flex-col gap-5 p-6 text-sm text-muted-foreground">
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                      <CompactFact label="风险等级" value={plan.riskLevel ?? '-'} />
+                      <CompactFact label="当前阶段" value={plan.currentStage ?? '-'} />
+                      <CompactFact label="审批要求" value={needsApproval ? '需要审批' : '无需审批'} />
+                      <CompactFact label="发起人" value={plan.requestedBy ?? '-'} />
+                      <CompactFact label="维护窗口" value={window ? `${window.windowName}${window.activeNow ? '（命中）' : '（未命中）'}` : '-'} />
+                      <CompactFact label="恢复快照" value={checkpoint ? `${checkpoint.checkpointName} / ${checkpoint.verificationStatus ?? '-'}` : '-'} />
+                      <CompactFact label="发布制品" value={release ? release.versionName : '-'} />
+                      <CompactFact label="人工覆写" value={plan.manualOverride ? '是' : '否'} />
+                    </div>
+                    <div className="rounded-2xl border border-border/60 bg-background/90 px-4 py-3 text-sm text-foreground">
+                      当前说明：{plan.currentMessage ?? '-'}
+                    </div>
+                    <div className="flex flex-wrap gap-2 border-t border-border/60 pt-4">
+                      {plan.status === 'PENDING_APPROVAL' ? (
+                        <Button type="button" variant="outline" size="sm" onClick={() => approveMutation.mutate(plan.id)}>审批通过</Button>
+                      ) : null}
+                      {['READY', 'APPROVED', 'FAILED'].includes(plan.status) ? (
+                        <Button type="button" variant="outline" size="sm" onClick={() => executeMutation.mutate(plan.id)}>执行计划</Button>
+                      ) : null}
+                      {!['COMPLETED', 'CANCELED', 'ROLLED_BACK'].includes(plan.status) ? (
+                        <Button type="button" variant="outline" size="sm" onClick={() => cancelMutation.mutate(plan.id)}>取消计划</Button>
+                      ) : null}
+                    </div>
+                    <details className="rounded-2xl border border-border/60 bg-muted/20 px-5 py-4">
+                      <summary className="cursor-pointer font-medium text-foreground">展开阶段与策略明细</summary>
+                      <div className="mt-4 flex flex-col gap-3">
+                        {plan.preflightChecks.map((item: PreflightCheck) => (
+                          <div key={`${plan.id}-${item.checkName}`}>{item.checkName}: {item.status} / {item.message}</div>
+                        ))}
+                        {plan.rolloutStages.map((item: RolloutStage) => (
+                          <div key={item.id}>{item.stage}: {item.status}{item.message ? ` / ${item.message}` : ''}</div>
+                        ))}
+                        {plan.approvals.map((item: ApprovalRecord) => (
+                          <div key={item.id}>审批记录：{item.decision} / {item.actor}{item.reason ? ` / ${item.reason}` : ''}</div>
+                        ))}
+                        {plan.rollbackPlaybook ? (
+                          <div>
+                            回滚预案 #{plan.rollbackPlaybook.id} / {plan.rollbackPlaybook.status}
+                            {plan.rollbackPlaybook.latestRollbackPlanId ? ` / 回滚 #${plan.rollbackPlaybook.latestRollbackPlanId}` : ''}
+                          </div>
+                        ) : null}
+                      </div>
+                    </details>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        ) : (
+          <EmptyState title="当前没有变更计划" />
+        )}
+      </PageSection>
+
+      <PageSection kicker="外发状态" title="变更外发状态">
+        {outboundDeliveriesQuery.isPending ? (
+          <PageSkeleton count={1} />
+        ) : outboundDeliveriesQuery.error ? (
+          <InlineError error={outboundDeliveriesQuery.error} title="变更外发状态加载失败" />
+        ) : (outboundDeliveriesQuery.data ?? []).length ? (
+          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {(outboundDeliveriesQuery.data ?? []).slice(0, 5).map((delivery: OutboundDelivery) => (
+              <Card key={delivery.id} className="border-border/60 bg-card/92 shadow-sm">
+                  <CardHeader className="gap-2 border-b border-border/60">
+                    <CardTitle className="text-base">{delivery.eventType}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex flex-col gap-4 p-5 text-sm text-muted-foreground">
+                    <div className="text-foreground">{delivery.entityRef ?? 'CHANGE_PLAN'} / 通道 #{delivery.channelId}</div>
+                    <StatusBadge tone={delivery.deliveryStatus === 'SUCCEEDED' ? 'success' : 'warning'}>
+                      {delivery.deliveryStatus} / 尝试 {delivery.attemptCount}
+                    </StatusBadge>
+                    <div className="text-foreground">{delivery.responseSummary ?? delivery.lastError ?? '等待投递结果'}</div>
+                  </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <EmptyState title="当前没有变更外发记录" />
+        )}
+      </PageSection>
+    </div>
   )
+}
+
+function CompactFact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-border/60 bg-background/90 px-4 py-3.5">
+      <div className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">{label}</div>
+      <div className="mt-1 text-sm text-foreground">{value}</div>
+    </div>
+  )
+}
+
+function planTypeLabel(type: string) {
+  switch (type) {
+    case 'SNAPSHOT':
+      return '拍快照'
+    case 'UPGRADE':
+      return '升级'
+    case 'RESTORE':
+      return '恢复'
+    case 'ROLLBACK':
+      return '回滚'
+    default:
+      return type
+  }
+}
+
+function executionClassLabel(value: string) {
+  switch (value) {
+    case 'DRY_RUN':
+      return '演练'
+    case 'MANUAL':
+      return '人工执行'
+    case 'AUTO_TRIGGERED':
+      return '自动触发'
+    default:
+      return value
+  }
 }

@@ -1,8 +1,8 @@
 # TASK-20260519-002 Codex 功能性服务 API 最高优先推进
 
-状态：Done  
-优先级：Critical  
-类型：父任务  
+状态：Done
+优先级：Critical
+类型：父任务
 上游来源：[REQ-20260519-002](../../docs/requirements/REQ-20260519-002-codex-priority-functional-service-api.md)、[REP-20260519](../../docs/reports/REP-20260519-codex-priority-replan.md)
 
 ## 背景
@@ -27,7 +27,7 @@
 
 - [REQ-20260518-005](../../docs/requirements/REQ-20260518-005-functional-service-api-scope.md)
 - [ADR-0010](../../docs/decisions/ADR-0010-functional-service-api-scope.md)
-- [TASK-20260514-029](../in-progress/TASK-20260514-029-openai-openapi-catalog-conformance-sdk.md)
+- [TASK-20260514-029](TASK-20260514-029-openai-openapi-catalog-conformance-sdk.md)
 - [TASK-20260514-031](../backlog/TASK-20260514-031-openai-real-smoke-certification-harness.md)
 - 已完成 Codex 反代、导入、观测、批量恢复和 smoke 基线任务。
 

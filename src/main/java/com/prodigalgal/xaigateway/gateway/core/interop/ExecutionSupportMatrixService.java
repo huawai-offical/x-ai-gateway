@@ -47,7 +47,7 @@ public class ExecutionSupportMatrixService {
                         : InteropCapabilityLevel.UNSUPPORTED;
                 default -> InteropCapabilityLevel.UNSUPPORTED;
             };
-            case AUDIO_TRANSCRIPTION, AUDIO_TRANSLATION, AUDIO_SPEECH ->
+            case AUDIO_TRANSCRIPTION, AUDIO_SPEECH ->
                     supportsGoogleGenAiAudio(siteKind) || supportsOpenAiStyleSite(siteKind)
                             ? InteropCapabilityLevel.NATIVE
                             : InteropCapabilityLevel.UNSUPPORTED;
@@ -55,8 +55,6 @@ public class ExecutionSupportMatrixService {
                     supportsGoogleGenAiImages(siteKind) || supportsOpenAiStyleSite(siteKind)
                             ? InteropCapabilityLevel.NATIVE
                             : InteropCapabilityLevel.UNSUPPORTED;
-            case IMAGE_EDIT, IMAGE_VARIATION ->
-                    supportsOpenAiStyleSite(siteKind) ? InteropCapabilityLevel.NATIVE : InteropCapabilityLevel.UNSUPPORTED;
             case MODERATION ->
                     supportsGoogleGenAiModeration(siteKind) || supportsOpenAiStyleSite(siteKind)
                             ? InteropCapabilityLevel.NATIVE
@@ -66,7 +64,7 @@ public class ExecutionSupportMatrixService {
                     || supportsGoogleGenAiSite(siteKind))
                     ? InteropCapabilityLevel.NATIVE
                     : InteropCapabilityLevel.UNSUPPORTED;
-            case UPLOAD_CREATE, REALTIME_CLIENT_SECRET ->
+            case UPLOAD_CREATE ->
                     siteKind == UpstreamSiteKind.OPENAI_DIRECT ? InteropCapabilityLevel.NATIVE : InteropCapabilityLevel.UNSUPPORTED;
             case RERANK ->
                     (siteKind == UpstreamSiteKind.COHERE || siteKind == UpstreamSiteKind.JINA)

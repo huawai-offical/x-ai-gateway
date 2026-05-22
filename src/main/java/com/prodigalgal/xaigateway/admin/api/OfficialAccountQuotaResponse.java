@@ -6,7 +6,7 @@ import java.util.List;
 
 public record OfficialAccountQuotaResponse(
         Long accountId,
-        Long poolId,
+        Long groupId,
         String accountName,
         OfficialAccountType accountType,
         UpstreamAccountProviderType providerType,

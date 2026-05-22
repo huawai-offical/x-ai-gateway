@@ -215,12 +215,17 @@ class GovernanceAdminControllerTests {
                                 Instant.parse("2026-04-17T08:10:00Z")
                         )),
                         List.of(new CredentialHealthScoreResponse(
+                                "API_KEY",
                                 101L,
+                                101L,
+                                null,
+                                "openai-primary",
                                 "openai-primary",
                                 ProviderType.OPENAI_DIRECT,
                                 1L,
                                 null,
                                 true,
+                                null,
                                 100,
                                 "HEALTHY",
                                 null,

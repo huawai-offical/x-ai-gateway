@@ -298,18 +298,16 @@
       ]
     },
     {
-      "id": "stateful.conversations_webhooks_realtime",
+      "id": "stateful.conversations_webhooks",
       "status": "supporting",
-      "description": "对话状态、Webhook 入站、Realtime 基线与本地持久化支撑。",
+      "description": "对话状态与 Webhook 入站本地持久化支撑。",
       "canonicalOperations": [
         "conversation_lifecycle",
-        "webhook_ingress",
-        "realtime_client_secret_create"
+        "webhook_ingress"
       ],
       "openAiStandardPaths": [
         "/v1/conversations",
-        "/v1/webhooks/openai",
-        "/v1/realtime/client_secrets"
+        "/v1/webhooks/openai"
       ],
       "providerSurfaces": [
         {
@@ -317,10 +315,9 @@
           "protocol": "openai",
           "paths": [
             "/v1/conversations",
-            "/v1/webhooks/openai",
-            "/v1/realtime/client_secrets"
+            "/v1/webhooks/openai"
           ],
-          "contract": "本地 lifecycle、Standard Webhooks 入站与 Realtime client secret 基线；不承诺 full calls/WebRTC/SIP。"
+          "contract": "本地 lifecycle 与 Standard Webhooks 入站基线。"
         }
       ]
     },

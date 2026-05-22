@@ -10,6 +10,7 @@ import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalMessageRole;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalReasoningConfig;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequestMetadata;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolCall;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolDefinition;
 import java.util.ArrayList;
 import java.util.List;
@@ -105,7 +106,13 @@ public class OpenAiResponsesRequestMapper {
     private CanonicalMessage toMessage(JsonNode messageNode) {
         CanonicalMessageRole role = CanonicalMessageRole.from(messageNode.path("role").asText("user"));
         List<CanonicalContentPart> parts = parseContent(messageNode.path("content"), role, messageNode.path("tool_call_id").asText(null), "tool");
-        return new CanonicalMessage(role, parts);
+        return new CanonicalMessage(
+                role,
+                parts,
+                readOptionalText(messageNode, "reasoning_content"),
+                toMessageToolCalls(messageNode.path("tool_calls")),
+                messageExtensions(messageNode)
+        );
     }
 
     private List<CanonicalMessage> toInputItems(JsonNode inputItemsNode) {
@@ -259,6 +266,45 @@ public class OpenAiResponsesRequestMapper {
             }
         }
         return List.copyOf(parts);
+    }
+
+    private List<CanonicalToolCall> toMessageToolCalls(JsonNode toolCallsNode) {
+        if (toolCallsNode == null || toolCallsNode.isMissingNode() || toolCallsNode.isNull()) {
+            return List.of();
+        }
+        if (!toolCallsNode.isArray()) {
+            throw new IllegalArgumentException("message.tool_calls 必须是 JSON array。");
+        }
+        List<CanonicalToolCall> result = new ArrayList<>();
+        for (JsonNode item : toolCallsNode) {
+            if (item == null || !item.isObject()) {
+                throw new IllegalArgumentException("message.tool_calls 每一项必须是 JSON object。");
+            }
+            JsonNode function = item.path("function");
+            result.add(new CanonicalToolCall(
+                    item.path("id").asText(null),
+                    item.path("type").asText("function"),
+                    function.path("name").asText(null),
+                    function.path("arguments").isMissingNode() || function.path("arguments").isNull()
+                            ? null
+                            : function.path("arguments").isTextual() ? function.path("arguments").asText() : function.path("arguments").toString()
+            ));
+        }
+        return List.copyOf(result);
+    }
+
+    private JsonNode messageExtensions(JsonNode messageNode) {
+        if (messageNode == null || !messageNode.isObject()) {
+            return null;
+        }
+        var metadata = objectMapper.createObjectNode();
+        if (messageNode.has("reasoning_content")) {
+            metadata.set("reasoning_content", messageNode.get("reasoning_content"));
+        }
+        if (messageNode.has("tool_calls")) {
+            metadata.set("tool_calls", messageNode.get("tool_calls"));
+        }
+        return metadata.isEmpty() ? null : metadata;
     }
 
     private List<CanonicalToolDefinition> toTools(JsonNode toolsNode) {

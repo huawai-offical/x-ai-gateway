@@ -222,103 +222,7 @@ class ProviderSiteAdminServiceTests {
         Mockito.verify(providerSiteRegistryService).refreshCapabilities(active, List.of());
     }
 
-    @Test
-    void shouldExposeGeminiNativeWrappedSurfaceTruthSeparatelyFromBackend() {
-        UpstreamSiteProfileRepository profileRepository = Mockito.mock(UpstreamSiteProfileRepository.class);
-        SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
-        SiteModelCapabilityRepository modelCapabilityRepository = Mockito.mock(SiteModelCapabilityRepository.class);
-        UpstreamCredentialRepository credentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
-        ProviderSiteRegistryService providerSiteRegistryService = Mockito.mock(ProviderSiteRegistryService.class);
-        CredentialModelDiscoveryService credentialModelDiscoveryService = Mockito.mock(CredentialModelDiscoveryService.class);
-        SiteCapabilityTruthService truthService = new SiteCapabilityTruthService(
-                new UpstreamSitePolicyService(),
-                snapshotRepository
-        );
 
-        ProviderSiteAdminService service = new ProviderSiteAdminService(
-                profileRepository,
-                snapshotRepository,
-                modelCapabilityRepository,
-                credentialRepository,
-                providerSiteRegistryService,
-                credentialModelDiscoveryService,
-                truthService
-        );
-
-        UpstreamSiteProfileEntity site = sampleGeminiSite(1L, UpstreamSiteKind.GEMINI_DIRECT);
-        SiteCapabilitySnapshotEntity snapshot = geminiSnapshot(site, true);
-
-        Mockito.when(profileRepository.findById(1L)).thenReturn(Optional.of(site));
-        Mockito.when(snapshotRepository.findBySiteProfile_Id(1L)).thenReturn(Optional.of(snapshot));
-        Mockito.when(modelCapabilityRepository.findAllBySiteProfile_IdOrderByModelKeyAsc(1L)).thenReturn(List.of());
-        Mockito.when(credentialRepository.findAllBySiteProfileIdAndDeletedFalseAndActiveTrueOrderByCreatedAtDesc(1L))
-                .thenReturn(List.of());
-
-        ProviderSiteResponse response = service.get(1L);
-
-        assertEquals("native", response.features().get("file_object").supportStatus());
-        assertEquals(SupportStatus.NATIVE, response.surfaces().get("file_create").supportStatus());
-        assertEquals(InteropCapabilityLevel.NATIVE, response.surfaces().get("file_create").degradationLevel());
-        assertEquals("native", response.features().get("audio_transcription").supportStatus());
-        assertEquals(SupportStatus.NATIVE, response.surfaces().get("audio_transcription").supportStatus());
-        assertEquals(SupportStatus.NATIVE, response.surfaces().get("image_generation").supportStatus());
-        assertEquals(SupportStatus.NATIVE, response.surfaces().get("moderation_create").supportStatus());
-        assertEquals("blocked", response.features().get("upload_create").supportStatus());
-        assertTrue(response.features().get("upload_create").blockedReasons().stream()
-                .anyMatch(reason -> reason.contains("gateway-local orchestration surface")));
-        assertEquals(SupportStatus.ORCHESTRATION, response.surfaces().get("upload_create").supportStatus());
-        assertEquals(SupportStatus.BLOCKED, response.surfaces().get("realtime_client_secret_create").supportStatus());
-        assertTrue(response.features().get("realtime_client_secret").blockedReasons().stream()
-                .anyMatch(reason -> reason.contains("Gemini ephemeral/live token")));
-        assertEquals(SupportStatus.NATIVE, response.surfaces().get("embedding_create").supportStatus());
-        assertTrue(response.surfaces().get("file_create").featureResolutions().containsKey("file_object"));
-    }
-
-    @Test
-    void shouldExposeVertexNativeMediaAndWrappedObjectSurfaces() {
-        UpstreamSiteProfileRepository profileRepository = Mockito.mock(UpstreamSiteProfileRepository.class);
-        SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
-        SiteModelCapabilityRepository modelCapabilityRepository = Mockito.mock(SiteModelCapabilityRepository.class);
-        UpstreamCredentialRepository credentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
-        ProviderSiteRegistryService providerSiteRegistryService = Mockito.mock(ProviderSiteRegistryService.class);
-        CredentialModelDiscoveryService credentialModelDiscoveryService = Mockito.mock(CredentialModelDiscoveryService.class);
-        SiteCapabilityTruthService truthService = new SiteCapabilityTruthService(
-                new UpstreamSitePolicyService(),
-                snapshotRepository
-        );
-
-        ProviderSiteAdminService service = new ProviderSiteAdminService(
-                profileRepository,
-                snapshotRepository,
-                modelCapabilityRepository,
-                credentialRepository,
-                providerSiteRegistryService,
-                credentialModelDiscoveryService,
-                truthService
-        );
-
-        UpstreamSiteProfileEntity site = sampleGeminiSite(2L, UpstreamSiteKind.VERTEX_AI);
-        SiteCapabilitySnapshotEntity snapshot = geminiSnapshot(site, true);
-
-        Mockito.when(profileRepository.findById(2L)).thenReturn(Optional.of(site));
-        Mockito.when(snapshotRepository.findBySiteProfile_Id(2L)).thenReturn(Optional.of(snapshot));
-        Mockito.when(modelCapabilityRepository.findAllBySiteProfile_IdOrderByModelKeyAsc(2L)).thenReturn(List.of());
-        Mockito.when(credentialRepository.findAllBySiteProfileIdAndDeletedFalseAndActiveTrueOrderByCreatedAtDesc(2L))
-                .thenReturn(List.of());
-
-        ProviderSiteResponse response = service.get(2L);
-
-        assertEquals("native", response.features().get("embeddings").supportStatus());
-        assertEquals(SupportStatus.NATIVE, response.surfaces().get("embedding_create").supportStatus());
-        assertEquals("native", response.features().get("audio_transcription").supportStatus());
-        assertEquals(SupportStatus.NATIVE, response.surfaces().get("audio_transcription").supportStatus());
-        assertEquals(SupportStatus.NATIVE, response.surfaces().get("image_generation").supportStatus());
-        assertEquals(SupportStatus.NATIVE, response.surfaces().get("moderation_create").supportStatus());
-        assertEquals("native", response.features().get("file_object").supportStatus());
-        assertEquals(SupportStatus.NATIVE, response.surfaces().get("file_create").supportStatus());
-        assertEquals("blocked", response.features().get("upload_create").supportStatus());
-        assertEquals(SupportStatus.BLOCKED, response.surfaces().get("realtime_client_secret_create").supportStatus());
-    }
 
     @Test
     void shouldExposeAnthropicFileSurfaceOnlyForFunctionalApiScope() {
@@ -362,66 +266,6 @@ class ProviderSiteAdminServiceTests {
         assertFalse(response.surfaces().containsKey("anthropic_message_batch_create"));
     }
 
-    @Test
-    void shouldKeepOpenAiDirectObjectLifecycleUsableAndBlockOpenAiCompatibleAcceptedExceptions() {
-        UpstreamSiteProfileRepository profileRepository = Mockito.mock(UpstreamSiteProfileRepository.class);
-        SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
-        SiteModelCapabilityRepository modelCapabilityRepository = Mockito.mock(SiteModelCapabilityRepository.class);
-        UpstreamCredentialRepository credentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
-        ProviderSiteRegistryService providerSiteRegistryService = Mockito.mock(ProviderSiteRegistryService.class);
-        CredentialModelDiscoveryService credentialModelDiscoveryService = Mockito.mock(CredentialModelDiscoveryService.class);
-        SiteCapabilityTruthService truthService = new SiteCapabilityTruthService(
-                new UpstreamSitePolicyService(),
-                snapshotRepository
-        );
-
-        ProviderSiteAdminService service = new ProviderSiteAdminService(
-                profileRepository,
-                snapshotRepository,
-                modelCapabilityRepository,
-                credentialRepository,
-                providerSiteRegistryService,
-                credentialModelDiscoveryService,
-                truthService
-        );
-
-        UpstreamSiteProfileEntity openAiDirect = sampleSite(4L, "OPENAI_DIRECT", true);
-        SiteCapabilitySnapshotEntity openAiDirectSnapshot = sampleSnapshot(openAiDirect);
-        openAiDirectSnapshot.setSupportsFiles(true);
-        openAiDirectSnapshot.setSupportsUploads(true);
-        openAiDirectSnapshot.setSupportsRealtime(true);
-
-        UpstreamSiteProfileEntity openAiCompatible = sampleOpenAiCompatibleSite(5L);
-        SiteCapabilitySnapshotEntity openAiCompatibleSnapshot = sampleSnapshot(openAiCompatible);
-        openAiCompatibleSnapshot.setSupportsFiles(true);
-        openAiCompatibleSnapshot.setSupportsUploads(true);
-        openAiCompatibleSnapshot.setSupportsRealtime(true);
-
-        Mockito.when(profileRepository.findById(4L)).thenReturn(Optional.of(openAiDirect));
-        Mockito.when(profileRepository.findById(5L)).thenReturn(Optional.of(openAiCompatible));
-        Mockito.when(snapshotRepository.findBySiteProfile_Id(4L)).thenReturn(Optional.of(openAiDirectSnapshot));
-        Mockito.when(snapshotRepository.findBySiteProfile_Id(5L)).thenReturn(Optional.of(openAiCompatibleSnapshot));
-        Mockito.when(modelCapabilityRepository.findAllBySiteProfile_IdOrderByModelKeyAsc(4L)).thenReturn(List.of());
-        Mockito.when(modelCapabilityRepository.findAllBySiteProfile_IdOrderByModelKeyAsc(5L)).thenReturn(List.of());
-        Mockito.when(credentialRepository.findAllBySiteProfileIdAndDeletedFalseAndActiveTrueOrderByCreatedAtDesc(4L))
-                .thenReturn(List.of());
-        Mockito.when(credentialRepository.findAllBySiteProfileIdAndDeletedFalseAndActiveTrueOrderByCreatedAtDesc(5L))
-                .thenReturn(List.of());
-
-        ProviderSiteResponse openAiDirectResponse = service.get(4L);
-        ProviderSiteResponse openAiCompatibleResponse = service.get(5L);
-
-        assertEquals(SupportStatus.ORCHESTRATION, openAiDirectResponse.surfaces().get("file_create").supportStatus());
-        assertEquals(SupportStatus.ORCHESTRATION, openAiDirectResponse.surfaces().get("upload_create").supportStatus());
-        assertEquals(SupportStatus.ORCHESTRATION, openAiDirectResponse.surfaces().get("realtime_client_secret_create").supportStatus());
-
-        assertEquals("blocked", openAiCompatibleResponse.features().get("file_object").supportStatus());
-        assertEquals(SupportStatus.BLOCKED, openAiCompatibleResponse.surfaces().get("file_create").supportStatus());
-        assertEquals(SupportStatus.BLOCKED, openAiCompatibleResponse.surfaces().get("upload_create").supportStatus());
-        assertEquals(SupportStatus.BLOCKED, openAiCompatibleResponse.surfaces().get("realtime_client_secret_create").supportStatus());
-        assertTrue(openAiCompatibleResponse.surfaces().get("file_create").blockerReasons().stream()
-                .anyMatch(reason -> reason.contains("accepted exception")));
-    }
 
     @Test
     void shouldExposeAllMatrixFeaturesAndAvoidJinaGeneralChatOverclaim() {
@@ -489,15 +333,11 @@ class ProviderSiteAdminServiceTests {
                 InteropFeature.EMBEDDINGS,
                 InteropFeature.REASONING,
                 InteropFeature.AUDIO_TRANSCRIPTION,
-                InteropFeature.AUDIO_TRANSLATION,
                 InteropFeature.AUDIO_SPEECH,
                 InteropFeature.IMAGE_GENERATION,
-                InteropFeature.IMAGE_EDIT,
-                InteropFeature.IMAGE_VARIATION,
                 InteropFeature.MODERATION,
                 InteropFeature.FILE_OBJECT,
                 InteropFeature.UPLOAD_CREATE,
-                InteropFeature.REALTIME_CLIENT_SECRET,
                 InteropFeature.RERANK,
                 InteropFeature.VIDEO_GENERATION,
                 InteropFeature.MUSIC_GENERATION,
@@ -635,7 +475,6 @@ class ProviderSiteAdminServiceTests {
         snapshot.setSupportsModeration(true);
         snapshot.setSupportsFiles(site.getSiteKind() == UpstreamSiteKind.GEMINI_DIRECT || site.getSiteKind() == UpstreamSiteKind.VERTEX_AI);
         snapshot.setSupportsUploads(false);
-        snapshot.setSupportsRealtime(false);
         snapshot.setRefreshedAt(Instant.parse("2026-04-15T02:00:00Z"));
         return snapshot;
     }
@@ -652,7 +491,6 @@ class ProviderSiteAdminServiceTests {
         snapshot.setSupportsImages(false);
         snapshot.setSupportsModeration(false);
         snapshot.setSupportsUploads(false);
-        snapshot.setSupportsRealtime(false);
         snapshot.setRefreshedAt(Instant.parse("2026-04-16T02:00:00Z"));
         return snapshot;
     }

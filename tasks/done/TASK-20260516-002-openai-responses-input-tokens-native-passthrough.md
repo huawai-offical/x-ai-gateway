@@ -1,10 +1,10 @@
 # TASK-20260516-002 OpenAI Responses input_tokens Native Passthrough
 
-状态：Done  
-优先级：Critical  
-类型：子任务切片  
-父任务：[TASK-20260514-018](../backlog/TASK-20260514-018-openai-responses-native-lifecycle.md)  
-上游来源：[TASK-20260514-018](../backlog/TASK-20260514-018-openai-responses-native-lifecycle.md)、[TASK-20260515-020](../done/TASK-20260515-020-openai-responses-input-tokens-compact-baseline.md)、[TASK-20260516-001](../done/TASK-20260516-001-openai-responses-remote-lifecycle-passthrough-baseline.md)
+状态：Done
+优先级：Critical
+类型：子任务切片
+父任务：[TASK-20260514-018](../done/TASK-20260514-018-openai-responses-native-lifecycle.md)
+上游来源：[TASK-20260514-018](../done/TASK-20260514-018-openai-responses-native-lifecycle.md)、[TASK-20260515-020](../done/TASK-20260515-020-openai-responses-input-tokens-compact-baseline.md)、[TASK-20260516-001](../done/TASK-20260516-001-openai-responses-remote-lifecycle-passthrough-baseline.md)
 
 ## 背景
 

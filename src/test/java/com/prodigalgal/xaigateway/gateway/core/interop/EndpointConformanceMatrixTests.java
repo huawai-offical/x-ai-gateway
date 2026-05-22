@@ -251,7 +251,7 @@ class EndpointConformanceMatrixTests {
                 root.putObject("input").put("text", "hello x-ai");
                 yield root;
             }
-            case "audio_transcription", "audio_translation" -> root.put("prompt", "hello x-ai");
+            case "audio_transcription" -> root.put("prompt", "hello x-ai");
             case "audio_speech" -> {
                 if ("google_native".equals(definition.protocol())) {
                     yield googleGenerateContentBody("AUDIO");
@@ -264,10 +264,8 @@ class EndpointConformanceMatrixTests {
                 }
                 yield root.put("prompt", "hello x-ai");
             }
-            case "image_edit", "image_variation" -> root.put("prompt", "hello x-ai");
             case "moderation_create" -> root.put("input", "hello x-ai");
             case "file_create" -> root.put("filename", "doc.txt").put("purpose", "assistants").put("bytes", 12);
-            case "realtime_client_secret_create" -> root.put("model", definition.requestedModel());
             default -> root;
         };
     }
@@ -397,7 +395,6 @@ class EndpointConformanceMatrixTests {
         entity.setSupportsModeration(scenario.snapshotModeration());
         entity.setSupportsFiles(scenario.snapshotFiles());
         entity.setSupportsUploads(scenario.snapshotUploads());
-        entity.setSupportsRealtime(scenario.snapshotRealtime());
         entity.setAuthStrategy(policy.authStrategy());
         entity.setPathStrategy(policy.pathStrategy());
         entity.setErrorSchemaStrategy(policy.errorSchemaStrategy());
@@ -424,7 +421,7 @@ class EndpointConformanceMatrixTests {
                 UpstreamSiteKind.OPENAI_DIRECT,
                 List.of("openai", "responses"),
                 true, true, true, true, true,
-                true, true, true, true, true, true, true, true
+                true, true, true, true, true, true, true
         ));
         scenarios.put("openai-compatible", new ScenarioDefinition(
                 ProviderType.OPENAI_COMPATIBLE,
@@ -432,7 +429,7 @@ class EndpointConformanceMatrixTests {
                 UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC,
                 List.of("openai", "responses"),
                 true, true, true, true, true,
-                true, true, true, true, true, false, false, false
+                true, true, true, true, true, false, false
         ));
         scenarios.put("gemini-direct", new ScenarioDefinition(
                 ProviderType.GEMINI_DIRECT,
@@ -440,7 +437,7 @@ class EndpointConformanceMatrixTests {
                 UpstreamSiteKind.GEMINI_DIRECT,
                 List.of("google_native", "openai"),
                 true, true, true, true, true,
-                true, true, true, true, true, true, false, false
+                true, true, true, true, true, true, false
         ));
         scenarios.put("anthropic-direct", new ScenarioDefinition(
                 ProviderType.ANTHROPIC_DIRECT,
@@ -448,7 +445,7 @@ class EndpointConformanceMatrixTests {
                 UpstreamSiteKind.ANTHROPIC_DIRECT,
                 List.of("anthropic_native", "openai"),
                 true, true, true, false, true,
-                false, false, false, false, false, true, false, false
+                false, false, false, false, false, true, false
         ));
         scenarios.put("anthropic-files", new ScenarioDefinition(
                 ProviderType.ANTHROPIC_DIRECT,
@@ -456,7 +453,7 @@ class EndpointConformanceMatrixTests {
                 UpstreamSiteKind.ANTHROPIC_DIRECT,
                 List.of("anthropic_native", "openai"),
                 true, true, true, false, true,
-                false, false, false, false, false, true, false, false
+                false, false, false, false, false, true, false
         ));
         return scenarios;
     }
@@ -482,7 +479,7 @@ class EndpointConformanceMatrixTests {
                         "provider_family",
                         "OPENAI_COMPATIBLE family 不扩成 object lifecycle 通用替代实现。",
                         "OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；object lifecycle 仍作为 accepted exception，不在当前实现面内。",
-                        List.of("/v1/files", "/v1/uploads", "/v1/realtime/client_secrets")
+                        List.of("/v1/files", "/v1/uploads")
                 ),
                 new AcceptedExceptionRecord(
                         "notion-mcp-auth-required",
@@ -501,11 +498,8 @@ class EndpointConformanceMatrixTests {
         definitions.add(provider("responses", "POST", "/v1/responses", "/v1/responses", "response_create", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "gpt-4o-mini", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiResponsesControllerTests.java", null, null, "openai-direct"));
         definitions.add(provider("openai", "POST", "/v1/embeddings", "/v1/embeddings", "embedding_create", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "text-embedding-3-small", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiEmbeddingsControllerTests.java", null, null, "openai-direct"));
         definitions.add(provider("openai", "POST", "/v1/audio/transcriptions", "/v1/audio/transcriptions", "audio_transcription", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "gpt-4o-mini-transcribe", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiAudioControllerTests.java", null, null, "openai-direct"));
-        definitions.add(provider("openai", "POST", "/v1/audio/translations", "/v1/audio/translations", "audio_translation", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "gpt-4o-mini-transcribe", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiAudioControllerTests.java", null, null, "openai-direct"));
         definitions.add(provider("openai", "POST", "/v1/audio/speech", "/v1/audio/speech", "audio_speech", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "gpt-4o-mini-tts", "binary", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiAudioControllerTests.java", null, null, "openai-direct"));
         definitions.add(provider("openai", "POST", "/v1/images/generations", "/v1/images/generations", "image_generation", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "gpt-image-1", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiImagesControllerTests.java", null, null, "openai-direct"));
-        definitions.add(provider("openai", "POST", "/v1/images/edits", "/v1/images/edits", "image_edit", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "gpt-image-1", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiImagesControllerTests.java", null, null, "openai-direct"));
-        definitions.add(provider("openai", "POST", "/v1/images/variations", "/v1/images/variations", "image_variation", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "gpt-image-1", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiImagesControllerTests.java", null, null, "openai-direct"));
         definitions.add(provider("openai", "POST", "/v1/moderations", "/v1/moderations", "moderation_create", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "omni-moderation-latest", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiModerationsControllerTests.java", null, null, "openai-direct"));
 
         definitions.add(provider("openai", "POST", "/v1/files", "/v1/files", "file_create", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiFilesControllerTests.java", null, null, "openai-direct"));
@@ -520,11 +514,9 @@ class EndpointConformanceMatrixTests {
         definitions.add(provider("openai", "POST", "/v1/uploads/{uploadId}/complete", "/v1/uploads/upload_1/complete", "upload_complete", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiUploadsControllerTests.java", null, null, "openai-direct"));
         definitions.add(provider("openai", "POST", "/v1/uploads/{uploadId}/cancel", "/v1/uploads/upload_1/cancel", "upload_cancel", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiUploadsControllerTests.java", null, null, "openai-direct"));
 
-        definitions.add(provider("openai", "POST", "/v1/realtime/client_secrets", "/v1/realtime/client_secrets", "realtime_client_secret_create", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "gpt-4o-realtime-preview", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiRealtimeControllerTests.java", null, null, "openai-direct"));
 
         definitions.add(provider("openai", "POST", "/v1/files", "/v1/files", "file_create", ProviderFamily.OPENAI, ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/gateway/core/interop/SiteCapabilityTruthServiceTests.java", "openai-compatible-object-lifecycle-blocked", null, "openai-compatible"));
         definitions.add(provider("openai", "POST", "/v1/uploads", "/v1/uploads", "upload_create", ProviderFamily.OPENAI, ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/gateway/core/interop/SiteCapabilityTruthServiceTests.java", "openai-compatible-object-lifecycle-blocked", null, "openai-compatible"));
-        definitions.add(provider("openai", "POST", "/v1/realtime/client_secrets", "/v1/realtime/client_secrets", "realtime_client_secret_create", ProviderFamily.OPENAI, ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC, "gpt-4o-realtime-preview", "json", "src/test/java/com/prodigalgal/xaigateway/gateway/core/interop/SiteCapabilityTruthServiceTests.java", "openai-compatible-object-lifecycle-blocked", null, "openai-compatible"));
 
         definitions.add(provider("google_native", "POST", "/v1beta/models/{model}:generateContent", "/v1beta/models/gemini-2.5-pro:generateContent", "chat_completion", ProviderFamily.GEMINI, ProviderType.GEMINI_DIRECT, UpstreamSiteKind.GEMINI_DIRECT, "gemini-2.5-pro", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/google/GeminiGenerateContentControllerTests.java", null, null, "gemini-direct"));
         definitions.add(provider("google_native", "POST", "/v1beta/models/{model}:generateContent", "/v1beta/models/gemini-2.5-image:generateContent", "image_generation", ProviderFamily.GEMINI, ProviderType.GEMINI_DIRECT, UpstreamSiteKind.GEMINI_DIRECT, "gemini-2.5-image", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/google/GeminiGenerateContentControllerTests.java", null, null, "gemini-direct"));
@@ -662,8 +654,7 @@ class EndpointConformanceMatrixTests {
             boolean snapshotImages,
             boolean snapshotModeration,
             boolean snapshotFiles,
-            boolean snapshotUploads,
-            boolean snapshotRealtime
+            boolean snapshotUploads
     ) {
     }
 

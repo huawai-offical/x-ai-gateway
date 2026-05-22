@@ -37,6 +37,7 @@ import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 
 @Service
 @Transactional
@@ -51,6 +52,7 @@ public class ProviderSiteAdminService {
     private final SiteCapabilityTruthService siteCapabilityTruthService;
     private final ExecutionBackendPolicyService executionBackendPolicyService;
     private final SecurityPolicyService securityPolicyService;
+    private final ObjectMapper objectMapper;
 
     @Autowired
     public ProviderSiteAdminService(
@@ -63,6 +65,31 @@ public class ProviderSiteAdminService {
             SiteCapabilityTruthService siteCapabilityTruthService,
             ExecutionBackendPolicyService executionBackendPolicyService,
             SecurityPolicyService securityPolicyService) {
+        this(
+                upstreamSiteProfileRepository,
+                siteCapabilitySnapshotRepository,
+                siteModelCapabilityRepository,
+                upstreamCredentialRepository,
+                providerSiteRegistryService,
+                credentialModelDiscoveryService,
+                siteCapabilityTruthService,
+                executionBackendPolicyService,
+                securityPolicyService,
+                new ObjectMapper()
+        );
+    }
+
+    public ProviderSiteAdminService(
+            UpstreamSiteProfileRepository upstreamSiteProfileRepository,
+            SiteCapabilitySnapshotRepository siteCapabilitySnapshotRepository,
+            SiteModelCapabilityRepository siteModelCapabilityRepository,
+            UpstreamCredentialRepository upstreamCredentialRepository,
+            ProviderSiteRegistryService providerSiteRegistryService,
+            CredentialModelDiscoveryService credentialModelDiscoveryService,
+            SiteCapabilityTruthService siteCapabilityTruthService,
+            ExecutionBackendPolicyService executionBackendPolicyService,
+            SecurityPolicyService securityPolicyService,
+            ObjectMapper objectMapper) {
         this.upstreamSiteProfileRepository = upstreamSiteProfileRepository;
         this.siteCapabilitySnapshotRepository = siteCapabilitySnapshotRepository;
         this.siteModelCapabilityRepository = siteModelCapabilityRepository;
@@ -72,6 +99,7 @@ public class ProviderSiteAdminService {
         this.siteCapabilityTruthService = siteCapabilityTruthService;
         this.executionBackendPolicyService = executionBackendPolicyService;
         this.securityPolicyService = securityPolicyService;
+        this.objectMapper = objectMapper == null ? new ObjectMapper() : objectMapper;
     }
 
     public ProviderSiteAdminService(
@@ -262,8 +290,7 @@ public class ProviderSiteAdminService {
                 siteCapabilityTruthService.supportsFeature(entity, snapshot, InteropFeature.IMAGE_GENERATION),
                 siteCapabilityTruthService.supportsFeature(entity, snapshot, InteropFeature.MODERATION),
                 siteCapabilityTruthService.supportsFeature(entity, snapshot, InteropFeature.FILE_OBJECT),
-                siteCapabilityTruthService.supportsFeature(entity, snapshot, InteropFeature.UPLOAD_CREATE),
-                siteCapabilityTruthService.supportsFeature(entity, snapshot, InteropFeature.REALTIME_CLIENT_SECRET)
+                siteCapabilityTruthService.supportsFeature(entity, snapshot, InteropFeature.UPLOAD_CREATE)
         );
     }
 
@@ -282,6 +309,8 @@ public class ProviderSiteAdminService {
                 entity.getId(),
                 entity.getProfileCode(),
                 entity.getDisplayName(),
+                entity.getVendorCode(),
+                entity.getVendorName(),
                 entity.getProviderFamily(),
                 entity.getSiteKind(),
                 entity.getAuthStrategy(),
@@ -290,6 +319,7 @@ public class ProviderSiteAdminService {
                 entity.getErrorSchemaStrategy(),
                 entity.getBaseUrlPattern(),
                 entity.getDescription(),
+                readObjectMap(entity.getConversationProfileJson()),
                 entity.getProfileSource(),
                 entity.isActive(),
                 snapshot == null ? "UNKNOWN" : snapshot.getHealthState(),
@@ -364,15 +394,11 @@ public class ProviderSiteAdminService {
                 Map.entry(InteropFeature.EMBEDDINGS.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.EMBEDDINGS))),
                 Map.entry(InteropFeature.REASONING.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.REASONING))),
                 Map.entry(InteropFeature.AUDIO_TRANSCRIPTION.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.AUDIO_TRANSCRIPTION))),
-                Map.entry(InteropFeature.AUDIO_TRANSLATION.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.AUDIO_TRANSLATION))),
                 Map.entry(InteropFeature.AUDIO_SPEECH.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.AUDIO_SPEECH))),
                 Map.entry(InteropFeature.IMAGE_GENERATION.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.IMAGE_GENERATION))),
-                Map.entry(InteropFeature.IMAGE_EDIT.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.IMAGE_EDIT))),
-                Map.entry(InteropFeature.IMAGE_VARIATION.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.IMAGE_VARIATION))),
                 Map.entry(InteropFeature.MODERATION.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.MODERATION))),
                 Map.entry(InteropFeature.FILE_OBJECT.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.FILE_OBJECT))),
                 Map.entry(InteropFeature.UPLOAD_CREATE.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.UPLOAD_CREATE))),
-                Map.entry(InteropFeature.REALTIME_CLIENT_SECRET.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.REALTIME_CLIENT_SECRET))),
                 Map.entry(InteropFeature.RERANK.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.RERANK))),
                 Map.entry(InteropFeature.VIDEO_GENERATION.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.VIDEO_GENERATION))),
                 Map.entry(InteropFeature.MUSIC_GENERATION.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.MUSIC_GENERATION))),
@@ -455,15 +481,6 @@ public class ProviderSiteAdminService {
                         TranslationResourceType.UPLOAD,
                         TranslationOperation.UPLOAD_CREATE,
                         List.of(InteropFeature.UPLOAD_CREATE, InteropFeature.FILE_OBJECT)
-                )),
-                Map.entry("realtime_client_secret_create", toSurface(
-                        entity,
-                        snapshot,
-                        "openai",
-                        "/v1/realtime/client_secrets",
-                        TranslationResourceType.REALTIME,
-                        TranslationOperation.REALTIME_CLIENT_SECRET_CREATE,
-                        List.of(InteropFeature.REALTIME_CLIENT_SECRET)
                 )),
                 Map.entry("rerank_create", toSurface(
                         entity,
@@ -661,6 +678,8 @@ public class ProviderSiteAdminService {
         }
         entity.setProfileCode(request.profileCode().trim());
         entity.setDisplayName(request.displayName().trim());
+        entity.setVendorCode(blankToNull(request.vendorCode()));
+        entity.setVendorName(blankToNull(request.vendorName()));
         entity.setProviderFamily(policy.providerFamily());
         entity.setSiteKind(request.siteKind());
         entity.setAuthStrategy(policy.authStrategy());
@@ -669,10 +688,50 @@ public class ProviderSiteAdminService {
         entity.setErrorSchemaStrategy(policy.errorSchemaStrategy());
         entity.setBaseUrlPattern(request.baseUrlPattern() == null ? null : request.baseUrlPattern().trim());
         entity.setDescription(request.description() == null ? null : request.description().trim());
+        entity.setConversationProfileJson(writeObjectJson(request.conversationProfile()));
         if (entity.getProfileSource() == null) {
             entity.setProfileSource(SiteProfileSource.MANUAL);
         }
         entity.setActive(request.active() == null || request.active());
+    }
+
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private Map<String, Object> readObjectMap(String json) {
+        if (json == null || json.isBlank()) {
+            return Map.of();
+        }
+        try {
+            Object value = objectMapper.readValue(json, Object.class);
+            if (!(value instanceof Map<?, ?> map)) {
+                return Map.of();
+            }
+            return map.entrySet().stream()
+                    .collect(java.util.stream.Collectors.toMap(
+                            entry -> String.valueOf(entry.getKey()),
+                            Map.Entry::getValue,
+                            (left, right) -> left,
+                            java.util.LinkedHashMap::new
+                    ));
+        } catch (Exception exception) {
+            return Map.of("invalidProfileJson", true);
+        }
+    }
+
+    private String writeObjectJson(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Map<?, ?> map && map.isEmpty()) {
+            return null;
+        }
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (Exception exception) {
+            throw new IllegalArgumentException("conversationProfile 必须是可序列化的 JSON 对象。", exception);
+        }
     }
 
     private ProviderSiteResponse refreshCapabilitiesInternal(UpstreamSiteProfileEntity entity) {

@@ -1,10 +1,10 @@
 # TASK-20260515-018 OpenAI Responses 本地生命周期 cancel/input_items 基线
 
-状态：Done  
-优先级：Critical  
-类型：子任务切片  
-父任务：[TASK-20260514-018](../backlog/TASK-20260514-018-openai-responses-native-lifecycle.md)  
-上游来源：[TASK-20260514-013](../backlog/TASK-20260514-013-openai-chat-responses-native-parity.md)、OpenAI Responses API Reference
+状态：Done
+优先级：Critical
+类型：子任务切片
+父任务：[TASK-20260514-018](../done/TASK-20260514-018-openai-responses-native-lifecycle.md)
+上游来源：[TASK-20260514-013](../done/TASK-20260514-013-openai-chat-responses-native-parity.md)、OpenAI Responses API Reference
 
 ## 背景
 

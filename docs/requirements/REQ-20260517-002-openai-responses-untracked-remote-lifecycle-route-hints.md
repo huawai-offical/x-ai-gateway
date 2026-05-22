@@ -2,7 +2,7 @@
 
 状态：Done
 日期：2026-05-17
-来源任务：[TASK-20260514-018](../../tasks/backlog/TASK-20260514-018-openai-responses-native-lifecycle.md)
+来源任务：[TASK-20260514-018](../../tasks/done/TASK-20260514-018-openai-responses-native-lifecycle.md)
 
 ## 背景
 

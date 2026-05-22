@@ -6,7 +6,7 @@ import java.util.List;
 public record PortalKeyCreateRequest(
         @NotBlank(message = "Key 名称不能为空。")
         String keyName,
-        List<String> allowedProtocols,
+        List<String> allowedProtocolSuites,
         List<String> allowedModels,
         Integer rpmLimit,
         Integer tpmLimit,

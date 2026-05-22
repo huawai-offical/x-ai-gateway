@@ -1,10 +1,10 @@
 # TASK-20260515-022 OpenAI Responses Native JSON 原始对象透传基线
 
-状态：Done  
-优先级：Critical  
-类型：子任务切片  
-父任务：[TASK-20260514-018](../backlog/TASK-20260514-018-openai-responses-native-lifecycle.md)  
-上游来源：[TASK-20260514-018](../backlog/TASK-20260514-018-openai-responses-native-lifecycle.md)、[TASK-20260515-017](../done/TASK-20260515-017-openai-responses-native-http-create-baseline.md)
+状态：Done
+优先级：Critical
+类型：子任务切片
+父任务：[TASK-20260514-018](../done/TASK-20260514-018-openai-responses-native-lifecycle.md)
+上游来源：[TASK-20260514-018](../done/TASK-20260514-018-openai-responses-native-lifecycle.md)、[TASK-20260515-017](../done/TASK-20260515-017-openai-responses-native-http-create-baseline.md)
 
 ## 背景
 

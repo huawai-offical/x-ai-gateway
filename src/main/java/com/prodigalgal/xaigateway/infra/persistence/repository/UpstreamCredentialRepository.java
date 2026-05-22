@@ -14,7 +14,7 @@ public interface UpstreamCredentialRepository extends JpaRepository<UpstreamCred
 
     List<UpstreamCredentialEntity> findAllByDeletedFalseOrderByCreatedAtDesc();
 
-    List<UpstreamCredentialEntity> findAllByPoolIdAndDeletedFalseOrderByCreatedAtDesc(Long poolId);
+    List<UpstreamCredentialEntity> findAllByGroupIdAndDeletedFalseOrderByCreatedAtDesc(Long groupId);
 
     List<UpstreamCredentialEntity> findAllByIdInAndDeletedFalse(Collection<Long> ids);
 
@@ -28,11 +28,21 @@ public interface UpstreamCredentialRepository extends JpaRepository<UpstreamCred
 
     long countBySiteProfileIdAndDeletedFalse(Long siteProfileId);
 
-    long countByPoolIdAndDeletedFalse(Long poolId);
+    long countByGroupIdAndDeletedFalse(Long groupId);
 
-    Optional<UpstreamCredentialEntity> findByApiKeyFingerprintAndDeletedFalse(String apiKeyFingerprint);
+    Optional<UpstreamCredentialEntity> findByApiKeyFingerprintAndProviderTypeAndBaseUrlAndSiteProfileIdAndDeletedFalse(
+            String apiKeyFingerprint,
+            ProviderType providerType,
+            String baseUrl,
+            Long siteProfileId);
+
+    Optional<UpstreamCredentialEntity> findFirstByApiKeyFingerprintAndProviderTypeAndBaseUrlAndSiteProfileIdOrderByUpdatedAtDesc(
+            String apiKeyFingerprint,
+            ProviderType providerType,
+            String baseUrl,
+            Long siteProfileId);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("update UpstreamCredentialEntity credential set credential.poolId = null where credential.poolId = :poolId")
-    int clearPoolReferenceByPoolId(@Param("poolId") Long poolId);
+    @Query("update UpstreamCredentialEntity credential set credential.groupId = null where credential.groupId = :groupId")
+    int clearGroupReferenceByGroupId(@Param("groupId") Long groupId);
 }

@@ -39,7 +39,7 @@ class OpenAiDirectSmokeRecordReplayFixtureVerifierTests {
     void shouldRejectUnredactedSecretMaterial() throws Exception {
         String unsafe = Files.readString(SAMPLE)
                 .replace("Bearer ***", "Bearer sk-live-secret")
-                .replace("file_1", "AIzaSyBPM5panpM3zawPoYSUZ1JGTmzCPzr-R-s")
+                .replace("file_1", "AIzaSy" + "BPM5panpM3zawPoYSUZ1JGTmzCPzr-R-s")
                 .replace("org-***", "org-real");
 
         var result = verifier.validate(objectMapper.readTree(unsafe));

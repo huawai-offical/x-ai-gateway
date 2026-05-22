@@ -4,9 +4,9 @@ import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
 import com.prodigalgal.xaigateway.gateway.core.governance.GovernanceContext;
 import com.prodigalgal.xaigateway.gateway.core.governance.GovernancePolicyEngine;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
-import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyAccountPoolBindingEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyAccountGroupBindingEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountEntity;
-import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAccountPoolBindingRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAccountGroupBindingRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.NetworkProxyRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,7 +23,7 @@ import java.util.Optional;
 @Transactional
 public class AccountSelectionService {
 
-    private final DistributedKeyAccountPoolBindingRepository distributedKeyAccountPoolBindingRepository;
+    private final DistributedKeyAccountGroupBindingRepository distributedKeyAccountGroupBindingRepository;
     private final UpstreamAccountRepository upstreamAccountRepository;
     private final NetworkProxyRepository networkProxyRepository;
     private final StringRedisTemplate stringRedisTemplate;
@@ -31,12 +31,12 @@ public class AccountSelectionService {
 
     @Autowired
     public AccountSelectionService(
-            DistributedKeyAccountPoolBindingRepository distributedKeyAccountPoolBindingRepository,
+            DistributedKeyAccountGroupBindingRepository distributedKeyAccountGroupBindingRepository,
             UpstreamAccountRepository upstreamAccountRepository,
             NetworkProxyRepository networkProxyRepository,
             StringRedisTemplate stringRedisTemplate,
             GovernancePolicyEngine governancePolicyEngine) {
-        this.distributedKeyAccountPoolBindingRepository = distributedKeyAccountPoolBindingRepository;
+        this.distributedKeyAccountGroupBindingRepository = distributedKeyAccountGroupBindingRepository;
         this.upstreamAccountRepository = upstreamAccountRepository;
         this.networkProxyRepository = networkProxyRepository;
         this.stringRedisTemplate = stringRedisTemplate;
@@ -44,26 +44,26 @@ public class AccountSelectionService {
     }
 
     public AccountSelectionService(
-            DistributedKeyAccountPoolBindingRepository distributedKeyAccountPoolBindingRepository,
+            DistributedKeyAccountGroupBindingRepository distributedKeyAccountGroupBindingRepository,
             UpstreamAccountRepository upstreamAccountRepository,
             NetworkProxyRepository networkProxyRepository,
             StringRedisTemplate stringRedisTemplate) {
-        this(distributedKeyAccountPoolBindingRepository, upstreamAccountRepository, networkProxyRepository, stringRedisTemplate, GovernancePolicyEngine.allowAll());
+        this(distributedKeyAccountGroupBindingRepository, upstreamAccountRepository, networkProxyRepository, stringRedisTemplate, GovernancePolicyEngine.allowAll());
     }
 
     @Transactional(readOnly = true)
     public boolean hasHealthyAccountBinding(Long distributedKeyId, ProviderType providerType, GatewayClientFamily clientFamily) {
-        List<DistributedKeyAccountPoolBindingEntity> bindings = distributedKeyAccountPoolBindingRepository
+        List<DistributedKeyAccountGroupBindingEntity> bindings = distributedKeyAccountGroupBindingRepository
                 .findAllByDistributedKey_IdAndProviderTypeAndActiveTrueOrderByPriorityAscCreatedAtAsc(distributedKeyId, providerType);
         if (bindings.isEmpty()) {
             return true;
         }
-        for (DistributedKeyAccountPoolBindingEntity binding : bindings) {
+        for (DistributedKeyAccountGroupBindingEntity binding : bindings) {
             List<UpstreamAccountEntity> accounts = upstreamAccountRepository
-                    .findAllByPool_IdAndActiveTrueAndFrozenFalseAndHealthyTrueOrderByUpdatedAtDesc(binding.getPool().getId());
+                    .findAllByGroup_IdAndActiveTrueAndFrozenFalseAndHealthyTrueOrderByUpdatedAtDesc(binding.getGroup().getId());
             for (UpstreamAccountEntity account : accounts) {
-                if (!binding.getPool().getAllowedClientFamilies().isEmpty()
-                        && !binding.getPool().getAllowedClientFamilies().contains(clientFamily.name())) {
+                if (!binding.getGroup().getAllowedClientFamilies().isEmpty()
+                        && !binding.getGroup().getAllowedClientFamilies().contains(clientFamily.name())) {
                     continue;
                 }
                 if (!isGovernanceHealthy(account)) {
@@ -87,7 +87,7 @@ public class AccountSelectionService {
             GatewayClientFamily clientFamily,
             int stickyTtlSeconds,
             String sessionAffinityKey) {
-        List<DistributedKeyAccountPoolBindingEntity> bindings = distributedKeyAccountPoolBindingRepository
+        List<DistributedKeyAccountGroupBindingEntity> bindings = distributedKeyAccountGroupBindingRepository
                 .findAllByDistributedKey_IdAndProviderTypeAndActiveTrueOrderByPriorityAscCreatedAtAsc(distributedKeyId, providerType);
         if (bindings.isEmpty()) {
             return Optional.empty();
@@ -105,12 +105,12 @@ public class AccountSelectionService {
             }
         }
 
-        for (DistributedKeyAccountPoolBindingEntity binding : bindings) {
+        for (DistributedKeyAccountGroupBindingEntity binding : bindings) {
             List<UpstreamAccountEntity> accounts = upstreamAccountRepository
-                    .findAllByPool_IdAndActiveTrueAndFrozenFalseAndHealthyTrueOrderByUpdatedAtDesc(binding.getPool().getId());
+                    .findAllByGroup_IdAndActiveTrueAndFrozenFalseAndHealthyTrueOrderByUpdatedAtDesc(binding.getGroup().getId());
             for (UpstreamAccountEntity account : accounts) {
-                if (!binding.getPool().getAllowedClientFamilies().isEmpty()
-                        && !binding.getPool().getAllowedClientFamilies().contains(clientFamily.name())) {
+                if (!binding.getGroup().getAllowedClientFamilies().isEmpty()
+                        && !binding.getGroup().getAllowedClientFamilies().contains(clientFamily.name())) {
                     continue;
                 }
                 if (!isGovernanceHealthy(account)) {
@@ -132,7 +132,7 @@ public class AccountSelectionService {
             return true;
         }
         return networkProxyRepository.findById(account.getProxyId())
-                .map(proxy -> proxy.isActive() && !"FAILED".equalsIgnoreCase(proxy.getLastStatus()))
+                .map(com.prodigalgal.xaigateway.infra.persistence.entity.NetworkProxyEntity::isActive)
                 .orElse(false);
     }
 

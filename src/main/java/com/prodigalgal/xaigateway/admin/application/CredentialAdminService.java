@@ -19,15 +19,17 @@ import com.prodigalgal.xaigateway.gateway.core.catalog.CredentialModelDiscoveryS
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
-import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountPoolEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountGroupEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
-import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountPoolRepository;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamSiteProfileEntity;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountGroupRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import org.springframework.stereotype.Service;
@@ -41,7 +43,7 @@ public class CredentialAdminService {
     private final CredentialCryptoService credentialCryptoService;
     private final CredentialModelDiscoveryService credentialModelDiscoveryService;
     private final ProviderSiteRegistryService providerSiteRegistryService;
-    private final UpstreamAccountPoolRepository upstreamAccountPoolRepository;
+    private final UpstreamAccountGroupRepository upstreamAccountGroupRepository;
     private final ObjectMapper objectMapper;
     private final SupportedModelCatalogService supportedModelCatalogService;
     private final OpenAiDirectSmokeHttpClient openAiDirectSmokeHttpClient;
@@ -55,14 +57,14 @@ public class CredentialAdminService {
             CredentialCryptoService credentialCryptoService,
             CredentialModelDiscoveryService credentialModelDiscoveryService,
             ProviderSiteRegistryService providerSiteRegistryService,
-            UpstreamAccountPoolRepository upstreamAccountPoolRepository,
+            UpstreamAccountGroupRepository upstreamAccountGroupRepository,
             ObjectMapper objectMapper,
             SupportedModelCatalogService supportedModelCatalogService) {
         this.upstreamCredentialRepository = upstreamCredentialRepository;
         this.credentialCryptoService = credentialCryptoService;
         this.credentialModelDiscoveryService = credentialModelDiscoveryService;
         this.providerSiteRegistryService = providerSiteRegistryService;
-        this.upstreamAccountPoolRepository = upstreamAccountPoolRepository;
+        this.upstreamAccountGroupRepository = upstreamAccountGroupRepository;
         this.objectMapper = objectMapper;
         this.supportedModelCatalogService = supportedModelCatalogService;
         this.openAiDirectSmokeHttpClient = new OpenAiDirectSmokeHttpClient(objectMapper);
@@ -75,46 +77,63 @@ public class CredentialAdminService {
     @Transactional(readOnly = true)
     public List<CredentialResponse> list() {
         List<UpstreamCredentialEntity> credentials = upstreamCredentialRepository.findAllByDeletedFalseOrderByCreatedAtDesc();
-        Map<Long, String> poolNameMap = resolvePoolNameMap(credentials);
+        Map<Long, String> groupNameMap = resolveGroupNameMap(credentials);
         return credentials.stream()
                 .sorted(Comparator.comparing(UpstreamCredentialEntity::getCreatedAt).reversed())
-                .map(entity -> toResponse(entity, poolNameMap.get(entity.getPoolId())))
+                .map(entity -> toResponse(entity, groupNameMap.get(entity.getGroupId())))
                 .toList();
     }
 
     @Transactional(readOnly = true)
-    public List<CredentialResponse> listByPool(Long poolId) {
-        List<UpstreamCredentialEntity> credentials = upstreamCredentialRepository.findAllByPoolIdAndDeletedFalseOrderByCreatedAtDesc(poolId);
-        Map<Long, String> poolNameMap = resolvePoolNameMap(credentials);
+    public List<CredentialResponse> listByGroup(Long groupId) {
+        List<UpstreamCredentialEntity> credentials = upstreamCredentialRepository.findAllByGroupIdAndDeletedFalseOrderByCreatedAtDesc(groupId);
+        Map<Long, String> groupNameMap = resolveGroupNameMap(credentials);
         return credentials.stream()
-                .map(entity -> toResponse(entity, poolNameMap.get(entity.getPoolId())))
+                .map(entity -> toResponse(entity, groupNameMap.get(entity.getGroupId())))
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public CredentialResponse get(Long id) {
         UpstreamCredentialEntity entity = getRequired(id);
-        String poolName = entity.getPoolId() == null
+        String groupName = entity.getGroupId() == null
                 ? null
-                : upstreamAccountPoolRepository.findById(entity.getPoolId()).map(UpstreamAccountPoolEntity::getPoolName).orElse(null);
-        return toResponse(entity, poolName);
+                : upstreamAccountGroupRepository.findById(entity.getGroupId()).map(UpstreamAccountGroupEntity::getGroupName).orElse(null);
+        return toResponse(entity, groupName);
     }
 
     public CredentialResponse create(CredentialRequest request) {
         String secret = requireSecret(request.resolvedSecret());
         String fingerprint = credentialCryptoService.fingerprint(secret);
-        if (upstreamCredentialRepository.findByApiKeyFingerprintAndDeletedFalse(fingerprint).isPresent()) {
-            throw new IllegalArgumentException("已存在相同的上游凭证密钥。");
-        }
+        UpstreamAccountGroupEntity group = resolveGroup(request.groupId());
+        UpstreamSiteProfileEntity siteProfile = providerSiteRegistryService.ensureSiteProfile(
+                request.providerType(),
+                request.baseUrl().trim(),
+                request.siteProfileId()
+        );
+        UpstreamCredentialEntity entity = upstreamCredentialRepository
+                .findFirstByApiKeyFingerprintAndProviderTypeAndBaseUrlAndSiteProfileIdOrderByUpdatedAtDesc(
+                        fingerprint,
+                        request.providerType(),
+                        request.baseUrl().trim(),
+                        siteProfile.getId()
+                )
+                .map(existing -> {
+                    if (!existing.isDeleted()) {
+                        throw new IllegalArgumentException("已存在相同上游接入面的凭证密钥。");
+                    }
+                    existing.setDeleted(false);
+                    return existing;
+                })
+                .orElseGet(UpstreamCredentialEntity::new);
 
-        UpstreamCredentialEntity entity = new UpstreamCredentialEntity();
-        apply(entity, request);
+        apply(entity, request, true, group, siteProfile);
         return toResponse(upstreamCredentialRepository.save(entity));
     }
 
     public CredentialResponse update(Long id, CredentialRequest request) {
         UpstreamCredentialEntity entity = getRequired(id);
-        apply(entity, request);
+        apply(entity, request, false);
         return toResponse(upstreamCredentialRepository.save(entity));
     }
 
@@ -908,33 +927,74 @@ public class CredentialAdminService {
         return entity.get();
     }
 
-    private void apply(UpstreamCredentialEntity entity, CredentialRequest request) {
-        String secret = requireSecret(request.resolvedSecret());
-        UpstreamAccountPoolEntity pool = resolvePool(request.poolId());
+    private void apply(UpstreamCredentialEntity entity, CredentialRequest request, boolean requireSecret) {
+        UpstreamAccountGroupEntity group = resolveGroup(request.groupId());
+        UpstreamSiteProfileEntity siteProfile = providerSiteRegistryService.ensureSiteProfile(
+                request.providerType(),
+                request.baseUrl().trim(),
+                request.siteProfileId()
+        );
+        apply(entity, request, requireSecret, group, siteProfile);
+    }
+
+    private void apply(
+            UpstreamCredentialEntity entity,
+            CredentialRequest request,
+            boolean requireSecret,
+            UpstreamAccountGroupEntity group,
+            UpstreamSiteProfileEntity siteProfile) {
+        applySecret(
+                entity,
+                request.resolvedSecret(),
+                requireSecret,
+                request.providerType(),
+                request.baseUrl().trim(),
+                siteProfile.getId()
+        );
         entity.setCredentialName(request.credentialName().trim());
         entity.setProviderType(request.providerType());
         entity.setBaseUrl(request.baseUrl().trim());
         entity.setAuthKind(request.resolvedAuthKind());
-        entity.setApiKeyCiphertext(credentialCryptoService.encrypt(secret));
-        entity.setApiKeyFingerprint(credentialCryptoService.fingerprint(secret));
         entity.setCredentialMetadataJson(writeMetadata(request.resolvedCredentialMetadata()));
         entity.setSupportedModels(supportedModelCatalogService.resolveForCredentialImport(
                 request.providerType(),
-                pool,
+                group,
                 request.resolvedSupportedModels()
         ));
         entity.setActive(request.active() == null || request.active());
         entity.setProxyId(request.proxyId());
         entity.setTlsFingerprintProfileId(request.tlsFingerprintProfileId());
-        entity.setSiteProfileId(providerSiteRegistryService.ensureSiteProfile(
-                request.providerType(),
-                request.baseUrl().trim(),
-                request.siteProfileId()
-        ).getId());
-        entity.setPoolId(pool == null ? null : pool.getId());
+        entity.setSiteProfileId(siteProfile.getId());
+        entity.setGroupId(group == null ? null : group.getId());
     }
 
-    private CredentialResponse toResponse(UpstreamCredentialEntity entity, String poolName) {
+    private void applySecret(
+            UpstreamCredentialEntity entity,
+            String rawSecret,
+            boolean required,
+            ProviderType providerType,
+            String baseUrl,
+            Long siteProfileId) {
+        if (!required && (rawSecret == null || rawSecret.isBlank())) {
+            return;
+        }
+        String secret = requireSecret(rawSecret);
+        String fingerprint = credentialCryptoService.fingerprint(secret);
+        upstreamCredentialRepository.findByApiKeyFingerprintAndProviderTypeAndBaseUrlAndSiteProfileIdAndDeletedFalse(
+                        fingerprint,
+                        providerType,
+                        baseUrl,
+                        siteProfileId
+                )
+                .filter(existing -> !Objects.equals(existing.getId(), entity.getId()))
+                .ifPresent(existing -> {
+                    throw new IllegalArgumentException("已存在相同上游接入面的凭证密钥。");
+                });
+        entity.setApiKeyCiphertext(credentialCryptoService.encrypt(secret));
+        entity.setApiKeyFingerprint(fingerprint);
+    }
+
+    private CredentialResponse toResponse(UpstreamCredentialEntity entity, String groupName) {
         long totalRequests = entity.getTotalRequestCount();
         long successRequests = entity.getSuccessfulRequestCount();
         long totalTokens = entity.getTotalTokenCount();
@@ -978,41 +1038,41 @@ public class CredentialAdminService {
                 entity.getProxyId(),
                 entity.getTlsFingerprintProfileId(),
                 entity.getSiteProfileId(),
-                entity.getPoolId(),
-                poolName,
+                entity.getGroupId(),
+                groupName,
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
         );
     }
 
     private CredentialResponse toResponse(UpstreamCredentialEntity entity) {
-        String poolName = entity.getPoolId() == null
+        String groupName = entity.getGroupId() == null
                 ? null
-                : upstreamAccountPoolRepository.findById(entity.getPoolId())
-                        .map(UpstreamAccountPoolEntity::getPoolName)
+                : upstreamAccountGroupRepository.findById(entity.getGroupId())
+                        .map(UpstreamAccountGroupEntity::getGroupName)
                         .orElse(null);
-        return toResponse(entity, poolName);
+        return toResponse(entity, groupName);
     }
 
-    private UpstreamAccountPoolEntity resolvePool(Long requestPoolId) {
-        if (requestPoolId == null) {
-            return null;
+    private UpstreamAccountGroupEntity resolveGroup(Long requestGroupId) {
+        if (requestGroupId == null) {
+            throw new IllegalArgumentException("上游凭证必须归入一个账号分组。");
         }
-        return upstreamAccountPoolRepository.findById(requestPoolId)
-                .orElseThrow(() -> new IllegalArgumentException("未找到指定账号池。"));
+        return upstreamAccountGroupRepository.findById(requestGroupId)
+                .orElseThrow(() -> new IllegalArgumentException("未找到指定账号分组。"));
     }
 
-    private Map<Long, String> resolvePoolNameMap(List<UpstreamCredentialEntity> credentials) {
-        Set<Long> poolIds = credentials.stream()
-                .map(UpstreamCredentialEntity::getPoolId)
+    private Map<Long, String> resolveGroupNameMap(List<UpstreamCredentialEntity> credentials) {
+        Set<Long> groupIds = credentials.stream()
+                .map(UpstreamCredentialEntity::getGroupId)
                 .filter(id -> id != null && id > 0)
                 .collect(java.util.stream.Collectors.toSet());
-        if (poolIds.isEmpty()) {
+        if (groupIds.isEmpty()) {
             return Map.of();
         }
         Map<Long, String> result = new HashMap<>();
-        upstreamAccountPoolRepository.findAllById(poolIds)
-                .forEach(pool -> result.put(pool.getId(), pool.getPoolName()));
+        upstreamAccountGroupRepository.findAllById(groupIds)
+                .forEach(group -> result.put(group.getId(), group.getGroupName()));
         return result;
     }
 

@@ -269,7 +269,7 @@ public class ModelCatalogQueryService {
     }
 
     private boolean isProtocolAllowed(DistributedKeyView distributedKey, String protocol) {
-        return distributedKey.allowedProtocols().isEmpty() || distributedKey.allowedProtocols().contains(protocol);
+        return distributedKey.allowedProtocolSuites().isEmpty() || distributedKey.allowedProtocolSuites().contains(protocol);
     }
 
     private boolean isModelAllowed(DistributedKeyView distributedKey, String modelNameOrAlias) {

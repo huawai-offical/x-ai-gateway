@@ -8,7 +8,7 @@ public record PortalKeyResponse(
         String keyName,
         String maskedKey,
         boolean active,
-        List<String> allowedProtocols,
+        List<String> allowedProtocolSuites,
         List<String> allowedModels,
         Instant expiresAt,
         Integer rpmLimit,

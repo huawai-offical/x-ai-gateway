@@ -12,10 +12,14 @@ public class DefaultResourceBootstrapService {
 
     private static final Logger log = LoggerFactory.getLogger(DefaultResourceBootstrapService.class);
 
-    private final AccountPoolAdminService accountPoolAdminService;
+    private final AccountGroupAdminService accountGroupAdminService;
+    private final NetworkGovernanceService networkGovernanceService;
 
-    public DefaultResourceBootstrapService(AccountPoolAdminService accountPoolAdminService) {
-        this.accountPoolAdminService = accountPoolAdminService;
+    public DefaultResourceBootstrapService(
+            AccountGroupAdminService accountGroupAdminService,
+            NetworkGovernanceService networkGovernanceService) {
+        this.accountGroupAdminService = accountGroupAdminService;
+        this.networkGovernanceService = networkGovernanceService;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -25,7 +29,8 @@ public class DefaultResourceBootstrapService {
     }
 
     public void bootstrapDefaults() {
-        var defaultPool = accountPoolAdminService.ensureDefaultPool();
-        log.info("默认资源引导完成：default 账号池 id={}。", defaultPool.getId());
+        var defaultGroup = accountGroupAdminService.ensureDefaultGroup();
+        networkGovernanceService.ensureDefaultTlsProfiles();
+        log.info("默认资源引导完成：default 账号分组 id={}，TLS 指纹默认画像已校验。", defaultGroup.getId());
     }
 }

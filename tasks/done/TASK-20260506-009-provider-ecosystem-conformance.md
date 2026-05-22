@@ -70,3 +70,8 @@
 
 - 将 Midjourney/Suno/Video/Music 等媒体 provider 原生 adapter 与真实 smoke 拆到 `TASK-20260506-011 Realtime 与 Media 生产硬化` 或独立任务。
 - 为 Qwen、Moonshot、SiliconFlow、Volcengine、MiniMax、Dify、Jina 分别补生产凭证 smoke 与价格同步自动化。
+
+## 2026-05-21 历史归档口径
+
+- 本任务中的 `provider-sites`、`capability matrix`、`站点档案` 页面属于当时的控制台实现背景。
+- 当前保留该任务是为了保存 provider 识别、能力判定与 conformance 规则的实现证据，不再代表这些控制台页面仍是现役产品面。

@@ -43,8 +43,8 @@ public record CredentialResponse(
         Long proxyId,
         Long tlsFingerprintProfileId,
         Long siteProfileId,
-        Long poolId,
-        String poolName,
+        Long groupId,
+        String groupName,
         Instant createdAt,
         Instant updatedAt
 ) {

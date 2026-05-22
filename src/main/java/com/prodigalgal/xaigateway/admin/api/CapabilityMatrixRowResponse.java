@@ -46,8 +46,7 @@ public record CapabilityMatrixRowResponse(
         boolean supportsImages,
         boolean supportsModeration,
         boolean supportsFiles,
-        boolean supportsUploads,
-        boolean supportsRealtime
+        boolean supportsUploads
 ) {
     public CapabilityMatrixRowResponse(
             Long siteProfileId,
@@ -80,8 +79,7 @@ public record CapabilityMatrixRowResponse(
             boolean supportsImages,
             boolean supportsModeration,
             boolean supportsFiles,
-            boolean supportsUploads,
-            boolean supportsRealtime
+            boolean supportsUploads
     ) {
         this(
                 siteProfileId,
@@ -116,8 +114,7 @@ public record CapabilityMatrixRowResponse(
                 supportsImages,
                 supportsModeration,
                 supportsFiles,
-                supportsUploads,
-                supportsRealtime
+                supportsUploads
         );
     }
 }

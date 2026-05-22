@@ -1,6 +1,7 @@
 package com.prodigalgal.xaigateway.admin.api;
 
 import com.prodigalgal.xaigateway.admin.application.CredentialAdminService;
+import com.prodigalgal.xaigateway.admin.application.UpstreamCredentialInventoryService;
 import com.prodigalgal.xaigateway.gateway.core.credential.CredentialAuthKind;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.testsupport.PermitAllSecurityTestConfig;
@@ -26,6 +27,9 @@ class CredentialAdminControllerTests {
     @MockitoBean
     private CredentialAdminService credentialAdminService;
 
+    @MockitoBean
+    private UpstreamCredentialInventoryService upstreamCredentialInventoryService;
+
     @Test
     void shouldListAndGetCredential() {
         CredentialResponse response = credentialResponse(7L, "OpenAI Primary");
@@ -46,6 +50,24 @@ class CredentialAdminControllerTests {
                 .expectBody()
                 .jsonPath("$.id").isEqualTo(7)
                 .jsonPath("$.providerType").isEqualTo("OPENAI_DIRECT");
+    }
+
+    @Test
+    void shouldListUnifiedCredentialInventory() {
+        Mockito.when(upstreamCredentialInventoryService.list()).thenReturn(List.of(
+                inventory("api-key:1", "API_KEY", "Gemini AI Studio 01", "GEMINI_DIRECT", 3L, "Gemini AI Studio"),
+                inventory("account:2", "AUTH_JSON_ACCOUNT", "Codex 账号 01", "CODEX_OAUTH", 2L, "Codex")
+        ));
+
+        webTestClient.get()
+                .uri("/admin/credentials/inventory")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$[0].rowKey").isEqualTo("api-key:1")
+                .jsonPath("$[0].sourceType").isEqualTo("API_KEY")
+                .jsonPath("$[1].rowKey").isEqualTo("account:2")
+                .jsonPath("$[1].groupName").isEqualTo("Codex");
     }
 
     @Test
@@ -319,6 +341,68 @@ class CredentialAdminControllerTests {
                 15L,
                 15L,
                 "default",
+                now,
+                now
+        );
+    }
+
+    private UpstreamCredentialInventoryResponse inventory(
+            String rowKey,
+            String sourceType,
+            String displayName,
+            String providerType,
+            Long groupId,
+            String groupName) {
+        Instant now = Instant.now();
+        return new UpstreamCredentialInventoryResponse(
+                sourceType,
+                rowKey.endsWith(":1") ? 1L : 2L,
+                rowKey,
+                displayName,
+                providerType,
+                sourceType.equals("API_KEY") ? "API_KEY" : "OAUTH_TOKEN",
+                sourceType.equals("API_KEY") ? "https://example.com" : null,
+                List.of("gpt-5.4"),
+                sourceType.equals("API_KEY") ? "fp" : null,
+                sourceType.equals("API_KEY") ? null : "codex:user",
+                Map.of(),
+                true,
+                sourceType.equals("API_KEY") ? null : false,
+                sourceType.equals("API_KEY") ? null : true,
+                sourceType.equals("API_KEY") ? null : "READY",
+                sourceType.equals("API_KEY") ? null : 0,
+                null,
+                null,
+                null,
+                null,
+                now,
+                sourceType.equals("API_KEY") ? null : now,
+                sourceType.equals("API_KEY") ? null : now,
+                null,
+                null,
+                null,
+                null,
+                groupId,
+                groupName,
+                0L,
+                0L,
+                0L,
+                0L,
+                0L,
+                0L,
+                0L,
+                0L,
+                0D,
+                0D,
+                0L,
+                0L,
+                0D,
+                0L,
+                0L,
+                0D,
+                null,
+                null,
+                null,
                 now,
                 now
         );

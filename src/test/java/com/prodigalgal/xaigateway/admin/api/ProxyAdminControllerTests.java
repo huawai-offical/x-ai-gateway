@@ -24,7 +24,7 @@ class ProxyAdminControllerTests {
     @Test
     void shouldCreateProxy() {
         Mockito.when(networkGovernanceService.saveProxy(Mockito.isNull(), Mockito.any()))
-                .thenReturn(new ProxyResponse(1L, "proxy-a", "https://proxy.example.com:443", true, null, null, null, null, null, null, null));
+                .thenReturn(new ProxyResponse(1L, "proxy-a", "https://proxy.example.com:443", true, null, null, null));
 
         webTestClient.post()
                 .uri("/admin/network/proxies")

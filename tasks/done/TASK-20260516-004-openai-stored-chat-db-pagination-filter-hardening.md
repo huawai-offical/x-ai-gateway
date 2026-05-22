@@ -1,9 +1,9 @@
 # TASK-20260516-004 OpenAI Stored Chat 数据库游标分页与过滤硬化
 
-状态：Done  
-优先级：Critical  
-类型：子任务切片  
-父任务：[TASK-20260514-017](../backlog/TASK-20260514-017-openai-chat-completions-full-parity.md)、[TASK-20260514-030](../backlog/TASK-20260514-030-openai-cross-cutting-protocol-compatibility.md)  
+状态：Done
+优先级：Critical
+类型：子任务切片
+父任务：[TASK-20260514-017](../done/TASK-20260514-017-openai-chat-completions-full-parity.md)、[TASK-20260514-030](../done/TASK-20260514-030-openai-cross-cutting-protocol-compatibility.md)
 上游来源：[TASK-20260515-004](../done/TASK-20260515-004-openai-stored-chat-lifecycle-foundation.md)、[TASK-20260515-010](../done/TASK-20260515-010-openai-list-pagination-envelope-cursor-baseline.md)
 
 ## 背景
@@ -54,8 +54,8 @@ Stored Chat Completions 已支持 list/get/update/delete/messages 和 OpenAI-com
 - `docs/public-api-compatibility.md`
 - `docs/migrations/MIG-20260516-stored-chat-pagination-index.md`
 - `docs/reports/REP-20260514-openai-full-api-coverage-task-breakdown.md`
-- `tasks/backlog/TASK-20260514-017-openai-chat-completions-full-parity.md`
-- `tasks/backlog/TASK-20260514-030-openai-cross-cutting-protocol-compatibility.md`
+- `tasks/done/TASK-20260514-017-openai-chat-completions-full-parity.md`
+- `tasks/done/TASK-20260514-030-openai-cross-cutting-protocol-compatibility.md`
 
 ## 依赖
 

@@ -1,9 +1,9 @@
 # TASK-20260515-008 OpenAI Chat 参数兼容证明、公开文档与 SDK 示例
 
-状态：Done  
-优先级：Critical  
-类型：子任务  
-父任务：[TASK-20260514-017](../backlog/TASK-20260514-017-openai-chat-completions-full-parity.md)、[TASK-20260514-029](../in-progress/TASK-20260514-029-openai-openapi-catalog-conformance-sdk.md)
+状态：Done
+优先级：Critical
+类型：子任务
+父任务：[TASK-20260514-017](../done/TASK-20260514-017-openai-chat-completions-full-parity.md)、[TASK-20260514-029](TASK-20260514-029-openai-openapi-catalog-conformance-sdk.md)
 上游来源：[REQ-20260514-009](../../docs/requirements/REQ-20260514-009-openai-full-api-coverage-task-system.md)、[REP-20260514 OpenAI 全量覆盖任务拆解](../../docs/reports/REP-20260514-openai-full-api-coverage-task-breakdown.md)
 
 ## 背景

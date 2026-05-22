@@ -14,7 +14,7 @@ describe('OauthConnectPage', () => {
   it('renders connect action', async () => {
     render(
       <QueryClientProvider client={new QueryClient()}>
-        <MemoryRouter initialEntries={['/accounts/connect/openai_oauth?poolId=1']}>
+        <MemoryRouter initialEntries={['/accounts/connect/openai_oauth?groupId=1']}>
           <Routes>
             <Route path="/accounts/connect/:provider" element={<OauthConnectPage />} />
           </Routes>

@@ -8,10 +8,14 @@ import com.prodigalgal.xaigateway.infra.config.GatewayProperties;
 import com.prodigalgal.xaigateway.infra.persistence.entity.CacheHitLogEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.RequestLogEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.RouteDecisionLogEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UsageRecordEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.CacheHitLogRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.RequestLogRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.RouteDecisionLogRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UsageRecordRepository;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -308,6 +312,95 @@ class GatewayObservabilityAsyncPersistenceServiceTests {
         assertEquals(originalOrder, fixture.queue);
     }
 
+    @Test
+    void shouldMergeRuntimeMetricsThroughRedisQueueBeforeWritingBackToPg() {
+        QueueFixture fixture = new QueueFixture();
+        UpstreamCredentialEntity credential = new UpstreamCredentialEntity();
+        UpstreamAccountEntity account = new UpstreamAccountEntity();
+        Mockito.when(fixture.upstreamCredentialRepository.findById(101L)).thenReturn(java.util.Optional.of(credential));
+        Mockito.when(fixture.upstreamAccountRepository.findById(201L)).thenReturn(java.util.Optional.of(account));
+
+        GatewayObservabilityAsyncPersistenceService service = fixture.service();
+        service.enqueueCredentialMetricsAccumulate(new GatewayObservabilityAsyncPersistenceService.RuntimeMetricSnapshot(
+                101L,
+                1,
+                1,
+                0,
+                0,
+                120,
+                1,
+                30,
+                4,
+                2,
+                8,
+                35,
+                1,
+                35L,
+                35L,
+                35L,
+                Instant.parse("2026-04-20T12:00:00Z")
+        ));
+        service.enqueueCredentialMetricsAccumulate(new GatewayObservabilityAsyncPersistenceService.RuntimeMetricSnapshot(
+                101L,
+                1,
+                0,
+                1,
+                0,
+                180,
+                1,
+                20,
+                5,
+                0,
+                6,
+                20,
+                1,
+                20L,
+                20L,
+                20L,
+                Instant.parse("2026-04-20T12:01:00Z")
+        ));
+        service.enqueueAccountMetricsAccumulate(new GatewayObservabilityAsyncPersistenceService.RuntimeMetricSnapshot(
+                201L,
+                1,
+                0,
+                0,
+                1,
+                90,
+                1,
+                10,
+                0,
+                0,
+                0,
+                0,
+                0,
+                null,
+                null,
+                null,
+                Instant.parse("2026-04-20T12:02:00Z")
+        ));
+
+        assertEquals(3, service.flushBatch());
+        assertEquals(2, credential.getTotalRequestCount());
+        assertEquals(1, credential.getSuccessfulRequestCount());
+        assertEquals(1, credential.getFailedRequestCount());
+        assertEquals(300, credential.getTotalDurationMs());
+        assertEquals(50, credential.getTotalTokenCount());
+        assertEquals(9, credential.getTotalCacheHitTokenCount());
+        assertEquals(14, credential.getTotalSavedInputTokenCount());
+        assertEquals(55, credential.getTotalFirstTokenMs());
+        assertEquals(2, credential.getFirstTokenSampleCount());
+        assertEquals(20L, credential.getLastFirstTokenMs());
+        assertEquals(20L, credential.getMinFirstTokenMs());
+        assertEquals(35L, credential.getMaxFirstTokenMs());
+        assertEquals(Instant.parse("2026-04-20T12:01:00Z"), credential.getLastUsedAt());
+        assertEquals(1, account.getTotalRequestCount());
+        assertEquals(1, account.getCanceledRequestCount());
+        assertEquals(90, account.getTotalDurationMs());
+        assertEquals(Instant.parse("2026-04-20T12:02:00Z"), account.getLastUsedAt());
+        Mockito.verify(fixture.upstreamCredentialRepository).save(credential);
+        Mockito.verify(fixture.upstreamAccountRepository).save(account);
+    }
+
     private static final class QueueFixture {
         private final ObjectMapper objectMapper = new ObjectMapper();
         private final GatewayProperties gatewayProperties = new GatewayProperties();
@@ -318,6 +411,8 @@ class GatewayObservabilityAsyncPersistenceServiceTests {
         private final UsageRecordRepository usageRecordRepository = Mockito.mock(UsageRecordRepository.class);
         private final RouteDecisionLogRepository routeDecisionLogRepository = Mockito.mock(RouteDecisionLogRepository.class);
         private final CacheHitLogRepository cacheHitLogRepository = Mockito.mock(CacheHitLogRepository.class);
+        private final UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        private final UpstreamAccountRepository upstreamAccountRepository = Mockito.mock(UpstreamAccountRepository.class);
         private final PlatformTransactionManager transactionManager = Mockito.mock(PlatformTransactionManager.class);
         private final List<String> queue = new ArrayList<>();
         private final Map<String, RequestLogEntity> requestStore = new LinkedHashMap<>();
@@ -392,6 +487,8 @@ class GatewayObservabilityAsyncPersistenceServiceTests {
                     usageRecordRepository,
                     routeDecisionLogRepository,
                     cacheHitLogRepository,
+                    upstreamCredentialRepository,
+                    upstreamAccountRepository,
                     gatewayProperties,
                     transactionManager
             );

@@ -9,6 +9,7 @@ import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalMessage;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalMessageRole;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequestMetadata;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolCall;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolDefinition;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -80,11 +81,21 @@ public class OpenAiChatCompletionRequestMapper {
             return result;
         }
         for (OpenAiChatCompletionRequest.Message message : messages) {
-            ParsedMessageContent parsed = parseMessageContent(message.content(), CanonicalMessageRole.from(message.role()), message.toolCallId());
-            if (parsed.parts().isEmpty()) {
+            CanonicalMessageRole role = CanonicalMessageRole.from(message.role());
+            ParsedMessageContent parsed = parseMessageContent(message.content(), role, message.toolCallId());
+            List<CanonicalToolCall> toolCalls = toMessageToolCalls(message.toolCalls());
+            if (parsed.parts().isEmpty()
+                    && toolCalls.isEmpty()
+                    && (message.reasoningContent() == null || message.reasoningContent().isBlank())) {
                 continue;
             }
-            result.add(new CanonicalMessage(CanonicalMessageRole.from(message.role()), parsed.parts()));
+            result.add(new CanonicalMessage(
+                    role,
+                    parsed.parts(),
+                    message.reasoningContent(),
+                    toolCalls,
+                    messageExtensions(message)
+            ));
         }
         return List.copyOf(result);
     }
@@ -316,6 +327,38 @@ public class OpenAiChatCompletionRequestMapper {
         putJson(metadata, "prediction", request.prediction());
         putJson(metadata, "functions", request.functions());
         putJson(metadata, "function_call", request.functionCall());
+        return metadata.isEmpty() ? null : metadata;
+    }
+
+    private List<CanonicalToolCall> toMessageToolCalls(JsonNode toolCallsNode) {
+        if (!hasJson(toolCallsNode)) {
+            return List.of();
+        }
+        if (!toolCallsNode.isArray()) {
+            throw new IllegalArgumentException("message.tool_calls 必须是 JSON array。");
+        }
+        List<CanonicalToolCall> result = new ArrayList<>();
+        for (JsonNode item : toolCallsNode) {
+            if (item == null || !item.isObject()) {
+                throw new IllegalArgumentException("message.tool_calls 每一项必须是 JSON object。");
+            }
+            JsonNode function = item.path("function");
+            result.add(new CanonicalToolCall(
+                    item.path("id").asText(null),
+                    item.path("type").asText("function"),
+                    function.path("name").asText(null),
+                    function.path("arguments").isMissingNode() || function.path("arguments").isNull()
+                            ? null
+                            : function.path("arguments").isTextual() ? function.path("arguments").asText() : function.path("arguments").toString()
+            ));
+        }
+        return List.copyOf(result);
+    }
+
+    private JsonNode messageExtensions(OpenAiChatCompletionRequest.Message message) {
+        ObjectNode metadata = objectMapper.createObjectNode();
+        putJson(metadata, "tool_calls", message.toolCalls());
+        putText(metadata, "reasoning_content", message.reasoningContent());
         return metadata.isEmpty() ? null : metadata;
     }
 

@@ -1,10 +1,10 @@
 # TASK-20260515-014 OpenAI Streaming Event Usage 与 Sequence 基线
 
-状态：Done  
-优先级：Critical  
-类型：子任务  
-父任务：[TASK-20260514-030](../backlog/TASK-20260514-030-openai-cross-cutting-protocol-compatibility.md)  
-上游来源：[TASK-20260514-017](../backlog/TASK-20260514-017-openai-chat-completions-full-parity.md)、[TASK-20260514-018](../backlog/TASK-20260514-018-openai-responses-native-lifecycle.md)
+状态：Done
+优先级：Critical
+类型：子任务
+父任务：[TASK-20260514-030](../done/TASK-20260514-030-openai-cross-cutting-protocol-compatibility.md)
+上游来源：[TASK-20260514-017](../done/TASK-20260514-017-openai-chat-completions-full-parity.md)、[TASK-20260514-018](../done/TASK-20260514-018-openai-responses-native-lifecycle.md)
 
 ## 背景
 
@@ -77,7 +77,7 @@ OpenAI Chat Completions stream 使用 `chat.completion.chunk`，`stream_options.
 
 ## 关联文档
 
-- [TASK-20260514-030](../backlog/TASK-20260514-030-openai-cross-cutting-protocol-compatibility.md)
+- [TASK-20260514-030](../done/TASK-20260514-030-openai-cross-cutting-protocol-compatibility.md)
 - [REP-20260514 OpenAI 全量覆盖任务拆解](../../docs/reports/REP-20260514-openai-full-api-coverage-task-breakdown.md)
 
 ## 实现结果

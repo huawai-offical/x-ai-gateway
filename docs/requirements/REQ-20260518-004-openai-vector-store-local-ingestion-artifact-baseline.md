@@ -2,7 +2,7 @@
 
 状态：Done
 日期：2026-05-18
-上游来源：[TASK-20260514-023](../../tasks/backlog/TASK-20260514-023-openai-vector-stores-full-stack.md)
+上游来源：[TASK-20260514-023](../../tasks/done/TASK-20260514-023-openai-vector-stores-full-stack.md)
 
 ## 背景
 
@@ -81,7 +81,7 @@
 
 ## 关联文档
 
-- [TASK-20260514-023](../../tasks/backlog/TASK-20260514-023-openai-vector-stores-full-stack.md)
+- [TASK-20260514-023](../../tasks/done/TASK-20260514-023-openai-vector-stores-full-stack.md)
 - [REQ-20260518-001](REQ-20260518-001-openai-vector-store-file-content-local-read-baseline.md)
 - [REQ-20260518-002](REQ-20260518-002-openai-vector-store-search-local-text-baseline.md)
 - [REQ-20260518-003](REQ-20260518-003-openai-responses-file-search-local-vector-store-binding.md)

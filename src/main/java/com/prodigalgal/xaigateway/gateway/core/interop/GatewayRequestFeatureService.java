@@ -160,20 +160,11 @@ public class GatewayRequestFeatureService {
         if ("POST".equals(method) && "/v1/audio/transcriptions".equals(normalizedPath)) {
             return semantics("audio", normalizedPath, TranslationResourceType.AUDIO, TranslationOperation.AUDIO_TRANSCRIPTION, List.of(InteropFeature.AUDIO_TRANSCRIPTION), RouteSelectionMode.CATALOG_SELECTION);
         }
-        if ("POST".equals(method) && "/v1/audio/translations".equals(normalizedPath)) {
-            return semantics("audio", normalizedPath, TranslationResourceType.AUDIO, TranslationOperation.AUDIO_TRANSLATION, List.of(InteropFeature.AUDIO_TRANSLATION), RouteSelectionMode.CATALOG_SELECTION);
-        }
         if ("POST".equals(method) && "/v1/audio/speech".equals(normalizedPath)) {
             return semantics("audio", normalizedPath, TranslationResourceType.AUDIO, TranslationOperation.AUDIO_SPEECH, List.of(InteropFeature.AUDIO_SPEECH), RouteSelectionMode.CATALOG_SELECTION);
         }
         if ("POST".equals(method) && "/v1/images/generations".equals(normalizedPath)) {
             return semantics("images", normalizedPath, TranslationResourceType.IMAGE, TranslationOperation.IMAGE_GENERATION, List.of(InteropFeature.IMAGE_GENERATION), RouteSelectionMode.CATALOG_SELECTION);
-        }
-        if ("POST".equals(method) && "/v1/images/edits".equals(normalizedPath)) {
-            return semantics("images", normalizedPath, TranslationResourceType.IMAGE, TranslationOperation.IMAGE_EDIT, List.of(InteropFeature.IMAGE_EDIT), RouteSelectionMode.CATALOG_SELECTION);
-        }
-        if ("POST".equals(method) && "/v1/images/variations".equals(normalizedPath)) {
-            return semantics("images", normalizedPath, TranslationResourceType.IMAGE, TranslationOperation.IMAGE_VARIATION, List.of(InteropFeature.IMAGE_VARIATION), RouteSelectionMode.CATALOG_SELECTION);
         }
         if ("POST".equals(method) && "/v1/moderations".equals(normalizedPath)) {
             return semantics("moderations", normalizedPath, TranslationResourceType.MODERATION, TranslationOperation.MODERATION_CREATE, List.of(InteropFeature.MODERATION), RouteSelectionMode.CATALOG_SELECTION);
@@ -222,9 +213,6 @@ public class GatewayRequestFeatureService {
         }
         if ("POST".equals(method) && "/v1/uploads/{uploadId}/cancel".equals(normalizedPath)) {
             return semantics("uploads", normalizedPath, TranslationResourceType.UPLOAD, TranslationOperation.UPLOAD_CANCEL, List.of(InteropFeature.UPLOAD_CREATE), RouteSelectionMode.STORED_LINEAGE);
-        }
-        if ("POST".equals(method) && "/v1/realtime/client_secrets".equals(normalizedPath)) {
-            return semantics("realtime", normalizedPath, TranslationResourceType.REALTIME, TranslationOperation.REALTIME_CLIENT_SECRET_CREATE, List.of(InteropFeature.REALTIME_CLIENT_SECRET), RouteSelectionMode.DISTRIBUTED_TARGET);
         }
         return semantics("unknown", normalizedPath, TranslationResourceType.UNKNOWN, TranslationOperation.UNKNOWN, List.of(InteropFeature.CHAT_TEXT), RouteSelectionMode.CATALOG_SELECTION);
     }

@@ -158,7 +158,7 @@ public class AccessGroupAdminService {
         entity.setDescription(blankToNull(request.description()));
         entity.setActive(request.active() == null ? isCreate || entity.isActive() : request.active());
         entity.setPriority(resolvePriority(request.priority(), entity.getPriority()));
-        entity.setAllowedProtocols(normalizeProtocols(request.allowedProtocols()));
+        entity.setAllowedProtocolSuites(normalizeProtocols(request.allowedProtocolSuites()));
         entity.setAllowedModels(normalizeModels(request.allowedModels()));
         entity.setAllowedProviderTypes(normalizeProviderTypes(request.allowedProviderTypes()));
         entity.setAllowedClientFamilies(normalizeClientFamilies(request.allowedClientFamilies()));
@@ -313,7 +313,7 @@ public class AccessGroupAdminService {
                 entity.getDescription(),
                 entity.isActive(),
                 entity.getPriority(),
-                entity.getAllowedProtocols(),
+                entity.getAllowedProtocolSuites(),
                 entity.getAllowedModels(),
                 entity.getAllowedProviderTypes(),
                 entity.getAllowedClientFamilies(),
@@ -360,7 +360,7 @@ public class AccessGroupAdminService {
     private AccessGroupResolvedPolicyResponse toResolvedPolicyResponse(ResolvedAccessPolicy policy) {
         return new AccessGroupResolvedPolicyResponse(
                 policy.sourceAccessGroups(),
-                policy.allowedProtocols(),
+                policy.allowedProtocolSuites(),
                 policy.allowedModels(),
                 policy.allowedProviderTypes(),
                 policy.allowedClientFamilies(),

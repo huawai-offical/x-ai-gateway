@@ -20,8 +20,8 @@ public class UpstreamAccountEntity {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = true)
-    @JoinColumn(name = "pool_id", nullable = true)
-    private UpstreamAccountPoolEntity pool;
+    @JoinColumn(name = "group_id", nullable = true)
+    private UpstreamAccountGroupEntity group;
 
     @Column(name = "account_name", nullable = false, length = 128)
     private String accountName;
@@ -160,8 +160,8 @@ public class UpstreamAccountEntity {
     private Instant updatedAt;
 
     public Long getId() { return id; }
-    public UpstreamAccountPoolEntity getPool() { return pool; }
-    public void setPool(UpstreamAccountPoolEntity pool) { this.pool = pool; }
+    public UpstreamAccountGroupEntity getGroup() { return group; }
+    public void setGroup(UpstreamAccountGroupEntity group) { this.group = group; }
     public String getAccountName() { return accountName; }
     public void setAccountName(String accountName) { this.accountName = accountName; }
     public UpstreamAccountProviderType getProviderType() { return providerType; }

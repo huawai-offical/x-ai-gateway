@@ -7,7 +7,7 @@ import com.prodigalgal.xaigateway.admin.api.OfficialAccountQuotaResponse;
 import com.prodigalgal.xaigateway.admin.api.OfficialAccountType;
 import com.prodigalgal.xaigateway.gateway.core.account.UpstreamAccountProviderType;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountEntity;
-import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountPoolRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountGroupRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountRepository;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -29,12 +29,12 @@ class OfficialAccountAdminServiceTests {
     @Test
     void shouldImportOfficialAccountAndRefreshQuotaWithoutPersistingPlainSecret() {
         UpstreamAccountRepository accountRepository = Mockito.mock(UpstreamAccountRepository.class);
-        UpstreamAccountPoolRepository poolRepository = Mockito.mock(UpstreamAccountPoolRepository.class);
+        UpstreamAccountGroupRepository groupRepository = Mockito.mock(UpstreamAccountGroupRepository.class);
         CredentialCryptoService cryptoService = Mockito.mock(CredentialCryptoService.class);
         SupportedModelCatalogService modelCatalogService = Mockito.mock(SupportedModelCatalogService.class);
         OfficialAccountAdminService service = new OfficialAccountAdminService(
                 accountRepository,
-                poolRepository,
+                groupRepository,
                 cryptoService,
                 modelCatalogService,
                 new ObjectMapper()
@@ -102,12 +102,12 @@ class OfficialAccountAdminServiceTests {
     @Test
     void shouldImportCodexOfficialAccountFromRawAuthJsonMetadata() {
         UpstreamAccountRepository accountRepository = Mockito.mock(UpstreamAccountRepository.class);
-        UpstreamAccountPoolRepository poolRepository = Mockito.mock(UpstreamAccountPoolRepository.class);
+        UpstreamAccountGroupRepository groupRepository = Mockito.mock(UpstreamAccountGroupRepository.class);
         CredentialCryptoService cryptoService = Mockito.mock(CredentialCryptoService.class);
         SupportedModelCatalogService modelCatalogService = Mockito.mock(SupportedModelCatalogService.class);
         OfficialAccountAdminService service = new OfficialAccountAdminService(
                 accountRepository,
-                poolRepository,
+                groupRepository,
                 cryptoService,
                 modelCatalogService,
                 new ObjectMapper()
@@ -169,13 +169,13 @@ class OfficialAccountAdminServiceTests {
     @Test
     void shouldUpdateExistingCodexOfficialAccountByCanonicalIdentity() {
         UpstreamAccountRepository accountRepository = Mockito.mock(UpstreamAccountRepository.class);
-        UpstreamAccountPoolRepository poolRepository = Mockito.mock(UpstreamAccountPoolRepository.class);
+        UpstreamAccountGroupRepository groupRepository = Mockito.mock(UpstreamAccountGroupRepository.class);
         CredentialCryptoService cryptoService = Mockito.mock(CredentialCryptoService.class);
         SupportedModelCatalogService modelCatalogService = Mockito.mock(SupportedModelCatalogService.class);
         ObjectMapper objectMapper = new ObjectMapper();
         OfficialAccountAdminService service = new OfficialAccountAdminService(
                 accountRepository,
-                poolRepository,
+                groupRepository,
                 cryptoService,
                 modelCatalogService,
                 objectMapper
@@ -239,12 +239,12 @@ class OfficialAccountAdminServiceTests {
     @Test
     void shouldMarkOfficialQuotaRefreshFailureWithRetryAndRouteBlockReason() {
         UpstreamAccountRepository accountRepository = Mockito.mock(UpstreamAccountRepository.class);
-        UpstreamAccountPoolRepository poolRepository = Mockito.mock(UpstreamAccountPoolRepository.class);
+        UpstreamAccountGroupRepository groupRepository = Mockito.mock(UpstreamAccountGroupRepository.class);
         CredentialCryptoService cryptoService = Mockito.mock(CredentialCryptoService.class);
         SupportedModelCatalogService modelCatalogService = Mockito.mock(SupportedModelCatalogService.class);
         OfficialAccountAdminService service = new OfficialAccountAdminService(
                 accountRepository,
-                poolRepository,
+                groupRepository,
                 cryptoService,
                 modelCatalogService,
                 new ObjectMapper()
@@ -286,12 +286,12 @@ class OfficialAccountAdminServiceTests {
     @Test
     void shouldExposeOfficialQuotaSummaryForScheduler() {
         UpstreamAccountRepository accountRepository = Mockito.mock(UpstreamAccountRepository.class);
-        UpstreamAccountPoolRepository poolRepository = Mockito.mock(UpstreamAccountPoolRepository.class);
+        UpstreamAccountGroupRepository groupRepository = Mockito.mock(UpstreamAccountGroupRepository.class);
         CredentialCryptoService cryptoService = Mockito.mock(CredentialCryptoService.class);
         SupportedModelCatalogService modelCatalogService = Mockito.mock(SupportedModelCatalogService.class);
         OfficialAccountAdminService service = new OfficialAccountAdminService(
                 accountRepository,
-                poolRepository,
+                groupRepository,
                 cryptoService,
                 modelCatalogService,
                 new ObjectMapper()
@@ -333,12 +333,12 @@ class OfficialAccountAdminServiceTests {
     @Test
     void shouldRefreshCodexQuotaWithAuthJsonAdapterSnapshotWhenRequestIsEmpty() {
         UpstreamAccountRepository accountRepository = Mockito.mock(UpstreamAccountRepository.class);
-        UpstreamAccountPoolRepository poolRepository = Mockito.mock(UpstreamAccountPoolRepository.class);
+        UpstreamAccountGroupRepository groupRepository = Mockito.mock(UpstreamAccountGroupRepository.class);
         CredentialCryptoService cryptoService = Mockito.mock(CredentialCryptoService.class);
         SupportedModelCatalogService modelCatalogService = Mockito.mock(SupportedModelCatalogService.class);
         OfficialAccountAdminService service = new OfficialAccountAdminService(
                 accountRepository,
-                poolRepository,
+                groupRepository,
                 cryptoService,
                 modelCatalogService,
                 new ObjectMapper()
@@ -365,12 +365,12 @@ class OfficialAccountAdminServiceTests {
     @Test
     void shouldBuildCodexResponsesSmokeWithoutReturningCredential() {
         UpstreamAccountRepository accountRepository = Mockito.mock(UpstreamAccountRepository.class);
-        UpstreamAccountPoolRepository poolRepository = Mockito.mock(UpstreamAccountPoolRepository.class);
+        UpstreamAccountGroupRepository groupRepository = Mockito.mock(UpstreamAccountGroupRepository.class);
         CredentialCryptoService cryptoService = Mockito.mock(CredentialCryptoService.class);
         SupportedModelCatalogService modelCatalogService = Mockito.mock(SupportedModelCatalogService.class);
         OfficialAccountAdminService service = new OfficialAccountAdminService(
                 accountRepository,
-                poolRepository,
+                groupRepository,
                 cryptoService,
                 modelCatalogService,
                 new ObjectMapper()
@@ -417,12 +417,12 @@ class OfficialAccountAdminServiceTests {
     @Test
     void shouldClassifyCodexResponsesSmokeAsBudgetBlockedWhenRouteQuotaIsExhausted() {
         UpstreamAccountRepository accountRepository = Mockito.mock(UpstreamAccountRepository.class);
-        UpstreamAccountPoolRepository poolRepository = Mockito.mock(UpstreamAccountPoolRepository.class);
+        UpstreamAccountGroupRepository groupRepository = Mockito.mock(UpstreamAccountGroupRepository.class);
         CredentialCryptoService cryptoService = Mockito.mock(CredentialCryptoService.class);
         SupportedModelCatalogService modelCatalogService = Mockito.mock(SupportedModelCatalogService.class);
         OfficialAccountAdminService service = new OfficialAccountAdminService(
                 accountRepository,
-                poolRepository,
+                groupRepository,
                 cryptoService,
                 modelCatalogService,
                 new ObjectMapper()

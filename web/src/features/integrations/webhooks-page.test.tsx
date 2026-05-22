@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-import '@testing-library/jest-dom/vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -17,7 +16,13 @@ mockedApiRequest.mockImplementation(async (url: string, init?: RequestInit) => {
     if (init?.method === 'POST') {
       return { id: 2, endpointName: 'ops-webhook', endpointUrl: 'https://example.com/hook', signingMode: 'HMAC_SHA256', timeoutMs: 5000, enabled: true, secretFingerprint: 'abc123' }
     }
+    if (init?.method === 'DELETE') {
+      return null
+    }
     return [{ id: 1, endpointName: 'primary-webhook', endpointUrl: 'https://example.com/hook', signingMode: 'HMAC_SHA256', timeoutMs: 5000, enabled: true, secretFingerprint: 'abc123' }]
+  }
+  if (url === '/admin/integrations/webhooks/1' && init?.method === 'DELETE') {
+    return null
   }
   throw new Error(`unexpected url: ${url}`)
 })
@@ -34,13 +39,15 @@ describe('WebhooksPage', () => {
       </QueryClientProvider>,
     )
 
-    expect(await screen.findByText('统一 webhook 出口')).toBeInTheDocument()
+    expect(await screen.findByText('已配置回调终端')).toBeInTheDocument()
     expect(await screen.findByText('primary-webhook')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '创建终端' }))
 
-    fireEvent.change(screen.getByPlaceholderText('endpoint name'), { target: { value: 'ops-webhook' } })
+    fireEvent.change(screen.getByPlaceholderText('请输入终端名称'), { target: { value: 'ops-webhook' } })
     fireEvent.change(screen.getByPlaceholderText('https://example.com/hook'), { target: { value: 'https://example.com/hook' } })
-    fireEvent.change(screen.getByPlaceholderText('secret (optional)'), { target: { value: 'secret-1' } })
-    fireEvent.click(screen.getByRole('button', { name: '创建 endpoint' }))
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }))
+    fireEvent.change(await screen.findByPlaceholderText('可选密钥'), { target: { value: 'secret-1' } })
+    fireEvent.click(screen.getByRole('button', { name: '创建终端' }))
 
     await waitFor(() => {
       const call = mockedApiRequest.mock.calls.find(
@@ -49,5 +56,16 @@ describe('WebhooksPage', () => {
       expect(call).toBeTruthy()
       expect(JSON.parse(call?.[1]?.body as string).endpointName).toBe('ops-webhook')
     })
+
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    fireEvent.click(await screen.findByRole('button', { name: '删除' }))
+
+    await waitFor(() => {
+      expect(mockedApiRequest).toHaveBeenCalledWith(
+        '/admin/integrations/webhooks/1',
+        expect.objectContaining({ method: 'DELETE' }),
+      )
+    })
+    confirmSpy.mockRestore()
   })
 })

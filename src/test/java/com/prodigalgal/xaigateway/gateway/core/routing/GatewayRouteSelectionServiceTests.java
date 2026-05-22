@@ -23,9 +23,16 @@ import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestFeatureServ
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature;
 import com.prodigalgal.xaigateway.gateway.core.interop.NonChatRoutePolicyService;
+import com.prodigalgal.xaigateway.gateway.core.interop.NonChatRoutePolicyDecision;
+import com.prodigalgal.xaigateway.gateway.core.interop.RouteSelectionMode;
+import com.prodigalgal.xaigateway.gateway.core.interop.SupportStatus;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
 import com.prodigalgal.xaigateway.gateway.core.interop.SiteCapabilityTruthService;
+import com.prodigalgal.xaigateway.gateway.core.model.ModelPolicyCandidateDecision;
+import com.prodigalgal.xaigateway.gateway.core.model.ModelPolicyResolvedModel;
+import com.prodigalgal.xaigateway.gateway.core.model.ModelPolicyResolver;
+import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend;
 import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.shared.ReasoningTransport;
@@ -49,6 +56,137 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 
 class GatewayRouteSelectionServiceTests {
+
+    @Test
+    void shouldRouteWithModelPolicyMappedUpstreamModel() {
+        DistributedKeyQueryService distributedKeyQueryService = Mockito.mock(DistributedKeyQueryService.class);
+        ModelCatalogQueryService modelCatalogQueryService = Mockito.mock(ModelCatalogQueryService.class);
+        AffinityCacheService affinityCacheService = Mockito.mock(AffinityCacheService.class);
+        DistributedKeyGovernanceService distributedKeyGovernanceService = Mockito.mock(DistributedKeyGovernanceService.class);
+        UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        NetworkProxyRepository networkProxyRepository = Mockito.mock(NetworkProxyRepository.class);
+        AccountSelectionService accountSelectionService = Mockito.mock(AccountSelectionService.class);
+        GatewayRequestFeatureService gatewayRequestFeatureService = Mockito.mock(GatewayRequestFeatureService.class);
+        SiteCapabilityTruthService siteCapabilityTruthService = Mockito.mock(SiteCapabilityTruthService.class);
+        NonChatRoutePolicyService nonChatRoutePolicyService = Mockito.mock(NonChatRoutePolicyService.class);
+        RouteCacheStore routeCacheStore = Mockito.mock(RouteCacheStore.class);
+        HealthStateStore healthStateStore = Mockito.mock(HealthStateStore.class);
+        ModelPolicyResolver modelPolicyResolver = Mockito.mock(ModelPolicyResolver.class);
+        PromptFingerprintService promptFingerprintService = new PromptFingerprintService(new ObjectMapper(), new GatewayProperties());
+        GatewayRouteSelectionService service = new GatewayRouteSelectionService(
+                distributedKeyQueryService,
+                modelCatalogQueryService,
+                promptFingerprintService,
+                affinityCacheService,
+                distributedKeyGovernanceService,
+                upstreamCredentialRepository,
+                networkProxyRepository,
+                accountSelectionService,
+                gatewayRequestFeatureService,
+                siteCapabilityTruthService,
+                nonChatRoutePolicyService,
+                GovernancePolicyEngine.allowAll(),
+                routeCacheStore,
+                healthStateStore,
+                null,
+                null,
+                modelPolicyResolver
+        );
+        DistributedKeyView keyView = new DistributedKeyView(
+                1L,
+                "test-key",
+                "sk-gw-test",
+                "masked",
+                List.of("responses"),
+                List.of("gpt-5-codex"),
+                List.of(new DistributedCredentialBindingView(
+                        11L,
+                        101L,
+                        "mimo",
+                        ProviderType.OPENAI_COMPATIBLE,
+                        "https://token-plan-sgp.xiaomimimo.com/v1",
+                        10,
+                        100
+                ))
+        );
+        CatalogCandidateView candidate = new CatalogCandidateView(
+                101L,
+                "mimo",
+                ProviderType.OPENAI_COMPATIBLE,
+                "https://token-plan-sgp.xiaomimimo.com/v1",
+                "mimo-v2.5-pro",
+                "mimo-v2.5-pro",
+                List.of("responses", "openai"),
+                true,
+                true,
+                false,
+                false,
+                true,
+                true,
+                ReasoningTransport.OPENAI_CHAT
+        );
+        RouteCandidateView routeCandidate = new RouteCandidateView(candidate, 11L, 10, 100);
+
+        when(distributedKeyQueryService.findActiveByKeyPrefix("sk-gw-test")).thenReturn(Optional.of(keyView));
+        when(distributedKeyGovernanceService.evaluate(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.anyBoolean()))
+                .thenReturn(new DistributedKeyGovernanceService.GovernanceDecision(List.of(), List.of(), 1L, 100L, null));
+        when(modelPolicyResolver.hasEnabledPolicies()).thenReturn(true);
+        when(modelPolicyResolver.resolveRequestedModel(keyView, "responses", "gpt-5-codex"))
+                .thenReturn(new ModelPolicyResolvedModel(
+                        "gpt-5-codex",
+                        "gpt-5-codex",
+                        "mimo-v2.5-pro",
+                        "gpt-5-codex",
+                        true,
+                        List.of(candidate),
+                        List.of("model_policy_mapping:DISTRIBUTED_KEY:1")
+                ));
+        when(modelPolicyResolver.evaluateCandidate(Mockito.eq(keyView), Mockito.eq("responses"), Mockito.eq("gpt-5-codex"), Mockito.eq("gpt-5-codex"), Mockito.any()))
+                .thenReturn(new ModelPolicyCandidateDecision(routeCandidate, true, List.of(), List.of("allow_policy=1")));
+        when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.any()))
+                .thenReturn(new GatewayRequestSemantics(
+                        TranslationResourceType.RESPONSE,
+                        TranslationOperation.RESPONSE_CREATE,
+                        List.of(InteropFeature.RESPONSE_OBJECT),
+                        true
+                ));
+        when(nonChatRoutePolicyService.evaluateCandidate(Mockito.anyString(), Mockito.anyString(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
+                .thenReturn(new NonChatRoutePolicyDecision(
+                        RouteSelectionMode.CATALOG_SELECTION,
+                        ExecutionBackend.NATIVE,
+                        List.of(ExecutionBackend.NATIVE),
+                        InteropCapabilityLevel.NATIVE,
+                        InteropCapabilityLevel.NATIVE,
+                        InteropCapabilityLevel.NATIVE,
+                        SupportStatus.NATIVE,
+                        "chat",
+                        List.of(),
+                        List.of(),
+                        "test"
+                ));
+        when(upstreamCredentialRepository.findById(101L)).thenReturn(Optional.of(new com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity() {{
+            setProviderType(ProviderType.OPENAI_COMPATIBLE);
+            setBaseUrl("https://token-plan-sgp.xiaomimimo.com/v1");
+        }}));
+        when(healthStateStore.getCredentialState(101L)).thenReturn(Optional.empty());
+        when(accountSelectionService.hasHealthyAccountBinding(1L, ProviderType.OPENAI_COMPATIBLE, GatewayClientFamily.CODEX))
+                .thenReturn(true);
+
+        RouteSelectionResult result = service.select(new RouteSelectionRequest(
+                "sk-gw-test",
+                "responses",
+                "/v1/responses",
+                "gpt-5-codex",
+                Map.of("input", "hello"),
+                GatewayClientFamily.CODEX,
+                false
+        ));
+
+        assertEquals("gpt-5-codex", result.publicModel());
+        assertEquals("mimo-v2.5-pro", result.resolvedModelKey());
+        assertEquals("gpt-5-codex", result.modelGroup());
+        assertTrue(result.candidateEvaluations().get(0).scoreBreakdown().contains("allow_policy=1"));
+    }
 
     @Test
     void shouldPreferPrefixAffinityWhenPresent() {

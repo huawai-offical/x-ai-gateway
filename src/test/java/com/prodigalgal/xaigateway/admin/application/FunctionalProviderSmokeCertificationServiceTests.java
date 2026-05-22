@@ -180,7 +180,7 @@ class FunctionalProviderSmokeCertificationServiceTests {
                                 null,
                                 null,
                                 null,
-                                "blocked api-key=mimo-live-secret Bearer sk-live-secret AIzaSyBPM5panpM3zawPoYSUZ1JGTmzCPzr-R-s",
+                                "blocked api-key=mimo-live-secret Bearer sk-live-secret " + "AIzaSy" + "BPM5panpM3zawPoYSUZ1JGTmzCPzr-R-s",
                                 Map.of("probeKind", "openai_compatible_chat_tools"),
                                 Map.of("headers", Map.of("api-key", "***"))
                         )

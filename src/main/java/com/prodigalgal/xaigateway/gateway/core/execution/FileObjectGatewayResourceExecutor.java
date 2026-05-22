@@ -2,10 +2,12 @@ package com.prodigalgal.xaigateway.gateway.core.execution;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalFileRef;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileContent;
+import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileListPage;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileResponse;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileService;
 import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend;
@@ -110,7 +112,20 @@ public class FileObjectGatewayResourceExecutor implements GatewayResourceExecuto
 
     private ResponseEntity<JsonNode> executeGet(GatewayResourceExecutionContext context) {
         if ("/v1/files".equals(context.normalizedPath())) {
-            return ResponseEntity.ok(objectMapper.valueToTree(gatewayFileService.listFiles(context.distributedKeyId())));
+            GatewayFileListPage page = gatewayFileService.listFilesPage(
+                    context.distributedKeyId(),
+                    null,
+                    null,
+                    null,
+                    null
+            );
+            ObjectNode body = objectMapper.createObjectNode()
+                    .put("object", "list")
+                    .put("has_more", page.hasMore());
+            body.set("data", objectMapper.valueToTree(page.data()));
+            body.put("first_id", page.firstId());
+            body.put("last_id", page.lastId());
+            return ResponseEntity.ok(body);
         }
         if ("/v1/files/{fileId}".equals(context.normalizedPath())) {
             String fileId = requirePathParam(context, "fileId");

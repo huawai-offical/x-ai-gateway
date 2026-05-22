@@ -1,10 +1,10 @@
 # TASK-20260519-002-01 Codex 功能性服务 API 事实源优先收紧
 
-状态：Done  
-优先级：Critical  
-类型：子任务  
-父任务：[TASK-20260519-002](TASK-20260519-002-codex-priority-functional-service-api.md)  
-上游来源：[REQ-20260519-002](../../docs/requirements/REQ-20260519-002-codex-priority-functional-service-api.md)、[TASK-20260514-029](../in-progress/TASK-20260514-029-openai-openapi-catalog-conformance-sdk.md)
+状态：Done
+优先级：Critical
+类型：子任务
+父任务：[TASK-20260519-002](TASK-20260519-002-codex-priority-functional-service-api.md)
+上游来源：[REQ-20260519-002](../../docs/requirements/REQ-20260519-002-codex-priority-functional-service-api.md)、[TASK-20260514-029](TASK-20260514-029-openai-openapi-catalog-conformance-sdk.md)
 
 ## 背景
 
@@ -64,8 +64,8 @@
 
 ## 关联任务
 
-- [TASK-20260514-029](../in-progress/TASK-20260514-029-openai-openapi-catalog-conformance-sdk.md)
-- [TASK-20260514-016](../backlog/TASK-20260514-016-openai-full-api-coverage-parent.md)
+- [TASK-20260514-029](TASK-20260514-029-openai-openapi-catalog-conformance-sdk.md)
+- [TASK-20260514-016](../backlog/TASK-20260514-016-functional-service-api-coverage-parent.md)
 
 ## 当前状态
 

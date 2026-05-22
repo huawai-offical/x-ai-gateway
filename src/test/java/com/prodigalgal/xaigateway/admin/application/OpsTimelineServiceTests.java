@@ -68,9 +68,9 @@ class OpsTimelineServiceTests {
         ReflectionTestUtils.setField(codexEvent, "id", 11L);
         codexEvent.setEventType("CODEX_RUNTIME_BATCH_RECOVERY");
         codexEvent.setSeverity("INFO");
-        codexEvent.setSource("account-pool-admin");
-        codexEvent.setEntityType("ACCOUNT_POOL");
-        codexEvent.setEntityRef("account-pool:5");
+        codexEvent.setSource("account-group-admin");
+        codexEvent.setEntityType("ACCOUNT_GROUP");
+        codexEvent.setEntityRef("account-group:5");
         codexEvent.setTitle("Codex Runtime 批量恢复预检");
         codexEvent.setDetailJson("{}");
         codexEvent.setOccurredAt(Instant.parse("2026-05-08T01:00:00Z"));
@@ -78,18 +78,18 @@ class OpsTimelineServiceTests {
         ReflectionTestUtils.setField(otherEvent, "id", 12L);
         otherEvent.setEventType("OTHER_EVENT");
         otherEvent.setSeverity("INFO");
-        otherEvent.setSource("account-pool-admin");
-        otherEvent.setEntityType("ACCOUNT_POOL");
-        otherEvent.setEntityRef("account-pool:6");
+        otherEvent.setSource("account-group-admin");
+        otherEvent.setEntityType("ACCOUNT_GROUP");
+        otherEvent.setEntityRef("account-group:6");
         otherEvent.setTitle("Other");
         otherEvent.setDetailJson("{}");
         otherEvent.setOccurredAt(Instant.parse("2026-05-08T01:01:00Z"));
         Mockito.when(systemEventRepository.findTop500ByOrderByOccurredAtDesc()).thenReturn(List.of(otherEvent, codexEvent));
 
-        var filtered = service.listEvents(null, null, "CODEX_RUNTIME_BATCH_RECOVERY", "ACCOUNT_POOL", "account-pool:5", null, null);
+        var filtered = service.listEvents(null, null, "CODEX_RUNTIME_BATCH_RECOVERY", "ACCOUNT_GROUP", "account-group:5", null, null);
 
         assertEquals(1, filtered.size());
         assertEquals(11L, filtered.get(0).id());
-        assertEquals("account-pool:5", filtered.get(0).entityRef());
+        assertEquals("account-group:5", filtered.get(0).entityRef());
     }
 }

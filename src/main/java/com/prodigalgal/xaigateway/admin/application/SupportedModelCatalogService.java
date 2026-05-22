@@ -2,8 +2,8 @@ package com.prodigalgal.xaigateway.admin.application;
 
 import com.prodigalgal.xaigateway.gateway.core.account.UpstreamAccountProviderType;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
-import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountPoolEntity;
-import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountPoolRepository;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountGroupEntity;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountGroupRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import java.util.ArrayList;
@@ -19,15 +19,15 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class SupportedModelCatalogService {
 
-    private final UpstreamAccountPoolRepository upstreamAccountPoolRepository;
+    private final UpstreamAccountGroupRepository upstreamAccountGroupRepository;
     private final UpstreamAccountRepository upstreamAccountRepository;
     private final UpstreamCredentialRepository upstreamCredentialRepository;
 
     public SupportedModelCatalogService(
-            UpstreamAccountPoolRepository upstreamAccountPoolRepository,
+            UpstreamAccountGroupRepository upstreamAccountGroupRepository,
             UpstreamAccountRepository upstreamAccountRepository,
             UpstreamCredentialRepository upstreamCredentialRepository) {
-        this.upstreamAccountPoolRepository = upstreamAccountPoolRepository;
+        this.upstreamAccountGroupRepository = upstreamAccountGroupRepository;
         this.upstreamAccountRepository = upstreamAccountRepository;
         this.upstreamCredentialRepository = upstreamCredentialRepository;
     }
@@ -35,9 +35,9 @@ public class SupportedModelCatalogService {
     public List<String> listByUpstreamProvider(UpstreamAccountProviderType providerType) {
         Set<String> models = new LinkedHashSet<>();
 
-        upstreamAccountPoolRepository.findAllByOrderByCreatedAtDesc().forEach(pool -> {
-            if (providerType == null || providerType == pool.getProviderType()) {
-                models.addAll(normalize(pool.getSupportedModels()));
+        upstreamAccountGroupRepository.findAllByOrderByCreatedAtDesc().forEach(group -> {
+            if (providerType == null || providerType == group.getProviderType()) {
+                models.addAll(normalize(group.getSupportedModels()));
             }
         });
 
@@ -78,18 +78,18 @@ public class SupportedModelCatalogService {
                 .toList();
     }
 
-    public List<String> resolveForAccountImport(UpstreamAccountPoolEntity pool, List<String> requestModels) {
+    public List<String> resolveForAccountImport(UpstreamAccountGroupEntity group, List<String> requestModels) {
         List<String> normalizedRequest = normalize(requestModels);
         if (!normalizedRequest.isEmpty()) {
             return normalizedRequest;
         }
 
-        if (pool != null) {
-            List<String> normalizedPool = normalize(pool.getSupportedModels());
-            if (!normalizedPool.isEmpty()) {
-                return normalizedPool;
+        if (group != null) {
+            List<String> normalizedGroup = normalize(group.getSupportedModels());
+            if (!normalizedGroup.isEmpty()) {
+                return normalizedGroup;
             }
-            return listByUpstreamProvider(pool.getProviderType());
+            return listByUpstreamProvider(group.getProviderType());
         }
 
         return listByUpstreamProvider(UpstreamAccountProviderType.OPENAI_OAUTH);
@@ -97,17 +97,17 @@ public class SupportedModelCatalogService {
 
     public List<String> resolveForCredentialImport(
             ProviderType providerType,
-            UpstreamAccountPoolEntity pool,
+            UpstreamAccountGroupEntity group,
             List<String> requestModels) {
         List<String> normalizedRequest = normalize(requestModels);
         if (!normalizedRequest.isEmpty()) {
             return normalizedRequest;
         }
 
-        if (pool != null) {
-            List<String> normalizedPool = normalize(pool.getSupportedModels());
-            if (!normalizedPool.isEmpty()) {
-                return normalizedPool;
+        if (group != null) {
+            List<String> normalizedGroup = normalize(group.getSupportedModels());
+            if (!normalizedGroup.isEmpty()) {
+                return normalizedGroup;
             }
         }
 

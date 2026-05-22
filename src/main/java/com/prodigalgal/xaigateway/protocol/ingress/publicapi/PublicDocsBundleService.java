@@ -76,7 +76,7 @@ public class PublicDocsBundleService {
                         "Chat stream 支持 stream_options.include_usage，开启后会在 [DONE] 前输出 choices=[] 的 usage chunk；Responses canonical stream event 会携带本地单调递增 sequence_number，并按 stream_options.include_obfuscation 控制 delta event obfuscation 字段；OpenAI Direct raw SSE 保留上游原始 sequence 与 event shape。",
                         "OpenAI Webhooks 提供 POST /v1/webhooks/openai 接收入口，按 Standard Webhooks 校验 webhook-id、webhook-timestamp、webhook-signature，使用 raw body 验签，并把合法 event 保存为本地 WEBHOOK_EVENT；重复 delivery 或重复 event id 返回 duplicate=true 且不重复落库。",
                         "OpenAI path 本地限流命中会返回 429、rate_limit_error，并带 Retry-After 与 x-ratelimit remaining/reset headers。",
-                        "Files、Uploads、Models、Vector Stores 和 Realtime client secret 仅作为对话、tools、RAG/file_search 的支撑能力公开；官方非核心 API 不纳入公开兼容面。",
+                        "Files、Uploads、Models 和 Vector Stores 仅作为对话、tools、RAG/file_search 的支撑能力公开；官方非核心 API 不纳入公开兼容面。",
                         "Anthropic、Gemini、Vertex 按 OpenAI 标准功能区收紧为 chat/messages/generateContent、tools、embeddings/files 等支撑面；Codex 单独限定为 Responses smoke/反代边界，拒绝 provider-specific async/admin/eval 和非 Responses Codex 内部接口。"
                 ),
                 List.of(
@@ -158,7 +158,7 @@ public class PublicDocsBundleService {
                         "Chat streams support stream_options.include_usage by emitting a choices=[] usage chunk before [DONE]; Responses canonical stream events include a local monotonic sequence_number and honor stream_options.include_obfuscation for delta event obfuscation fields; OpenAI Direct raw SSE keeps upstream sequence and event shape.",
                         "OpenAI Webhooks expose POST /v1/webhooks/openai, verify webhook-id, webhook-timestamp and webhook-signature against the raw body, persist valid events as local WEBHOOK_EVENT records, and return duplicate=true without another write for duplicate deliveries or duplicate event ids.",
                         "Local rate limit hits on OpenAI paths return 429, rate_limit_error, Retry-After and x-ratelimit remaining/reset headers.",
-                        "Files, Uploads, Models, Vector Stores and Realtime client secrets are exposed only as support surfaces for conversations, tools and RAG/file_search; official non-core APIs are outside the public compatibility surface.",
+                        "Files, Uploads, Models and Vector Stores are exposed only as support surfaces for conversations, tools and RAG/file_search; official non-core APIs are outside the public compatibility surface.",
                         "Anthropic, Gemini and Vertex are narrowed to the OpenAI standard functional zone for chat/messages/generateContent, tools and embeddings/files support surfaces; Codex is separately limited to the Responses smoke/proxy boundary, while provider-specific async/admin/eval APIs and non-Responses Codex internals are rejected."
                 ),
                 List.of(
@@ -209,7 +209,7 @@ public class PublicDocsBundleService {
         root.put("openapi", "3.1.0");
         ObjectNode info = root.putObject("info");
         info.put("title", "x-ai-gateway Public API");
-        info.put("version", "2026.05.18");
+        info.put("version", "2026.05.21");
         info.put("description", "公开接入面的最小 OpenAPI 事实源，按 OpenAI 标准功能区覆盖 docs、OpenAI-compatible、Claude/Gemini/Vertex 功能性入口、Codex Responses smoke 边界和 Media provider matrix。");
         root.putArray("servers")
                 .addObject()
@@ -263,6 +263,21 @@ public class PublicDocsBundleService {
         addResponseIdPathParameter(responsesInputItems);
         addResponseInputItemsListParameters(responsesInputItems);
         addResponsesRemoteRouteHintParameters(responsesInputItems);
+        ObjectNode embeddingsCreate = addPath(paths, "post", "/v1/embeddings", "Create embeddings for functional RAG support", true);
+        embeddingsCreate.put("description", "Creates embeddings through provider-governed routing for retrieval and RAG support. This is a functional supporting surface, not a promise of every upstream embedding parameter.");
+        addEmbeddingsRequestBody(embeddingsCreate);
+        ObjectNode audioTranscriptions = addPath(paths, "post", "/v1/audio/transcriptions", "Create audio transcription for multimodal input", true);
+        audioTranscriptions.put("description", "Transcribes an uploaded audio file through provider-governed routing as part of the multimodal conversation support surface.");
+        addAudioTranscriptionRequestBody(audioTranscriptions);
+        ObjectNode audioSpeech = addPath(paths, "post", "/v1/audio/speech", "Create speech audio for multimodal output", true);
+        audioSpeech.put("description", "Generates speech audio through provider-governed routing for multimodal response output.");
+        addAudioSpeechRequestBody(audioSpeech);
+        ObjectNode imageGeneration = addPath(paths, "post", "/v1/images/generations", "Create image generation for multimodal output", true);
+        imageGeneration.put("description", "Creates image generations through provider-governed routing for the multimodal output surface.");
+        addImageGenerationRequestBody(imageGeneration);
+        ObjectNode moderationCreate = addPath(paths, "post", "/v1/moderations", "Create moderation classification", true);
+        moderationCreate.put("description", "Runs moderation classification for conversation safety and governance support.");
+        addModerationRequestBody(moderationCreate);
         ObjectNode conversationCreate = addPath(paths, "post", "/v1/conversations", "Create a local OpenAI Conversation", true);
         conversationCreate.put("description", "Creates a gateway-local Conversation lineage object with optional metadata and up to 20 initial items.");
         addConversationRequestBody(conversationCreate, false);
@@ -289,6 +304,34 @@ public class PublicDocsBundleService {
         ObjectNode conversationItemDelete = addPath(paths, "delete", "/v1/conversations/{conversationId}/items/{itemId}", "Delete a local OpenAI Conversation item", true);
         addConversationIdPathParameter(conversationItemDelete);
         addConversationItemIdPathParameter(conversationItemDelete);
+        ObjectNode fileList = addPath(paths, "get", "/v1/files", "List gateway-local Files", true);
+        fileList.put("description", "Lists gateway-local file objects owned by the current Distributed Key for conversation context, RAG and upload support.");
+        addFileListParameters(fileList);
+        ObjectNode fileCreate = addPath(paths, "post", "/v1/files", "Create a gateway-local File", true);
+        fileCreate.put("description", "Creates a gateway-local file object from multipart upload. Files support local content read and Vector Store attachment; this does not imply every upstream Files lifecycle feature.");
+        addFileCreateRequestBody(fileCreate);
+        ObjectNode fileGet = addPath(paths, "get", "/v1/files/{fileId}", "Retrieve a gateway-local File", true);
+        addFileIdPathParameter(fileGet);
+        ObjectNode fileContent = addPath(paths, "get", "/v1/files/{fileId}/content", "Retrieve gateway-local File content", true);
+        fileContent.put("description", "Returns raw gateway-local file content for downstream RAG or inspection flows.");
+        addFileIdPathParameter(fileContent);
+        ObjectNode fileDelete = addPath(paths, "delete", "/v1/files/{fileId}", "Delete a gateway-local File", true);
+        addFileIdPathParameter(fileDelete);
+        ObjectNode uploadCreate = addPath(paths, "post", "/v1/uploads", "Create gateway-local Upload orchestration", true);
+        uploadCreate.put("description", "Creates a gateway-local Upload orchestration object for multipart file assembly. This surface exists to support conversation/RAG file workflows, not generic provider batch upload parity.");
+        addUploadCreateRequestBody(uploadCreate);
+        ObjectNode uploadGet = addPath(paths, "get", "/v1/uploads/{uploadId}", "Retrieve gateway-local Upload orchestration", true);
+        addUploadIdPathParameter(uploadGet);
+        ObjectNode uploadPartAdd = addPath(paths, "post", "/v1/uploads/{uploadId}/parts", "Add part to gateway-local Upload", true);
+        uploadPartAdd.put("description", "Adds a multipart binary part to a gateway-local Upload orchestration object.");
+        addUploadIdPathParameter(uploadPartAdd);
+        addUploadPartRequestBody(uploadPartAdd);
+        ObjectNode uploadComplete = addPath(paths, "post", "/v1/uploads/{uploadId}/complete", "Complete gateway-local Upload", true);
+        uploadComplete.put("description", "Completes a gateway-local Upload orchestration and makes the assembled file available to supporting workflows.");
+        addUploadIdPathParameter(uploadComplete);
+        ObjectNode uploadCancel = addPath(paths, "post", "/v1/uploads/{uploadId}/cancel", "Cancel gateway-local Upload", true);
+        uploadCancel.put("description", "Cancels a gateway-local Upload orchestration before completion.");
+        addUploadIdPathParameter(uploadCancel);
         ObjectNode vectorStoreCreate = addPath(paths, "post", "/v1/vector_stores", "Create a local OpenAI Vector Store", true);
         vectorStoreCreate.put("description", "Creates a gateway-local Vector Store lifecycle object. File ids are attached as local references with local chunk ingestion metadata; local content read and local text search are available, while hosted OpenAI embedding/vector index ingestion is not implemented in this baseline.");
         addVectorStoreRequestBody(vectorStoreCreate);
@@ -351,7 +394,10 @@ public class PublicDocsBundleService {
         addModelPathParameter(modelGet);
         addPath(paths, "post", "/v1/web_search", "Provider-governed Web Search", true);
         addPath(paths, "post", "/v1/messages", "Claude Messages compatible endpoint", true);
-        addPath(paths, "post", "/v1beta/models/{model}:generateContent", "Gemini generateContent compatible endpoint", true);
+        ObjectNode geminiGenerateContent = addPath(paths, "post", "/v1beta/models/{model}:generateContent", "Gemini generateContent compatible endpoint", true);
+        geminiGenerateContent.put("description", "Accepts Gemini generateContent-style requests for conversation, streaming and tools-capable provider adapters within the functional service API scope.");
+        addModelPathParameter(geminiGenerateContent);
+        addGeminiGenerateContentRequestBody(geminiGenerateContent);
         addPath(paths, "post", "/api/v1/videos/generations", "创建 Video async task", true);
         addPath(paths, "get", "/api/v1/videos/{videoId}", "读取 Video async task", true);
         addPath(paths, "post", "/api/v1/videos/{videoId}/cancel", "取消 Video async task", true);
@@ -376,7 +422,7 @@ public class PublicDocsBundleService {
                         "openai",
                         "/v1",
                         List.of("OpenAI SDK", "Codex", "OpenCode", "OpenClaw", "curl"),
-                        List.of("chat.completions", "chat.typed-parameters", "stored_chat.completions", "responses", "responses.lifecycle", "responses.file_search_local_vector_store_binding", "conversations.local_lineage", "vector_stores.local_lifecycle", "vector_store_files.local_attachment", "vector_store_files.local_ingestion_artifact", "vector_store_files.local_content_read", "vector_stores.local_text_search", "vector_store_file_batches.local_lifecycle", "webhooks.ingress_event_persistence", "embeddings", "files", "models", "realtime"),
+                        List.of("chat.completions", "chat.typed-parameters", "stored_chat.completions", "responses", "responses.lifecycle", "responses.file_search_local_vector_store_binding", "conversations.local_lineage", "vector_stores.local_lifecycle", "vector_store_files.local_attachment", "vector_store_files.local_ingestion_artifact", "vector_store_files.local_content_read", "vector_stores.local_text_search", "vector_store_file_batches.local_lifecycle", "webhooks.ingress_event_persistence", "embeddings", "files", "models"),
                         "OpenAI-compatible clients should use /v1 as base path. OpenAI Direct supports typed Chat parameters; third-party compatible sites are governed by provider capability."
                 ),
                 new PublicDocsCompatibilityResponse(
@@ -650,6 +696,134 @@ public class PublicDocsBundleService {
         addProperty(properties, "metadata", "object", "OpenAI metadata object preserved by the gateway.");
     }
 
+    private void addEmbeddingsRequestBody(ObjectNode operation) {
+        ObjectNode schema = operation.putObject("requestBody")
+                .putObject("content")
+                .putObject("application/json")
+                .putObject("schema");
+        schema.put("type", "object");
+        schema.putArray("required").add("model").add("input");
+        ObjectNode properties = schema.putObject("properties");
+        addProperty(properties, "model", "string", "Embedding model name or gateway model alias.");
+        addProperty(properties, "input", "object", "Input string, token array or batched inputs to embed.");
+        addProperty(properties, "encoding_format", "string", "Optional encoding format such as float or base64 when supported by the routed provider.");
+        addProperty(properties, "dimensions", "integer", "Optional output dimension hint when supported by the routed provider.");
+        addProperty(properties, "user", "string", "Optional end-user identifier for abuse monitoring.");
+    }
+
+    private void addAudioTranscriptionRequestBody(ObjectNode operation) {
+        ObjectNode schema = operation.putObject("requestBody")
+                .putObject("content")
+                .putObject("multipart/form-data")
+                .putObject("schema");
+        schema.put("type", "object");
+        schema.putArray("required").add("file").add("model");
+        ObjectNode properties = schema.putObject("properties");
+        addBinaryProperty(properties, "file", "Audio file to transcribe.");
+        addProperty(properties, "model", "string", "Transcription model name or gateway model alias.");
+        addProperty(properties, "language", "string", "Optional input language hint.");
+        addProperty(properties, "prompt", "string", "Optional transcription prompt.");
+        addProperty(properties, "response_format", "string", "Optional response format when supported by the routed provider.");
+        addProperty(properties, "temperature", "string", "Optional temperature, accepted as multipart text.");
+        addProperty(properties, "timestamp_granularities[]", "array", "Optional timestamp granularity hints preserved as multipart text values.");
+        addProperty(properties, "include[]", "array", "Optional extra response fields preserved as multipart text values when supported by the routed provider.");
+        addProperty(properties, "stream", "string", "Optional streaming flag accepted as multipart text; provider support is route-dependent.");
+    }
+
+    private void addAudioSpeechRequestBody(ObjectNode operation) {
+        ObjectNode schema = operation.putObject("requestBody")
+                .putObject("content")
+                .putObject("application/json")
+                .putObject("schema");
+        schema.put("type", "object");
+        schema.putArray("required").add("model").add("input").add("voice");
+        ObjectNode properties = schema.putObject("properties");
+        addProperty(properties, "model", "string", "Speech model name or gateway model alias.");
+        addProperty(properties, "input", "string", "Text input used to generate speech audio.");
+        addProperty(properties, "voice", "string", "Voice identifier supported by the routed provider.");
+        addProperty(properties, "response_format", "string", "Optional audio format such as mp3, wav or opus.");
+        addProperty(properties, "speed", "number", "Optional playback speed hint when supported.");
+    }
+
+    private void addImageGenerationRequestBody(ObjectNode operation) {
+        ObjectNode schema = operation.putObject("requestBody")
+                .putObject("content")
+                .putObject("application/json")
+                .putObject("schema");
+        schema.put("type", "object");
+        schema.putArray("required").add("prompt");
+        ObjectNode properties = schema.putObject("properties");
+        addProperty(properties, "model", "string", "Image model name or gateway model alias.");
+        addProperty(properties, "prompt", "string", "Image generation prompt.");
+        addProperty(properties, "size", "string", "Optional image size supported by the routed provider.");
+        addProperty(properties, "quality", "string", "Optional quality hint supported by the routed provider.");
+        addProperty(properties, "n", "integer", "Optional number of images.");
+        addProperty(properties, "response_format", "string", "Optional response format such as url or b64_json.");
+    }
+
+    private void addModerationRequestBody(ObjectNode operation) {
+        ObjectNode schema = operation.putObject("requestBody")
+                .putObject("content")
+                .putObject("application/json")
+                .putObject("schema");
+        schema.put("type", "object");
+        schema.putArray("required").add("input");
+        ObjectNode properties = schema.putObject("properties");
+        addProperty(properties, "input", "object", "Text, image or structured input to classify.");
+        addProperty(properties, "model", "string", "Moderation model name or gateway model alias.");
+    }
+
+    private void addFileCreateRequestBody(ObjectNode operation) {
+        ObjectNode schema = operation.putObject("requestBody")
+                .putObject("content")
+                .putObject("multipart/form-data")
+                .putObject("schema");
+        schema.put("type", "object");
+        schema.putArray("required").add("file");
+        ObjectNode properties = schema.putObject("properties");
+        addBinaryProperty(properties, "file", "File content to store in gateway-local file storage.");
+        addProperty(properties, "purpose", "string", "Optional purpose such as assistants or batch; stored as metadata only for the functional service scope.");
+    }
+
+    private void addUploadCreateRequestBody(ObjectNode operation) {
+        ObjectNode schema = operation.putObject("requestBody")
+                .putObject("content")
+                .putObject("application/json")
+                .putObject("schema");
+        schema.put("type", "object");
+        ObjectNode properties = schema.putObject("properties");
+        addProperty(properties, "filename", "string", "Original file name for the upload orchestration.");
+        addProperty(properties, "purpose", "string", "Upload purpose used by downstream conversation/RAG workflows.");
+        addProperty(properties, "bytes", "integer", "Expected total bytes when known.");
+        addProperty(properties, "mime_type", "string", "Optional MIME type for assembled content.");
+        addProperty(properties, "model", "string", "Optional route hint; resource-orchestration is used when omitted.");
+    }
+
+    private void addUploadPartRequestBody(ObjectNode operation) {
+        ObjectNode schema = operation.putObject("requestBody")
+                .putObject("content")
+                .putObject("multipart/form-data")
+                .putObject("schema");
+        schema.put("type", "object");
+        schema.putArray("required").add("data");
+        ObjectNode properties = schema.putObject("properties");
+        addBinaryProperty(properties, "data", "Binary upload part data.");
+    }
+
+    private void addGeminiGenerateContentRequestBody(ObjectNode operation) {
+        ObjectNode schema = operation.putObject("requestBody")
+                .putObject("content")
+                .putObject("application/json")
+                .putObject("schema");
+        schema.put("type", "object");
+        ObjectNode properties = schema.putObject("properties");
+        addProperty(properties, "contents", "array", "Gemini contents array.");
+        addProperty(properties, "tools", "array", "Gemini function calling tools.");
+        addProperty(properties, "toolConfig", "object", "Gemini tool configuration.");
+        addProperty(properties, "generationConfig", "object", "Gemini generation configuration.");
+        addProperty(properties, "systemInstruction", "object", "Gemini system instruction.");
+    }
+
     private void addConversationRequestBody(ObjectNode operation, boolean requireMetadata) {
         ObjectNode schema = operation.putObject("requestBody")
                 .putObject("content")
@@ -821,6 +995,24 @@ public class PublicDocsBundleService {
         parameter.putObject("schema").put("type", "string");
     }
 
+    private void addFileIdPathParameter(ObjectNode operation) {
+        ObjectNode parameter = parameters(operation).addObject();
+        parameter.put("name", "fileId");
+        parameter.put("in", "path");
+        parameter.put("required", true);
+        parameter.put("description", "Gateway-local File id.");
+        parameter.putObject("schema").put("type", "string");
+    }
+
+    private void addUploadIdPathParameter(ObjectNode operation) {
+        ObjectNode parameter = parameters(operation).addObject();
+        parameter.put("name", "uploadId");
+        parameter.put("in", "path");
+        parameter.put("required", true);
+        parameter.put("description", "Gateway-local Upload orchestration id.");
+        parameter.putObject("schema").put("type", "string");
+    }
+
     private void addModelPathParameter(ObjectNode operation) {
         ObjectNode parameter = parameters(operation).addObject();
         parameter.put("name", "model");
@@ -871,6 +1063,13 @@ public class PublicDocsBundleService {
         addQueryParameter(operation, "filter", "string", "Optional local status filter such as completed or failed.");
     }
 
+    private void addFileListParameters(ObjectNode operation) {
+        addQueryParameter(operation, "purpose", "string", "Optional gateway-local purpose filter.");
+        addQueryParameter(operation, "limit", "integer", "Number of Files to return, from 1 to 100. Defaults to 20.");
+        addQueryParameter(operation, "after", "string", "Cursor id of the last File from the previous page.");
+        addQueryParameter(operation, "order", "string", "Sort by creation time: asc or desc. Defaults to desc.");
+    }
+
     private void addResponsesIncludeParameter(ObjectNode operation) {
         addQueryParameter(operation, "include", "array", "Additional OpenAI Responses fields to include. Local stored baseline accepts this parameter as a no-op; OpenAI Direct objects with upstream lineage or explicit route hints forward it upstream.");
     }
@@ -918,6 +1117,13 @@ public class PublicDocsBundleService {
     private void addProperty(ObjectNode properties, String name, String type, String description) {
         ObjectNode property = properties.putObject(name);
         property.put("type", type);
+        property.put("description", description);
+    }
+
+    private void addBinaryProperty(ObjectNode properties, String name, String description) {
+        ObjectNode property = properties.putObject(name);
+        property.put("type", "string");
+        property.put("format", "binary");
         property.put("description", description);
     }
 

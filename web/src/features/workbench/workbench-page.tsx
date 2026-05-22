@@ -1,81 +1,61 @@
-import { type FormEvent, useMemo, useState } from 'react'
+import { startTransition, type FormEvent, useDeferredValue, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { apiRequest } from '../../lib/api'
-import { useTypedMutation, useTypedQuery } from '../../lib/typed-react-query'
+import {
+  ArrowUpRightIcon,
+  BrainCircuitIcon,
+  LoaderCircleIcon,
+  PlayIcon,
+  RefreshCcwIcon,
+  SparklesIcon,
+  WaypointsIcon,
+  WorkflowIcon,
+} from 'lucide-react'
+
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { EmptyState } from '@/components/app/empty-state'
+import { InlineError } from '@/components/app/inline-error'
+import { MetricCard } from '@/components/app/metric-card'
+import { PageSection } from '@/components/app/page-section'
+import { StatusBadge } from '@/components/app/status-badge'
+import { apiClient } from '@/lib/api'
+import { useTypedMutation, useTypedQuery } from '@/lib/typed-react-query'
+import { type ObservabilityTraceResponse } from '../traces/types'
+import {
+  AttemptCard,
+  DraftStatus,
+  ExecutionResultCard,
+  Field,
+  JsonBlock,
+  KeyValueGrid,
+  ListBlock,
+  PlanNarrativeCard,
+  StageLoading,
+  TraceTimeline,
+  WorkbenchDisclosure,
+  WorkbenchPanel,
+  WorkbenchStage,
+} from './workbench-components'
+import { DEBUG_PRESETS, type DebugPreset } from './workbench-presets'
 import {
   featureLabel,
-  isChatLikePath,
-  isDebugExecutablePath,
-  isMultipartResourcePath,
   type AdminChatExecuteResponse,
   type AdminResourceExecuteResponse,
-  type ObservabilityTraceResponse,
-  type TranslationPlan,
-} from '../provider-sites/types'
+  type ExecutionPreview,
+  type GatewayUsageView,
+  type RouteSelectionPreview,
+} from './types'
+import { isChatLikePath, isDebugExecutablePath, isMultipartResourcePath } from './utils'
 
-type WorkbenchTab = 'request' | 'plan' | 'execute' | 'trace' | 'raw'
-
-type DebugPreset = {
-  id: string
-  label: string
-  description: string
-  protocol: string
-  method: string
-  requestPath: string
-  requestedModel: string
-  body: string
-  formFields?: string
-  fileRefs?: string
+type WorkbenchPreviewBundle = {
+  routingPreview: RouteSelectionPreview
+  executionPreview: ExecutionPreview
 }
 
-const DEBUG_PRESETS: DebugPreset[] = [
-  {
-    id: 'chat',
-    label: 'Chat',
-    description: '快速调试 `/v1/chat/completions`。',
-    protocol: 'openai',
-    method: 'POST',
-    requestPath: '/v1/chat/completions',
-    requestedModel: 'gpt-4o',
-    body: '{"model":"gpt-4o","messages":[{"role":"user","content":"hello"}]}',
-  },
-  {
-    id: 'embeddings',
-    label: 'Embeddings',
-    description: '验证 `/v1/embeddings` 的执行解释。',
-    protocol: 'openai',
-    method: 'POST',
-    requestPath: '/v1/embeddings',
-    requestedModel: 'text-embedding-3-small',
-    body: '{"model":"text-embedding-3-small","input":"hello"}',
-  },
-  {
-    id: 'file-content',
-    label: 'File Content',
-    description: '检查文件内容读取的资源调试。',
-    protocol: 'openai',
-    method: 'GET',
-    requestPath: '/v1/files/file_123/content',
-    requestedModel: 'gpt-4o-mini',
-    body: '{}',
-  },
-  {
-    id: 'audio-transcription',
-    label: 'Audio',
-    description: '验证 multipart 资源路径与 fileRefs。',
-    protocol: 'openai',
-    method: 'POST',
-    requestPath: '/v1/audio/transcriptions',
-    requestedModel: 'gpt-4o-mini-transcribe',
-    body: '{}',
-    formFields: '{"model":"gpt-4o-mini-transcribe","language":"zh"}',
-    fileRefs: '[{"fieldName":"file","fileKey":"file-123"}]',
-  },
-]
-
 export function WorkbenchPage() {
-  const [searchParams] = useSearchParams()
-  const [activeTab, setActiveTab] = useState<WorkbenchTab>('request')
+  const [searchParams, setSearchParams] = useSearchParams()
   const [distributedKeyPrefix, setDistributedKeyPrefix] = useState(searchParams.get('distributedKeyPrefix') ?? 'sk-gw-test')
   const [protocol, setProtocol] = useState(searchParams.get('protocol') ?? 'openai')
   const [method, setMethod] = useState(searchParams.get('method') ?? 'POST')
@@ -84,53 +64,67 @@ export function WorkbenchPage() {
   const [body, setBody] = useState(searchParams.get('body') ?? '{"model":"gpt-4o","messages":[{"role":"user","content":"hello"}]}')
   const [formFields, setFormFields] = useState(searchParams.get('formFields') ?? '{"model":"gpt-4o-mini-transcribe"}')
   const [fileRefs, setFileRefs] = useState(searchParams.get('fileRefs') ?? '[{"fieldName":"file","fileKey":"file-123"}]')
-  const [inputError, setInputError] = useState<string | null>(null)
+  const [inputError, setInputError] = useState<unknown>(null)
+
+  const deferredBody = useDeferredValue(body)
+  const deferredFormFields = useDeferredValue(formFields)
+  const deferredFileRefs = useDeferredValue(fileRefs)
 
   const multipartMode = isMultipartResourcePath(requestPath)
+  const canExecute = isDebugExecutablePath(requestPath)
 
-  const explainMutation = useTypedMutation<TranslationPlan, void>({
+  const previewMutation = useTypedMutation<WorkbenchPreviewBundle, void>({
     mutationFn: async () => {
-      const parsedBody = multipartMode
-        ? buildMultipartExplainBody(requestedModel, formFields, fileRefs)
-        : parseJsonBody(body)
-      return apiRequest<TranslationPlan>('/admin/translation/explain', {
-        method: 'POST',
-        body: JSON.stringify({
-          distributedKeyPrefix,
-          protocol,
-          method,
-          requestPath,
-          requestedModel,
-          body: parsedBody,
-        }),
+      const previewRequest = buildPreviewRequest({
+        distributedKeyPrefix,
+        protocol,
+        requestPath,
+        requestedModel,
+        body,
+        multipartMode,
+        formFields,
+        fileRefs,
       })
+
+      const [routingPreview, executionPreview] = await Promise.all([
+        apiClient.post<RouteSelectionPreview>('/admin/routing/preview', {
+          body: previewRequest,
+        }),
+        apiClient.post<ExecutionPreview>('/admin/execution/preview', {
+          body: previewRequest,
+        }),
+      ])
+
+      return { routingPreview, executionPreview }
     },
-    onSuccess: () => setActiveTab('plan'),
+    onSuccess: () => {
+      persistSearchParams({ requestId: undefined })
+    },
   })
 
   const executeMutation = useTypedMutation<AdminChatExecuteResponse, void>({
     mutationFn: async () => {
       const parsedBody = parseJsonBody(body)
-      return apiRequest<AdminChatExecuteResponse>('/admin/chat/execute', {
-        method: 'POST',
-        body: JSON.stringify({
+      return apiClient.post<AdminChatExecuteResponse>('/admin/chat/execute', {
+        body: {
           distributedKeyPrefix,
           protocol,
           requestPath,
           requestedModel,
           body: parsedBody,
-        }),
+        },
       })
     },
-    onSuccess: () => setActiveTab('execute'),
+    onSuccess: (data) => {
+      persistSearchParams({ requestId: data.requestId })
+    },
   })
 
   const resourceExecuteMutation = useTypedMutation<AdminResourceExecuteResponse, void>({
     mutationFn: async () => {
       const parsedBody = multipartMode ? safeParseJsonBody(body) : parseJsonBody(body)
-      return apiRequest<AdminResourceExecuteResponse>('/admin/resource/execute', {
-        method: 'POST',
-        body: JSON.stringify({
+      return apiClient.post<AdminResourceExecuteResponse>('/admin/resource/execute', {
+        body: {
           distributedKeyPrefix,
           protocol,
           method,
@@ -139,118 +133,75 @@ export function WorkbenchPage() {
           body: parsedBody,
           formFields: multipartMode ? parseJsonObject(formFields) : undefined,
           fileRefs: multipartMode ? parseJsonArray(fileRefs) : undefined,
-        }),
+        },
       })
     },
-    onSuccess: () => setActiveTab('execute'),
+    onSuccess: (data) => {
+      persistSearchParams({ requestId: data.requestId ?? undefined })
+    },
   })
 
-  const explainResult = explainMutation.data
+  const previewBundle = previewMutation.data
+  const routingPreview = previewBundle?.routingPreview ?? null
+  const executionPreview = previewBundle?.executionPreview ?? null
   const executeResult = executeMutation.data
   const resourceExecuteResult = resourceExecuteMutation.data
-  const activePlan = resourceExecuteResult?.plan ?? executeResult?.plan ?? explainResult ?? null
-  const activeRequestId = resourceExecuteResult?.requestId ?? executeResult?.requestId ?? searchParams.get('requestId') ?? null
-  const activeGatewayResourceKey = resourceExecuteResult?.gatewayResourceKey ?? null
 
+  const activePlan = resourceExecuteResult?.plan ?? executeResult?.plan ?? routingPreview?.plan ?? null
+  const activeSelection = resourceExecuteResult?.routeSelection ?? executeResult?.routeSelection ?? routingPreview?.selection ?? null
+  const activeRequestId = resourceExecuteResult?.requestId ?? executeResult?.requestId ?? searchParams.get('requestId') ?? null
   const traceQuery = useTypedQuery<ObservabilityTraceResponse>({
     queryKey: ['workbench-trace', activeRequestId],
-    queryFn: () => apiRequest<ObservabilityTraceResponse>(`/admin/observability/traces/${encodeURIComponent(activeRequestId ?? '')}`),
+    queryFn: () =>
+      apiClient.get<ObservabilityTraceResponse>(
+        `/admin/observability/traces/${encodeURIComponent(activeRequestId ?? '')}`,
+      ),
     enabled: Boolean(activeRequestId),
   })
-
-  const canExecute = isDebugExecutablePath(requestPath)
-  const executeTarget = canExecute
-    ? isChatLikePath(requestPath)
-      ? '/admin/chat/execute'
-      : '/admin/resource/execute'
-    : '当前路径不可执行'
 
   const activePreset = useMemo(
     () => DEBUG_PRESETS.find((preset) => preset.method === method && preset.requestPath === requestPath) ?? null,
     [method, requestPath],
   )
-  const bodyDraft = useMemo(() => inspectJsonDraft(body), [body])
+
+  const bodyDraft = useMemo(() => inspectJsonDraft(deferredBody), [deferredBody])
   const formFieldsDraft = useMemo(
-    () => (multipartMode ? inspectJsonDraft(formFields, 'object') : null),
-    [formFields, multipartMode],
+    () => (multipartMode ? inspectJsonDraft(deferredFormFields, 'object') : null),
+    [deferredFormFields, multipartMode],
   )
   const fileRefsDraft = useMemo(
-    () => (multipartMode ? inspectJsonDraft(fileRefs, 'array') : null),
-    [fileRefs, multipartMode],
+    () => (multipartMode ? inspectJsonDraft(deferredFileRefs, 'array') : null),
+    [deferredFileRefs, multipartMode],
   )
 
-  const requestSummary = useMemo(
-    () => [
-      { label: '预设', value: activePreset?.label ?? '自定义' },
-      { label: '模式', value: multipartMode ? 'multipart resource' : isChatLikePath(requestPath) ? 'chat-like' : 'resource' },
-      { label: '执行端点', value: executeTarget },
-      { label: 'method', value: method },
-      { label: 'path', value: requestPath },
-      { label: 'model', value: requestedModel },
-    ],
-    [activePreset?.label, executeTarget, method, multipartMode, requestPath, requestedModel],
-  )
+  const currentError = inputError
+    ?? previewMutation.error
+    ?? executeMutation.error
+    ?? resourceExecuteMutation.error
 
-  const planSummary = activePlan
-    ? [
-        { label: 'routeSelectionMode', value: activePlan.routeSelectionMode ?? '-' },
-        { label: 'routePolicyReason', value: activePlan.routePolicyReason ?? '-' },
-        { label: 'renderPolicyReason', value: activePlan.renderPolicyReason ?? '-' },
-        { label: 'fallbackPolicyReason', value: activePlan.fallbackPolicyReason ?? '-' },
-        { label: 'supportStatus', value: activePlan.supportStatus ?? '-' },
-        { label: 'degradationLevel', value: activePlan.degradationLevel ?? '-' },
-        { label: 'objectMode', value: activePlan.objectMode ?? '-' },
-      ]
-    : []
+  const requestSummary = [
+    { label: '预设', value: activePreset?.label ?? '自定义', hint: activePreset?.hint ?? '手动定义输入参数' },
+    {
+      label: '模式',
+      value: multipartMode ? '多段资源' : isChatLikePath(requestPath) ? '对话请求' : '资源请求',
+      hint: method,
+    },
+    { label: '请求路径', value: requestPath, hint: protocol },
+    { label: '当前结果', value: activeRequestId ?? '仅预览', hint: activePlan?.supportStatus ?? '尚未生成计划' },
+  ]
 
-  const executeSummary = isChatLikePath(requestPath)
-    ? executeResult
-      ? [
-          { label: 'requestId', value: executeResult.requestId },
-          { label: 'gatewayResourceKey', value: activeGatewayResourceKey ?? '-' },
-          { label: 'backend', value: executeResult.executionBackend ?? '-' },
-          { label: 'text', value: executeResult.text ?? '无文本输出' },
-        ]
-      : []
-    : resourceExecuteResult
-      ? [
-          { label: 'requestId', value: resourceExecuteResult.requestId ?? '-' },
-          { label: 'gatewayResourceKey', value: resourceExecuteResult.gatewayResourceKey ?? '-' },
-          { label: 'backend', value: resourceExecuteResult.executionBackend ?? '无 backend' },
-          { label: 'status', value: String(resourceExecuteResult.statusCode) },
-          { label: 'contentType', value: resourceExecuteResult.contentType ?? '未知' },
-          { label: 'upstreamPath', value: resourceExecuteResult.upstreamPath ?? '无' },
-          { label: 'binaryLength', value: String(resourceExecuteResult.binaryLength ?? '-') },
-        ]
-      : []
+  const candidateEvaluations = routingPreview?.candidateEvaluations ?? activeSelection?.candidateEvaluations ?? []
+  const attempts = activeSelection?.attempts ?? []
+  const traceTimeline = buildTraceTimeline(traceQuery.data)
+  const usageSummary = buildUsageSummary(executeResult?.usage)
 
-  const applyPreset = (preset: DebugPreset) => {
-    setProtocol(preset.protocol)
-    setMethod(preset.method)
-    setRequestPath(preset.requestPath)
-    setRequestedModel(preset.requestedModel)
-    setBody(preset.body)
-    setFormFields(preset.formFields ?? '{"model":"gpt-4o-mini-transcribe"}')
-    setFileRefs(preset.fileRefs ?? '[{"fieldName":"file","fileKey":"file-123"}]')
-    setInputError(null)
-    setActiveTab('request')
-  }
-
-  const handleClearResults = () => {
-    explainMutation.reset()
-    executeMutation.reset()
-    resourceExecuteMutation.reset()
-    setInputError(null)
-    setActiveTab('request')
-  }
-
-  const handleExplain = async (event: FormEvent) => {
+  const handlePreview = async (event: FormEvent) => {
     event.preventDefault()
     try {
       setInputError(null)
-      await explainMutation.mutateAsync()
+      await previewMutation.mutateAsync()
     } catch (error) {
-      setInputError(error instanceof Error ? error.message : '请求体解析失败。')
+      setInputError(error)
     }
   }
 
@@ -263,309 +214,604 @@ export function WorkbenchPage() {
       }
       await resourceExecuteMutation.mutateAsync()
     } catch (error) {
-      setInputError(error instanceof Error ? error.message : '执行调试失败。')
+      setInputError(error)
     }
   }
 
+  const handleClear = () => {
+    previewMutation.reset()
+    executeMutation.reset()
+    resourceExecuteMutation.reset()
+    setInputError(null)
+    persistSearchParams({ requestId: undefined })
+  }
+
+  const applyPreset = (preset: DebugPreset) => {
+    startTransition(() => {
+      setProtocol(preset.protocol)
+      setMethod(preset.method)
+      setRequestPath(preset.requestPath)
+      setRequestedModel(preset.requestedModel)
+      setBody(preset.body)
+      setFormFields(preset.formFields ?? '{"model":"gpt-4o-mini-transcribe"}')
+      setFileRefs(preset.fileRefs ?? '[{"fieldName":"file","fileKey":"file-123"}]')
+      setInputError(null)
+    })
+    previewMutation.reset()
+    executeMutation.reset()
+    resourceExecuteMutation.reset()
+    persistSearchParams({
+      protocol: preset.protocol,
+      method: preset.method,
+      requestPath: preset.requestPath,
+      requestedModel: preset.requestedModel,
+      body: preset.body,
+      formFields: preset.formFields ?? '{"model":"gpt-4o-mini-transcribe"}',
+      fileRefs: preset.fileRefs ?? '[{"fieldName":"file","fileKey":"file-123"}]',
+      requestId: undefined,
+    })
+  }
+
   return (
-    <section className="page-grid">
-      <div className="panel panel-wide">
-        <div className="panel-head">
-          <p className="panel-kicker">Translation workbench</p>
-          <h2>执行工作台</h2>
-          <p className="empty-state">默认阅读路径固定为 Request → Plan → Execute → Trace → Raw，原始 JSON 退到末级视图。</p>
-        </div>
-        <div className="inline-actions">
-          {(['request', 'plan', 'execute', 'trace', 'raw'] as WorkbenchTab[]).map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              className={`secondary-button${activeTab === tab ? ' active' : ''}`}
-              onClick={() => setActiveTab(tab)}
-            >
-              {tabLabel(tab)}
-            </button>
-          ))}
+    <div className="flex flex-col gap-6">
+      <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-primary/10 via-background/50 to-muted/30 p-6 backdrop-blur-md shadow-lg">
+        <div className="absolute -left-16 -top-16 h-36 w-36 rounded-full bg-primary/20 blur-3xl" />
+        <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6 relative z-10">
+          <div className="space-y-1.5 max-w-2xl">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary dark:text-primary-foreground">
+              <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+              调试台
+            </span>
+            <h2 className="text-xl font-bold tracking-tight text-foreground">网关白盒调试台</h2>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 text-xs font-medium">
+            <div className="flex items-center gap-2 bg-background/50 backdrop-blur border border-border/40 rounded-xl p-2.5 shadow-sm">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">1</span>
+              <span>配置请求草稿</span>
+            </div>
+            <span className="text-muted-foreground hidden sm:inline">➔</span>
+            <div className="flex items-center gap-2 bg-background/50 backdrop-blur border border-border/40 rounded-xl p-2.5 shadow-sm">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/10 text-[10px] font-bold text-emerald-600">2</span>
+              <span>预览上游翻译</span>
+            </div>
+            <span className="text-muted-foreground hidden sm:inline">➔</span>
+            <div className="flex items-center gap-2 bg-background/50 backdrop-blur border border-border/40 rounded-xl p-2.5 shadow-sm">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500/10 text-[10px] font-bold text-amber-600">3</span>
+              <span>执行请求</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {activeTab === 'request' ? (
-        <div className="panel panel-wide">
-          <div className="panel-head">
-            <p className="panel-kicker">Request</p>
-            <h3>请求输入</h3>
-          </div>
-          <div className="detail-grid">
-            {requestSummary.map((item) => (
-              <div key={item.label} className="detail-card">
-                <strong>{item.label}</strong>
-                <span>{item.value}</span>
-              </div>
-            ))}
-          </div>
-          <div className="stack-bar">
-            <span>body · {bodyDraft.summary}</span>
-            <span>执行目标 · {executeTarget}</span>
-            {multipartMode && formFieldsDraft ? <span>formFields · {formFieldsDraft.summary}</span> : null}
-            {multipartMode && fileRefsDraft ? <span>fileRefs · {fileRefsDraft.summary}</span> : null}
-          </div>
-          <div className="preset-strip" aria-label="调试预设">
-            {DEBUG_PRESETS.map((preset) => (
-              <button
-                key={preset.id}
-                type="button"
-                className={`secondary-button${activePreset?.id === preset.id ? ' active' : ''}`}
-                onClick={() => applyPreset(preset)}
-                title={preset.description}
-              >
-                {preset.label}
-              </button>
-            ))}
-          </div>
-          <form className="stacked-form" onSubmit={handleExplain}>
-            <div className="form-grid">
-              <label>
-                <span>distributedKeyPrefix</span>
-                <input value={distributedKeyPrefix} onChange={(event) => setDistributedKeyPrefix(event.target.value)} />
-              </label>
-              <label>
-                <span>protocol</span>
-                <input value={protocol} onChange={(event) => setProtocol(event.target.value)} />
-              </label>
-              <label>
-                <span>method</span>
-                <input value={method} onChange={(event) => setMethod(event.target.value.toUpperCase())} />
-              </label>
-              <label>
-                <span>requestPath</span>
-                <input value={requestPath} onChange={(event) => setRequestPath(event.target.value)} />
-              </label>
-              <label>
-                <span>requestedModel</span>
-                <input value={requestedModel} onChange={(event) => setRequestedModel(event.target.value)} />
-              </label>
-            </div>
-            <label>
-              <span>request body</span>
-              <textarea value={body} onChange={(event) => setBody(event.target.value)} rows={8} />
-            </label>
-            {multipartMode ? (
-              <>
-                <label>
-                  <span>formFields JSON</span>
-                  <textarea value={formFields} onChange={(event) => setFormFields(event.target.value)} rows={5} />
-                </label>
-                <label>
-                  <span>fileRefs JSON</span>
-                  <textarea value={fileRefs} onChange={(event) => setFileRefs(event.target.value)} rows={4} />
-                </label>
-              </>
+      <PageSection
+        kicker="调试台"
+        title="白盒翻译调试"
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <StatusBadge tone={canExecute ? 'info' : 'warning'}>
+              {canExecute ? '可执行' : '仅预览'}
+            </StatusBadge>
+            <StatusBadge>{multipartMode ? '多段资源' : method}</StatusBadge>
+            <StatusBadge tone={bodyDraft.valid ? 'success' : 'danger'}>
+              请求体 · {bodyDraft.summary}
+            </StatusBadge>
+            {activePlan?.supportStatus ? (
+              <StatusBadge tone={toneForSupportStatus(activePlan.supportStatus)}>
+                {activePlan.supportStatus}
+              </StatusBadge>
             ) : null}
-            <div className="inline-actions">
-              <button type="submit" disabled={explainMutation.isPending}>查看 Plan</button>
-              <button type="button" onClick={handleExecute} disabled={!canExecute || executeMutation.isPending || resourceExecuteMutation.isPending}>
-                {isChatLikePath(requestPath) ? '执行 Chat 调试' : '执行资源调试'}
-              </button>
-              <button type="button" className="secondary-button" onClick={handleClearResults}>清空结果</button>
-            </div>
-            {!canExecute ? <p className="empty-state">当前 requestPath 暂不支持执行调试。</p> : null}
-            {inputError ? <p className="empty-state">{inputError}</p> : null}
-          </form>
-        </div>
-      ) : null}
-
-      {activeTab === 'plan' ? (
-        <div className="panel panel-wide">
-          <div className="panel-head">
-            <p className="panel-kicker">Plan</p>
-            <h3>计划语义</h3>
-            <p className="empty-state">Explain 与 Execute 共用同一套 route / render / fallback 语义。</p>
           </div>
-          {planSummary.length ? (
-            <>
-              <div className="detail-grid">
-                {planSummary.map((item) => (
-                  <div key={item.label} className="detail-card">
-                    <strong>{item.label}</strong>
-                    <span>{item.value}</span>
+        }
+      >
+        <div className="grid gap-5 2xl:grid-cols-[minmax(0,1.2fr)_minmax(19rem,0.8fr)]">
+          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+            {requestSummary.map((item) => (
+              <MetricCard key={item.label} label={item.label} value={item.value} hint={item.hint} />
+            ))}
+          </div>
+
+          <Card className="border-border/60 bg-card/92 shadow-sm">
+            <CardHeader className="gap-2 border-b border-border/60">
+              <CardTitle className="text-base">下一步入口</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-3 p-5">
+              {activeRequestId ? (
+                <Button asChild variant="outline" size="sm">
+                  <Link to={`/traces?requestId=${encodeURIComponent(activeRequestId)}`}>
+                    打开追踪工作台
+                    <ArrowUpRightIcon data-icon="inline-end" />
+                  </Link>
+                </Button>
+              ) : null}
+              {!activeRequestId ? (
+                <div className="rounded-2xl border border-dashed border-border/60 bg-background/60 px-4 py-3 text-sm text-muted-foreground">
+                  执行后可从这里继续排查。
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+        </div>
+
+        {currentError ? <InlineError error={currentError} title="调试工作台预览或执行失败" /> : null}
+
+        <div className="grid gap-7 2xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.95fr)]">
+          <WorkbenchStage
+            title="客户端请求"
+            kicker="步骤 1"
+            icon={<BrainCircuitIcon className="size-4" />}
+          >
+            <div className="grid gap-6 xl:grid-cols-[minmax(17rem,0.78fr)_minmax(0,1.22fr)]">
+              <div className="grid gap-5">
+                <WorkbenchPanel title="快捷预设">
+                  <div className="grid gap-3">
+                    {DEBUG_PRESETS.map((preset) => (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => applyPreset(preset)}
+                        className="flex flex-col items-start gap-2 rounded-3xl border border-border/60 bg-background/90 px-4 py-4 text-left transition-colors hover:border-primary/30 hover:bg-accent/40"
+                      >
+                        <div className="flex w-full items-center justify-between gap-3">
+                          <span className="font-medium text-foreground">{preset.label}</span>
+                          {activePreset?.id === preset.id ? <StatusBadge tone="info">已启用</StatusBadge> : null}
+                        </div>
+                        <span className="text-sm leading-6 text-muted-foreground">{preset.hint}</span>
+                      </button>
+                    ))}
                   </div>
-                ))}
+                </WorkbenchPanel>
+
+                <WorkbenchPanel title="草稿校验">
+                  <div className="grid gap-3">
+                    <DraftStatus label="请求体" summary={bodyDraft.summary} valid={bodyDraft.valid} />
+                    {formFieldsDraft ? (
+                      <DraftStatus label="表单字段" summary={formFieldsDraft.summary} valid={formFieldsDraft.valid} />
+                    ) : null}
+                    {fileRefsDraft ? (
+                      <DraftStatus label="文件引用" summary={fileRefsDraft.summary} valid={fileRefsDraft.valid} />
+                    ) : null}
+                  </div>
+                </WorkbenchPanel>
               </div>
-              {activePlan?.requiredFeatures?.length ? (
-                <div className="feature-list">
-                  {activePlan.requiredFeatures.map((feature) => (
-                    <div key={feature} className="feature-badge native">
-                      <strong>{formatRequiredFeature(feature)}</strong>
-                      <small>{resolveFeatureLevel(activePlan.featureLevels, feature)}</small>
-                    </div>
+
+              <form className="flex flex-col gap-6" onSubmit={handlePreview}>
+                <WorkbenchPanel title="请求上下文">
+                  <div className="grid gap-4 xl:grid-cols-2">
+                    <Field label="分布式 Key 前缀">
+                      <Input value={distributedKeyPrefix} onChange={(event) => setDistributedKeyPrefix(event.target.value)} />
+                    </Field>
+                    <Field label="协议">
+                      <Input value={protocol} onChange={(event) => setProtocol(event.target.value)} />
+                    </Field>
+                    <Field label="方法">
+                      <Input value={method} onChange={(event) => setMethod(event.target.value.toUpperCase())} />
+                    </Field>
+                    <Field label="请求模型">
+                      <Input value={requestedModel} onChange={(event) => setRequestedModel(event.target.value)} />
+                    </Field>
+                  </div>
+                </WorkbenchPanel>
+
+                <WorkbenchPanel title="请求内容">
+                  <div className="grid gap-5">
+                    <Field label="请求路径">
+                      <Input value={requestPath} onChange={(event) => setRequestPath(event.target.value)} />
+                    </Field>
+
+                    <Field label="请求体">
+                      <Textarea value={body} onChange={(event) => setBody(event.target.value)} rows={10} />
+                    </Field>
+
+                    {multipartMode ? (
+                      <div className="grid gap-4 xl:grid-cols-2">
+                        <Field label="表单字段">
+                          <Textarea value={formFields} onChange={(event) => setFormFields(event.target.value)} rows={7} />
+                        </Field>
+                        <Field label="文件引用">
+                          <Textarea value={fileRefs} onChange={(event) => setFileRefs(event.target.value)} rows={7} />
+                        </Field>
+                      </div>
+                    ) : null}
+                  </div>
+                </WorkbenchPanel>
+
+                <WorkbenchPanel title="执行动作">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Button type="submit" disabled={previewMutation.isPending}>
+                      {previewMutation.isPending ? (
+                        <LoaderCircleIcon className="animate-spin" data-icon="inline-start" />
+                      ) : (
+                        <WorkflowIcon data-icon="inline-start" />
+                      )}
+                      生成白盒预览
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleExecute}
+                      disabled={!canExecute || executeMutation.isPending || resourceExecuteMutation.isPending}
+                    >
+                      {executeMutation.isPending || resourceExecuteMutation.isPending ? (
+                        <LoaderCircleIcon className="animate-spin" data-icon="inline-start" />
+                      ) : (
+                        <PlayIcon data-icon="inline-start" />
+                      )}
+                      {isChatLikePath(requestPath) ? '执行对话调试' : '执行资源调试'}
+                    </Button>
+                    <Button type="button" variant="secondary" onClick={handleClear}>
+                      <RefreshCcwIcon data-icon="inline-start" />
+                      清空舞台
+                    </Button>
+                  </div>
+                </WorkbenchPanel>
+              </form>
+            </div>
+          </WorkbenchStage>
+
+          <div className="grid gap-6">
+            <WorkbenchStage
+              title="规范化计划"
+            kicker="步骤 2"
+              icon={<WorkflowIcon className="size-4" />}
+            >
+              {routingPreview && activePlan ? (
+                <div className="flex flex-col gap-5">
+                  <PlanNarrativeCard
+                    title="请求语义与能力"
+                    items={[
+                      `所需能力：${routingPreview.requestedSemantics.requiredFeatures.map(formatRequiredFeature).join('、') || '无'}`,
+                      `路由选择模式：${activePlan.routeSelectionMode ?? '-'}`,
+                      `执行后端：${activePlan.executionBackend ?? '-'}`,
+                      `支持状态：${activePlan.supportStatus ?? '-'}`,
+                      ...(activePlan.requiredFeatures.length
+                        ? activePlan.requiredFeatures.map((feature) => `${formatRequiredFeature(feature)} · ${resolveFeatureLevel(activePlan.featureLevels, feature)}`)
+                        : ['能力判定：当前请求未声明额外所需能力。']),
+                    ]}
+                  />
+
+                  <PlanNarrativeCard
+                    title="策略原因"
+                    items={[
+                      `路由策略原因：${activePlan.routePolicyReason ?? '-'}`,
+                      `渲染策略原因：${activePlan.renderPolicyReason ?? '-'}`,
+                      `回退策略原因：${activePlan.fallbackPolicyReason ?? '-'}`,
+                      `后端选择原因：${activePlan.backendReason ?? '-'}`,
+                    ]}
+                  />
+
+                  <PlanNarrativeCard
+                    title="降级与阻断"
+                    items={[
+                      ...activePlan.degradations,
+                      ...activePlan.blockerReasons,
+                      ...activePlan.blockers,
+                    ].length
+                      ? [
+                          ...activePlan.degradations,
+                          ...activePlan.blockerReasons,
+                          ...activePlan.blockers,
+                        ]
+                      : ['当前计划没有阻断或降级。']}
+                  />
+                </div>
+              ) : previewMutation.isPending ? (
+                <StageLoading text="正在生成规范化计划…" />
+              ) : (
+                <EmptyState
+                  title="先生成白盒预览"
+                  icon={<WorkflowIcon className="size-5" />}
+                />
+              )}
+            </WorkbenchStage>
+
+            <WorkbenchStage
+              title="上游载荷与结果"
+            kicker="步骤 3"
+              icon={<SparklesIcon className="size-4" />}
+            >
+              {executionPreview ? (
+                <div className="flex flex-col gap-5">
+                  <ExecutionResultCard
+                    requestPath={requestPath}
+                    executeResult={executeResult}
+                    resourceExecuteResult={resourceExecuteResult}
+                    usageSummary={usageSummary}
+                  />
+
+                  <div className="grid gap-5 xl:grid-cols-2">
+                    <PlanNarrativeCard
+                      title="绑定摘要"
+                      items={[
+                        `绑定优先级：${executionPreview.providerBindingSummary.bindingPriority ?? '-'}`,
+                        `绑定权重：${executionPreview.providerBindingSummary.bindingWeight ?? '-'}`,
+                        `能力等级：${executionPreview.providerBindingSummary.capabilityLevel ?? '-'}`,
+                        `解析后模型：${executionPreview.translatedUpstreamPayload.resolvedModel ?? '-'}`,
+                      ]}
+                    />
+
+                    <PlanNarrativeCard
+                      title="规范化结果预告"
+                      items={executionPreview.normalizedResponsePreview.notes.length
+                        ? executionPreview.normalizedResponsePreview.notes
+                        : ['执行后可在此查看真实规范化结果。']}
+                    />
+                  </div>
+
+                  <Card className="border-border/60 bg-background/90 shadow-none">
+                    <CardHeader className="gap-2 border-b border-border/60">
+                      <CardTitle className="text-base">上游执行载荷预览</CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex flex-col gap-5 p-5">
+                      {executionPreview.translatedUpstreamPayload.messages.length ? (
+                        executionPreview.translatedUpstreamPayload.messages.map((message, index) => (
+                          <div key={`${message.role}-${index}`} className="rounded-2xl border border-border/60 bg-card px-4 py-3">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="font-medium text-foreground">{message.role ?? '未知角色'}</div>
+                              <StatusBadge>{message.parts.length} 个片段</StatusBadge>
+                            </div>
+                            {message.text ? (
+                              <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground">
+                                {message.text}
+                              </div>
+                            ) : null}
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {message.parts.map((part, partIndex) => (
+                                <StatusBadge key={`${part.type}-${partIndex}`} tone={toneForPayloadPart(part.type)}>
+                                  {part.type}
+                                </StatusBadge>
+                              ))}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-sm text-muted-foreground">当前载荷没有可展示的消息。</div>
+                      )}
+
+                      <JsonBlock title="提供方选项" value={executionPreview.translatedUpstreamPayload.providerOptions} />
+                    </CardContent>
+                  </Card>
+                </div>
+              ) : previewMutation.isPending ? (
+                <StageLoading text="正在生成上游载荷预览…" />
+              ) : (
+                <EmptyState
+                  title="右侧区域等待预览或执行"
+                  icon={<SparklesIcon className="size-5" />}
+                />
+              )}
+            </WorkbenchStage>
+          </div>
+        </div>
+
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
+          <div className="grid gap-5">
+            <div className="px-1 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">执行观察</div>
+            <WorkbenchDisclosure title="追踪时间线" defaultOpen={Boolean(activeRequestId)}>
+              {!activeRequestId ? (
+                <EmptyState
+                  title="执行后自动挂上追踪记录"
+                  icon={<WaypointsIcon className="size-5" />}
+                />
+              ) : traceQuery.isPending ? (
+                <StageLoading text="正在加载追踪记录…" compact />
+              ) : traceQuery.error ? (
+                <InlineError error={traceQuery.error} title="追踪记录查询失败" />
+              ) : traceTimeline.length ? (
+                <TraceTimeline items={traceTimeline} />
+              ) : (
+                <EmptyState title="当前没有可展示的追踪时间线" />
+              )}
+            </WorkbenchDisclosure>
+
+            <WorkbenchDisclosure title="执行尝试">
+              {attempts.length ? (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {attempts.map((attempt) => (
+                    <AttemptCard key={`${attempt.attempt}-${attempt.credentialId ?? 'unknown'}`} attempt={attempt} />
                   ))}
                 </div>
-              ) : null}
-              <div className="detail-grid">
-                {(activePlan?.blockerReasons ?? []).length ? (
-                  <div className="detail-card">
-                    <strong>blockerReasons</strong>
-                    <span>{activePlan?.blockerReasons.join('；')}</span>
-                  </div>
-                ) : null}
-                {(activePlan?.degradations ?? []).length ? (
-                  <div className="detail-card">
-                    <strong>degradations</strong>
-                    <span>{activePlan?.degradations.join('；')}</span>
-                  </div>
-                ) : null}
-                {(activePlan?.blockers ?? []).length ? (
-                  <div className="detail-card">
-                    <strong>blockers</strong>
-                    <span>{activePlan?.blockers.join('；')}</span>
-                  </div>
-                ) : null}
-              </div>
-            </>
-          ) : (
-            <p className="empty-state">先在 Request 页执行 explain 或 execute，这里才会出现 plan。</p>
-          )}
-        </div>
-      ) : null}
+              ) : (
+                <EmptyState title="当前还没有执行尝试" />
+              )}
+            </WorkbenchDisclosure>
+          </div>
 
-      {activeTab === 'execute' ? (
-        <div className="panel panel-wide">
-          <div className="panel-head">
-            <p className="panel-kicker">Execute</p>
-            <h3>执行结果</h3>
-          </div>
-          {executeSummary.length ? (
-            <div className="detail-grid">
-              {executeSummary.map((item) => (
-                <div key={item.label} className="detail-card">
-                  <strong>{item.label}</strong>
-                  <span>{item.value}</span>
+          <div className="grid gap-5">
+            <div className="px-1 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">深度明细</div>
+            <WorkbenchDisclosure title="候选评估">
+              {candidateEvaluations.length ? (
+                <div className="grid gap-4 xl:grid-cols-2">
+                  {candidateEvaluations.map((evaluation, index) => (
+                    <Card key={`${evaluation.candidate?.bindingId ?? 'candidate'}-${index}`} className="border-border/60 bg-card/92 shadow-sm">
+                      <CardHeader className="gap-2 border-b border-border/60">
+                        <CardTitle className="text-base">
+                          {evaluation.candidate?.candidate?.providerType ?? '未知提供方'} / {evaluation.candidate?.candidate?.modelKey ?? '-'}
+                        </CardTitle>
+                        <div className="text-sm text-muted-foreground">
+                          {evaluation.selectionSource ?? '未知来源'} · 总分 {evaluation.totalScore ?? '-'}
+                        </div>
+                      </CardHeader>
+                      <CardContent className="flex flex-col gap-3 p-5">
+                        <div className="flex flex-wrap gap-2">
+                          <StatusBadge tone={evaluation.eligible ? 'success' : 'danger'}>
+                            {evaluation.eligible ? '可用' : '已排除'}
+                          </StatusBadge>
+                          {evaluation.healthState ? <StatusBadge>{evaluation.healthState}</StatusBadge> : null}
+                          {evaluation.affinityMatched ? <StatusBadge tone="info">命中亲和</StatusBadge> : null}
+                        </div>
+                        <KeyValueGrid
+                          items={[
+                            ['冷却截止', evaluation.cooldownUntil ?? '-'],
+                            ['能力等级', evaluation.candidate?.capabilityLevel ?? '-'],
+                          ]}
+                        />
+                        <ListBlock title="评分拆解" items={evaluation.scoreBreakdown} emptyText="无评分拆解" />
+                        <ListBlock title="排除原因" items={evaluation.exclusionReasons} emptyText="无排除原因" />
+                      </CardContent>
+                    </Card>
+                  ))}
                 </div>
-              ))}
-            </div>
-          ) : (
-            <p className="empty-state">先执行调试，再在这里查看结果摘要。</p>
-          )}
-          {isChatLikePath(requestPath) && executeResult ? (
-            <div className="card-list">
-              <div className="detail-card">
-                <strong>Chat output</strong>
-                <span>{executeResult.text ?? '无文本输出'}</span>
-              </div>
-              <div className="detail-card">
-                <strong>Trace anchor</strong>
-                <span>{executeResult.requestId}</span>
-              </div>
-            </div>
-          ) : !isChatLikePath(requestPath) && resourceExecuteResult ? (
-            <div className="card-list">
-              {resourceExecuteResult.canonicalResponse ? (
-                <div className="detail-card">
-                  <strong>Canonical summary</strong>
-                  <span>responseKind: {resourceExecuteResult.canonicalResponse.responseKind ?? '无'}</span>
-                  <span>objectType: {resourceExecuteResult.canonicalResponse.objectType ?? '无'}</span>
-                  <span>objectId: {resourceExecuteResult.canonicalResponse.objectId ?? '无'}</span>
-                  <span>status: {resourceExecuteResult.canonicalResponse.status ?? '无'}</span>
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-      ) : null}
+              ) : (
+                <EmptyState title="先生成预览，再查看候选评估" />
+              )}
+            </WorkbenchDisclosure>
 
-      {activeTab === 'trace' ? (
-        <div className="panel panel-wide">
-          <div className="panel-head">
-            <p className="panel-kicker">Trace</p>
-            <h3>联查视图</h3>
-          </div>
-          {!activeRequestId ? (
-            <p className="empty-state">执行调试后会自动拿到 requestId，并在这里展示 trace。</p>
-          ) : traceQuery.isLoading ? (
-            <p className="empty-state">正在加载 trace…</p>
-          ) : traceQuery.error ? (
-            <p className="empty-state">{traceQuery.error instanceof Error ? traceQuery.error.message : 'trace 查询失败。'}</p>
-          ) : traceQuery.data ? (
-            <>
-              <div className="detail-grid">
-                <div className="detail-card">
-                  <strong>requestId</strong>
-                  <span>{activeRequestId}</span>
-                </div>
-                <div className="detail-card">
-                  <strong>gatewayResourceKey</strong>
-                  <span>{activeGatewayResourceKey ?? traceQuery.data.requestLog?.gatewayResourceKey ?? '-'}</span>
-                </div>
-                <div className="detail-card">
-                  <strong>routeDecision</strong>
-                  <span>{traceQuery.data.routeDecision?.selectionSource ?? '无'}</span>
-                </div>
-                <div className="detail-card">
-                  <strong>async resource</strong>
-                  <span>{traceQuery.data.asyncResourceSummary?.resourceKey ?? '无'}</span>
-                </div>
+            <WorkbenchDisclosure title="原始数据">
+              <div className="grid gap-4">
+                {routingPreview ? <JsonBlock title="路由预览" value={routingPreview} /> : null}
+                {executionPreview ? <JsonBlock title="执行预览" value={executionPreview} /> : null}
+                {executeResult ? <JsonBlock title="对话执行结果" value={executeResult} /> : null}
+                {resourceExecuteResult ? <JsonBlock title="资源执行结果" value={resourceExecuteResult} /> : null}
+                {traceQuery.data ? <JsonBlock title="追踪结果" value={traceQuery.data} /> : null}
+                {!routingPreview && !executionPreview && !executeResult && !resourceExecuteResult && !traceQuery.data ? (
+                  <EmptyState title="还没有原始数据" />
+                ) : null}
               </div>
-              {traceQuery.data.asyncResourceSummary ? (
-                <div className="detail-grid">
-                  <div className="detail-card">
-                    <strong>resourceType</strong>
-                    <span>{traceQuery.data.asyncResourceSummary.resourceType ?? '-'}</span>
-                  </div>
-                  <div className="detail-card">
-                    <strong>resourceStatus</strong>
-                    <span>{traceQuery.data.asyncResourceSummary.status ?? '-'}</span>
-                  </div>
-                  <div className="detail-card">
-                    <strong>upstreamObjectId</strong>
-                    <span>{traceQuery.data.asyncResourceSummary.upstreamObjectId ?? '-'}</span>
-                  </div>
-                </div>
-              ) : null}
-              <div className="inline-actions">
-                <Link className="action-link" to={`/traces?requestId=${encodeURIComponent(activeRequestId)}`}>打开 Trace Workbench</Link>
-              </div>
-            </>
-          ) : (
-            <p className="empty-state">暂无 trace 数据。</p>
-          )}
-        </div>
-      ) : null}
-
-      {activeTab === 'raw' ? (
-        <div className="panel panel-wide">
-          <div className="panel-head">
-            <p className="panel-kicker">Raw</p>
-            <h3>原始明细</h3>
-          </div>
-          <div className="card-list">
-            {explainResult ? (
-              <div className="code-block">
-                <pre>{JSON.stringify(explainResult, null, 2)}</pre>
-              </div>
-            ) : null}
-            {executeResult ? (
-              <div className="code-block">
-                <pre>{JSON.stringify(executeResult, null, 2)}</pre>
-              </div>
-            ) : null}
-            {resourceExecuteResult ? (
-              <div className="code-block">
-                <pre>{JSON.stringify(resourceExecuteResult, null, 2)}</pre>
-              </div>
-            ) : null}
-            {traceQuery.data ? (
-              <div className="code-block">
-                <pre>{JSON.stringify(traceQuery.data, null, 2)}</pre>
-              </div>
-            ) : null}
-            {!explainResult && !executeResult && !resourceExecuteResult && !traceQuery.data ? (
-              <p className="empty-state">还没有可展示的 raw 数据。</p>
-            ) : null}
+            </WorkbenchDisclosure>
           </div>
         </div>
-      ) : null}
-    </section>
+      </PageSection>
+    </div>
   )
+
+  function persistSearchParams(
+    overrides?: Partial<Record<
+      'distributedKeyPrefix' | 'protocol' | 'method' | 'requestPath' | 'requestedModel' | 'body' | 'formFields' | 'fileRefs' | 'requestId',
+      string | undefined
+    >>,
+  ) {
+    const next = new URLSearchParams(searchParams)
+    const values = {
+      distributedKeyPrefix,
+      protocol,
+      method,
+      requestPath,
+      requestedModel,
+      body,
+      formFields,
+      fileRefs,
+      requestId: searchParams.get('requestId') ?? undefined,
+      ...overrides,
+    }
+
+    Object.entries(values).forEach(([key, value]) => {
+      if (value == null || value === '') {
+        next.delete(key)
+      } else {
+        next.set(key, value)
+      }
+    })
+
+    setSearchParams(next, { replace: true })
+  }
+}
+
+function buildPreviewRequest({
+  distributedKeyPrefix,
+  protocol,
+  requestPath,
+  requestedModel,
+  body,
+  multipartMode,
+  formFields,
+  fileRefs,
+}: {
+  distributedKeyPrefix: string
+  protocol: string
+  requestPath: string
+  requestedModel: string
+  body: string
+  multipartMode: boolean
+  formFields: string
+  fileRefs: string
+}) {
+  return {
+    distributedKeyPrefix,
+    protocol,
+    requestPath,
+    requestedModel,
+    requestBody: multipartMode
+      ? buildMultipartExplainBody(requestedModel, formFields, fileRefs)
+      : parseJsonBody(body),
+  }
+}
+
+function buildTraceTimeline(trace?: ObservabilityTraceResponse) {
+  if (!trace) return []
+
+  const items: Array<{ title: string; meta: Array<[string, string]> }> = []
+
+  if (trace.requestLog) {
+    items.push({
+      title: '请求日志',
+      meta: [
+        ['请求 ID', trace.requestLog.requestId],
+        ['支持状态', String(trace.requestLog.supportStatus ?? '-')],
+        ['降级级别', String(trace.requestLog.degradationLevel ?? '-')],
+        ['响应类型', String(trace.requestLog.responseKind ?? '-')],
+      ],
+    })
+  }
+
+  if (trace.routeDecision) {
+    items.push({
+      title: '路由决策',
+      meta: [
+        ['选路来源', String(trace.routeDecision.selectionSource ?? '-')],
+        ['支持状态', String(trace.routeDecision.supportStatus ?? '-')],
+        ['降级级别', String(trace.routeDecision.degradationLevel ?? '-')],
+        ['对象模式', String(trace.routeDecision.objectMode ?? '-')],
+      ],
+    })
+  }
+
+  trace.cacheHits.forEach((item, index) => {
+    items.push({
+      title: `缓存命中 #${index + 1}`,
+      meta: [
+        ['缓存类型', String(item.cacheKind ?? '-')],
+        ['支持状态', String(item.supportStatus ?? '-')],
+        ['降级级别', String(item.degradationLevel ?? '-')],
+        ['对象模式', String(item.objectMode ?? '-')],
+      ],
+    })
+  })
+
+  trace.upstreamCacheReferences.forEach((item, index) => {
+    items.push({
+      title: `上游缓存引用 #${index + 1}`,
+      meta: [
+        ['外部缓存引用', String(item.externalCacheRef ?? '-')],
+        ['状态', String(item.status ?? '-')],
+      ],
+    })
+  })
+
+  if (trace.asyncResourceSummary) {
+    items.push({
+      title: '异步资源',
+      meta: [
+        ['资源键', String(trace.asyncResourceSummary.resourceKey ?? '-')],
+        ['资源类型', String(trace.asyncResourceSummary.resourceType ?? '-')],
+        ['状态', String(trace.asyncResourceSummary.status ?? '-')],
+        ['上游对象 ID', String(trace.asyncResourceSummary.upstreamObjectId ?? '-')],
+      ],
+    })
+  }
+
+  if (trace.asyncResourceDetail) {
+    items.push({
+      title: '异步资源详情',
+      meta: [
+        ['状态变更', String(trace.asyncResourceDetail.transitions?.length ?? 0)],
+        ['产物数量', String(trace.asyncResourceDetail.artifacts?.length ?? 0)],
+        ['含请求载荷', trace.asyncResourceDetail.requestPayloadJson ? '是' : '否'],
+        ['含响应载荷', trace.asyncResourceDetail.responsePayloadJson ? '是' : '否'],
+      ],
+    })
+  }
+
+  return items
 }
 
 function parseJsonBody(value: string) {
@@ -626,20 +872,20 @@ function inspectJsonDraft(value: string, expectedType: 'json' | 'object' | 'arra
         summary:
           typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
             ? `${Object.keys(parsed).length} 个字段`
-            : '需为 object',
+            : '需为对象',
       }
     }
 
     if (expectedType === 'array') {
       return {
         valid: Array.isArray(parsed),
-        summary: Array.isArray(parsed) ? `${parsed.length} 个引用` : '需为 array',
+        summary: Array.isArray(parsed) ? `${parsed.length} 个引用` : '需为数组',
       }
     }
 
     return {
       valid: true,
-      summary: Array.isArray(parsed) ? `JSON array · ${parsed.length} 项` : 'JSON 有效',
+      summary: Array.isArray(parsed) ? `JSON 数组 · ${parsed.length} 项` : 'JSON 有效',
     }
   } catch {
     return {
@@ -657,17 +903,36 @@ function formatRequiredFeature(feature: string) {
   return featureLabel(feature.toLowerCase())
 }
 
-function tabLabel(tab: WorkbenchTab) {
-  switch (tab) {
-    case 'request':
-      return 'Request'
-    case 'plan':
-      return 'Plan'
-    case 'execute':
-      return 'Execute'
-    case 'trace':
-      return 'Trace'
-    case 'raw':
-      return 'Raw'
-  }
+function buildUsageSummary(usage?: GatewayUsageView | null) {
+  if (!usage) return []
+
+  const promptTokens = usage.promptTokens ?? 0
+  const rawPromptTokens = usage.rawPromptTokens ?? 0
+  const completionTokens = usage.completionTokens ?? 0
+  const reasoningTokens = usage.reasoningTokens ?? 0
+  const cacheHitTokens = usage.cacheHitTokens ?? 0
+  const cacheWriteTokens = usage.cacheWriteTokens ?? 0
+  const totalTokens = usage.totalTokens ?? 0
+
+  return [
+    { label: '输入 Token', value: promptTokens, hint: `原始 ${rawPromptTokens}` },
+    { label: '输出 Token', value: completionTokens, hint: `推理 ${reasoningTokens}` },
+    { label: '缓存 Token', value: cacheHitTokens + cacheWriteTokens, hint: usage.completeness },
+    { label: '总 Token', value: totalTokens, hint: usage.source },
+  ]
+}
+
+function toneForSupportStatus(status: string) {
+  const normalized = status.toLowerCase()
+  if (normalized.includes('block')) return 'danger' as const
+  if (normalized.includes('degrad') || normalized.includes('orchestration')) return 'warning' as const
+  if (normalized.includes('native')) return 'success' as const
+  return 'info' as const
+}
+
+function toneForPayloadPart(type?: string | null) {
+  const normalized = type?.toLowerCase()
+  if (normalized === 'tool_result') return 'warning' as const
+  if (normalized === 'image' || normalized === 'file') return 'info' as const
+  return 'neutral' as const
 }

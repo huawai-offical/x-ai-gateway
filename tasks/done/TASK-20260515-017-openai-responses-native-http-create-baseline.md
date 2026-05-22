@@ -1,10 +1,10 @@
 # TASK-20260515-017 OpenAI Responses Native HTTP Create 基线
 
-状态：Done  
-优先级：Critical  
-类型：子任务切片  
-父任务：[TASK-20260514-018](../backlog/TASK-20260514-018-openai-responses-native-lifecycle.md)  
-上游来源：[TASK-20260514-013](../backlog/TASK-20260514-013-openai-chat-responses-native-parity.md)、[REP-20260514 OpenAI 全量覆盖任务拆解](../../docs/reports/REP-20260514-openai-full-api-coverage-task-breakdown.md)
+状态：Done
+优先级：Critical
+类型：子任务切片
+父任务：[TASK-20260514-018](../done/TASK-20260514-018-openai-responses-native-lifecycle.md)
+上游来源：[TASK-20260514-013](../done/TASK-20260514-013-openai-chat-responses-native-parity.md)、[REP-20260514 OpenAI 全量覆盖任务拆解](../../docs/reports/REP-20260514-openai-full-api-coverage-task-breakdown.md)
 
 ## 背景
 
@@ -40,7 +40,7 @@
 
 - `src/main/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntime.java`
 - `src/test/java/com/prodigalgal/xaigateway/gateway/core/execution/OpenAiNativeGatewayChatRuntimeTests.java`
-- `tasks/backlog/TASK-20260514-018-openai-responses-native-lifecycle.md`
+- `tasks/done/TASK-20260514-018-openai-responses-native-lifecycle.md`
 - `docs/reports/REP-20260514-openai-full-api-coverage-task-breakdown.md`
 
 ## 依赖

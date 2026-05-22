@@ -3,7 +3,7 @@
 状态：Done
 优先级：Critical
 类型：子任务
-父任务：[TASK-20260514-018](../backlog/TASK-20260514-018-openai-responses-native-lifecycle.md)
+父任务：[TASK-20260514-018](../done/TASK-20260514-018-openai-responses-native-lifecycle.md)
 上游来源：[REQ-20260517-002](../../docs/requirements/REQ-20260517-002-openai-responses-untracked-remote-lifecycle-route-hints.md)
 
 ## 背景
@@ -47,7 +47,7 @@ Responses 远端 lifecycle passthrough 目前依赖 gateway-created stored Respo
 ## 依赖
 
 - [TASK-20260516-001 OpenAI Responses 远端生命周期 Passthrough 基线](TASK-20260516-001-openai-responses-remote-lifecycle-passthrough-baseline.md)
-- [TASK-20260514-018 OpenAI Responses 原生执行器与生命周期](../backlog/TASK-20260514-018-openai-responses-native-lifecycle.md)
+- [TASK-20260514-018 OpenAI Responses 原生执行器与生命周期](../done/TASK-20260514-018-openai-responses-native-lifecycle.md)
 
 ## 风险
 
@@ -71,7 +71,7 @@ Responses 远端 lifecycle passthrough 目前依赖 gateway-created stored Respo
 ## 关联文档
 
 - [REQ-20260517-002](../../docs/requirements/REQ-20260517-002-openai-responses-untracked-remote-lifecycle-route-hints.md)
-- [TASK-20260514-018](../backlog/TASK-20260514-018-openai-responses-native-lifecycle.md)
+- [TASK-20260514-018](../done/TASK-20260514-018-openai-responses-native-lifecycle.md)
 
 ## 当前状态
 

@@ -8,8 +8,8 @@ import com.prodigalgal.xaigateway.admin.api.OfficialAccountQuotaResponse;
 import com.prodigalgal.xaigateway.admin.api.OfficialAccountType;
 import com.prodigalgal.xaigateway.gateway.core.account.UpstreamAccountProviderType;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountEntity;
-import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountPoolEntity;
-import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountPoolRepository;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountGroupEntity;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountGroupRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountRepository;
 import java.nio.charset.StandardCharsets;
 import java.net.URI;
@@ -41,7 +41,7 @@ public class OfficialAccountAdminService {
     private static final String CODEX_RECORD_REPLAY_SCHEMA_VERSION = "2026-05-19.codex-responses-smoke-record-replay.v1";
 
     private final UpstreamAccountRepository upstreamAccountRepository;
-    private final UpstreamAccountPoolRepository upstreamAccountPoolRepository;
+    private final UpstreamAccountGroupRepository upstreamAccountGroupRepository;
     private final CredentialCryptoService credentialCryptoService;
     private final SupportedModelCatalogService supportedModelCatalogService;
     private final ObjectMapper objectMapper;
@@ -51,12 +51,12 @@ public class OfficialAccountAdminService {
 
     public OfficialAccountAdminService(
             UpstreamAccountRepository upstreamAccountRepository,
-            UpstreamAccountPoolRepository upstreamAccountPoolRepository,
+            UpstreamAccountGroupRepository upstreamAccountGroupRepository,
             CredentialCryptoService credentialCryptoService,
             SupportedModelCatalogService supportedModelCatalogService,
             ObjectMapper objectMapper) {
         this.upstreamAccountRepository = upstreamAccountRepository;
-        this.upstreamAccountPoolRepository = upstreamAccountPoolRepository;
+        this.upstreamAccountGroupRepository = upstreamAccountGroupRepository;
         this.credentialCryptoService = credentialCryptoService;
         this.supportedModelCatalogService = supportedModelCatalogService;
         this.objectMapper = objectMapper;
@@ -68,7 +68,7 @@ public class OfficialAccountAdminService {
     public OfficialAccountQuotaResponse importOfficialAccount(OfficialAccountImportRequest request) {
         OfficialAccountType accountType = request.accountType();
         CodexAuthJsonParser.ParsedCodexAuthJson parsedCodexAuth = tryParseCodexAuthJson(accountType, request.metadataJson());
-        UpstreamAccountPoolEntity pool = resolvePool(request.poolId(), accountType);
+        UpstreamAccountGroupEntity group = resolveGroup(request.groupId(), accountType);
         String accessToken = requireSecret(firstNonBlank(
                 request.accessToken(),
                 parsedCodexAuth == null ? null : parsedCodexAuth.accessToken()
@@ -83,7 +83,7 @@ public class OfficialAccountAdminService {
         UpstreamAccountEntity entity = resolveExistingOfficialAccount(accountType, parsedCodexAuth, externalAccountId)
                 .orElseGet(UpstreamAccountEntity::new);
         boolean created = entity.getId() == null;
-        entity.setPool(pool);
+        entity.setGroup(group);
         entity.setProviderType(accountType.providerType());
         entity.setAccountName(resolveAccountName(firstNonBlank(
                 request.accountName(),
@@ -100,7 +100,7 @@ public class OfficialAccountAdminService {
                 : request.tokenExpiresAt());
         entity.setLastRefreshAt(now);
         entity.setRefreshStatus("IMPORTED");
-        entity.setSupportedModels(resolveSupportedModels(pool, request.supportedModels(), accountType));
+        entity.setSupportedModels(resolveSupportedModels(group, request.supportedModels(), accountType));
         entity.setProxyId(request.proxyId());
         entity.setTlsFingerprintProfileId(request.tlsFingerprintProfileId());
         entity.setSiteProfileId(request.siteProfileId());
@@ -636,28 +636,28 @@ public class OfficialAccountAdminService {
         return text(metadata.get("identityKey"));
     }
 
-    private UpstreamAccountPoolEntity resolvePool(Long poolId, OfficialAccountType accountType) {
-        if (poolId == null) {
-            return null;
+    private UpstreamAccountGroupEntity resolveGroup(Long groupId, OfficialAccountType accountType) {
+        if (groupId == null) {
+            throw new IllegalArgumentException("官方账号必须归入一个账号分组。");
         }
-        UpstreamAccountPoolEntity pool = upstreamAccountPoolRepository.findById(poolId)
-                .orElseThrow(() -> new IllegalArgumentException("未找到指定账号池。"));
-        if (pool.getProviderType() != accountType.providerType()) {
-            throw new IllegalArgumentException("账号池 providerType 与官方账号类型不匹配。");
+        UpstreamAccountGroupEntity group = upstreamAccountGroupRepository.findById(groupId)
+                .orElseThrow(() -> new IllegalArgumentException("未找到指定账号分组。"));
+        if (group.getProviderType() != accountType.providerType()) {
+            throw new IllegalArgumentException("账号分组 providerType 与官方账号类型不匹配。");
         }
-        return pool;
+        return group;
     }
 
     private List<String> resolveSupportedModels(
-            UpstreamAccountPoolEntity pool,
+            UpstreamAccountGroupEntity group,
             List<String> requestedModels,
             OfficialAccountType accountType) {
         List<String> normalized = supportedModelCatalogService.normalize(requestedModels);
         if (!normalized.isEmpty()) {
             return normalized;
         }
-        if (pool != null && pool.getSupportedModels() != null && !pool.getSupportedModels().isEmpty()) {
-            return supportedModelCatalogService.normalize(pool.getSupportedModels());
+        if (group != null && group.getSupportedModels() != null && !group.getSupportedModels().isEmpty()) {
+            return supportedModelCatalogService.normalize(group.getSupportedModels());
         }
         return accountType.defaultModels();
     }
@@ -802,7 +802,7 @@ public class OfficialAccountAdminService {
         String routeBlockReason = routeBlockReason(entity);
         return new OfficialAccountQuotaResponse(
                 entity.getId(),
-                entity.getPool() == null ? null : entity.getPool().getId(),
+                entity.getGroup() == null ? null : entity.getGroup().getId(),
                 entity.getAccountName(),
                 accountType,
                 entity.getProviderType(),

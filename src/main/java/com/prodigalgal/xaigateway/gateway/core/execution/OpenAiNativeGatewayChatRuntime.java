@@ -19,10 +19,12 @@ import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
 import com.prodigalgal.xaigateway.gateway.core.usage.GatewayUsage;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamSiteProfileRepository;
 import com.prodigalgal.xaigateway.provider.adapter.ProviderExecutionSupportService;
 import com.prodigalgal.xaigateway.provider.adapter.openai.OpenAiChatModelFactory;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -40,6 +42,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.ai.openai.api.ResponseFormat;
 import org.springframework.stereotype.Service;
@@ -53,7 +56,24 @@ public class OpenAiNativeGatewayChatRuntime implements GatewayChatRuntime {
     private final ProviderExecutionSupportService providerExecutionSupportService;
     private final GatewayFileService gatewayFileService;
     private final DistributedKeyQueryService distributedKeyQueryService;
+    private final UpstreamSiteProfileRepository upstreamSiteProfileRepository;
     private final ObjectMapper objectMapper;
+
+    @Autowired
+    public OpenAiNativeGatewayChatRuntime(
+            OpenAiChatModelFactory openAiChatModelFactory,
+            ProviderExecutionSupportService providerExecutionSupportService,
+            GatewayFileService gatewayFileService,
+            DistributedKeyQueryService distributedKeyQueryService,
+            UpstreamSiteProfileRepository upstreamSiteProfileRepository,
+            ObjectMapper objectMapper) {
+        this.openAiChatModelFactory = openAiChatModelFactory;
+        this.providerExecutionSupportService = providerExecutionSupportService;
+        this.gatewayFileService = gatewayFileService;
+        this.distributedKeyQueryService = distributedKeyQueryService;
+        this.upstreamSiteProfileRepository = upstreamSiteProfileRepository;
+        this.objectMapper = objectMapper;
+    }
 
     public OpenAiNativeGatewayChatRuntime(
             OpenAiChatModelFactory openAiChatModelFactory,
@@ -61,11 +81,14 @@ public class OpenAiNativeGatewayChatRuntime implements GatewayChatRuntime {
             GatewayFileService gatewayFileService,
             DistributedKeyQueryService distributedKeyQueryService,
             ObjectMapper objectMapper) {
-        this.openAiChatModelFactory = openAiChatModelFactory;
-        this.providerExecutionSupportService = providerExecutionSupportService;
-        this.gatewayFileService = gatewayFileService;
-        this.distributedKeyQueryService = distributedKeyQueryService;
-        this.objectMapper = objectMapper;
+        this(
+                openAiChatModelFactory,
+                providerExecutionSupportService,
+                gatewayFileService,
+                distributedKeyQueryService,
+                null,
+                objectMapper
+        );
     }
 
     @Override
@@ -83,6 +106,9 @@ public class OpenAiNativeGatewayChatRuntime implements GatewayChatRuntime {
         CanonicalRequest request = context.canonicalRequest();
         if (shouldUseNativeResponsesHttp(context)) {
             return executeNativeResponsesCreate(context);
+        }
+        if (shouldUseRawChatCompletionsHttp(context)) {
+            return executeRawChatCompletionsCreate(context);
         }
         OpenAiApi api = openAiChatModelFactory.createApi(
                 context.credential().getBaseUrl(),
@@ -118,6 +144,9 @@ public class OpenAiNativeGatewayChatRuntime implements GatewayChatRuntime {
     public Flux<CanonicalStreamEvent> executeStream(GatewayChatRuntimeContext context) {
         if (shouldUseNativeResponsesHttp(context)) {
             return executeNativeResponsesStream(context);
+        }
+        if (shouldUseRawChatCompletionsHttp(context)) {
+            return executeRawChatCompletionsStream(context);
         }
         CanonicalRequest request = context.canonicalRequest();
         OpenAiApi api = openAiChatModelFactory.createApi(
@@ -305,6 +334,8 @@ public class OpenAiNativeGatewayChatRuntime implements GatewayChatRuntime {
         LinkedHashMap<String, Object> extraBody = new LinkedHashMap<>();
         copyJson(extraBody, extensions, "stream_options");
         copyJson(extraBody, extensions, "prediction");
+        copyJson(extraBody, extensions, "tool_calls");
+        copyJson(extraBody, extensions, "reasoning_content");
         if (providerType == ProviderType.OPENAI_COMPATIBLE) {
             copyJson(extraBody, extensions, "functions");
             copyJson(extraBody, extensions, "function_call");
@@ -488,6 +519,298 @@ public class OpenAiNativeGatewayChatRuntime implements GatewayChatRuntime {
         return selected.candidate().providerType() == ProviderType.OPENAI_DIRECT;
     }
 
+    private boolean shouldUseRawChatCompletionsHttp(GatewayChatRuntimeContext context) {
+        if (context == null || context.canonicalRequest() == null || context.selectionResult() == null) {
+            return false;
+        }
+        var selected = context.selectionResult().selectedCandidate();
+        if (selected == null || selected.candidate() == null) {
+            return false;
+        }
+        if (selected.candidate().providerType() != ProviderType.OPENAI_COMPATIBLE) {
+            return false;
+        }
+        JsonNode profile = conversationProfile(context);
+        String upstreamSurface = profile.path("upstreamSurface").asText("");
+        String responsesMode = profile.path("responsesCompatibility").asText(profile.path("responsesMode").asText(""));
+        return "chat_completions".equalsIgnoreCase(upstreamSurface)
+                || "openai_chat_completions".equalsIgnoreCase(upstreamSurface)
+                || "emulate_with_chat_completions".equalsIgnoreCase(responsesMode)
+                || context.canonicalRequest().ingressProtocol() == com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol.RESPONSES;
+    }
+
+    private CanonicalResponse executeRawChatCompletionsCreate(GatewayChatRuntimeContext context) {
+        ObjectNode payload = rawChatCompletionsPayload(context, false);
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
+                .uri(URI.create(chatCompletionsUrl(context.credential().getBaseUrl())))
+                .timeout(Duration.ofSeconds(90))
+                .header("authorization", "Bearer " + context.apiKey())
+                .header("content-type", "application/json")
+                .header("accept", "application/json");
+        upstreamHeaders(context.selectionResult().selectedCandidate().candidate().siteKind(), context.canonicalRequest())
+                .forEach(builder::header);
+        try {
+            HttpResponse<String> upstreamResponse = HttpClient.newHttpClient().send(
+                    builder.POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload))).build(),
+                    HttpResponse.BodyHandlers.ofString()
+            );
+            if (upstreamResponse.statusCode() < 200 || upstreamResponse.statusCode() >= 300) {
+                throw new IllegalStateException("OpenAI-compatible Chat Completions 请求失败：HTTP "
+                        + upstreamResponse.statusCode() + " " + truncate(upstreamResponse.body(), 240));
+            }
+            JsonNode body = objectMapper.readTree(upstreamResponse.body());
+            JsonNode choice = firstChoice(body);
+            JsonNode message = choice.path("message");
+            return new CanonicalResponse(
+                    firstNonBlank(
+                            text(body.path("id")),
+                            upstreamResponse.headers().firstValue("x-request-id").orElse(null),
+                            upstreamResponse.headers().firstValue("request-id").orElse(null)
+                    ),
+                    context.selectionResult().publicModel(),
+                    text(message.path("content")),
+                    firstNonBlank(text(message.path("reasoning_content")), text(message.path("reasoning"))),
+                    rawChatToolCalls(message.path("tool_calls")),
+                    chatUsage(body.path("usage")),
+                    com.prodigalgal.xaigateway.gateway.core.response.GatewayFinishReason.fromRaw(text(choice.path("finish_reason"))),
+                    body
+            );
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("OpenAI-compatible Chat Completions 请求被中断。", exception);
+        } catch (Exception exception) {
+            if (exception instanceof IllegalStateException stateException) {
+                throw stateException;
+            }
+            throw new IllegalStateException("OpenAI-compatible Chat Completions 请求失败：" + truncate(exception.getMessage(), 240), exception);
+        }
+    }
+
+    private Flux<CanonicalStreamEvent> executeRawChatCompletionsStream(GatewayChatRuntimeContext context) {
+        ObjectNode payload = rawChatCompletionsPayload(context, true);
+        return Flux.using(
+                        () -> openRawChatCompletionsStreamReader(context, payload),
+                        reader -> Flux.generate(sink -> {
+                            try {
+                                String line = reader.readLine();
+                                if (line == null) {
+                                    sink.complete();
+                                    return;
+                                }
+                                sink.next(CanonicalStreamEvent.rawSse(line + "\n"));
+                            } catch (IOException exception) {
+                                sink.error(new IllegalStateException("读取 OpenAI-compatible Chat Completions SSE 失败。", exception));
+                            }
+                        }),
+                        reader -> {
+                            try {
+                                reader.close();
+                            } catch (IOException ignored) {
+                                // 流关闭失败不影响已传递给下游的 upstream SSE 结果。
+                            }
+                        }
+                )
+                .cast(CanonicalStreamEvent.class)
+                .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    private BufferedReader openRawChatCompletionsStreamReader(GatewayChatRuntimeContext context, ObjectNode payload) throws Exception {
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
+                .uri(URI.create(chatCompletionsUrl(context.credential().getBaseUrl())))
+                .timeout(Duration.ofSeconds(90))
+                .header("authorization", "Bearer " + context.apiKey())
+                .header("content-type", "application/json")
+                .header("accept", "text/event-stream");
+        upstreamHeaders(context.selectionResult().selectedCandidate().candidate().siteKind(), context.canonicalRequest())
+                .forEach(builder::header);
+        try {
+            HttpResponse<InputStream> upstreamResponse = HttpClient.newHttpClient().send(
+                    builder.POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(payload))).build(),
+                    HttpResponse.BodyHandlers.ofInputStream()
+            );
+            if (upstreamResponse.statusCode() < 200 || upstreamResponse.statusCode() >= 300) {
+                String body = readBody(upstreamResponse.body());
+                throw new IllegalStateException("OpenAI-compatible Chat Completions stream 请求失败：HTTP "
+                        + upstreamResponse.statusCode() + " " + truncate(body, 240));
+            }
+            return new BufferedReader(new InputStreamReader(upstreamResponse.body(), StandardCharsets.UTF_8));
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("OpenAI-compatible Chat Completions stream 请求被中断。", exception);
+        }
+    }
+
+    private ObjectNode rawChatCompletionsPayload(GatewayChatRuntimeContext context, boolean stream) {
+        CanonicalRequest request = context.canonicalRequest();
+        ObjectNode payload = objectMapper.createObjectNode();
+        payload.put("model", context.selectionResult().resolvedModelKey());
+        payload.set("messages", rawChatMessages(context));
+        if (request.temperature() != null) {
+            payload.put("temperature", request.temperature());
+        }
+        if (request.maxTokens() != null) {
+            payload.put("max_tokens", request.maxTokens());
+        }
+        if (request.tools() != null && !request.tools().isEmpty()) {
+            ArrayNode tools = payload.putArray("tools");
+            for (CanonicalToolDefinition tool : request.tools()) {
+                ObjectNode toolNode = tools.addObject();
+                toolNode.put("type", "function");
+                ObjectNode function = toolNode.putObject("function");
+                function.put("name", tool.name());
+                if (tool.description() != null) {
+                    function.put("description", tool.description());
+                }
+                if (tool.inputSchema() != null) {
+                    function.set("parameters", tool.inputSchema());
+                }
+                if (tool.strict() != null) {
+                    function.put("strict", tool.strict());
+                }
+            }
+        }
+        if (request.toolChoice() != null) {
+            payload.set("tool_choice", request.toolChoice());
+        }
+        copyRequestExtension(payload, request.providerExtensions(), "response_format");
+        copyRequestExtension(payload, request.providerExtensions(), "metadata");
+        copyRequestExtension(payload, request.providerExtensions(), "top_p");
+        copyRequestExtension(payload, request.providerExtensions(), "presence_penalty");
+        copyRequestExtension(payload, request.providerExtensions(), "frequency_penalty");
+        copyRequestExtension(payload, request.providerExtensions(), "stop");
+        copyRequestExtension(payload, request.providerExtensions(), "seed");
+        applyReasoningRequestConfig(payload, context);
+        payload.put("stream", stream);
+        if (stream) {
+            ObjectNode streamOptions = payload.putObject("stream_options");
+            streamOptions.put("include_usage", true);
+        }
+        return payload;
+    }
+
+    private ArrayNode rawChatMessages(GatewayChatRuntimeContext context) {
+        ArrayNode messages = objectMapper.createArrayNode();
+        JsonNode profile = conversationProfile(context);
+        JsonNode reasoning = profile.path("reasoning");
+        String assistantReasoningField = textOrDefault(reasoning.path("assistantReasoningField"), "reasoning_content");
+        String historyReplayPolicy = reasoning.path("historyReplayPolicy").asText("");
+        for (CanonicalMessage message : context.canonicalRequest().messages()) {
+            ObjectNode node = messages.addObject();
+            node.put("role", chatRole(message.role()));
+            if (message.role() == CanonicalMessageRole.TOOL) {
+                CanonicalContentPart toolResult = message.parts().stream()
+                        .filter(part -> part.type() == CanonicalPartType.TOOL_RESULT)
+                        .findFirst()
+                        .orElse(null);
+                node.put("tool_call_id", toolResult == null ? "" : toolResult.toolCallId());
+                node.put("content", toolResult == null ? "" : nullToEmpty(toolResult.text()));
+                continue;
+            }
+            String text = message.parts().stream()
+                    .filter(part -> part.type() == CanonicalPartType.TEXT)
+                    .map(CanonicalContentPart::text)
+                    .filter(value -> value != null && !value.isBlank())
+                    .reduce((left, right) -> left + "\n" + right)
+                    .orElse("");
+            node.put("content", text);
+            if (message.role() == CanonicalMessageRole.ASSISTANT) {
+                if (message.reasoningContent() != null && !message.reasoningContent().isBlank()) {
+                    node.put(assistantReasoningField, message.reasoningContent());
+                }
+                if (message.toolCalls() != null && !message.toolCalls().isEmpty()) {
+                    if ("required_when_tool_calls".equalsIgnoreCase(historyReplayPolicy)
+                            && (message.reasoningContent() == null || message.reasoningContent().isBlank())) {
+                        throw new IllegalArgumentException("当前上游站点要求 assistant tool_calls 历史必须携带 " + assistantReasoningField + "。");
+                    }
+                    node.set("tool_calls", rawToolCalls(message.toolCalls()));
+                }
+            }
+        }
+        return messages;
+    }
+
+    private ArrayNode rawToolCalls(List<CanonicalToolCall> toolCalls) {
+        ArrayNode array = objectMapper.createArrayNode();
+        for (CanonicalToolCall toolCall : toolCalls) {
+            ObjectNode item = array.addObject();
+            item.put("id", toolCall.id());
+            item.put("type", toolCall.type() == null || toolCall.type().isBlank() ? "function" : toolCall.type());
+            ObjectNode function = item.putObject("function");
+            function.put("name", toolCall.name());
+            function.put("arguments", toolCall.arguments() == null ? "" : toolCall.arguments());
+        }
+        return array;
+    }
+
+    private void applyReasoningRequestConfig(ObjectNode payload, GatewayChatRuntimeContext context) {
+        CanonicalRequest request = context.canonicalRequest();
+        JsonNode profileReasoning = conversationProfile(context).path("reasoning");
+        JsonNode requestEnabledValue = profileReasoning.path("requestEnabledValue");
+        String requestField = profileReasoning.path("requestField").asText(null);
+        if (requestField != null && !requestField.isBlank() && !requestEnabledValue.isMissingNode() && !requestEnabledValue.isNull()) {
+            putDottedJson(payload, requestField, requestEnabledValue);
+        }
+        if (request.reasoning() == null) {
+            return;
+        }
+        if (request.reasoning().rawSettings() != null && !request.reasoning().rawSettings().isNull()) {
+            payload.set("reasoning", request.reasoning().rawSettings());
+        }
+        if (request.reasoning().effort() != null && !request.reasoning().effort().isBlank()) {
+            payload.put("reasoning_effort", request.reasoning().effort());
+        }
+    }
+
+    private void putDottedJson(ObjectNode root, String path, JsonNode value) {
+        String[] parts = path.split("\\.");
+        ObjectNode current = root;
+        int start = parts.length > 0 && "extra_body".equals(parts[0]) ? 1 : 0;
+        for (int index = start; index < parts.length - 1; index++) {
+            JsonNode child = current.path(parts[index]);
+            if (!child.isObject()) {
+                child = current.putObject(parts[index]);
+            }
+            current = (ObjectNode) child;
+        }
+        if (parts.length > start) {
+            current.set(parts[parts.length - 1], value);
+        }
+    }
+
+    private JsonNode conversationProfile(GatewayChatRuntimeContext context) {
+        JsonNode siteProfile = objectMapper.createObjectNode();
+        if (upstreamSiteProfileRepository != null && context.credential().getSiteProfileId() != null) {
+            siteProfile = upstreamSiteProfileRepository.findById(context.credential().getSiteProfileId())
+                    .map(profile -> parseJson(profile.getConversationProfileJson()))
+                    .orElse(siteProfile);
+        }
+        JsonNode credentialProfile = parseJson(context.credential().getCredentialMetadataJson()).path("conversationProfile");
+        if (credentialProfile.isObject()) {
+            return mergeObjects(siteProfile, credentialProfile);
+        }
+        return siteProfile;
+    }
+
+    private JsonNode parseJson(String json) {
+        if (json == null || json.isBlank()) {
+            return objectMapper.createObjectNode();
+        }
+        try {
+            JsonNode node = objectMapper.readTree(json);
+            return node == null || !node.isObject() ? objectMapper.createObjectNode() : node;
+        } catch (Exception exception) {
+            return objectMapper.createObjectNode();
+        }
+    }
+
+    private JsonNode mergeObjects(JsonNode base, JsonNode override) {
+        ObjectNode result = base != null && base.isObject() ? ((ObjectNode) base).deepCopy() : objectMapper.createObjectNode();
+        if (override != null && override.isObject()) {
+            override.properties().forEach(entry -> result.set(entry.getKey(), entry.getValue()));
+        }
+        return result;
+    }
+
     private CanonicalResponse executeNativeResponsesCreate(GatewayChatRuntimeContext context) {
         CanonicalRequest request = context.canonicalRequest();
         ObjectNode payload = nativeResponsesPayload(request, context.selectionResult().resolvedModelKey(), false);
@@ -623,6 +946,54 @@ public class OpenAiNativeGatewayChatRuntime implements GatewayChatRuntime {
         return normalized + "/v1/responses";
     }
 
+    private String chatCompletionsUrl(String baseUrl) {
+        String normalized = baseUrl == null ? "" : baseUrl.replaceAll("/+$", "");
+        if (normalized.endsWith("/v1/chat/completions")) {
+            return normalized;
+        }
+        if (normalized.endsWith("/v1")) {
+            return normalized + "/chat/completions";
+        }
+        return normalized + "/v1/chat/completions";
+    }
+
+    private JsonNode firstChoice(JsonNode body) {
+        JsonNode choices = body == null ? null : body.path("choices");
+        if (choices != null && choices.isArray() && !choices.isEmpty()) {
+            return choices.get(0);
+        }
+        return objectMapper.createObjectNode();
+    }
+
+    private List<CanonicalToolCall> rawChatToolCalls(JsonNode toolCallsNode) {
+        if (toolCallsNode == null || !toolCallsNode.isArray()) {
+            return List.of();
+        }
+        List<CanonicalToolCall> result = new ArrayList<>();
+        for (JsonNode item : toolCallsNode) {
+            JsonNode function = item.path("function");
+            result.add(new CanonicalToolCall(
+                    text(item.path("id")),
+                    text(item.path("type")),
+                    text(function.path("name")),
+                    text(function.path("arguments"))
+            ));
+        }
+        return List.copyOf(result);
+    }
+
+    private CanonicalUsage chatUsage(JsonNode usage) {
+        if (usage == null || !usage.isObject()) {
+            return CanonicalUsage.empty();
+        }
+        int promptTokens = usage.path("prompt_tokens").asInt(0);
+        int completionTokens = usage.path("completion_tokens").asInt(0);
+        int totalTokens = usage.path("total_tokens").asInt(promptTokens + completionTokens);
+        int cacheHitTokens = usage.path("prompt_tokens_details").path("cached_tokens").asInt(0);
+        int reasoningTokens = usage.path("completion_tokens_details").path("reasoning_tokens").asInt(0);
+        return new CanonicalUsage(true, promptTokens, completionTokens, totalTokens, cacheHitTokens, 0, reasoningTokens);
+    }
+
     private String responsesOutputText(JsonNode body) {
         String direct = text(body.path("output_text"));
         if (direct != null && !direct.isBlank()) {
@@ -726,6 +1097,33 @@ public class OpenAiNativeGatewayChatRuntime implements GatewayChatRuntime {
         }
         String value = node.get(field).asText(null);
         return value == null || value.isBlank() ? null : value;
+    }
+
+    private void copyRequestExtension(ObjectNode target, JsonNode source, String field) {
+        if (source != null && source.has(field) && !source.get(field).isNull()) {
+            target.set(field, source.get(field));
+        }
+    }
+
+    private String textOrDefault(JsonNode node, String fallback) {
+        String value = text(node);
+        return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private String nullToEmpty(String value) {
+        return value == null ? "" : value;
+    }
+
+    private String chatRole(CanonicalMessageRole role) {
+        if (role == null) {
+            return "user";
+        }
+        return switch (role) {
+            case SYSTEM -> "system";
+            case USER -> "user";
+            case ASSISTANT -> "assistant";
+            case TOOL -> "tool";
+        };
     }
 
     private void copyJson(Map<String, Object> target, JsonNode source, String field) {

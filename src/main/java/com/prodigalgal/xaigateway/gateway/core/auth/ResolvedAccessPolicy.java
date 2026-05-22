@@ -4,7 +4,7 @@ import java.util.List;
 
 public record ResolvedAccessPolicy(
         List<String> sourceAccessGroups,
-        List<String> allowedProtocols,
+        List<String> allowedProtocolSuites,
         List<String> allowedModels,
         List<String> allowedProviderTypes,
         List<String> allowedClientFamilies,

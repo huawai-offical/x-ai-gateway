@@ -1,9 +1,9 @@
 # TASK-20260516-012 OpenAI Models Delete 与 Fine-tuned Model 删除边界
 
-状态：Done  
-优先级：High  
-类型：子任务切片  
-父任务：[TASK-20260514-021](../backlog/TASK-20260514-021-openai-files-uploads-batches-models-lifecycle.md)  
+状态：Done
+优先级：High
+类型：子任务切片
+父任务：[TASK-20260514-021](TASK-20260514-021-openai-files-uploads-models-functional-support.md)
 上游来源：[TASK-20260514-014](../backlog/TASK-20260514-014-openai-resource-family-coverage-gap.md)、[TASK-20260514-015](../backlog/TASK-20260514-015-openai-openapi-conformance-truth-source-hardening.md)、[REP-20260514 OpenAI API 兼容性深度审计](../../docs/reports/REP-20260514-openai-api-compatibility-deep-audit.md)
 
 ## 背景
@@ -79,7 +79,7 @@
 
 ## 关联文档
 
-- [TASK-20260514-021](../backlog/TASK-20260514-021-openai-files-uploads-batches-models-lifecycle.md)
+- [TASK-20260514-021](TASK-20260514-021-openai-files-uploads-models-functional-support.md)
 - [REP-20260514 OpenAI API 兼容性深度审计](../../docs/reports/REP-20260514-openai-api-compatibility-deep-audit.md)
 - OpenAI Models Delete API Reference：`https://developers.openai.com/api/reference/resources/models/methods/delete`
 

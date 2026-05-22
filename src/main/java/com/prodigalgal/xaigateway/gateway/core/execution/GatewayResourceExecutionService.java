@@ -20,6 +20,7 @@ import com.prodigalgal.xaigateway.gateway.core.canonical.DefaultCanonicalResourc
 import com.prodigalgal.xaigateway.gateway.core.credential.CredentialMaterialResolver;
 import com.prodigalgal.xaigateway.gateway.core.credential.ResolvedCredentialMaterial;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileContent;
+import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileListPage;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileResponse;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileService;
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayDegradationPolicy;
@@ -186,6 +187,15 @@ public class GatewayResourceExecutionService {
 
     public java.util.List<GatewayFileResponse> listFiles(Long distributedKeyId) {
         return gatewayFileService.listFiles(distributedKeyId);
+    }
+
+    public GatewayFileListPage listFilesPage(
+            Long distributedKeyId,
+            String purpose,
+            String after,
+            Integer limit,
+            String order) {
+        return gatewayFileService.listFilesPage(distributedKeyId, purpose, after, limit, order);
     }
 
     public GatewayFileResponse getFile(String fileId, Long distributedKeyId) {
@@ -1134,8 +1144,7 @@ public class GatewayResourceExecutionService {
             return false;
         }
         return resourceType == TranslationResourceType.RESPONSE
-                || resourceType == TranslationResourceType.UPLOAD
-                || resourceType == TranslationResourceType.REALTIME;
+                || resourceType == TranslationResourceType.UPLOAD;
     }
 
     private void recordStructuredRouteDecision(

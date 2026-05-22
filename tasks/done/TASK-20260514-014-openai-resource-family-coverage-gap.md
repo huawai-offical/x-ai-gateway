@@ -1,9 +1,9 @@
 # TASK-20260514-014 OpenAI 对话与 Tools 支撑资源族覆盖差距补齐
 
-状态：Done  
-优先级：High  
-类型：子任务  
-父任务：[REQ-20260514-008](../../docs/requirements/REQ-20260514-008-openai-api-compatibility-deep-audit.md)  
+状态：Done
+优先级：High
+类型：子任务
+父任务：[REQ-20260514-008](../../docs/requirements/REQ-20260514-008-openai-api-compatibility-deep-audit.md)
 上游来源：[REP-20260514 OpenAI API 完整兼容性深度审计](../../docs/reports/REP-20260514-openai-api-compatibility-deep-audit.md)
 
 ## 背景
@@ -76,15 +76,15 @@ OpenAI 官方 API Reference 覆盖大量资源族，但当前产品边界已收�
 
 ## 下游细分任务
 
-- [TASK-20260514-020 OpenAI Audio、Images、Embeddings、Moderations 参数 parity](../backlog/TASK-20260514-020-openai-audio-images-embeddings-moderations-parity.md)
-- [TASK-20260514-021 OpenAI Files、Uploads、Models 对话支撑最小生命周期](../backlog/TASK-20260514-021-openai-files-uploads-batches-models-lifecycle.md)
-- [TASK-20260514-023 OpenAI Vector Stores 对话 RAG 支撑面](../backlog/TASK-20260514-023-openai-vector-stores-full-stack.md)
+- [TASK-20260514-020 OpenAI Audio、Images、Embeddings、Moderations 参数边界](TASK-20260514-020-openai-multimodal-supporting-parameters.md)
+- [TASK-20260514-021 OpenAI Files、Uploads、Models 对话支撑最小生命周期](TASK-20260514-021-openai-files-uploads-models-functional-support.md)
+- [TASK-20260514-023 OpenAI Vector Stores 对话 RAG 支撑面](../done/TASK-20260514-023-openai-vector-stores-full-stack.md)
 
 ## 已删除非核心任务
 
 - `TASK-20260514-022 OpenAI Fine-tuning 全生命周期`
-- `TASK-20260514-024 OpenAI Containers 与 Code Interpreter 文件`
-- `TASK-20260514-025 OpenAI Videos API 兼容面`
+- `TASK-20260514-024 OpenAI Containers 与 Code Interpreter 文件`：已按 ADR-0010 判定为非核心官方 API，不再保留独立 Backlog 任务。
+- `TASK-20260514-025 OpenAI Videos API 兼容面`：已按 ADR-0010 判定为非核心官方 API，不再保留独立 Backlog 任务。
 - `TASK-20260514-026 OpenAI Evals、Graders 与 Runs API`
 - `TASK-20260514-027 OpenAI Skills API 与工具分发`
 - `TASK-20260514-028 OpenAI Administration API 权限隔离与只读优先`

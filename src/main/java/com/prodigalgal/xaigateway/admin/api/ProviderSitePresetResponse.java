@@ -12,6 +12,8 @@ public record ProviderSitePresetResponse(
         String code,
         String profileCode,
         String displayName,
+        String vendorCode,
+        String vendorName,
         UpstreamSiteKind siteKind,
         ProviderFamily providerFamily,
         AuthStrategy authStrategy,
@@ -35,6 +37,8 @@ public record ProviderSitePresetResponse(
         List<String> modelFamilies,
         String pricingMetadata,
         List<String> unsupportedFeatures,
+        Object conversationProfile,
+        Object modelPolicies,
         boolean imported,
         Long existingSiteProfileId
 ) {

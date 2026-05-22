@@ -6,7 +6,7 @@ import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeySecretService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeySecrets;
 import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeySecretExportGrantEntity;
-import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAccountPoolBindingRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAccountGroupBindingRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAccessGroupGrantRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyBindingRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyRepository;
@@ -35,7 +35,7 @@ class DistributedKeyAdminServiceTests {
                 keyRepository,
                 Mockito.mock(DistributedKeySecretService.class),
                 Mockito.mock(DistributedKeyBindingRepository.class),
-                Mockito.mock(DistributedKeyAccountPoolBindingRepository.class),
+                Mockito.mock(DistributedKeyAccountGroupBindingRepository.class),
                 Mockito.mock(DistributedKeyAccessGroupGrantRepository.class),
                 grantRepository,
                 Mockito.mock(GatewayUserRepository.class),
@@ -71,7 +71,7 @@ class DistributedKeyAdminServiceTests {
                 keyRepository,
                 Mockito.mock(DistributedKeySecretService.class),
                 Mockito.mock(DistributedKeyBindingRepository.class),
-                Mockito.mock(DistributedKeyAccountPoolBindingRepository.class),
+                Mockito.mock(DistributedKeyAccountGroupBindingRepository.class),
                 Mockito.mock(DistributedKeyAccessGroupGrantRepository.class),
                 Mockito.mock(DistributedKeySecretExportGrantRepository.class),
                 Mockito.mock(GatewayUserRepository.class),
@@ -133,7 +133,7 @@ class DistributedKeyAdminServiceTests {
                 keyRepository,
                 secretService,
                 Mockito.mock(DistributedKeyBindingRepository.class),
-                Mockito.mock(DistributedKeyAccountPoolBindingRepository.class),
+                Mockito.mock(DistributedKeyAccountGroupBindingRepository.class),
                 Mockito.mock(DistributedKeyAccessGroupGrantRepository.class),
                 grantRepository,
                 Mockito.mock(GatewayUserRepository.class),
@@ -236,7 +236,7 @@ class DistributedKeyAdminServiceTests {
                 keyRepository,
                 Mockito.mock(DistributedKeySecretService.class),
                 Mockito.mock(DistributedKeyBindingRepository.class),
-                Mockito.mock(DistributedKeyAccountPoolBindingRepository.class),
+                Mockito.mock(DistributedKeyAccountGroupBindingRepository.class),
                 Mockito.mock(DistributedKeyAccessGroupGrantRepository.class),
                 grantRepository,
                 Mockito.mock(GatewayUserRepository.class),

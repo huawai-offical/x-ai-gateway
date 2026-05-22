@@ -2,8 +2,8 @@ package com.prodigalgal.xaigateway.admin.application;
 
 import com.prodigalgal.xaigateway.gateway.core.account.UpstreamAccountProviderType;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountEntity;
-import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountPoolEntity;
-import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountPoolRepository;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountGroupEntity;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountGroupRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountRepository;
 import java.util.ArrayList;
 import java.util.List;
@@ -22,26 +22,26 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class CodexLongTermTestImportServiceTests {
 
     @Test
-    void shouldCreatePoolAndCodexAccountFromAuthJsonWithoutLeakingSecret() {
+    void shouldCreateGroupAndCodexAccountFromAuthJsonWithoutLeakingSecret() {
         UpstreamAccountRepository accountRepository = Mockito.mock(UpstreamAccountRepository.class);
-        UpstreamAccountPoolRepository poolRepository = Mockito.mock(UpstreamAccountPoolRepository.class);
+        UpstreamAccountGroupRepository groupRepository = Mockito.mock(UpstreamAccountGroupRepository.class);
         CredentialCryptoService cryptoService = Mockito.mock(CredentialCryptoService.class);
         SupportedModelCatalogService modelCatalogService = Mockito.mock(SupportedModelCatalogService.class);
         CodexLongTermTestImportService service = new CodexLongTermTestImportService(
                 accountRepository,
-                poolRepository,
+                groupRepository,
                 cryptoService,
                 modelCatalogService,
                 new ObjectMapper()
         );
-        AtomicReference<UpstreamAccountPoolEntity> savedPoolRef = new AtomicReference<>();
+        AtomicReference<UpstreamAccountGroupEntity> savedGroupRef = new AtomicReference<>();
         AtomicReference<UpstreamAccountEntity> savedAccountRef = new AtomicReference<>();
-        Mockito.when(poolRepository.findByPoolNameIgnoreCase("codex-long-term-test")).thenReturn(Optional.empty());
-        Mockito.when(poolRepository.save(Mockito.any())).thenAnswer(invocation -> {
-            UpstreamAccountPoolEntity pool = invocation.getArgument(0);
-            ReflectionTestUtils.setField(pool, "id", 91L);
-            savedPoolRef.set(pool);
-            return pool;
+        Mockito.when(groupRepository.findByGroupNameIgnoreCase("codex-long-term-test")).thenReturn(Optional.empty());
+        Mockito.when(groupRepository.save(Mockito.any())).thenAnswer(invocation -> {
+            UpstreamAccountGroupEntity group = invocation.getArgument(0);
+            ReflectionTestUtils.setField(group, "id", 91L);
+            savedGroupRef.set(group);
+            return group;
         });
         Mockito.when(accountRepository.findFirstByProviderTypeAndExternalAccountIdOrderByUpdatedAtDesc(
                 Mockito.eq(UpstreamAccountProviderType.CODEX_OAUTH),
@@ -60,16 +60,16 @@ class CodexLongTermTestImportServiceTests {
 
         CodexLongTermTestImportResult result = service.importAuthJson(authJson("codex-access-secret", "codex-refresh-secret"), null);
 
-        UpstreamAccountPoolEntity pool = savedPoolRef.get();
+        UpstreamAccountGroupEntity group = savedGroupRef.get();
         UpstreamAccountEntity account = savedAccountRef.get();
         assertEquals(151L, result.accountId());
-        assertEquals(91L, result.poolId());
+        assertEquals(91L, result.groupId());
         assertEquals("CREATED", result.status());
         assertTrue(result.routeEligible());
         assertTrue(result.externalAccountId().startsWith("codex:email:"));
         assertNotNull(result.credentialFingerprint());
-        assertEquals(UpstreamAccountProviderType.CODEX_OAUTH, pool.getProviderType());
-        assertEquals(List.of("CODEX"), pool.getAllowedClientFamilies());
+        assertEquals(UpstreamAccountProviderType.CODEX_OAUTH, group.getProviderType());
+        assertEquals(List.of("CODEX"), group.getAllowedClientFamilies());
         assertEquals("enc:codex-access-secret", account.getAccessTokenCiphertext());
         assertEquals("enc:codex-refresh-secret", account.getRefreshTokenCiphertext());
         assertEquals("QUOTA_READY", account.getRefreshStatus());
@@ -86,20 +86,20 @@ class CodexLongTermTestImportServiceTests {
     @Test
     void shouldUpdateExistingCodexAccountByExternalAccountId() {
         UpstreamAccountRepository accountRepository = Mockito.mock(UpstreamAccountRepository.class);
-        UpstreamAccountPoolRepository poolRepository = Mockito.mock(UpstreamAccountPoolRepository.class);
+        UpstreamAccountGroupRepository groupRepository = Mockito.mock(UpstreamAccountGroupRepository.class);
         CredentialCryptoService cryptoService = Mockito.mock(CredentialCryptoService.class);
         SupportedModelCatalogService modelCatalogService = Mockito.mock(SupportedModelCatalogService.class);
         CodexLongTermTestImportService service = new CodexLongTermTestImportService(
                 accountRepository,
-                poolRepository,
+                groupRepository,
                 cryptoService,
                 modelCatalogService,
                 new ObjectMapper()
         );
-        UpstreamAccountPoolEntity pool = new UpstreamAccountPoolEntity();
-        ReflectionTestUtils.setField(pool, "id", 92L);
-        pool.setPoolName("codex-long-term-test");
-        pool.setProviderType(UpstreamAccountProviderType.CODEX_OAUTH);
+        UpstreamAccountGroupEntity group = new UpstreamAccountGroupEntity();
+        ReflectionTestUtils.setField(group, "id", 92L);
+        group.setGroupName("codex-long-term-test");
+        group.setProviderType(UpstreamAccountProviderType.CODEX_OAUTH);
         UpstreamAccountEntity existing = new UpstreamAccountEntity();
         ReflectionTestUtils.setField(existing, "id", 152L);
         existing.setExternalAccountId("legacy-account-id");
@@ -111,7 +111,7 @@ class CodexLongTermTestImportServiceTests {
                 .identityKey();
         existing.setMetadataJson("{\"codex_auth_json\":{\"identityKey\":\"" + identityKey + "\"}}");
         AtomicReference<UpstreamAccountEntity> savedAccountRef = new AtomicReference<>();
-        Mockito.when(poolRepository.findByPoolNameIgnoreCase("codex-long-term-test")).thenReturn(Optional.of(pool));
+        Mockito.when(groupRepository.findByGroupNameIgnoreCase("codex-long-term-test")).thenReturn(Optional.of(group));
         Mockito.when(accountRepository.findFirstByProviderTypeAndExternalAccountIdOrderByUpdatedAtDesc(
                 Mockito.eq(UpstreamAccountProviderType.CODEX_OAUTH),
                 Mockito.anyString()
@@ -133,14 +133,14 @@ class CodexLongTermTestImportServiceTests {
 
         UpstreamAccountEntity account = savedAccountRef.get();
         assertEquals(152L, result.accountId());
-        assertEquals(92L, result.poolId());
+        assertEquals(92L, result.groupId());
         assertEquals("UPDATED", result.status());
         assertEquals(identityKey, result.externalAccountId());
         assertEquals("enc:codex-new-access-secret", account.getAccessTokenCiphertext());
         assertEquals("enc:codex-new-refresh-secret", account.getRefreshTokenCiphertext());
         assertFalse(account.getMetadataJson().contains("codex-new-access-secret"));
         assertFalse(account.getMetadataJson().contains("codex-new-refresh-secret"));
-        Mockito.verify(poolRepository, Mockito.never()).save(Mockito.any());
+        Mockito.verify(groupRepository, Mockito.never()).save(Mockito.any());
     }
 
     private String authJson(String accessToken, String refreshToken) {

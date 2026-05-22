@@ -50,6 +50,14 @@ public class UpstreamSiteProfileEntity {
     @Comment("站点档案显示名称。")
     private String displayName;
 
+    @Column(name = "vendor_code", length = 64)
+    @Comment("厂商品牌编码，例如 openai、xiaomi_mimo、deepseek。")
+    private String vendorCode;
+
+    @Column(name = "vendor_name", length = 128)
+    @Comment("厂商品牌显示名称。")
+    private String vendorName;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "provider_family", nullable = false, length = 32)
     @Comment("Provider family。")
@@ -88,6 +96,10 @@ public class UpstreamSiteProfileEntity {
     @Comment("备注说明。")
     private String description;
 
+    @Column(name = "conversation_profile_json", columnDefinition = "text")
+    @Comment("对话协议画像 JSON，承载 Responses/Chat 转译、reasoning_content、tool call 历史回放等厂商兼容策略。")
+    private String conversationProfileJson;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "profile_source", nullable = false, length = 32)
     @Comment("站点档案来源。")
@@ -125,6 +137,22 @@ public class UpstreamSiteProfileEntity {
 
     public void setDisplayName(String displayName) {
         this.displayName = displayName;
+    }
+
+    public String getVendorCode() {
+        return vendorCode;
+    }
+
+    public void setVendorCode(String vendorCode) {
+        this.vendorCode = vendorCode;
+    }
+
+    public String getVendorName() {
+        return vendorName;
+    }
+
+    public void setVendorName(String vendorName) {
+        this.vendorName = vendorName;
     }
 
     public ProviderFamily getProviderFamily() {
@@ -189,6 +217,14 @@ public class UpstreamSiteProfileEntity {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public String getConversationProfileJson() {
+        return conversationProfileJson;
+    }
+
+    public void setConversationProfileJson(String conversationProfileJson) {
+        this.conversationProfileJson = conversationProfileJson;
     }
 
     public SiteProfileSource getProfileSource() {

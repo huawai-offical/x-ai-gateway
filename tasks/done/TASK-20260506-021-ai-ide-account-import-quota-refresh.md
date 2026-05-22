@@ -53,3 +53,8 @@
 
 - 本轮未扩展复杂 Admin 前端筛选/批量操作 UI；后端响应已包含 `quotaStatus`、`planTier`、`subscriptionTier`、`routeEligible` 和 `routeBlockReason`，可直接支撑 UI。
 - 本轮不绑定非公开远程接口；后续可按官方账号类型替换为真实 quota adapter。
+
+## 2026-05-21 口径补充
+
+- 本任务保留的是官方账号导入、quota refresh 和调度语义的后端闭环。
+- 任务中提到的 Admin 运营面属于历史设计背景，不应再解读为必须保留独立 `官方账号运行态` 控制台页面。

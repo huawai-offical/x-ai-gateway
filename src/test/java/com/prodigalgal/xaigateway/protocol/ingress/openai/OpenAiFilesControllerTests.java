@@ -3,6 +3,7 @@ package com.prodigalgal.xaigateway.protocol.ingress.openai;
 import tools.jackson.databind.node.JsonNodeFactory;
 import com.prodigalgal.xaigateway.gateway.core.auth.AuthenticatedDistributedKey;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyAuthenticationService;
+import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileListPage;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileResponse;
 import com.prodigalgal.xaigateway.gateway.core.execution.GatewayResourceExecutionService;
 import com.prodigalgal.xaigateway.testsupport.PermitAllSecurityTestConfig;
@@ -38,23 +39,26 @@ class OpenAiFilesControllerTests {
     void shouldListFiles() {
         Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayResourceExecutionService.listFiles(1L))
-                .thenReturn(List.of(GatewayFileResponse.from(
+        Mockito.when(gatewayResourceExecutionService.listFilesPage(1L, "assistants", "file-prev", 1, "asc"))
+                .thenReturn(new GatewayFileListPage(List.of(GatewayFileResponse.from(
                         "file-123",
                         "demo.txt",
                         "assistants",
                         12,
                         Instant.parse("2026-04-07T12:00:00Z"),
                         "processed"
-                )));
+                )), true, "file-123", "file-123"));
 
         webTestClient.get()
-                .uri("/v1/files")
+                .uri("/v1/files?purpose=assistants&after=file-prev&limit=1&order=asc")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.object").isEqualTo("list")
+                .jsonPath("$.has_more").isEqualTo(true)
+                .jsonPath("$.first_id").isEqualTo("file-123")
+                .jsonPath("$.last_id").isEqualTo("file-123")
                 .jsonPath("$.data[0].id").isEqualTo("file-123")
                 .jsonPath("$.data[0].filename").isEqualTo("demo.txt");
     }

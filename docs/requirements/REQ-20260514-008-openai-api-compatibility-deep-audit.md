@@ -36,7 +36,7 @@
 - 已完成 [REP-20260514 OpenAI API 完整兼容性深度审计](../reports/REP-20260514-openai-api-compatibility-deep-audit.md)。
 - 结论：当前项目不是 OpenAI API 全量实现，也不是 OpenAI API 全量参数兼容；当前是 OpenAI-compatible 核心 Chat/Responses 与部分 OpenAI 官方资源生命周期的基础兼容。
 - 已创建缺口任务：
-  - [TASK-20260514-013 OpenAI Chat/Responses 参数全量保真与原生 Responses 边界](../../tasks/backlog/TASK-20260514-013-openai-chat-responses-native-parity.md)
+  - [TASK-20260514-013 OpenAI Chat/Responses 参数全量保真与原生 Responses 边界](../../tasks/done/TASK-20260514-013-openai-chat-responses-native-parity.md)
   - [TASK-20260514-014 OpenAI 官方资源族覆盖差距补齐](../../tasks/backlog/TASK-20260514-014-openai-resource-family-coverage-gap.md)
   - [TASK-20260514-015 OpenAI 公开 OpenAPI、catalog 与 conformance 事实源校准](../../tasks/backlog/TASK-20260514-015-openai-openapi-conformance-truth-source-hardening.md)
 

@@ -9,5 +9,7 @@ public interface GatewayFileRepository extends JpaRepository<GatewayFileEntity, 
 
     List<GatewayFileEntity> findTop100ByDistributedKeyIdAndDeletedFalseOrderByCreatedAtDesc(Long distributedKeyId);
 
+    List<GatewayFileEntity> findAllByDistributedKeyIdAndDeletedFalseOrderByCreatedAtDesc(Long distributedKeyId);
+
     Optional<GatewayFileEntity> findByFileKeyAndDeletedFalse(String fileKey);
 }

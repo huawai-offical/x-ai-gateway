@@ -57,3 +57,8 @@
 - `bun run test -- src/features/request-logs/request-logs-page.test.tsx`：通过，覆盖 Codex 观测、筛选、usage/filter/cache 和脱敏包。
 - `bun run typecheck`：通过。
 - `bun run build`：通过。
+
+## 2026-05-21 历史归档口径
+
+- 本任务记录的是旧 `live/realtime` 观测台的历史实现与验证结果。
+- 随着 Realtime 对外面板和相关控制台能力下线，本任务仅作为归档证据保留，不再代表现役产品面。

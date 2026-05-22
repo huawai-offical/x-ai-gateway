@@ -9,7 +9,7 @@ public record AccessGroupResponse(
         String description,
         boolean active,
         int priority,
-        List<String> allowedProtocols,
+        List<String> allowedProtocolSuites,
         List<String> allowedModels,
         List<String> allowedProviderTypes,
         List<String> allowedClientFamilies,

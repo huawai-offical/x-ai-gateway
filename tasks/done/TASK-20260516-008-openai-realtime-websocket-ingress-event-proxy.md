@@ -1,10 +1,10 @@
 # TASK-20260516-008 OpenAI Realtime WebSocket 入口与事件代理基线
 
-状态：Done  
-优先级：Critical  
-类型：子任务切片  
-父任务：[TASK-20260514-030](../backlog/TASK-20260514-030-openai-cross-cutting-protocol-compatibility.md)  
-关联任务：[TASK-20260514-018](../backlog/TASK-20260514-018-openai-responses-native-lifecycle.md)、[TASK-20260501-024](../done/TASK-20260501-024-realtime-real-provider-websocket.md)
+状态：Done
+优先级：Critical
+类型：子任务切片
+父任务：[TASK-20260514-030](../done/TASK-20260514-030-openai-cross-cutting-protocol-compatibility.md)
+关联任务：[TASK-20260514-018](../done/TASK-20260514-018-openai-responses-native-lifecycle.md)、[TASK-20260501-024](../done/TASK-20260501-024-realtime-real-provider-websocket.md)
 
 ## 背景
 
@@ -50,7 +50,7 @@
 - `src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/`
 - `docs/realtime-provider-websocket.md`
 - `docs/public-api-compatibility.md`
-- `tasks/backlog/TASK-20260514-030-openai-cross-cutting-protocol-compatibility.md`
+- `tasks/done/TASK-20260514-030-openai-cross-cutting-protocol-compatibility.md`
 - `docs/reports/REP-20260514-openai-full-api-coverage-task-breakdown.md`
 
 ## 依赖

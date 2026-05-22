@@ -1,8 +1,8 @@
 # REQ-20260516-015 OpenAI Conversations 本地 Lifecycle 闭环
 
-状态：Done  
-日期：2026-05-16  
-来源任务：[TASK-20260514-019](../../tasks/backlog/TASK-20260514-019-openai-conversations-webhooks-tools.md)
+状态：Done
+日期：2026-05-16
+来源任务：[TASK-20260514-019](../../tasks/done/TASK-20260514-019-openai-conversations-webhooks-tools.md)
 
 ## 背景
 

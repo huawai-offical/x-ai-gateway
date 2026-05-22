@@ -11,7 +11,7 @@ import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
 import com.prodigalgal.xaigateway.infra.persistence.entity.AccessGroupEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.AnnouncementEntity;
-import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyAccountPoolBindingEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyAccountGroupBindingEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayUserBalanceLedgerEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayUserEntity;
@@ -20,13 +20,13 @@ import com.prodigalgal.xaigateway.infra.persistence.entity.PromoCampaignEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.RedeemCodeEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SiteCapabilitySnapshotEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SubscriptionPlanEntity;
-import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountPoolEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountGroupEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamSiteProfileEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UsageRecordEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UserSubscriptionEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.AnnouncementReadStateRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.AnnouncementRepository;
-import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAccountPoolBindingRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAccountGroupBindingRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayUserBalanceLedgerRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayUserRepository;
@@ -34,7 +34,7 @@ import com.prodigalgal.xaigateway.infra.persistence.repository.PaymentOrderRepos
 import com.prodigalgal.xaigateway.infra.persistence.repository.RedeemCodeRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.RedeemCodeUsageRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.SiteCapabilitySnapshotRepository;
-import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountPoolRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountGroupRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamSiteProfileRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UsageRecordRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UserSubscriptionRepository;
@@ -69,8 +69,8 @@ class PortalAuthServiceTests {
     private final RedeemCodeRepository redeemCodeRepository = Mockito.mock(RedeemCodeRepository.class);
     private final RedeemCodeUsageRepository redeemCodeUsageRepository = Mockito.mock(RedeemCodeUsageRepository.class);
     private final GatewayUserBalanceLedgerRepository balanceLedgerRepository = Mockito.mock(GatewayUserBalanceLedgerRepository.class);
-    private final UpstreamAccountPoolRepository accountPoolRepository = Mockito.mock(UpstreamAccountPoolRepository.class);
-    private final DistributedKeyAccountPoolBindingRepository keyPoolBindingRepository = Mockito.mock(DistributedKeyAccountPoolBindingRepository.class);
+    private final UpstreamAccountGroupRepository accountGroupRepository = Mockito.mock(UpstreamAccountGroupRepository.class);
+    private final DistributedKeyAccountGroupBindingRepository keyGroupBindingRepository = Mockito.mock(DistributedKeyAccountGroupBindingRepository.class);
     private final DistributedKeySecretService distributedKeySecretService = new DistributedKeySecretService();
     private final PasswordEncoder passwordEncoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
     private final AccessGroupEntitlementService accessGroupEntitlementService = Mockito.mock(AccessGroupEntitlementService.class);
@@ -83,8 +83,8 @@ class PortalAuthServiceTests {
             redeemCodeRepository,
             redeemCodeUsageRepository,
             balanceLedgerRepository,
-            accountPoolRepository,
-            keyPoolBindingRepository,
+            accountGroupRepository,
+            keyGroupBindingRepository,
             distributedKeySecretService,
             passwordEncoder,
             accessGroupEntitlementService
@@ -150,8 +150,8 @@ class PortalAuthServiceTests {
                 redeemCodeRepository,
                 redeemCodeUsageRepository,
                 balanceLedgerRepository,
-                accountPoolRepository,
-                keyPoolBindingRepository,
+                accountGroupRepository,
+                keyGroupBindingRepository,
                 distributedKeySecretService,
                 passwordEncoder,
                 accessGroupEntitlementService,
@@ -237,11 +237,11 @@ class PortalAuthServiceTests {
     @Test
     void shouldCreateRotateAndDisableOwnedPortalKey() {
         GatewayUserEntity user = user(8L, "beta@example.com", "password-123");
-        UpstreamAccountPoolEntity pool = defaultPool();
+        UpstreamAccountGroupEntity group = defaultGroup();
         Mockito.when(userRepository.findByEmailIgnoreCase("beta@example.com")).thenReturn(Optional.of(user));
         Mockito.when(userRepository.findById(8L)).thenReturn(Optional.of(user));
         Mockito.when(userRepository.save(Mockito.any())).thenAnswer(invocation -> invocation.getArgument(0));
-        Mockito.when(accountPoolRepository.findByPoolNameIgnoreCase("default")).thenReturn(Optional.of(pool));
+        Mockito.when(accountGroupRepository.findByGroupNameIgnoreCase("default")).thenReturn(Optional.of(group));
         AtomicReference<DistributedKeyEntity> savedKeyRef = new AtomicReference<>();
         Mockito.when(keyRepository.save(Mockito.any())).thenAnswer(invocation -> {
             DistributedKeyEntity key = invocation.getArgument(0);
@@ -251,7 +251,7 @@ class PortalAuthServiceTests {
             savedKeyRef.set(key);
             return key;
         });
-        Mockito.when(keyPoolBindingRepository.save(Mockito.any())).thenAnswer(invocation -> invocation.getArgument(0));
+        Mockito.when(keyGroupBindingRepository.save(Mockito.any())).thenAnswer(invocation -> invocation.getArgument(0));
         MockServerWebExchange exchange = exchange();
         service.login(new PortalLoginRequest("beta@example.com", "password-123"), exchange).block();
 
@@ -274,7 +274,7 @@ class PortalAuthServiceTests {
         assertTrue(created.key().active());
         assertTrue(rotated.fullKey().startsWith("sk-gw-"));
         assertTrue(!disabled.active());
-        Mockito.verify(keyPoolBindingRepository).save(Mockito.any(DistributedKeyAccountPoolBindingEntity.class));
+        Mockito.verify(keyGroupBindingRepository).save(Mockito.any(DistributedKeyAccountGroupBindingEntity.class));
     }
 
     @Test
@@ -301,8 +301,8 @@ class PortalAuthServiceTests {
                 usageRecordRepository,
                 siteProfileRepository,
                 snapshotRepository,
-                accountPoolRepository,
-                keyPoolBindingRepository,
+                accountGroupRepository,
+                keyGroupBindingRepository,
                 distributedKeySecretService,
                 passwordEncoder,
                 accessGroupEntitlementService,
@@ -471,7 +471,7 @@ class PortalAuthServiceTests {
         ReflectionTestUtils.setField(key, "id", id);
         key.setKeyName("Portal Key");
         key.setMaskedKey("xag_****_tail");
-        key.setAllowedProtocols(List.of("openai"));
+        key.setAllowedProtocolSuites(List.of("openai"));
         key.setAllowedModels(List.of("gpt-5-mini"));
         key.setActive(true);
         return key;
@@ -516,15 +516,15 @@ class PortalAuthServiceTests {
         return redeemCode;
     }
 
-    private UpstreamAccountPoolEntity defaultPool() {
-        UpstreamAccountPoolEntity pool = new UpstreamAccountPoolEntity();
-        ReflectionTestUtils.setField(pool, "id", 16L);
-        pool.setPoolName("default");
-        pool.setProviderType(UpstreamAccountProviderType.OPENAI_OAUTH);
-        pool.setSupportedProtocols(List.of("openai", "responses"));
-        pool.setSupportedModels(List.of("gpt-5-mini"));
-        pool.setAllowedClientFamilies(List.of("GENERIC_OPENAI", "CODEX"));
-        pool.setActive(true);
-        return pool;
+    private UpstreamAccountGroupEntity defaultGroup() {
+        UpstreamAccountGroupEntity group = new UpstreamAccountGroupEntity();
+        ReflectionTestUtils.setField(group, "id", 16L);
+        group.setGroupName("default");
+        group.setProviderType(UpstreamAccountProviderType.OPENAI_OAUTH);
+        group.setSupportedProtocols(List.of("openai", "responses"));
+        group.setSupportedModels(List.of("gpt-5-mini"));
+        group.setAllowedClientFamilies(List.of("GENERIC_OPENAI", "CODEX"));
+        group.setActive(true);
+        return group;
     }
 }

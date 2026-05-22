@@ -36,8 +36,7 @@ public class AsyncLifecycleGatewayResourceExecutor implements GatewayResourceExe
         if (request == null || request.normalizedPath() == null) {
             return false;
         }
-        return request.normalizedPath().startsWith("/v1/uploads")
-                || "/v1/realtime/client_secrets".equals(request.normalizedPath());
+        return request.normalizedPath().startsWith("/v1/uploads");
     }
 
     @Override
@@ -51,7 +50,6 @@ public class AsyncLifecycleGatewayResourceExecutor implements GatewayResourceExe
             case "/v1/uploads/{uploadId}" -> gatewayAsyncResourceService.getUpload(requirePathParam(context, "uploadId"), context.distributedKeyId());
             case "/v1/uploads/{uploadId}/complete" -> gatewayAsyncResourceService.completeUpload(requirePathParam(context, "uploadId"), context.distributedKeyId());
             case "/v1/uploads/{uploadId}/cancel" -> gatewayAsyncResourceService.cancelUpload(requirePathParam(context, "uploadId"), context.distributedKeyId());
-            case "/v1/realtime/client_secrets" -> gatewayAsyncResourceService.createRealtimeClientSecret(context.distributedKeyId(), requestBody, preferredCredentialId);
             default -> throw new IllegalArgumentException("当前生命周期对象路径不受支持。");
         };
         return ResponseEntity.ok(response);

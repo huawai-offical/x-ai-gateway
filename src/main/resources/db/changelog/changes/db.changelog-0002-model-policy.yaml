@@ -1,0 +1,199 @@
+databaseChangeLog:
+- changeSet:
+    id: 0002-model-policy-20260522
+    author: codex
+    preConditions:
+    - onFail: MARK_RAN
+    - not:
+      - tableExists:
+          tableName: model_policy
+    changes:
+    - createTable:
+        tableName: model_policy
+        remarks: 模型策略表，用于跨 DistributedKey、AccountGroup、Account、Credential、SiteProfile、Vendor 分层收缩与映射。
+        columns:
+        - column:
+            name: id
+            type: BIGINT
+            autoIncrement: true
+            constraints:
+              primaryKey: true
+              primaryKeyName: pk_model_policy
+              nullable: false
+        - column:
+            name: scope_type
+            type: VARCHAR(32)
+            constraints:
+              nullable: false
+        - column:
+            name: scope_id
+            type: BIGINT
+        - column:
+            name: scope_ref
+            type: VARCHAR(128)
+        - column:
+            name: policy_kind
+            type: VARCHAR(32)
+            defaultValue: ALLOW
+            constraints:
+              nullable: false
+        - column:
+            name: public_model
+            type: VARCHAR(256)
+            constraints:
+              nullable: false
+        - column:
+            name: public_model_key
+            type: VARCHAR(256)
+            constraints:
+              nullable: false
+        - column:
+            name: upstream_model
+            type: VARCHAR(256)
+        - column:
+            name: upstream_model_key
+            type: VARCHAR(256)
+        - column:
+            name: model_family
+            type: VARCHAR(64)
+        - column:
+            name: supported_protocols_json
+            type: TEXT
+        - column:
+            name: enabled
+            type: BOOLEAN
+            defaultValueBoolean: true
+            constraints:
+              nullable: false
+        - column:
+            name: deny
+            type: BOOLEAN
+            defaultValueBoolean: false
+            constraints:
+              nullable: false
+        - column:
+            name: priority
+            type: INT
+            defaultValueNumeric: 100
+            constraints:
+              nullable: false
+        - column:
+            name: weight
+            type: INT
+            defaultValueNumeric: 100
+            constraints:
+              nullable: false
+        - column:
+            name: capability_json
+            type: TEXT
+        - column:
+            name: request_overrides_json
+            type: TEXT
+        - column:
+            name: response_overrides_json
+            type: TEXT
+        - column:
+            name: runtime_policy_json
+            type: TEXT
+        - column:
+            name: mapping_source
+            type: VARCHAR(32)
+            defaultValue: manual
+            constraints:
+              nullable: false
+        - column:
+            name: description
+            type: VARCHAR(512)
+        - column:
+            name: created_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITH TIME ZONE
+            defaultValueComputed: CURRENT_TIMESTAMP
+            constraints:
+              nullable: false
+    - addUniqueConstraint:
+        tableName: model_policy
+        columnNames: scope_type,scope_id,scope_ref,public_model_key,upstream_model_key,policy_kind
+        constraintName: uk_model_policy_scope_public_upstream
+    - createIndex:
+        tableName: model_policy
+        indexName: idx_model_policy_scope
+        columns:
+        - column:
+            name: scope_type
+        - column:
+            name: scope_id
+        - column:
+            name: scope_ref
+    - createIndex:
+        tableName: model_policy
+        indexName: idx_model_policy_public_enabled
+        columns:
+        - column:
+            name: public_model_key
+        - column:
+            name: enabled
+    - createIndex:
+        tableName: model_policy
+        indexName: idx_model_policy_upstream_enabled
+        columns:
+        - column:
+            name: upstream_model_key
+        - column:
+            name: enabled
+    - createIndex:
+        tableName: model_policy
+        indexName: idx_model_policy_priority
+        columns:
+        - column:
+            name: priority
+    rollback:
+    - dropTable:
+        tableName: model_policy
+
+- changeSet:
+    id: 0002-upstream-credential-scope-fingerprint-20260522
+    author: codex
+    changes:
+    - sql:
+        dbms: postgresql
+        sql: >-
+          ALTER TABLE upstream_credential
+          DROP CONSTRAINT IF EXISTS uk_upstream_credential_api_key_fingerprint;
+          ALTER TABLE upstream_credential
+          DROP CONSTRAINT IF EXISTS uk_upstream_credential_scope_fingerprint;
+          ALTER TABLE upstream_credential
+          ADD CONSTRAINT uk_upstream_credential_scope_fingerprint
+          UNIQUE (api_key_fingerprint, provider_type, base_url, site_profile_id);
+    - sql:
+        dbms: h2
+        sql: >-
+          ALTER TABLE upstream_credential
+          DROP CONSTRAINT IF EXISTS uk_upstream_credential_api_key_fingerprint;
+          ALTER TABLE upstream_credential
+          ADD CONSTRAINT uk_upstream_credential_scope_fingerprint
+          UNIQUE (api_key_fingerprint, provider_type, base_url, site_profile_id);
+    rollback:
+    - sql:
+        dbms: postgresql
+        sql: >-
+          ALTER TABLE upstream_credential
+          DROP CONSTRAINT IF EXISTS uk_upstream_credential_scope_fingerprint;
+          ALTER TABLE upstream_credential
+          DROP CONSTRAINT IF EXISTS uk_upstream_credential_api_key_fingerprint;
+          ALTER TABLE upstream_credential
+          ADD CONSTRAINT uk_upstream_credential_api_key_fingerprint
+          UNIQUE (api_key_fingerprint);
+    - sql:
+        dbms: h2
+        sql: >-
+          ALTER TABLE upstream_credential
+          DROP CONSTRAINT IF EXISTS uk_upstream_credential_scope_fingerprint;
+          ALTER TABLE upstream_credential
+          ADD CONSTRAINT uk_upstream_credential_api_key_fingerprint
+          UNIQUE (api_key_fingerprint);

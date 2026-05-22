@@ -59,4 +59,6 @@ export type RunbookLink = {
   linkUrl: string
   description?: string | null
   enabled: boolean
+  createdAt?: string | null
+  updatedAt?: string | null
 }

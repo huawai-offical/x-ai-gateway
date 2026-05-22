@@ -1,9 +1,9 @@
 # TASK-20260514-012 OpenAI API 完整兼容性深度审计
 
-状态：Done  
-优先级：High  
-类型：子任务  
-父任务：[REQ-20260514-008](../../docs/requirements/REQ-20260514-008-openai-api-compatibility-deep-audit.md)  
+状态：Done
+优先级：High
+类型：子任务
+父任务：[REQ-20260514-008](../../docs/requirements/REQ-20260514-008-openai-api-compatibility-deep-audit.md)
 上游来源：用户要求“现在 open ai api 是否已经完全实现？完全兼容参数？深度排查下”
 
 ## 背景
@@ -59,7 +59,7 @@
 - 已输出 [REP-20260514 OpenAI API 完整兼容性深度审计](../../docs/reports/REP-20260514-openai-api-compatibility-deep-audit.md)。
 - 明确结论：当前不是 OpenAI API 全量实现，也不是全量参数兼容；当前是 OpenAI-compatible 核心 Chat/Responses 与部分官方资源生命周期兼容。
 - 已拆分 3 个后续任务：
-  - [TASK-20260514-013 OpenAI Chat/Responses 参数全量保真与原生 Responses 边界](../backlog/TASK-20260514-013-openai-chat-responses-native-parity.md)
+  - [TASK-20260514-013 OpenAI Chat/Responses 参数全量保真与原生 Responses 边界](../done/TASK-20260514-013-openai-chat-responses-native-parity.md)
   - [TASK-20260514-014 OpenAI 官方资源族覆盖差距补齐](../backlog/TASK-20260514-014-openai-resource-family-coverage-gap.md)
   - [TASK-20260514-015 OpenAI 公开 OpenAPI、catalog 与 conformance 事实源校准](../backlog/TASK-20260514-015-openai-openapi-conformance-truth-source-hardening.md)
 

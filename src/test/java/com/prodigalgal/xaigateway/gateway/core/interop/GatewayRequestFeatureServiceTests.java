@@ -223,17 +223,6 @@ class GatewayRequestFeatureServiceTests {
         );
     }
 
-    @Test
-    void shouldDescribeRealtimeClientSecretSemantics() {
-        GatewayRequestSemantics semantics = service.describe("POST", "/v1/realtime/client_secrets", null);
-
-        assertEquals(TranslationResourceType.REALTIME, semantics.resourceType());
-        assertEquals(TranslationOperation.REALTIME_CLIENT_SECRET_CREATE, semantics.operation());
-        assertEquals("realtime", semantics.surface());
-        assertEquals("/v1/realtime/client_secrets", semantics.normalizedPath());
-        assertEquals(RouteSelectionMode.DISTRIBUTED_TARGET, semantics.routeSelectionMode());
-        assertEquals(List.of(InteropFeature.REALTIME_CLIENT_SECRET), semantics.requiredFeatures());
-    }
 
     @Test
     void shouldDescribeExtendedNonChatResourceSemantics() {

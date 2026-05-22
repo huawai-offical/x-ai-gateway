@@ -3,7 +3,7 @@
 状态：Done
 优先级：High
 类型：子任务
-父任务：[TASK-20260514-023](../backlog/TASK-20260514-023-openai-vector-stores-full-stack.md)
+父任务：[TASK-20260514-023](../done/TASK-20260514-023-openai-vector-stores-full-stack.md)
 上游来源：[REQ-20260517-003](../../docs/requirements/REQ-20260517-003-openai-vector-stores-local-lifecycle-baseline.md)
 
 ## 背景
@@ -77,7 +77,7 @@
 ## 关联文档
 
 - [REQ-20260517-003](../../docs/requirements/REQ-20260517-003-openai-vector-stores-local-lifecycle-baseline.md)
-- [TASK-20260514-023](../backlog/TASK-20260514-023-openai-vector-stores-full-stack.md)
+- [TASK-20260514-023](../done/TASK-20260514-023-openai-vector-stores-full-stack.md)
 
 ## 实现结果
 

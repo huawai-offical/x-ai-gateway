@@ -108,9 +108,6 @@ public class ExecutionBackendPolicyService {
         if (supportsGoogleGenAiNativeMedia(providerType, siteKind, semantics)) {
             return List.of(ExecutionBackend.NATIVE);
         }
-        if (blocksGoogleGenAiNativeMedia(providerType, siteKind, semantics)) {
-            return List.of();
-        }
         if (semantics.resourceType() == TranslationResourceType.AUDIO
                 || semantics.resourceType() == TranslationResourceType.IMAGE
                 || semantics.resourceType() == TranslationResourceType.MODERATION
@@ -120,7 +117,6 @@ public class ExecutionBackendPolicyService {
         }
         if (semantics.resourceType() == TranslationResourceType.FILE
                 || semantics.resourceType() == TranslationResourceType.UPLOAD
-                || semantics.resourceType() == TranslationResourceType.REALTIME
                 || semantics.resourceType() == TranslationResourceType.VIDEO
                 || semantics.resourceType() == TranslationResourceType.MUSIC
                 || semantics.resourceType() == TranslationResourceType.TASK) {
@@ -136,7 +132,7 @@ public class ExecutionBackendPolicyService {
         return switch (semantics.resourceType()) {
             case EMBEDDING -> List.of(ExecutionBackend.NATIVE);
             case AUDIO, IMAGE, MODERATION, RERANK, WEB_SEARCH -> List.of(ExecutionBackend.PASSTHROUGH);
-            case FILE, UPLOAD, REALTIME, VIDEO, MUSIC, TASK -> List.of(ExecutionBackend.ORCHESTRATION);
+            case FILE, UPLOAD, VIDEO, MUSIC, TASK -> List.of(ExecutionBackend.ORCHESTRATION);
             case CHAT, RESPONSE, UNKNOWN -> List.of();
         };
     }
@@ -296,23 +292,9 @@ public class ExecutionBackendPolicyService {
             return false;
         }
         return switch (semantics.operation()) {
-            case AUDIO_TRANSCRIPTION, AUDIO_TRANSLATION, AUDIO_SPEECH, IMAGE_GENERATION, MODERATION_CREATE -> true;
+            case AUDIO_TRANSCRIPTION, AUDIO_SPEECH, IMAGE_GENERATION, MODERATION_CREATE -> true;
             default -> false;
         };
-    }
-
-    private boolean blocksGoogleGenAiNativeMedia(
-            ProviderType providerType,
-            UpstreamSiteKind siteKind,
-            GatewayRequestSemantics semantics) {
-        if (providerType != ProviderType.GEMINI_DIRECT || semantics == null) {
-            return false;
-        }
-        if (!supportsGoogleGenAiSite(siteKind)) {
-            return false;
-        }
-        return semantics.operation() == TranslationOperation.IMAGE_EDIT
-                || semantics.operation() == TranslationOperation.IMAGE_VARIATION;
     }
 
     private boolean supportsGoogleGenAiSite(UpstreamSiteKind siteKind) {

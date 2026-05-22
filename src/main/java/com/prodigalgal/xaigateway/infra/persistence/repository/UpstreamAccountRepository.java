@@ -11,17 +11,17 @@ import org.springframework.data.repository.query.Param;
 
 public interface UpstreamAccountRepository extends JpaRepository<UpstreamAccountEntity, Long> {
     List<UpstreamAccountEntity> findAllByOrderByCreatedAtDesc();
-    List<UpstreamAccountEntity> findAllByPool_IdOrderByCreatedAtDesc(Long poolId);
-    List<UpstreamAccountEntity> findAllByPool_IdAndActiveTrueAndFrozenFalseAndHealthyTrueOrderByUpdatedAtDesc(Long poolId);
+    List<UpstreamAccountEntity> findAllByGroup_IdOrderByCreatedAtDesc(Long groupId);
+    List<UpstreamAccountEntity> findAllByGroup_IdAndActiveTrueAndFrozenFalseAndHealthyTrueOrderByUpdatedAtDesc(Long groupId);
     List<UpstreamAccountEntity> findAllByProviderTypeOrderByUpdatedAtDesc(UpstreamAccountProviderType providerType);
     List<UpstreamAccountEntity> findAllByProviderTypeAndActiveTrueAndFrozenFalseAndHealthyTrueOrderByUpdatedAtDesc(UpstreamAccountProviderType providerType);
     List<UpstreamAccountEntity> findAllBySiteProfileIdAndActiveTrueAndFrozenFalseAndHealthyTrueOrderByUpdatedAtDesc(Long siteProfileId);
     Optional<UpstreamAccountEntity> findFirstByProviderTypeAndExternalAccountIdOrderByUpdatedAtDesc(UpstreamAccountProviderType providerType, String externalAccountId);
-    long countByPool_Id(Long poolId);
+    long countByGroup_Id(Long groupId);
     long countByProxyId(Long proxyId);
     long countByTlsFingerprintProfileId(Long tlsFingerprintProfileId);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("update UpstreamAccountEntity account set account.pool = null where account.pool.id = :poolId")
-    int clearPoolReferenceByPoolId(@Param("poolId") Long poolId);
+    @Query("update UpstreamAccountEntity account set account.group = null where account.group.id = :groupId")
+    int clearGroupReferenceByGroupId(@Param("groupId") Long groupId);
 }

@@ -1,140 +1,586 @@
-import { type FormEvent, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { apiRequest } from '../../lib/api'
-import type { OutboundDelivery } from '../integrations/types'
+import { type FormEvent, useMemo, useState } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
+import { ArrowUpRightIcon, BellRingIcon, ShieldAlertIcon } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { EmptyState } from '@/components/app/empty-state'
+import { InlineError } from '@/components/app/inline-error'
+import { MetricCard } from '@/components/app/metric-card'
+import { PageSection } from '@/components/app/page-section'
+import { PageSkeleton } from '@/components/app/page-skeleton'
+import { StatusBadge } from '@/components/app/status-badge'
+import { PaginatedRows } from '@/components/app/table-pagination'
+import { useTypedQuery } from '@/lib/typed-react-query'
+import { governanceApi } from './api'
+import {
+  autoActionToDraft,
+  createDefaultAlertSilenceDraft,
+  createDefaultAutoActionDraft,
+  type AlertRule,
+  type AutoActionDraft,
+  type AutoActionRule,
+  type QuarantineRecord,
+} from './types'
 
-type AlertRule = {
-  id: number
-  ruleName: string
-  metricKey: string
-  comparisonOperator: string
-  thresholdValue: number
-  severity: string
+export function OpsAlertsPage() {
+  const queryClient = useQueryClient()
+  const [ruleName, setRuleName] = useState('')
+  const [metricKey, setMetricKey] = useState('qps')
+  const [thresholdValue, setThresholdValue] = useState('1')
+  const [autoActionDraft, setAutoActionDraft] = useState<AutoActionDraft>(createDefaultAutoActionDraft())
+  const [silenceDraft, setSilenceDraft] = useState(createDefaultAlertSilenceDraft())
+
+  const alertRulesQuery = useTypedQuery<AlertRule[]>({
+    queryKey: ['ops-alert-rules'],
+    queryFn: governanceApi.listAlertRules,
+  })
+  const alertsQuery = useTypedQuery({
+    queryKey: ['ops-alert-events'],
+    queryFn: governanceApi.listAlertEvents,
+  })
+  const autoActionsQuery = useTypedQuery<AutoActionRule[]>({
+    queryKey: ['ops-auto-actions'],
+    queryFn: governanceApi.listAutoActions,
+  })
+  const healthScoresQuery = useTypedQuery({
+    queryKey: ['ops-health-scores'],
+    queryFn: governanceApi.listHealthScores,
+  })
+  const silencesQuery = useTypedQuery({
+    queryKey: ['ops-alert-silences'],
+    queryFn: governanceApi.listAlertSilences,
+  })
+  const quarantinesQuery = useTypedQuery<QuarantineRecord[]>({
+    queryKey: ['ops-quarantines'],
+    queryFn: () => governanceApi.listQuarantines(),
+  })
+  const outboundDeliveriesQuery = useTypedQuery({
+    queryKey: ['ops-outbound-deliveries'],
+    queryFn: governanceApi.listOutboundDeliveries,
+  })
+
+  const createAlertRuleMutation = useMutation({
+    mutationFn: () =>
+      governanceApi.createAlertRule({
+        ruleName,
+        metricKey,
+        comparisonOperator: '>',
+        thresholdValue: Number(thresholdValue),
+        severity: 'HIGH',
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['ops-alert-rules'] })
+      setRuleName('')
+    },
+  })
+
+  const createAutoActionMutation = useMutation({
+    mutationFn: () =>
+      governanceApi.saveAutoAction({
+        id: autoActionDraft.id,
+        ruleName: autoActionDraft.ruleName,
+        eventType: autoActionDraft.eventType,
+        severity: toNullableString(autoActionDraft.severity),
+        entityType: toNullableString(autoActionDraft.entityType),
+        actionType: autoActionDraft.actionType,
+        ttlSeconds: toNullableNumber(autoActionDraft.ttlSeconds),
+        recoveryMode: autoActionDraft.recoveryMode,
+        enabled: autoActionDraft.enabled,
+        description: toNullableString(autoActionDraft.description),
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['ops-auto-actions'] })
+      setAutoActionDraft(createDefaultAutoActionDraft())
+    },
+  })
+
+  const deleteAutoActionMutation = useMutation({
+    mutationFn: (id: number) => governanceApi.deleteAutoAction(id),
+    onSuccess: async (_: void, id: number) => {
+      await queryClient.invalidateQueries({ queryKey: ['ops-auto-actions'] })
+      setAutoActionDraft((current) => (current.id === id ? createDefaultAutoActionDraft() : current))
+    },
+  })
+
+  const acknowledgeAlertMutation = useMutation({
+    mutationFn: (id: number) => governanceApi.acknowledgeAlert(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ops-alert-events'] }),
+  })
+
+  const createSilenceMutation = useMutation({
+    mutationFn: () =>
+      governanceApi.saveAlertSilence({
+        silenceName: silenceDraft.silenceName,
+        eventType: toNullableString(silenceDraft.eventType),
+        severity: toNullableString(silenceDraft.severity),
+        entityType: toNullableString(silenceDraft.entityType),
+        entityRef: toNullableString(silenceDraft.entityRef),
+        startsAt: toNullableString(silenceDraft.startsAt),
+        endsAt: toNullableString(silenceDraft.endsAt),
+        enabled: silenceDraft.enabled,
+        reason: toNullableString(silenceDraft.reason),
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['ops-alert-silences'] })
+      setSilenceDraft(createDefaultAlertSilenceDraft())
+    },
+  })
+
+  const releaseMutation = useMutation({
+    mutationFn: (id: number) => governanceApi.releaseQuarantine(id, 'manual-release-from-ui'),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ops-quarantines'] }),
+  })
+
+  const pageError =
+    alertRulesQuery.error
+    ?? alertsQuery.error
+    ?? autoActionsQuery.error
+    ?? healthScoresQuery.error
+    ?? silencesQuery.error
+    ?? quarantinesQuery.error
+    ?? outboundDeliveriesQuery.error
+    ?? createAlertRuleMutation.error
+    ?? createAutoActionMutation.error
+    ?? deleteAutoActionMutation.error
+    ?? acknowledgeAlertMutation.error
+    ?? createSilenceMutation.error
+    ?? releaseMutation.error
+
+  const drainRecords = useMemo(
+    () => quarantinesQuery.data?.filter((item) => item.actionType === 'DRAIN') ?? [],
+    [quarantinesQuery.data],
+  )
+
+  const topMetrics = useMemo(
+    () => [
+      { label: '开放告警', value: alertsQuery.data?.length ?? 0, hint: '当前待处理告警' },
+      { label: '告警规则', value: alertRulesQuery.data?.length ?? 0, hint: '阈值与告警触发规则' },
+      { label: '自动动作', value: autoActionsQuery.data?.length ?? 0, hint: '告警到动作的自动闭环' },
+      { label: '隔离记录', value: quarantinesQuery.data?.filter((item) => item.status === 'ACTIVE').length ?? 0, hint: '当前生效中的隔离记录' },
+    ],
+    [alertRulesQuery.data, alertsQuery.data, autoActionsQuery.data, quarantinesQuery.data],
+  )
+  const healthScoreRows = useMemo(
+    () => [
+      ...((healthScoresQuery.data?.sites ?? []).map((site) => ({ type: 'site' as const, site }))),
+      ...((healthScoresQuery.data?.credentials ?? []).map((credential) => ({ type: 'credential' as const, credential }))),
+    ],
+    [healthScoresQuery.data],
+  )
+
+  return (
+    <div className="flex flex-col gap-6">
+      {pageError ? <InlineError error={pageError} title="运营视图加载失败" /> : null}
+
+      <PageSection
+        kicker="运维"
+        title="告警、静默与隔离运营台"
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline" size="sm">
+              <Link to="/ops/governance?tab=error-policies">
+                打开治理编排
+                <ArrowUpRightIcon data-icon="inline-end" />
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/ops">
+                返回总览
+                <ArrowUpRightIcon data-icon="inline-end" />
+              </Link>
+            </Button>
+          </div>
+        }
+      >
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {topMetrics.map((metric) => (
+            <MetricCard key={metric.label} label={metric.label} value={metric.value} hint={metric.hint} />
+          ))}
+        </div>
+      </PageSection>
+
+      <PageSection kicker="健康评分" title="治理健康分">
+        {healthScoresQuery.isPending ? (
+          <PageSkeleton count={2} />
+        ) : (
+          <PaginatedRows items={healthScoreRows}>
+            {({ pageItems }) => (
+              <div className="overflow-x-auto rounded-2xl border border-border/60 bg-card/92">
+                <table className="w-full min-w-[1040px] table-fixed text-sm">
+              <thead className="bg-muted/30">
+                <tr>
+                  <th className="w-[22%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">对象</th>
+                  <th className="w-[12%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">类型</th>
+                  <th className="w-[14%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">提供方</th>
+                  <th className="w-[10%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">评分</th>
+                  <th className="w-[13%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">健康状态</th>
+                  <th className="w-[13%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">关联 ID</th>
+                  <th className="w-[16%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">说明</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pageItems.map((row) => {
+                  if (row.type === 'site') {
+                    const site = row.site
+                    return (
+                      <tr key={`site:${site.siteProfileId}`} className="border-b border-border/40 align-middle">
+                        <td className="truncate px-4 py-3 font-medium text-foreground" title={site.displayName}>{site.displayName}</td>
+                        <td className="px-4 py-3"><StatusBadge tone="info">站点</StatusBadge></td>
+                        <td className="truncate px-4 py-3 text-muted-foreground" title={site.siteKind}>{site.siteKind}</td>
+                        <td className="px-4 py-3 text-foreground">{site.score}</td>
+                        <td className="px-4 py-3"><StatusBadge tone={healthScoreTone(site.healthState)}>{site.healthState}</StatusBadge></td>
+                        <td className="truncate px-4 py-3 text-muted-foreground">站点配置 {site.siteProfileId}</td>
+                        <td className="truncate px-4 py-3 text-muted-foreground" title={site.summary ?? site.reason ?? ''}>
+                          {site.summary ?? site.reason ?? '无治理阻断'}
+                        </td>
+                      </tr>
+                    )
+                  }
+                  const item = row.credential
+                  return (
+                    <tr key={`${item.sourceType ?? 'API_KEY'}:${item.sourceId ?? item.credentialId ?? item.accountId}`} className="border-b border-border/40 align-middle">
+                      <td className="truncate px-4 py-3 font-medium text-foreground" title={item.displayName ?? item.credentialName}>
+                        {item.displayName ?? item.credentialName}
+                      </td>
+                      <td className="px-4 py-3"><StatusBadge tone={item.sourceType === 'AUTH_JSON_ACCOUNT' ? 'info' : 'neutral'}>{healthSourceLabel(item.sourceType)}</StatusBadge></td>
+                      <td className="truncate px-4 py-3 text-muted-foreground" title={item.providerType}>{item.providerType}</td>
+                      <td className="px-4 py-3 text-foreground">{item.score}</td>
+                      <td className="px-4 py-3"><StatusBadge tone={healthScoreTone(item.healthState)}>{item.healthState}</StatusBadge></td>
+                      <td className="truncate px-4 py-3 text-muted-foreground">{healthSourceRef(item)}</td>
+                      <td className="truncate px-4 py-3 text-muted-foreground" title={item.summary ?? item.reason ?? ''}>
+                        {item.summary ?? item.reason ?? '可参与路由'}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+                </table>
+              </div>
+            )}
+          </PaginatedRows>
+        )}
+      </PageSection>
+
+      <PageSection kicker="告警" title="开放告警">
+        {alertsQuery.isPending ? (
+          <PageSkeleton count={1} />
+        ) : alertsQuery.data?.length ? (
+          <div className="grid gap-4 xl:grid-cols-2">
+            {alertsQuery.data.map((item) => (
+              <Card key={item.id} className="border-border/60 bg-card/92 shadow-sm">
+                <CardHeader className="gap-2 border-b border-border/60">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex flex-col gap-1">
+                      <CardTitle className="text-base">{item.title}</CardTitle>
+                      <div className="text-sm text-muted-foreground">{item.entityType ?? 'SYSTEM'} / {item.entityRef ?? '-'}</div>
+                    </div>
+                    <StatusBadge tone={item.severity === 'HIGH' ? 'danger' : 'warning'}>{item.severity}</StatusBadge>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-3 p-5">
+                  <div className="text-sm leading-6 text-foreground">{item.message}</div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" size="sm" variant="outline" onClick={() => acknowledgeAlertMutation.mutate(item.id)}>
+                      确认告警
+                    </Button>
+                    <Button asChild type="button" size="sm">
+                      <Link to="/ops/governance?tab=simulation">
+                        去模拟命中链
+                        <ArrowUpRightIcon data-icon="inline-end" />
+                      </Link>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            title="当前没有开放告警"
+            icon={<BellRingIcon className="size-5" />}
+          />
+        )}
+      </PageSection>
+
+      <PageSection kicker="告警规则" title="告警规则">
+        <form className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]" onSubmit={handleAlertRuleSubmit}>
+          <FormField label="ruleName">
+            <Input value={ruleName} onChange={(event) => setRuleName(event.target.value)} placeholder="规则名称" />
+          </FormField>
+          <FormField label="metricKey">
+            <Input value={metricKey} onChange={(event) => setMetricKey(event.target.value)} placeholder="指标键" />
+          </FormField>
+          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
+            <FormField label="thresholdValue">
+              <Input value={thresholdValue} onChange={(event) => setThresholdValue(event.target.value)} placeholder="阈值" />
+            </FormField>
+            <div className="flex items-end">
+              <Button type="submit" disabled={createAlertRuleMutation.isPending}>创建告警规则</Button>
+            </div>
+          </div>
+        </form>
+
+        {alertRulesQuery.isPending ? (
+          <PageSkeleton count={1} />
+        ) : alertRulesQuery.data?.length ? (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {alertRulesQuery.data.map((item) => (
+              <Card key={item.id} className="border-border/60 bg-card/92 shadow-sm">
+                <CardHeader className="gap-2 border-b border-border/60">
+                  <CardTitle className="text-base">{item.ruleName}</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-2 p-5 text-sm text-muted-foreground">
+                  <div className="text-foreground">{item.metricKey} {item.comparisonOperator} {item.thresholdValue}</div>
+                  <StatusBadge tone="warning">{item.severity}</StatusBadge>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <EmptyState title="当前还没有告警规则" />
+        )}
+      </PageSection>
+
+      <PageSection kicker="自动动作" title="自动动作">
+        <form className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_16rem_auto]" onSubmit={handleAutoActionSubmit}>
+          <FormField label="ruleName">
+            <Input value={autoActionDraft.ruleName} onChange={(event) => setAutoActionDraft((current) => ({ ...current, ruleName: event.target.value }))} placeholder="自动动作规则名" />
+          </FormField>
+          <FormField label="eventType">
+            <Input value={autoActionDraft.eventType} onChange={(event) => setAutoActionDraft((current) => ({ ...current, eventType: event.target.value }))} placeholder="事件类型" />
+          </FormField>
+          <FormField label="actionType">
+            <Input value={autoActionDraft.actionType} onChange={(event) => setAutoActionDraft((current) => ({ ...current, actionType: event.target.value }))} placeholder="QUARANTINE / COOLDOWN" />
+          </FormField>
+          <div className="flex items-end gap-2">
+            <Button type="submit" disabled={createAutoActionMutation.isPending}>
+              {autoActionDraft.id ? '保存自动动作' : '创建自动动作'}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={createAutoActionMutation.isPending}
+              onClick={() => setAutoActionDraft(createDefaultAutoActionDraft())}
+            >
+              重置
+            </Button>
+          </div>
+        </form>
+
+        {autoActionsQuery.isPending ? (
+          <PageSkeleton count={1} />
+        ) : autoActionsQuery.data?.length ? (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {autoActionsQuery.data.map((rule) => (
+              <Card key={rule.id} className="border-border/60 bg-card/92 shadow-sm">
+                <CardHeader className="gap-2 border-b border-border/60">
+                  <CardTitle className="text-base">{rule.ruleName}</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-3 p-5 text-sm text-muted-foreground">
+                  <div className="text-foreground">{rule.eventType} / {rule.entityType ?? 'ALL'}</div>
+                  <div className="flex flex-wrap gap-2">
+                    <StatusBadge tone="warning">{rule.actionType}</StatusBadge>
+                    <StatusBadge>{rule.recoveryMode}</StatusBadge>
+                  </div>
+                  <div className="text-foreground">{rule.description ?? '按事件和实体类型自动触发治理动作。'}</div>
+                  <div className="flex flex-wrap gap-2 border-t border-border/60 pt-3">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setAutoActionDraft(autoActionToDraft(rule))}
+                    >
+                      编辑动作
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={deleteAutoActionMutation.isPending}
+                      onClick={() => {
+                        if (!window.confirm(`确认删除自动动作“${rule.ruleName}”吗？`)) return
+                        deleteAutoActionMutation.mutate(rule.id)
+                      }}
+                    >
+                      删除动作
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <EmptyState title="当前没有自动动作" />
+        )}
+      </PageSection>
+
+      <PageSection kicker="静默" title="告警静默">
+        <form className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]" onSubmit={handleSilenceSubmit}>
+          <FormField label="silenceName">
+            <Input value={silenceDraft.silenceName} onChange={(event) => setSilenceDraft((current) => ({ ...current, silenceName: event.target.value }))} placeholder="静默名称" />
+          </FormField>
+          <FormField label="eventType">
+            <Input value={silenceDraft.eventType} onChange={(event) => setSilenceDraft((current) => ({ ...current, eventType: event.target.value }))} placeholder="事件类型" />
+          </FormField>
+          <FormField label="entityRef">
+            <Input value={silenceDraft.entityRef} onChange={(event) => setSilenceDraft((current) => ({ ...current, entityRef: event.target.value }))} placeholder="对象引用" />
+          </FormField>
+          <FormField label="reason" className="xl:col-span-2">
+            <Textarea rows={4} value={silenceDraft.reason} onChange={(event) => setSilenceDraft((current) => ({ ...current, reason: event.target.value }))} placeholder="静默原因" />
+          </FormField>
+          <div className="flex items-end">
+            <Button type="submit" disabled={createSilenceMutation.isPending}>创建告警静默</Button>
+          </div>
+        </form>
+
+        {silencesQuery.isPending ? (
+          <PageSkeleton count={1} />
+        ) : silencesQuery.data?.length ? (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {silencesQuery.data.map((silence) => (
+              <Card key={silence.id} className="border-border/60 bg-card/92 shadow-sm">
+                <CardHeader className="gap-2 border-b border-border/60">
+                  <CardTitle className="text-base">{silence.silenceName}</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-3 p-5 text-sm text-muted-foreground">
+                  <div className="text-foreground">{silence.eventType ?? 'ALL'} / {silence.entityType ?? 'ALL'}</div>
+                  <div className="flex flex-wrap gap-2">
+                    <StatusBadge tone={silence.enabled ? 'success' : 'danger'}>{silence.enabled ? '启用' : '停用'}</StatusBadge>
+                    {silence.severity ? <StatusBadge>{silence.severity}</StatusBadge> : null}
+                  </div>
+                  <div className="text-foreground">{silence.reason ?? '无额外原因'}</div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <EmptyState title="当前没有告警静默" />
+        )}
+      </PageSection>
+
+      <PageSection
+        kicker="熔断 / Drain"
+        title="熔断 / DRAIN 记录"
+      >
+        {quarantinesQuery.isPending ? (
+          <PageSkeleton count={1} />
+        ) : drainRecords.length ? (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {drainRecords.map((item) => (
+              <Card key={item.id} className="border-border/60 bg-card/92 shadow-sm">
+                <CardHeader className="gap-2 border-b border-border/60">
+                  <CardTitle className="text-base">{item.targetType}</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-3 p-5 text-sm text-muted-foreground">
+                  <div className="text-foreground">{describeTarget(item)}</div>
+                  <div className="flex flex-wrap gap-2">
+                    <StatusBadge tone="danger">{item.actionType}</StatusBadge>
+                    <StatusBadge tone={item.status === 'ACTIVE' ? 'warning' : 'success'}>{item.status}</StatusBadge>
+                  </div>
+                  <div className="text-foreground">{item.reason}</div>
+                  <div className="text-xs text-muted-foreground">
+                    开始于 {item.startedAt}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <EmptyState title="当前没有 DRAIN 记录" />
+        )}
+      </PageSection>
+
+      <PageSection kicker="隔离" title="隔离记录">
+        {quarantinesQuery.isPending ? (
+          <PageSkeleton count={1} />
+        ) : quarantinesQuery.data?.length ? (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {quarantinesQuery.data.map((item) => (
+              <Card key={item.id} className="border-border/60 bg-card/92 shadow-sm">
+                <CardHeader className="gap-2 border-b border-border/60">
+                  <CardTitle className="text-base">{item.targetType}</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-3 p-5 text-sm text-muted-foreground">
+                  <div className="text-foreground">{describeTarget(item)}</div>
+                  <div className="flex flex-wrap gap-2">
+                    <StatusBadge tone={item.status === 'ACTIVE' ? 'danger' : 'success'}>{item.status}</StatusBadge>
+                    <StatusBadge tone="warning">{item.actionType}</StatusBadge>
+                  </div>
+                  <div className="text-foreground">{item.reason}</div>
+                  <Button type="button" size="sm" variant="outline" onClick={() => releaseMutation.mutate(item.id)}>
+                    解除隔离
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <EmptyState title="当前没有隔离记录" icon={<ShieldAlertIcon className="size-5" />} />
+        )}
+      </PageSection>
+
+      <PageSection kicker="外发" title="外发投递状态">
+        {outboundDeliveriesQuery.isPending ? (
+          <PageSkeleton count={1} />
+        ) : outboundDeliveriesQuery.data?.length ? (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {outboundDeliveriesQuery.data.map((delivery) => (
+              <Card key={delivery.id} className="border-border/60 bg-card/92 shadow-sm">
+                <CardHeader className="gap-2 border-b border-border/60">
+                  <CardTitle className="text-base">{delivery.eventType}</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-2 p-5 text-sm text-muted-foreground">
+                  <div className="text-foreground">{delivery.deliveryStatus} / 尝试 {delivery.attemptCount}</div>
+                  <div className="text-foreground">{delivery.entityType ?? 'SYSTEM'} / {delivery.entityRef ?? '-'}</div>
+                  <div className="text-foreground">{delivery.responseSummary ?? delivery.lastError ?? '等待投递结果'}</div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <EmptyState title="当前没有外发投递记录" />
+        )}
+      </PageSection>
+    </div>
+  )
+
+  function handleAlertRuleSubmit(event: FormEvent) {
+    event.preventDefault()
+    createAlertRuleMutation.mutate()
+  }
+
+  function handleAutoActionSubmit(event: FormEvent) {
+    event.preventDefault()
+    createAutoActionMutation.mutate()
+  }
+
+  function handleSilenceSubmit(event: FormEvent) {
+    event.preventDefault()
+    createSilenceMutation.mutate()
+  }
 }
 
-type AlertEvent = {
-  id: number
-  title: string
-  severity: string
-  status: string
-  message: string
-  entityType?: string | null
-  entityRef?: string | null
+function FormField({
+  label,
+  children,
+  className,
+}: {
+  label: string
+  children: React.ReactNode
+  className?: string
+}) {
+  return (
+    <label className={className ? `flex flex-col gap-2 ${className}` : 'flex flex-col gap-2'}>
+      <span className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">{label}</span>
+      {children}
+    </label>
+  )
 }
 
-type RouteGuardPolicy = {
-  id: number
-  policyName: string
-  targetType: string
-  providerType?: string | null
-  siteProfileId?: number | null
-  credentialId?: number | null
-  accountId?: number | null
-  proxyId?: number | null
-  policyMode: string
-  actionType: string
-  ttlSeconds?: number | null
-  effectiveUntil?: string | null
-  priority: number
-  enabled: boolean
-  description?: string | null
-}
-
-type AutoActionRule = {
-  id: number
-  ruleName: string
-  eventType: string
-  severity?: string | null
-  entityType?: string | null
-  actionType: string
-  ttlSeconds?: number | null
-  recoveryMode: string
-  enabled: boolean
-  description?: string | null
-}
-
-type QuarantineRecord = {
-  id: number
-  targetType: string
-  providerType?: string | null
-  siteProfileId?: number | null
-  credentialId?: number | null
-  accountId?: number | null
-  proxyId?: number | null
-  sourceRuleId?: number | null
-  sourceEventId?: number | null
-  actionType: string
-  recoveryMode: string
-  reason: string
-  status: string
-  startedAt: string
-  expiresAt?: string | null
-  releasedAt?: string | null
-  releaseReason?: string | null
-}
-
-type CredentialHealthScore = {
-  credentialId: number
-  credentialName: string
-  providerType: string
-  siteProfileId?: number | null
-  proxyId?: number | null
-  active: boolean
-  score: number
-  healthState: string
-  reason?: string | null
-  effectiveUntil?: string | null
-}
-
-type SiteHealthScore = {
-  siteProfileId: number
-  profileCode: string
-  displayName: string
-  providerFamily: string
-  siteKind: string
-  active: boolean
-  score: number
-  healthState: string
-  reason?: string | null
-  activeCredentialCount: number
-  blockedCredentialCount: number
-  effectiveUntil?: string | null
-}
-
-type GovernanceHealthScores = {
-  sites: SiteHealthScore[]
-  credentials: CredentialHealthScore[]
-}
-
-type AlertSilence = {
-  id: number
-  silenceName: string
-  eventType?: string | null
-  severity?: string | null
-  entityType?: string | null
-  entityRef?: string | null
-  startsAt?: string | null
-  endsAt?: string | null
-  enabled: boolean
-  reason?: string | null
-}
-
-const targetOptions = ['PROVIDER_TYPE', 'SITE_PROFILE', 'CREDENTIAL', 'ACCOUNT', 'PROXY']
-const providerOptions = ['OPENAI_DIRECT', 'OPENAI_COMPATIBLE', 'GEMINI_DIRECT', 'ANTHROPIC_DIRECT', 'OLLAMA_DIRECT']
-const policyModeOptions = ['ENFORCE', 'OVERRIDE_ALLOW', 'OVERRIDE_BLOCK']
-const actionOptions = ['NONE', 'QUARANTINE', 'COOLDOWN', 'DRAIN']
-const recoveryModeOptions = ['AUTO_RESUME', 'MANUAL_RESUME']
-const entityTypeOptions = ['PROVIDER_TYPE', 'SITE_PROFILE', 'CREDENTIAL', 'ACCOUNT', 'PROXY']
-
-function toNullableNumber(value: string) {
-  return value.trim() ? Number(value) : null
-}
-
-function toNullableString(value: string) {
-  return value.trim() ? value.trim() : null
-}
-
-function buildTargetDescription(item: RouteGuardPolicy | QuarantineRecord) {
+function describeTarget(item: QuarantineRecord) {
   switch (item.targetType) {
     case 'PROVIDER_TYPE':
       return item.providerType ?? '-'
@@ -151,431 +597,33 @@ function buildTargetDescription(item: RouteGuardPolicy | QuarantineRecord) {
   }
 }
 
-export function OpsAlertsPage() {
-  const queryClient = useQueryClient()
-  const [ruleName, setRuleName] = useState('')
-  const [metricKey, setMetricKey] = useState('qps')
-  const [thresholdValue, setThresholdValue] = useState('1')
+function healthSourceLabel(sourceType?: string | null) {
+  if (sourceType === 'AUTH_JSON_ACCOUNT') return '账号凭证'
+  if (sourceType === 'API_KEY') return 'Key 凭证'
+  return '凭证'
+}
 
-  const [policyName, setPolicyName] = useState('')
-  const [targetType, setTargetType] = useState('CREDENTIAL')
-  const [providerType, setProviderType] = useState('OPENAI_DIRECT')
-  const [siteProfileId, setSiteProfileId] = useState('')
-  const [credentialId, setCredentialId] = useState('')
-  const [accountId, setAccountId] = useState('')
-  const [proxyId, setProxyId] = useState('')
-  const [policyMode, setPolicyMode] = useState('ENFORCE')
-  const [policyActionType, setPolicyActionType] = useState('QUARANTINE')
-  const [policyTtlSeconds, setPolicyTtlSeconds] = useState('300')
-  const [policyPriority, setPolicyPriority] = useState('100')
-
-  const [autoRuleName, setAutoRuleName] = useState('')
-  const [autoEventType, setAutoEventType] = useState('REQUEST_ERROR_RATIO')
-  const [autoSeverity, setAutoSeverity] = useState('HIGH')
-  const [autoEntityType, setAutoEntityType] = useState('CREDENTIAL')
-  const [autoActionType, setAutoActionType] = useState('QUARANTINE')
-  const [autoTtlSeconds, setAutoTtlSeconds] = useState('300')
-  const [autoRecoveryMode, setAutoRecoveryMode] = useState('AUTO_RESUME')
-  const [silenceName, setSilenceName] = useState('')
-  const [silenceEventType, setSilenceEventType] = useState('REQUEST_ERROR_RATIO')
-  const [silenceSeverity, setSilenceSeverity] = useState('HIGH')
-  const [silenceEntityType, setSilenceEntityType] = useState('CREDENTIAL')
-  const [silenceEntityRef, setSilenceEntityRef] = useState('')
-  const [silenceStartsAt, setSilenceStartsAt] = useState('')
-  const [silenceEndsAt, setSilenceEndsAt] = useState('')
-  const [silenceReason, setSilenceReason] = useState('')
-
-  const rulesQuery = useQuery({
-    queryKey: ['ops-alert-rules'],
-    queryFn: () => apiRequest<AlertRule[]>('/admin/ops/alerts/rules'),
-  })
-  const alertsQuery = useQuery({
-    queryKey: ['ops-alert-events'],
-    queryFn: () => apiRequest<AlertEvent[]>('/admin/ops/alerts?status=OPEN'),
-  })
-  const routeGuardsQuery = useQuery({
-    queryKey: ['ops-route-guards'],
-    queryFn: () => apiRequest<RouteGuardPolicy[]>('/admin/ops/policies/route-guards'),
-  })
-  const autoActionsQuery = useQuery({
-    queryKey: ['ops-auto-actions'],
-    queryFn: () => apiRequest<AutoActionRule[]>('/admin/ops/policies/auto-actions'),
-  })
-  const quarantinesQuery = useQuery({
-    queryKey: ['ops-quarantines'],
-    queryFn: () => apiRequest<QuarantineRecord[]>('/admin/ops/quarantines'),
-  })
-  const healthScoresQuery = useQuery({
-    queryKey: ['ops-health-scores'],
-    queryFn: () => apiRequest<GovernanceHealthScores>('/admin/ops/health-scores'),
-  })
-  const silencesQuery = useQuery({
-    queryKey: ['ops-alert-silences'],
-    queryFn: () => apiRequest<AlertSilence[]>('/admin/ops/alerts/silences'),
-  })
-  const outboundDeliveriesQuery = useQuery({
-    queryKey: ['ops-outbound-deliveries'],
-    queryFn: () => apiRequest<OutboundDelivery[]>('/admin/integrations/deliveries'),
-  })
-
-  const createAlertRuleMutation = useMutation({
-    mutationFn: () =>
-      apiRequest('/admin/ops/alerts/rules', {
-        method: 'POST',
-        body: JSON.stringify({
-          ruleName,
-          metricKey,
-          comparisonOperator: '>',
-          thresholdValue: Number(thresholdValue),
-          severity: 'HIGH',
-          enabled: true,
-        }),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ops-alert-rules'] })
-      setRuleName('')
-    },
-  })
-
-  const createRouteGuardMutation = useMutation({
-    mutationFn: () =>
-      apiRequest('/admin/ops/policies/route-guards', {
-        method: 'POST',
-        body: JSON.stringify({
-          policyName,
-          targetType,
-          providerType: targetType === 'PROVIDER_TYPE' ? providerType : null,
-          siteProfileId: targetType === 'SITE_PROFILE' ? toNullableNumber(siteProfileId) : null,
-          credentialId: targetType === 'CREDENTIAL' ? toNullableNumber(credentialId) : null,
-          accountId: targetType === 'ACCOUNT' ? toNullableNumber(accountId) : null,
-          proxyId: targetType === 'PROXY' ? toNullableNumber(proxyId) : null,
-          policyMode,
-          actionType: policyActionType,
-          ttlSeconds: toNullableNumber(policyTtlSeconds),
-          priority: Number(policyPriority),
-          enabled: true,
-        }),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ops-route-guards'] })
-      setPolicyName('')
-      setSiteProfileId('')
-      setCredentialId('')
-      setAccountId('')
-      setProxyId('')
-    },
-  })
-
-  const createAutoActionMutation = useMutation({
-    mutationFn: () =>
-      apiRequest('/admin/ops/policies/auto-actions', {
-        method: 'POST',
-        body: JSON.stringify({
-          ruleName: autoRuleName,
-          eventType: autoEventType,
-          severity: autoSeverity || null,
-          entityType: autoEntityType || null,
-          actionType: autoActionType,
-          ttlSeconds: toNullableNumber(autoTtlSeconds),
-          recoveryMode: autoRecoveryMode,
-          enabled: true,
-        }),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ops-auto-actions'] })
-      setAutoRuleName('')
-    },
-  })
-
-  const ackMutation = useMutation({
-    mutationFn: (id: number) => apiRequest(`/admin/ops/alerts/${id}/ack`, { method: 'POST' }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ops-alert-events'] }),
-  })
-  const createSilenceMutation = useMutation({
-    mutationFn: () =>
-      apiRequest('/admin/ops/alerts/silences', {
-        method: 'POST',
-        body: JSON.stringify({
-          silenceName,
-          eventType: toNullableString(silenceEventType),
-          severity: toNullableString(silenceSeverity),
-          entityType: toNullableString(silenceEntityType),
-          entityRef: toNullableString(silenceEntityRef),
-          startsAt: toNullableString(silenceStartsAt),
-          endsAt: toNullableString(silenceEndsAt),
-          enabled: true,
-          reason: toNullableString(silenceReason),
-        }),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ops-alert-silences'] })
-      setSilenceName('')
-      setSilenceEntityRef('')
-      setSilenceStartsAt('')
-      setSilenceEndsAt('')
-      setSilenceReason('')
-    },
-  })
-
-  const releaseMutation = useMutation({
-    mutationFn: (id: number) =>
-      apiRequest(`/admin/ops/quarantines/${id}/release`, {
-        method: 'POST',
-        body: JSON.stringify({ releaseReason: 'manual-release-from-ui' }),
-      }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ops-quarantines'] }),
-  })
-
-  const handleAlertRuleSubmit = (event: FormEvent) => {
-    event.preventDefault()
-    createAlertRuleMutation.mutate()
+function healthSourceRef(item: { sourceType?: string | null; credentialId?: number | null; accountId?: number | null; sourceId?: number | null; siteProfileId?: number | null }) {
+  if (item.sourceType === 'AUTH_JSON_ACCOUNT') {
+    return `账号 ID ${item.accountId ?? item.sourceId ?? '-'}`
   }
+  return `凭证 ID ${item.credentialId ?? item.sourceId ?? '-'}${item.siteProfileId ? ` / 站点 ${item.siteProfileId}` : ''}`
+}
 
-  const handleRouteGuardSubmit = (event: FormEvent) => {
-    event.preventDefault()
-    createRouteGuardMutation.mutate()
-  }
+function healthScoreTone(state: string): React.ComponentProps<typeof StatusBadge>['tone'] {
+  const normalized = state.toUpperCase()
+  if (normalized === 'HEALTHY') return 'success'
+  if (normalized === 'DEGRADED' || normalized === 'COOLDOWN') return 'warning'
+  if (normalized === 'INACTIVE') return 'neutral'
+  return 'danger'
+}
 
-  const handleAutoActionSubmit = (event: FormEvent) => {
-    event.preventDefault()
-    createAutoActionMutation.mutate()
-  }
+function toNullableString(value: string | null | undefined) {
+  return value == null || value.trim() === '' ? null : value.trim()
+}
 
-  const handleSilenceSubmit = (event: FormEvent) => {
-    event.preventDefault()
-    createSilenceMutation.mutate()
-  }
-
-  return (
-    <section className="page-grid">
-      <div className="panel panel-wide">
-        <div className="panel-head">
-          <p className="panel-kicker">Health scores</p>
-          <h2>治理健康分</h2>
-          <p className="empty-state">把治理策略、自动隔离与冷却状态聚合成可解释的站点 / 凭证健康视图。</p>
-        </div>
-        <div className="card-list">
-          {healthScoresQuery.data?.sites.map((site: SiteHealthScore) => (
-            <div key={site.siteProfileId} className="detail-card">
-              <strong>{site.displayName}</strong>
-              <span>{site.siteKind} / score {site.score}</span>
-              <span>{site.healthState} · active {site.activeCredentialCount} / blocked {site.blockedCredentialCount}</span>
-              <span>{site.reason ?? '站点当前无治理阻断。'}</span>
-            </div>
-          ))}
-          {healthScoresQuery.data?.credentials.map((item: CredentialHealthScore) => (
-            <div key={item.credentialId} className="detail-card">
-              <strong>{item.credentialName}</strong>
-              <span>{item.providerType} / score {item.score}</span>
-              <span>{item.healthState}{item.siteProfileId ? ` · siteProfileId=${item.siteProfileId}` : ''}</span>
-              <span>{item.reason ?? '凭证当前可参与路由。'}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="panel panel-wide">
-        <div className="panel-head">
-          <p className="panel-kicker">Alert rules</p>
-          <h2>告警规则</h2>
-          <p className="empty-state">负责发现异常，自动动作会基于这些事件继续触发治理闭环。</p>
-        </div>
-        <form className="inline-form" onSubmit={handleAlertRuleSubmit}>
-          <input value={ruleName} onChange={(e) => setRuleName(e.target.value)} placeholder="规则名称" />
-          <input value={metricKey} onChange={(e) => setMetricKey(e.target.value)} placeholder="metric key" />
-          <input value={thresholdValue} onChange={(e) => setThresholdValue(e.target.value)} placeholder="阈值" />
-          <button type="submit">创建告警规则</button>
-        </form>
-        <div className="card-list">
-          {rulesQuery.data?.map((rule: AlertRule) => (
-            <div key={rule.id} className="detail-card">
-              <strong>{rule.ruleName}</strong>
-              <span>{rule.metricKey}</span>
-              <span>{rule.comparisonOperator} {rule.thresholdValue}</span>
-              <span>{rule.severity}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="panel panel-wide">
-        <div className="panel-head">
-          <p className="panel-kicker">Outbound delivery</p>
-          <h2>外发投递状态</h2>
-          <p className="empty-state">显示最近的外部通知投递结果，帮助判断告警与治理动作是否已经同步到外部协作链路。</p>
-        </div>
-        <div className="card-list">
-          {(outboundDeliveriesQuery.data ?? []).slice(0, 5).map((delivery: OutboundDelivery) => (
-            <div key={delivery.id} className="detail-card">
-              <strong>{delivery.eventType}</strong>
-              <span>{delivery.deliveryStatus} / attempt {delivery.attemptCount}</span>
-              <span>{delivery.entityType ?? 'SYSTEM'} / {delivery.entityRef ?? '-'}</span>
-              <span>{delivery.responseSummary ?? delivery.lastError ?? '等待投递结果'}</span>
-            </div>
-          ))}
-          {!outboundDeliveriesQuery.data?.length ? <p className="empty-state">当前没有外发投递记录。</p> : null}
-        </div>
-      </div>
-
-      <div className="panel panel-wide">
-        <div className="panel-head">
-          <p className="panel-kicker">Route guards</p>
-          <h2>路由守卫</h2>
-          <p className="empty-state">手动治理入口，可按 provider/site/credential/account/proxy 直接阻断或临时隔离。</p>
-        </div>
-        <form className="inline-form" onSubmit={handleRouteGuardSubmit}>
-          <input value={policyName} onChange={(event) => setPolicyName(event.target.value)} placeholder="策略名称" />
-          <select value={targetType} onChange={(event) => setTargetType(event.target.value)}>
-            {targetOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
-          {targetType === 'PROVIDER_TYPE' ? (
-            <select value={providerType} onChange={(event) => setProviderType(event.target.value)}>
-              {providerOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-            </select>
-          ) : null}
-          {targetType === 'SITE_PROFILE' ? (
-            <input value={siteProfileId} onChange={(event) => setSiteProfileId(event.target.value)} placeholder="siteProfileId" />
-          ) : null}
-          {targetType === 'CREDENTIAL' ? (
-            <input value={credentialId} onChange={(event) => setCredentialId(event.target.value)} placeholder="credentialId" />
-          ) : null}
-          {targetType === 'ACCOUNT' ? (
-            <input value={accountId} onChange={(event) => setAccountId(event.target.value)} placeholder="accountId" />
-          ) : null}
-          {targetType === 'PROXY' ? (
-            <input value={proxyId} onChange={(event) => setProxyId(event.target.value)} placeholder="proxyId" />
-          ) : null}
-          <select value={policyMode} onChange={(event) => setPolicyMode(event.target.value)}>
-            {policyModeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
-          <select value={policyActionType} onChange={(event) => setPolicyActionType(event.target.value)}>
-            {actionOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
-          <input value={policyTtlSeconds} onChange={(event) => setPolicyTtlSeconds(event.target.value)} placeholder="ttl seconds" />
-          <input value={policyPriority} onChange={(event) => setPolicyPriority(event.target.value)} placeholder="priority" />
-          <button type="submit">创建路由守卫</button>
-        </form>
-        <div className="card-list">
-          {routeGuardsQuery.data?.map((policy: RouteGuardPolicy) => (
-            <div key={policy.id} className="detail-card">
-              <strong>{policy.policyName}</strong>
-              <span>{policy.targetType} · {buildTargetDescription(policy)}</span>
-              <span>{policy.policyMode} / {policy.actionType}</span>
-              <span>{policy.effectiveUntil ? `生效至 ${policy.effectiveUntil}` : '持续生效'}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="panel panel-wide">
-        <div className="panel-head">
-          <p className="panel-kicker">Auto actions</p>
-          <h2>自动动作</h2>
-          <p className="empty-state">把告警事件映射为 quarantine/cooldown 动作，形成自动治理闭环。</p>
-        </div>
-        <form className="inline-form" onSubmit={handleAutoActionSubmit}>
-          <input value={autoRuleName} onChange={(event) => setAutoRuleName(event.target.value)} placeholder="规则名称" />
-          <input value={autoEventType} onChange={(event) => setAutoEventType(event.target.value)} placeholder="eventType" />
-          <select value={autoSeverity} onChange={(event) => setAutoSeverity(event.target.value)}>
-            <option value="">ANY_SEVERITY</option>
-            {['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
-          <select value={autoEntityType} onChange={(event) => setAutoEntityType(event.target.value)}>
-            <option value="">ANY_ENTITY</option>
-            {entityTypeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
-          <select value={autoActionType} onChange={(event) => setAutoActionType(event.target.value)}>
-            {actionOptions.filter((option) => option !== 'NONE').map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
-          <input value={autoTtlSeconds} onChange={(event) => setAutoTtlSeconds(event.target.value)} placeholder="ttl seconds" />
-          <select value={autoRecoveryMode} onChange={(event) => setAutoRecoveryMode(event.target.value)}>
-            {recoveryModeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
-          <button type="submit">创建自动动作</button>
-        </form>
-        <div className="card-list">
-          {autoActionsQuery.data?.map((rule: AutoActionRule) => (
-            <div key={rule.id} className="detail-card">
-              <strong>{rule.ruleName}</strong>
-              <span>{rule.eventType} / {rule.entityType ?? 'ANY_ENTITY'}</span>
-              <span>{rule.actionType} / {rule.recoveryMode}</span>
-              <span>{rule.ttlSeconds ? `${rule.ttlSeconds}s` : '无 TTL'}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="panel panel-wide">
-        <div className="panel-head">
-          <p className="panel-kicker">Alert silences</p>
-          <h2>告警静默</h2>
-          <p className="empty-state">在维护窗口或可接受噪音期内，显式压低告警可见性，避免误触发治理动作。</p>
-        </div>
-        <form className="inline-form" onSubmit={handleSilenceSubmit}>
-          <input value={silenceName} onChange={(event) => setSilenceName(event.target.value)} placeholder="silence 名称" />
-          <input value={silenceEventType} onChange={(event) => setSilenceEventType(event.target.value)} placeholder="eventType" />
-          <select value={silenceSeverity} onChange={(event) => setSilenceSeverity(event.target.value)}>
-            {['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
-          <select value={silenceEntityType} onChange={(event) => setSilenceEntityType(event.target.value)}>
-            {entityTypeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
-          <input value={silenceEntityRef} onChange={(event) => setSilenceEntityRef(event.target.value)} placeholder="entityRef" />
-          <input value={silenceStartsAt} onChange={(event) => setSilenceStartsAt(event.target.value)} placeholder="startsAt (ISO8601)" />
-          <input value={silenceEndsAt} onChange={(event) => setSilenceEndsAt(event.target.value)} placeholder="endsAt (ISO8601)" />
-          <input value={silenceReason} onChange={(event) => setSilenceReason(event.target.value)} placeholder="reason" />
-          <button type="submit">创建告警静默</button>
-        </form>
-        <div className="card-list">
-          {silencesQuery.data?.map((silence: AlertSilence) => (
-            <div key={silence.id} className="detail-card">
-              <strong>{silence.silenceName}</strong>
-              <span>{silence.eventType ?? 'ANY_EVENT'} / {silence.entityType ?? 'ANY_ENTITY'}</span>
-              <span>{silence.entityRef ?? 'ANY_REF'} · {silence.severity ?? 'ANY_SEVERITY'}</span>
-              <span>{silence.reason ?? '无额外说明'}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="panel">
-        <div className="panel-head">
-          <p className="panel-kicker">Alert events</p>
-          <h2>打开中的告警</h2>
-        </div>
-        <div className="card-list">
-          {alertsQuery.data?.map((alert: AlertEvent) => (
-            <div key={alert.id} className="detail-card">
-              <strong>{alert.title}</strong>
-              <span>{alert.severity} / {alert.status}</span>
-              <span>{alert.message}</span>
-              <span>{alert.entityType ?? '-'} · {alert.entityRef ?? '-'}</span>
-              <button type="button" onClick={() => ackMutation.mutate(alert.id)}>Ack</button>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="panel panel-wide">
-        <div className="panel-head">
-          <p className="panel-kicker">Quarantines</p>
-          <h2>隔离记录</h2>
-          <p className="empty-state">显示自动动作和手动守卫生效后的治理结果，可在这里手动 release。</p>
-        </div>
-        <div className="card-list">
-          {quarantinesQuery.data?.map((item: QuarantineRecord) => (
-            <div key={item.id} className="detail-card">
-              <strong>{item.targetType} · {buildTargetDescription(item)}</strong>
-              <span>{item.actionType} / {item.status}</span>
-              <span>{item.reason}</span>
-              <span>{item.expiresAt ? `到期时间 ${item.expiresAt}` : '无自动恢复时间'}</span>
-              {item.status === 'ACTIVE' ? (
-                <button type="button" onClick={() => releaseMutation.mutate(item.id)}>Release</button>
-              ) : null}
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  )
+function toNullableNumber(value: string | null | undefined) {
+  if (value == null || value.trim() === '') return null
+  const parsed = Number(value)
+  return Number.isNaN(parsed) ? null : parsed
 }

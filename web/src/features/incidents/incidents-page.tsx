@@ -1,14 +1,22 @@
 import { Link, useSearchParams } from 'react-router-dom'
-import { apiRequest } from '../../lib/api'
-import { useTypedQuery } from '../../lib/typed-react-query'
+import { ArrowUpRightIcon, RadarIcon } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { EmptyState } from '@/components/app/empty-state'
+import { InlineError } from '@/components/app/inline-error'
+import { PageSection } from '@/components/app/page-section'
+import { PageSkeleton } from '@/components/app/page-skeleton'
+import { StatusBadge } from '@/components/app/status-badge'
+import { formatInstant } from '@/lib/format'
+import { apiClient } from '@/lib/api'
+import { useTypedQuery } from '@/lib/typed-react-query'
+import type { OutboundDelivery } from '../integrations/types'
 import {
-  formatInstant,
   type IncidentEntityResponse,
   type IncidentSummaryResponse,
   type IncidentTimelineEventResponse,
   type OpsAlertEvent,
-} from '../provider-sites/types'
-import type { OutboundDelivery } from '../integrations/types'
+} from './types'
 
 export function IncidentsPage() {
   const [searchParams] = useSearchParams()
@@ -17,228 +25,257 @@ export function IncidentsPage() {
 
   const query = useTypedQuery<IncidentSummaryResponse>({
     queryKey: ['incident-summary', entityType, entityRef],
-    queryFn: () => apiRequest<IncidentSummaryResponse>('/admin/incidents/summary'),
+    queryFn: () => apiClient.get<IncidentSummaryResponse>('/admin/incidents/summary'),
+  })
+
+  const outboundDeliveriesQuery = useTypedQuery<OutboundDelivery[]>({
+    queryKey: ['incident-outbound-deliveries', entityType, entityRef],
+    queryFn: () =>
+      apiClient.get<OutboundDelivery[]>('/admin/integrations/deliveries', {
+        params: {
+          entityType,
+          entityRef,
+        },
+      }),
   })
 
   const summary = query.data
   const incidents = filterIncidents(summary?.incidents ?? [], entityType, entityRef)
   const affectedEntities = filterEntities(summary?.affectedEntities ?? [], entityType, entityRef)
   const timeline = filterTimeline(summary?.timeline ?? [], entityType, entityRef)
-  const snapshot = summary?.opsSummary.snapshot
-  const outboundDeliveriesQuery = useTypedQuery<OutboundDelivery[]>({
-    queryKey: ['incident-outbound-deliveries', entityType, entityRef],
-    queryFn: () => {
-      const params = new URLSearchParams()
-      if (entityType) params.set('entityType', entityType)
-      if (entityRef) params.set('entityRef', entityRef)
-      const query = params.toString()
-      return apiRequest<OutboundDelivery[]>(`/admin/integrations/deliveries${query ? `?${query}` : ''}`)
-    },
-  })
+
+  const sectionActions = (
+    <div className="flex flex-wrap gap-2">
+      {entityType ? <StatusBadge tone="warning">{entityType}</StatusBadge> : null}
+      {entityRef ? <StatusBadge>{entityRef}</StatusBadge> : null}
+      {entityType || entityRef ? (
+        <Button asChild variant="outline" size="sm">
+          <Link to="/console/incidents">清除聚焦</Link>
+        </Button>
+      ) : null}
+      <Button asChild variant="outline" size="sm">
+        <Link to="/console/ops">返回智能运维总览</Link>
+      </Button>
+    </div>
+  )
 
   return (
-    <section className="page-grid">
-      <div className="panel panel-wide">
-        <div className="panel-head">
-          <p className="panel-kicker">Incident command center</p>
-          <h2>当前事件指挥台</h2>
-          <p className="empty-state">先回答发生了什么、影响谁、为什么危险以及下一步该做什么。</p>
-        </div>
-        {entityType || entityRef ? (
-          <div className="stack-bar">
-            {entityType ? <span>entityType · {entityType}</span> : null}
-            {entityRef ? <span>entityRef · {entityRef}</span> : null}
-            <Link className="action-link" to="/incidents">清除聚焦</Link>
-          </div>
-        ) : null}
-        {snapshot ? (
-          <div className="detail-grid">
-            <div className="detail-card">
-              <strong>Active incidents</strong>
-              <span>{incidents.length}</span>
+    <div className="flex flex-col gap-6">
+      <PageSection
+        kicker="智能运维总览补充视图"
+        title="事件处置视图"
+        actions={sectionActions}
+      />
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(20rem,1fr)]">
+        <PageSection
+          kicker="当前事件"
+          title="当前风险事件"
+        >
+          {query.isPending ? (
+            <PageSkeleton count={1} />
+          ) : incidents.length ? (
+            <div className="grid gap-4 lg:grid-cols-2">
+              {incidents.map((incident) => (
+                <EventCard
+                  key={incident.id}
+                  title={incident.title}
+                  meta={[
+                    incident.message,
+                    `${incident.severity} · ${incident.status}`,
+                    `${incident.entityType ?? 'SYSTEM'} / ${incident.entityRef ?? '全局'}`,
+                  ]}
+                  footer={
+                    <div className="flex flex-wrap gap-2">
+                      <ActionButton
+                        to={`/console/traces?requestId=${encodeURIComponent(incident.entityRef ?? '')}`}
+                        label="查看链路追踪"
+                      />
+                      <ActionButton
+                        to={`/console/workbench?requestId=${encodeURIComponent(incident.entityRef ?? '')}`}
+                        label="进入调试工作台"
+                      />
+                      <ActionButton
+                        to={`/console/incidents?entityType=${encodeURIComponent(
+                          incident.entityType ?? 'SYSTEM',
+                        )}&entityRef=${encodeURIComponent(incident.entityRef ?? incident.title)}`}
+                        label="聚焦实体"
+                      />
+                    </div>
+                  }
+                />
+              ))}
             </div>
-            <div className="detail-card">
-              <strong>Risk level</strong>
-              <span>{summary?.sloSummary.summary.riskLevel ?? '-'}</span>
+          ) : (
+            <EmptyState title="当前筛选下没有打开中的事件" />
+          )}
+        </PageSection>
+
+        <PageSection
+          kicker="建议动作"
+          title="建议动作"
+        >
+          {summary?.recommendedActions.length ? (
+            <div className="flex flex-col gap-3">
+              {summary.recommendedActions.map((action) => (
+                <Card key={action} className="border-border/60 bg-card/92 shadow-sm">
+                  <CardContent className="flex items-start gap-3 p-4 text-sm text-foreground">
+                    <StatusBadge tone="info">下一步</StatusBadge>
+                    <span>{normalizeUserVisibleTerms(action)}</span>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
-            <div className="detail-card">
-              <strong>Affected entities</strong>
-              <span>{affectedEntities.length}</span>
-            </div>
-            <div className="detail-card">
-              <strong>Quarantines</strong>
-              <span>{summary?.quarantines.length ?? 0}</span>
-            </div>
-            <div className="detail-card">
-              <strong>Burn rate</strong>
-              <span>{summary?.sloSummary.summary.burnRate?.toFixed(2) ?? '-'}</span>
-            </div>
-            <div className="detail-card">
-              <strong>Provider failures</strong>
-              <span>{snapshot.providerFailures}</span>
-            </div>
-          </div>
-        ) : (
-          <p className="empty-state">正在加载 incident 摘要…</p>
-        )}
+          ) : (
+            <EmptyState title="当前没有额外建议动作" />
+          )}
+        </PageSection>
       </div>
 
-      <div className="panel panel-wide">
-        <div className="panel-head">
-          <p className="panel-kicker">Current incidents</p>
-          <h3>当前风险事件</h3>
-        </div>
-        <div className="card-list">
-          {incidents.map((incident) => (
-            <div key={incident.id} className="detail-card">
-              <strong>{incident.title}</strong>
-              <span>{incident.severity} · {incident.status}</span>
-              <span>{incident.message}</span>
-              <span>{incident.entityType ?? 'SYSTEM'} / {incident.entityRef ?? 'global'}</span>
-              <div className="inline-actions">
-                <Link
-                  className="action-link"
-                  to={`/traces?requestId=${encodeURIComponent(incident.entityRef ?? '')}`}
-                >
-                  查看 Trace
-                </Link>
-                <Link
-                  className="action-link"
-                  to={`/workbench?requestId=${encodeURIComponent(incident.entityRef ?? '')}`}
-                >
-                  进入 Workbench
-                </Link>
-                <Link
-                  className="action-link"
-                  to={`/incidents?entityType=${encodeURIComponent(incident.entityType ?? 'SYSTEM')}&entityRef=${encodeURIComponent(incident.entityRef ?? incident.title)}`}
-                >
-                  聚焦实体
-                </Link>
-              </div>
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+        <PageSection
+          kicker="受影响对象"
+          title="受影响对象"
+        >
+          {affectedEntities.length ? (
+            <div className="grid gap-4 lg:grid-cols-2">
+              {affectedEntities.map((entity) => (
+                <EventCard
+                  key={`${entity.entityType}-${entity.entityRef}-${entity.title}`}
+                  title={entity.title}
+                  meta={[entity.summary, `${entity.entityType} / ${entity.entityRef}`, `${entity.severity} · ${entity.status}`]}
+                  footer={
+                    <div className="flex flex-wrap gap-2">
+                      <ActionButton
+                        to={`/console/incidents?entityType=${encodeURIComponent(entity.entityType)}&entityRef=${encodeURIComponent(entity.entityRef)}`}
+                        label="聚焦事件"
+                      />
+                      <ActionButton
+                        to={`/console/traces?gatewayResourceKey=${encodeURIComponent(entity.entityRef)}`}
+                        label="查看链路追踪"
+                      />
+                    </div>
+                  }
+                />
+              ))}
             </div>
+          ) : (
+            <EmptyState title="暂无受影响对象" />
+          )}
+        </PageSection>
+
+        <PageSection
+          kicker="外发投递"
+          title="外发状态摘要"
+        >
+          {outboundDeliveriesQuery.isPending ? (
+            <PageSkeleton count={1} />
+          ) : outboundDeliveriesQuery.error ? (
+            <InlineError error={outboundDeliveriesQuery.error} title="外发投递加载失败" />
+          ) : outboundDeliveriesQuery.data?.length ? (
+            <div className="flex flex-col gap-4">
+              {outboundDeliveriesQuery.data.slice(0, 4).map((delivery) => (
+                <EventCard
+                  key={delivery.id}
+                  title={delivery.eventType}
+                  meta={[
+                    delivery.responseSummary ?? delivery.lastError ?? '等待投递结果',
+                    `${delivery.deliveryStatus} / 尝试 ${delivery.attemptCount}`,
+                    `${delivery.entityType ?? 'SYSTEM'} / ${delivery.entityRef ?? '-'}`,
+                  ]}
+                  footer={
+                    <div className="flex flex-wrap gap-2">
+                      {delivery.requestId ? (
+                        <ActionButton
+                          to={`/console/traces?requestId=${encodeURIComponent(delivery.requestId)}`}
+                          label="查看链路追踪"
+                        />
+                      ) : null}
+                      <ActionButton to="/console/integrations/deliveries" label="查看全部投递" />
+                    </div>
+                  }
+                />
+              ))}
+            </div>
+          ) : (
+            <EmptyState title="当前没有相关外发投递记录" />
+          )}
+        </PageSection>
+      </div>
+
+      <div className="grid gap-6">
+        <PageSection
+          kicker="事件时间线"
+          title="事件时间线"
+        >
+          {timeline.length ? (
+            <div className="flex flex-col gap-4">
+              {timeline.map((event) => (
+                <Card key={`${event.eventType}-${event.title}-${event.occurredAt}`} className="border-border/60 bg-card/92 shadow-sm">
+                  <CardHeader className="gap-2 border-b border-border/60">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="flex min-w-0 flex-col gap-2">
+                        <CardTitle className="text-base">{event.title}</CardTitle>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <StatusBadge tone={toneForSeverity(event.severity)}>{event.severity}</StatusBadge>
+                        <StatusBadge>{event.source}</StatusBadge>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="flex flex-col gap-3 p-5 text-sm text-muted-foreground">
+                    <div>{event.entityType ?? '系统'} / {event.entityRef ?? '全局'}</div>
+                    <div>{formatInstant(event.occurredAt)}</div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              title="当前没有可展示的事件时间线"
+              icon={<RadarIcon className="size-5" />}
+            />
+          )}
+        </PageSection>
+      </div>
+    </div>
+  )
+}
+
+function EventCard({
+  title,
+  meta,
+  footer,
+}: {
+  title: string
+  meta: string[]
+  footer?: React.ReactNode
+}) {
+  return (
+    <Card className="border-border/60 bg-card/92 shadow-sm">
+      <CardHeader className="gap-2 border-b border-border/60">
+        <CardTitle className="text-base">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4 p-5">
+        <div className="flex flex-col gap-2 text-sm text-muted-foreground">
+          {meta.map((item) => (
+            <div key={item}>{normalizeUserVisibleTerms(item)}</div>
           ))}
-          {!incidents.length ? <p className="empty-state">当前筛选下没有打开中的 incident。</p> : null}
         </div>
-      </div>
+        {footer}
+      </CardContent>
+    </Card>
+  )
+}
 
-      <div className="panel panel-wide">
-        <div className="panel-head">
-          <p className="panel-kicker">Affected entities</p>
-          <h3>受影响对象</h3>
-        </div>
-        <div className="card-list">
-          {affectedEntities.map((entity) => (
-            <div key={`${entity.entityType}-${entity.entityRef}-${entity.title}`} className="detail-card">
-              <strong>{entity.title}</strong>
-              <span>{entity.entityType} / {entity.entityRef}</span>
-              <span>{entity.severity} · {entity.status}</span>
-              <span>{entity.summary}</span>
-              <div className="inline-actions">
-                <Link className="action-link" to={`/incidents?entityType=${encodeURIComponent(entity.entityType)}&entityRef=${encodeURIComponent(entity.entityRef)}`}>
-                  聚焦事件
-                </Link>
-                <Link className="action-link" to={`/traces?gatewayResourceKey=${encodeURIComponent(entity.entityRef)}`}>
-                  查看 Trace
-                </Link>
-              </div>
-            </div>
-          ))}
-          {!affectedEntities.length ? <p className="empty-state">暂无受影响对象。</p> : null}
-        </div>
-      </div>
-
-      <div className="panel">
-        <div className="panel-head">
-          <p className="panel-kicker">Outbound delivery</p>
-          <h3>外发状态摘要</h3>
-        </div>
-        <div className="card-list">
-          {(outboundDeliveriesQuery.data ?? []).slice(0, 4).map((delivery) => (
-            <div key={delivery.id} className="detail-card">
-              <strong>{delivery.eventType}</strong>
-              <span>{delivery.deliveryStatus} / attempt {delivery.attemptCount}</span>
-              <span>{delivery.responseSummary ?? delivery.lastError ?? '等待投递结果'}</span>
-              <span>{delivery.entityType ?? 'SYSTEM'} / {delivery.entityRef ?? '-'}</span>
-              <div className="inline-actions">
-                {delivery.requestId ? (
-                  <Link className="action-link" to={`/traces?requestId=${encodeURIComponent(delivery.requestId)}`}>
-                    查看 Trace
-                  </Link>
-                ) : null}
-                <Link className="action-link" to="/integrations/deliveries">
-                  查看全部投递
-                </Link>
-              </div>
-            </div>
-          ))}
-          {!outboundDeliveriesQuery.data?.length ? <p className="empty-state">当前没有相关外发投递记录。</p> : null}
-        </div>
-      </div>
-
-      <div className="panel">
-        <div className="panel-head">
-          <p className="panel-kicker">Recommended actions</p>
-          <h3>建议动作</h3>
-        </div>
-        <div className="card-list">
-          {summary?.recommendedActions.map((action) => (
-            <div key={action} className="detail-card">
-              <strong>Next action</strong>
-              <span>{action}</span>
-            </div>
-          ))}
-          {!summary?.recommendedActions.length ? <p className="empty-state">当前没有额外建议动作。</p> : null}
-        </div>
-      </div>
-
-      <div className="panel">
-        <div className="panel-head">
-          <p className="panel-kicker">Evidence</p>
-          <h3>风险证据</h3>
-        </div>
-        {summary ? (
-          <div className="detail-grid">
-            <div className="detail-card">
-              <strong>Error budget remaining</strong>
-              <span>{(summary.sloSummary.summary.errorBudgetRemainingRatio * 100).toFixed(1)}%</span>
-            </div>
-            <div className="detail-card">
-              <strong>Silences</strong>
-              <span>{summary.silences.length}</span>
-            </div>
-            <div className="detail-card">
-              <strong>Site health tracked</strong>
-              <span>{summary.healthScores.sites.length}</span>
-            </div>
-            <div className="detail-card">
-              <strong>Capacity pressure keys</strong>
-              <span>{summary.capacitySummary.distributedKeys.length}</span>
-            </div>
-          </div>
-        ) : (
-          <p className="empty-state">暂无风险证据。</p>
-        )}
-      </div>
-
-      <div className="panel panel-wide">
-        <div className="panel-head">
-          <p className="panel-kicker">Incident timeline</p>
-          <h3>事件时间线</h3>
-        </div>
-        <div className="card-list">
-          {timeline.map((event) => (
-            <div key={`${event.eventType}-${event.title}-${event.occurredAt}`} className="detail-card">
-              <strong>{event.title}</strong>
-              <span>{event.severity} · {event.source}</span>
-              <span>{event.description}</span>
-              <span>{event.entityType ?? 'SYSTEM'} / {event.entityRef ?? 'global'}</span>
-              <span>{formatInstant(event.occurredAt)}</span>
-            </div>
-          ))}
-          {!timeline.length ? <p className="empty-state">当前没有可展示的 incident timeline。</p> : null}
-        </div>
-      </div>
-    </section>
+function ActionButton({ to, label }: { to: string; label: string }) {
+  return (
+    <Button asChild variant="outline" size="sm">
+      <Link to={to}>
+        {label}
+        <ArrowUpRightIcon data-icon="inline-end" />
+      </Link>
+    </Button>
   )
 }
 
@@ -263,4 +300,15 @@ function matchesEntity(
   if (entityType && candidateType !== entityType) return false
   if (entityRef && candidateRef !== entityRef) return false
   return true
+}
+
+function toneForSeverity(severity?: string | null) {
+  const normalized = severity?.toLowerCase()
+  if (normalized === 'critical' || normalized === 'error') return 'danger' as const
+  if (normalized === 'warn' || normalized === 'warning') return 'warning' as const
+  return 'info' as const
+}
+
+function normalizeUserVisibleTerms(value: string) {
+  return value.replace(/\bTrace\b/g, '链路追踪')
 }

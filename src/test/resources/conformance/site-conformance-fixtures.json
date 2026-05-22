@@ -1008,5 +1008,36 @@
         "expectedRenderCapability":  "NATIVE",
         "expectedRouteSelectionMode":  "CATALOG_SELECTION",
         "operationHint":  "file_create"
+    },
+    {
+        "name":  "xiaomi-mimo-openai-compatible-chat",
+        "providerType":  "OPENAI_COMPATIBLE",
+        "providerFamily":  "OPENAI",
+        "siteKind":  "OPENAI_COMPATIBLE_GENERIC",
+        "protocol":  "responses",
+        "requestPath":  "/v1/responses",
+        "requestedModel":  "mimo-v2.5-pro",
+        "supportedProtocols":  [
+                                   "openai",
+                                   "responses"
+                               ],
+        "supportsChat":  true,
+        "supportsTools":  true,
+        "supportsImageInput":  true,
+        "supportsEmbeddings":  false,
+        "supportsThinking":  true,
+        "includeImageInput":  false,
+        "snapshotResponses":  true,
+        "snapshotEmbeddings":  false,
+        "snapshotAudio":  false,
+        "snapshotImages":  false,
+        "snapshotModeration":  false,
+        "snapshotFiles":  false,
+        "snapshotUploads":  false,
+        "snapshotRealtime":  false,
+        "expectedExecutable":  true,
+        "expectedEffectiveLevel":  "NATIVE",
+        "expectedExecutionKind":  "NATIVE",
+        "expectedModelVisible":  true
     }
 ]

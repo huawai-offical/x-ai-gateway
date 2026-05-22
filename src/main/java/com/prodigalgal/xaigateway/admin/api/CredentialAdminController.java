@@ -1,6 +1,7 @@
 package com.prodigalgal.xaigateway.admin.api;
 
 import com.prodigalgal.xaigateway.admin.application.CredentialAdminService;
+import com.prodigalgal.xaigateway.admin.application.UpstreamCredentialInventoryService;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -21,14 +22,23 @@ import org.springframework.web.bind.annotation.RestController;
 public class CredentialAdminController {
 
     private final CredentialAdminService credentialAdminService;
+    private final UpstreamCredentialInventoryService upstreamCredentialInventoryService;
 
-    public CredentialAdminController(CredentialAdminService credentialAdminService) {
+    public CredentialAdminController(
+            CredentialAdminService credentialAdminService,
+            UpstreamCredentialInventoryService upstreamCredentialInventoryService) {
         this.credentialAdminService = credentialAdminService;
+        this.upstreamCredentialInventoryService = upstreamCredentialInventoryService;
     }
 
     @GetMapping
     public List<CredentialResponse> list() {
         return credentialAdminService.list();
+    }
+
+    @GetMapping("/inventory")
+    public List<UpstreamCredentialInventoryResponse> inventory() {
+        return upstreamCredentialInventoryService.list();
     }
 
     @GetMapping("/model-catalog")
@@ -39,9 +49,9 @@ public class CredentialAdminController {
         return credentialAdminService.listSupportedModelCatalog(providerType);
     }
 
-    @GetMapping("/pool/{poolId}")
-    public List<CredentialResponse> listByPool(@PathVariable Long poolId) {
-        return credentialAdminService.listByPool(poolId);
+    @GetMapping("/group/{groupId}")
+    public List<CredentialResponse> listByGroup(@PathVariable Long groupId) {
+        return credentialAdminService.listByGroup(groupId);
     }
 
     @GetMapping("/{id}")

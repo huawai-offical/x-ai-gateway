@@ -6,10 +6,10 @@ import com.prodigalgal.xaigateway.gateway.core.governance.GovernanceContext;
 import com.prodigalgal.xaigateway.gateway.core.governance.GovernanceDecision;
 import com.prodigalgal.xaigateway.gateway.core.governance.GovernancePolicyEngine;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
-import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyAccountPoolBindingEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyAccountGroupBindingEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountEntity;
-import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountPoolEntity;
-import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAccountPoolBindingRepository;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountGroupEntity;
+import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAccountGroupBindingRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.NetworkProxyRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountRepository;
 import java.time.Duration;
@@ -28,7 +28,7 @@ class AccountSelectionServiceTests {
 
     @Test
     void shouldScopeStickyAccountBySessionAffinityKey() {
-        DistributedKeyAccountPoolBindingRepository bindingRepository = Mockito.mock(DistributedKeyAccountPoolBindingRepository.class);
+        DistributedKeyAccountGroupBindingRepository bindingRepository = Mockito.mock(DistributedKeyAccountGroupBindingRepository.class);
         UpstreamAccountRepository upstreamAccountRepository = Mockito.mock(UpstreamAccountRepository.class);
         NetworkProxyRepository networkProxyRepository = Mockito.mock(NetworkProxyRepository.class);
         StringRedisTemplate stringRedisTemplate = Mockito.mock(StringRedisTemplate.class);
@@ -43,16 +43,16 @@ class AccountSelectionServiceTests {
                 stringRedisTemplate
         );
 
-        DistributedKeyAccountPoolBindingEntity binding = new DistributedKeyAccountPoolBindingEntity();
-        UpstreamAccountPoolEntity pool = new UpstreamAccountPoolEntity();
-        ReflectionTestUtils.setField(pool, "id", 99L);
-        binding.setPool(pool);
+        DistributedKeyAccountGroupBindingEntity binding = new DistributedKeyAccountGroupBindingEntity();
+        UpstreamAccountGroupEntity group = new UpstreamAccountGroupEntity();
+        ReflectionTestUtils.setField(group, "id", 99L);
+        binding.setGroup(group);
         binding.setProviderType(ProviderType.OPENAI_DIRECT);
         binding.setActive(true);
 
         UpstreamAccountEntity account = new UpstreamAccountEntity();
         ReflectionTestUtils.setField(account, "id", 77L);
-        account.setPool(pool);
+        account.setGroup(group);
         account.setAccountName("codex-account");
         account.setProviderType(UpstreamAccountProviderType.CODEX_OAUTH);
         account.setActive(true);
@@ -61,7 +61,7 @@ class AccountSelectionServiceTests {
 
         Mockito.when(bindingRepository.findAllByDistributedKey_IdAndProviderTypeAndActiveTrueOrderByPriorityAscCreatedAtAsc(1L, ProviderType.OPENAI_DIRECT))
                 .thenReturn(List.of(binding));
-        Mockito.when(upstreamAccountRepository.findAllByPool_IdAndActiveTrueAndFrozenFalseAndHealthyTrueOrderByUpdatedAtDesc(99L))
+        Mockito.when(upstreamAccountRepository.findAllByGroup_IdAndActiveTrueAndFrozenFalseAndHealthyTrueOrderByUpdatedAtDesc(99L))
                 .thenReturn(List.of(account));
         Mockito.when(valueOperations.get(Mockito.anyString())).thenReturn(null);
 
@@ -81,7 +81,7 @@ class AccountSelectionServiceTests {
 
     @Test
     void shouldSkipGovernanceBlockedAccount() {
-        DistributedKeyAccountPoolBindingRepository bindingRepository = Mockito.mock(DistributedKeyAccountPoolBindingRepository.class);
+        DistributedKeyAccountGroupBindingRepository bindingRepository = Mockito.mock(DistributedKeyAccountGroupBindingRepository.class);
         UpstreamAccountRepository upstreamAccountRepository = Mockito.mock(UpstreamAccountRepository.class);
         NetworkProxyRepository networkProxyRepository = Mockito.mock(NetworkProxyRepository.class);
         StringRedisTemplate stringRedisTemplate = Mockito.mock(StringRedisTemplate.class);
@@ -107,14 +107,14 @@ class AccountSelectionServiceTests {
                 governancePolicyEngine
         );
 
-        DistributedKeyAccountPoolBindingEntity binding = new DistributedKeyAccountPoolBindingEntity();
-        UpstreamAccountPoolEntity pool = new UpstreamAccountPoolEntity();
-        binding.setPool(pool);
+        DistributedKeyAccountGroupBindingEntity binding = new DistributedKeyAccountGroupBindingEntity();
+        UpstreamAccountGroupEntity group = new UpstreamAccountGroupEntity();
+        binding.setGroup(group);
         binding.setProviderType(ProviderType.OPENAI_DIRECT);
         binding.setActive(true);
 
         UpstreamAccountEntity account = new UpstreamAccountEntity();
-        account.setPool(pool);
+        account.setGroup(group);
         account.setAccountName("oauth-account");
         account.setProviderType(UpstreamAccountProviderType.OPENAI_OAUTH);
         account.setActive(true);
@@ -123,7 +123,7 @@ class AccountSelectionServiceTests {
 
         Mockito.when(bindingRepository.findAllByDistributedKey_IdAndProviderTypeAndActiveTrueOrderByPriorityAscCreatedAtAsc(1L, ProviderType.OPENAI_DIRECT))
                 .thenReturn(List.of(binding));
-        Mockito.when(upstreamAccountRepository.findAllByPool_IdAndActiveTrueAndFrozenFalseAndHealthyTrueOrderByUpdatedAtDesc(null))
+        Mockito.when(upstreamAccountRepository.findAllByGroup_IdAndActiveTrueAndFrozenFalseAndHealthyTrueOrderByUpdatedAtDesc(null))
                 .thenReturn(List.of(account));
         Mockito.when(valueOperations.get(Mockito.anyString())).thenReturn(null);
 

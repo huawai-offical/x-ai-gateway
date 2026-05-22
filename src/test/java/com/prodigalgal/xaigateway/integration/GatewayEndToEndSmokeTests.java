@@ -23,26 +23,26 @@ import com.prodigalgal.xaigateway.gateway.core.shared.ReasoningTransport;
 import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
 import com.prodigalgal.xaigateway.gateway.core.usage.GatewayUsage;
 import com.prodigalgal.xaigateway.infra.persistence.entity.AuditLogEntity;
-import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyAccountPoolBindingEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyAccountGroupBindingEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyBindingEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.RequestLogEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SiteCapabilitySnapshotEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SiteModelCapabilityEntity;
-import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountPoolEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountGroupEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamSiteProfileEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.AuditLogRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.CacheHitLogRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyBindingRepository;
-import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAccountPoolBindingRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAccountGroupBindingRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.RequestLogRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.RouteDecisionLogRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.SiteCapabilitySnapshotRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.SiteModelCapabilityRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCacheReferenceRepository;
-import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountPoolRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountGroupRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamSiteProfileRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UsageRecordRepository;
@@ -96,10 +96,10 @@ class GatewayEndToEndSmokeTests {
     private DistributedKeyBindingRepository distributedKeyBindingRepository;
 
     @Autowired
-    private DistributedKeyAccountPoolBindingRepository distributedKeyAccountPoolBindingRepository;
+    private DistributedKeyAccountGroupBindingRepository distributedKeyAccountGroupBindingRepository;
 
     @Autowired
-    private UpstreamAccountPoolRepository upstreamAccountPoolRepository;
+    private UpstreamAccountGroupRepository upstreamAccountGroupRepository;
 
     @Autowired
     private UpstreamCredentialRepository upstreamCredentialRepository;
@@ -160,9 +160,9 @@ class GatewayEndToEndSmokeTests {
         cacheHitLogRepository.deleteAll();
         upstreamCacheReferenceRepository.deleteAll();
         distributedKeyBindingRepository.deleteAll();
-        distributedKeyAccountPoolBindingRepository.deleteAll();
+        distributedKeyAccountGroupBindingRepository.deleteAll();
         distributedKeyRepository.deleteAll();
-        upstreamAccountPoolRepository.deleteAll();
+        upstreamAccountGroupRepository.deleteAll();
         siteModelCapabilityRepository.deleteAll();
         siteCapabilitySnapshotRepository.deleteAll();
         upstreamCredentialRepository.deleteAll();
@@ -473,24 +473,24 @@ class GatewayEndToEndSmokeTests {
         distributedKey.setKeyPrefix("sk-gw-test");
         distributedKey.setSecretHash(distributedKeySecretService.hashSecret(openAiSecret));
         distributedKey.setMaskedKey("sk-gw-test...masked");
-        distributedKey.setAllowedProtocols(List.of("openai", "responses", "anthropic_native", "google_native"));
+        distributedKey.setAllowedProtocolSuites(List.of("openai", "responses", "anthropic_native", "google_native"));
         distributedKey.setAllowedModels(List.of("gpt-4o", "claude-sonnet-4", "gemini-2.5-pro"));
         distributedKey.setActive(true);
         distributedKey = distributedKeyRepository.save(distributedKey);
 
-        UpstreamAccountPoolEntity openAiPool = saveAccountPool(
+        UpstreamAccountGroupEntity openAiGroup = saveAccountGroup(
                 "default-openai",
                 UpstreamAccountProviderType.OPENAI_OAUTH,
                 List.of("gpt-4o"),
                 List.of("openai", "responses")
         );
-        UpstreamAccountPoolEntity anthropicPool = saveAccountPool(
+        UpstreamAccountGroupEntity anthropicGroup = saveAccountGroup(
                 "default-anthropic",
                 UpstreamAccountProviderType.CLAUDE_ACCOUNT,
                 List.of("claude-sonnet-4"),
                 List.of("anthropic_native")
         );
-        UpstreamAccountPoolEntity geminiPool = saveAccountPool(
+        UpstreamAccountGroupEntity geminiGroup = saveAccountGroup(
                 "default-gemini",
                 UpstreamAccountProviderType.GEMINI_OAUTH,
                 List.of("gemini-2.5-pro"),
@@ -501,9 +501,9 @@ class GatewayEndToEndSmokeTests {
         saveBinding(distributedKey, openAiSecondary, 20, 100);
         saveBinding(distributedKey, anthropicPrimary, 10, 100);
         saveBinding(distributedKey, geminiPrimary, 10, 100);
-        savePoolBinding(distributedKey, openAiPool, ProviderType.OPENAI_DIRECT, 10);
-        savePoolBinding(distributedKey, anthropicPool, ProviderType.ANTHROPIC_DIRECT, 20);
-        savePoolBinding(distributedKey, geminiPool, ProviderType.GEMINI_DIRECT, 30);
+        saveGroupBinding(distributedKey, openAiGroup, ProviderType.OPENAI_DIRECT, 10);
+        saveGroupBinding(distributedKey, anthropicGroup, ProviderType.ANTHROPIC_DIRECT, 20);
+        saveGroupBinding(distributedKey, geminiGroup, ProviderType.GEMINI_DIRECT, 30);
 
         return new SeedData(
                 distributedKey.getKeyPrefix(),
@@ -549,7 +549,6 @@ class GatewayEndToEndSmokeTests {
         entity.setSupportsModeration(false);
         entity.setSupportsFiles(false);
         entity.setSupportsUploads(false);
-        entity.setSupportsRealtime(false);
         entity.setAuthStrategy(siteProfile.getAuthStrategy());
         entity.setPathStrategy(siteProfile.getPathStrategy());
         entity.setErrorSchemaStrategy(siteProfile.getErrorSchemaStrategy());
@@ -598,19 +597,19 @@ class GatewayEndToEndSmokeTests {
         return upstreamCredentialRepository.save(entity);
     }
 
-    private UpstreamAccountPoolEntity saveAccountPool(
+    private UpstreamAccountGroupEntity saveAccountGroup(
             String name,
             UpstreamAccountProviderType providerType,
             List<String> supportedModels,
             List<String> supportedProtocols) {
-        UpstreamAccountPoolEntity entity = new UpstreamAccountPoolEntity();
-        entity.setPoolName(name);
+        UpstreamAccountGroupEntity entity = new UpstreamAccountGroupEntity();
+        entity.setGroupName(name);
         entity.setProviderType(providerType);
         entity.setSupportedModels(supportedModels);
         entity.setSupportedProtocols(supportedProtocols);
         entity.setAllowedClientFamilies(List.of("GENERIC_OPENAI", "CODEX"));
         entity.setActive(true);
-        return upstreamAccountPoolRepository.save(entity);
+        return upstreamAccountGroupRepository.save(entity);
     }
 
     private void saveBinding(DistributedKeyEntity distributedKey, UpstreamCredentialEntity credential, int priority, int weight) {
@@ -623,18 +622,18 @@ class GatewayEndToEndSmokeTests {
         distributedKeyBindingRepository.save(entity);
     }
 
-    private void savePoolBinding(
+    private void saveGroupBinding(
             DistributedKeyEntity distributedKey,
-            UpstreamAccountPoolEntity pool,
+            UpstreamAccountGroupEntity group,
             ProviderType providerType,
             int priority) {
-        DistributedKeyAccountPoolBindingEntity entity = new DistributedKeyAccountPoolBindingEntity();
+        DistributedKeyAccountGroupBindingEntity entity = new DistributedKeyAccountGroupBindingEntity();
         entity.setDistributedKey(distributedKey);
-        entity.setPool(pool);
+        entity.setGroup(group);
         entity.setProviderType(providerType);
         entity.setPriority(priority);
         entity.setActive(true);
-        distributedKeyAccountPoolBindingRepository.save(entity);
+        distributedKeyAccountGroupBindingRepository.save(entity);
     }
 
     private record SeedData(

@@ -3,7 +3,6 @@ package com.prodigalgal.xaigateway.admin.api;
 import com.prodigalgal.xaigateway.admin.application.OpsAlertService;
 import com.prodigalgal.xaigateway.admin.application.OpsCapacityService;
 import com.prodigalgal.xaigateway.admin.application.OpsDashboardService;
-import com.prodigalgal.xaigateway.admin.application.OpsProbeJobService;
 import com.prodigalgal.xaigateway.admin.application.OpsRuntimeLogService;
 import com.prodigalgal.xaigateway.admin.application.OpsSloService;
 import jakarta.validation.Valid;
@@ -18,7 +17,6 @@ public class OpsAdminController {
 
     private final OpsDashboardService opsDashboardService;
     private final OpsAlertService opsAlertService;
-    private final OpsProbeJobService opsProbeJobService;
     private final OpsRuntimeLogService opsRuntimeLogService;
     private final OpsSloService opsSloService;
     private final OpsCapacityService opsCapacityService;
@@ -26,13 +24,11 @@ public class OpsAdminController {
     public OpsAdminController(
             OpsDashboardService opsDashboardService,
             OpsAlertService opsAlertService,
-            OpsProbeJobService opsProbeJobService,
             OpsRuntimeLogService opsRuntimeLogService,
             OpsSloService opsSloService,
             OpsCapacityService opsCapacityService) {
         this.opsDashboardService = opsDashboardService;
         this.opsAlertService = opsAlertService;
-        this.opsProbeJobService = opsProbeJobService;
         this.opsRuntimeLogService = opsRuntimeLogService;
         this.opsSloService = opsSloService;
         this.opsCapacityService = opsCapacityService;
@@ -106,31 +102,6 @@ public class OpsAdminController {
     @GetMapping("/capacity")
     public OpsCapacitySummaryResponse capacitySummary() {
         return opsCapacityService.summary(Instant.now());
-    }
-
-    @GetMapping("/probes")
-    public List<OpsScheduledProbeJobResponse> listProbeJobs() {
-        return opsProbeJobService.list();
-    }
-
-    @PostMapping("/probes")
-    public OpsScheduledProbeJobResponse createProbeJob(@Valid @RequestBody OpsScheduledProbeJobRequest request) {
-        return opsProbeJobService.save(null, request);
-    }
-
-    @PutMapping("/probes/{id}")
-    public OpsScheduledProbeJobResponse updateProbeJob(@PathVariable Long id, @Valid @RequestBody OpsScheduledProbeJobRequest request) {
-        return opsProbeJobService.save(id, request);
-    }
-
-    @PostMapping("/probes/{id}/run")
-    public OpsScheduledProbeJobResponse runProbeJob(@PathVariable Long id) {
-        return opsProbeJobService.trigger(id);
-    }
-
-    @DeleteMapping("/probes/{id}")
-    public void deleteProbeJob(@PathVariable Long id) {
-        opsProbeJobService.delete(id);
     }
 
     @GetMapping("/logs/system")

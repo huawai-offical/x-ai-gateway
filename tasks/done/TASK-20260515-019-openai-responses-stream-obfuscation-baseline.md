@@ -1,10 +1,10 @@
 # TASK-20260515-019 OpenAI Responses Stream Obfuscation 字段基线
 
-状态：Done  
-优先级：Critical  
-类型：子任务切片  
-父任务：[TASK-20260514-018](../backlog/TASK-20260514-018-openai-responses-native-lifecycle.md)  
-上游来源：[TASK-20260514-018](../backlog/TASK-20260514-018-openai-responses-native-lifecycle.md)、OpenAI Responses API Reference
+状态：Done
+优先级：Critical
+类型：子任务切片
+父任务：[TASK-20260514-018](../done/TASK-20260514-018-openai-responses-native-lifecycle.md)
+上游来源：[TASK-20260514-018](../done/TASK-20260514-018-openai-responses-native-lifecycle.md)、OpenAI Responses API Reference
 
 ## 背景
 
@@ -40,7 +40,7 @@ OpenAI Responses streaming 支持 `stream_options.include_obfuscation`。官方�
 - `src/main/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiResponsesEncoder.java`
 - `src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiResponsesControllerTests.java`
 - `docs/public-api-compatibility.md`
-- `tasks/backlog/TASK-20260514-018-openai-responses-native-lifecycle.md`
+- `tasks/done/TASK-20260514-018-openai-responses-native-lifecycle.md`
 
 ## 依赖
 

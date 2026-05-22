@@ -1,7 +1,7 @@
 # REQ-20260519-002 Codex 功能性服务 API 最高优先推进
 
-状态：In Progress  
-日期：2026-05-19  
+状态：Completed
+日期：2026-05-19
 上游来源：用户指令“先不做测试了，全速推进项目任务，并且把 codex 的相关任务提高到最高的优先”、[ADR-0010](../decisions/ADR-0010-functional-service-api-scope.md)、[REQ-20260518-005](REQ-20260518-005-functional-service-api-scope.md)
 
 ## 背景
@@ -54,5 +54,5 @@
 - [TASK-20260519-002](../../tasks/done/TASK-20260519-002-codex-priority-functional-service-api.md)
 - [TASK-20260519-002-01](../../tasks/done/TASK-20260519-002-01-codex-functional-truth-source-priority.md)
 - [TASK-20260519-002-02](../../tasks/done/TASK-20260519-002-02-codex-smoke-record-replay-priority.md)
-- [TASK-20260514-029](../../tasks/in-progress/TASK-20260514-029-openai-openapi-catalog-conformance-sdk.md)
+- [TASK-20260514-029](../../tasks/done/TASK-20260514-029-openai-openapi-catalog-conformance-sdk.md)
 - [TASK-20260514-031](../../tasks/backlog/TASK-20260514-031-openai-real-smoke-certification-harness.md)

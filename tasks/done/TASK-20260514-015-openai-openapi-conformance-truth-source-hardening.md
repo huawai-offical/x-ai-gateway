@@ -1,9 +1,9 @@
 # TASK-20260514-015 OpenAI 公开 OpenAPI、catalog 与 conformance 事实源校准
 
-状态：Done  
-优先级：Medium  
-类型：子任务  
-父任务：[REQ-20260514-008](../../docs/requirements/REQ-20260514-008-openai-api-compatibility-deep-audit.md)  
+状态：Done
+优先级：Medium
+类型：子任务
+父任务：[REQ-20260514-008](../../docs/requirements/REQ-20260514-008-openai-api-compatibility-deep-audit.md)
 上游来源：[REP-20260514 OpenAI API 完整兼容性深度审计](../../docs/reports/REP-20260514-openai-api-compatibility-deep-audit.md)
 
 ## 背景
@@ -75,7 +75,7 @@
 
 ## 下游细分任务
 
-- [TASK-20260514-029 对话与 Tools OpenAPI、Catalog、Conformance 与 SDK 事实源统一](../in-progress/TASK-20260514-029-openai-openapi-catalog-conformance-sdk.md)
+- [TASK-20260514-029 对话与 Tools OpenAPI、Catalog、Conformance 与 SDK 事实源统一](TASK-20260514-029-openai-openapi-catalog-conformance-sdk.md)
 - [TASK-20260514-031 OpenAI 真实 Smoke 与认证成本防护](../backlog/TASK-20260514-031-openai-real-smoke-certification-harness.md)
 
 ## 已完成切片
@@ -89,7 +89,7 @@
 
 - 2026-05-18 已将 public OpenAPI、docs bundle、provider catalog、endpoint conformance matrix 和 smoke harness 统一到“对话、tools、RAG/file_search 支撑能力”口径。
 - 已从公开事实源移除 OpenAI `/v1/batches`、`/v1/fine_tuning/jobs*`、`DELETE /v1/models/{model}` fine-tuned owner-role delete、Anthropic message batches、Gemini batch prediction 和 public `/api/v1/tunings`。
-- 后续 SDK 示例、公开文档与 conformance 增量统一由 [TASK-20260514-029](../in-progress/TASK-20260514-029-openai-openapi-catalog-conformance-sdk.md) 继续承接。
+- 后续 SDK 示例、公开文档与 conformance 增量已由 [TASK-20260514-029](TASK-20260514-029-openai-openapi-catalog-conformance-sdk.md) 承接并归档。
 
 ## 验证结果
 

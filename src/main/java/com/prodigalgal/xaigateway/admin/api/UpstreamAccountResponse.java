@@ -6,7 +6,7 @@ import java.util.List;
 
 public record UpstreamAccountResponse(
         Long id,
-        Long poolId,
+        Long groupId,
         String accountName,
         UpstreamAccountProviderType providerType,
         List<String> supportedModels,

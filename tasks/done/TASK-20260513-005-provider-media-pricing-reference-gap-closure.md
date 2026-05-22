@@ -95,3 +95,8 @@ Done。
 
 - 当前价格同步状态是事实矩阵与策略合同，尚未接定时官方价格抓取器。
 - 真实 provider smoke 仍应通过环境变量注入测试 key，不能把 secret 写入仓库。
+
+## 2026-05-21 历史归档口径
+
+- 本任务保留的是 `ProviderReferenceGapService`、价格同步事实矩阵和媒体能力判定等历史实现证据。
+- 其中 `/console/provider-reference-gap` 与对应控制台入口已进入下线范围，不再作为现役控制台产品面保留理由。

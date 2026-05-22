@@ -244,36 +244,6 @@ class SiteCapabilityTruthServiceTests {
         assertEquals(InteropCapabilityLevel.UNSUPPORTED, service.capabilityLevel(candidate, InteropFeature.CHAT_TEXT));
     }
 
-    @Test
-    void shouldTreatQwenAsOpenAiCompatibleAndKeepRealtimeBlocked() {
-        SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
-        Mockito.when(repository.findBySiteProfile_Id(15L)).thenReturn(Optional.of(snapshot(true, true, false, false, false, true, true, true, true, true)));
-        SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
-
-        CatalogCandidateView candidate = candidate(15L, ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.QWEN);
-        FeatureCompatibilityReport embeddings = service.evaluate(
-                candidate,
-                new GatewayRequestSemantics(
-                        TranslationResourceType.EMBEDDING,
-                        TranslationOperation.EMBEDDING_CREATE,
-                        List.of(InteropFeature.EMBEDDINGS),
-                        true
-                )
-        );
-        FeatureCompatibilityReport realtime = service.evaluate(
-                candidate,
-                new GatewayRequestSemantics(
-                        TranslationResourceType.REALTIME,
-                        TranslationOperation.REALTIME_CLIENT_SECRET_CREATE,
-                        List.of(InteropFeature.REALTIME_CLIENT_SECRET),
-                        true
-                )
-        );
-
-        assertEquals(SupportStatus.NATIVE, embeddings.supportStatus());
-        assertEquals(SupportStatus.BLOCKED, realtime.supportStatus());
-        assertTrue(realtime.blockedReasons().stream().anyMatch(item -> item.contains("realtime client secrets")));
-    }
 
     @Test
     void shouldTreatPerplexityAsDedicatedWebSearchAdapterOnly() {
@@ -464,31 +434,6 @@ class SiteCapabilityTruthServiceTests {
                 .anyMatch(reason -> reason.contains("gateway-local orchestration surface")));
     }
 
-    @Test
-    void shouldKeepGeminiRealtimeBlockedAtSurfaceLevel() {
-        SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
-        SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
-
-        SurfaceCompatibilityReport report = service.evaluateSurface(
-                siteProfile(UpstreamSiteKind.GEMINI_DIRECT),
-                snapshot(false, true, true, true, true, true, false, true, true, true),
-                new GatewayRequestSemantics(
-                        TranslationResourceType.REALTIME,
-                        TranslationOperation.REALTIME_CLIENT_SECRET_CREATE,
-                        List.of(InteropFeature.REALTIME_CLIENT_SECRET),
-                        false
-                ),
-                new com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendDecision(
-                        ExecutionBackend.ORCHESTRATION,
-                        List.of(ExecutionBackend.ORCHESTRATION),
-                        "test"
-                )
-        );
-
-        assertEquals(InteropCapabilityLevel.UNSUPPORTED, report.executionCapabilityLevel());
-        assertTrue(report.blockedReasons().stream()
-                .anyMatch(reason -> reason.contains("Gemini ephemeral/live token")));
-    }
 
     @Test
     void shouldExposeVertexEmbeddingsAsNativeAtSurfaceLevel() {
@@ -575,60 +520,6 @@ class SiteCapabilityTruthServiceTests {
         assertEquals(InteropCapabilityLevel.NATIVE, fileReport.executionCapabilityLevel());
     }
 
-    @Test
-    void shouldKeepOpenAiDirectObjectLifecycleUsableAndBlockOpenAiCompatibleAcceptedExceptions() {
-        SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
-        SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
-
-        SurfaceCompatibilityReport openAiDirectFileReport = service.evaluateSurface(
-                siteProfile(UpstreamSiteKind.OPENAI_DIRECT),
-                snapshot(true, true, true, true, true, true, true, true, true, true),
-                new GatewayRequestSemantics(
-                        TranslationResourceType.FILE,
-                        TranslationOperation.FILE_CREATE,
-                        List.of(InteropFeature.FILE_OBJECT),
-                        true
-                ),
-                new com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendDecision(
-                        ExecutionBackend.ORCHESTRATION,
-                        List.of(ExecutionBackend.ORCHESTRATION),
-                        "test"
-                )
-        );
-        SurfaceCompatibilityReport openAiCompatibleFileReport = service.evaluateSurface(
-                siteProfile(UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC),
-                snapshot(true, true, true, true, true, true, true, true, true, true),
-                new GatewayRequestSemantics(
-                        TranslationResourceType.FILE,
-                        TranslationOperation.FILE_CREATE,
-                        List.of(InteropFeature.FILE_OBJECT),
-                        true
-                ),
-                new com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendDecision(
-                        ExecutionBackend.ORCHESTRATION,
-                        List.of(ExecutionBackend.ORCHESTRATION),
-                        "test"
-                )
-        );
-        FeatureCompatibilityReport openAiCompatibleRealtimeFeature = service.evaluate(
-                candidate(13L, ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC),
-                new GatewayRequestSemantics(
-                        TranslationResourceType.REALTIME,
-                        TranslationOperation.REALTIME_CLIENT_SECRET_CREATE,
-                        List.of(InteropFeature.REALTIME_CLIENT_SECRET),
-                        true
-                )
-        );
-
-        assertEquals(InteropCapabilityLevel.NATIVE, openAiDirectFileReport.executionCapabilityLevel());
-        assertTrue(openAiDirectFileReport.blockedReasons().isEmpty());
-        assertEquals(InteropCapabilityLevel.UNSUPPORTED, openAiCompatibleFileReport.executionCapabilityLevel());
-        assertTrue(openAiCompatibleFileReport.blockedReasons().stream()
-                .anyMatch(reason -> reason.contains("accepted exception")));
-        assertEquals(SupportStatus.BLOCKED, openAiCompatibleRealtimeFeature.supportStatus());
-        assertTrue(openAiCompatibleRealtimeFeature.blockedReasons().stream()
-                .anyMatch(reason -> reason.contains("realtime client secrets")));
-    }
 
     @Test
     void shouldUseSiteKindSpecificDefaultsForDifyAndJinaSiteProfileMatrix() {
@@ -774,7 +665,7 @@ class SiteCapabilityTruthServiceTests {
             boolean uploads,
             boolean ignoredLegacyFlag1,
             boolean ignoredLegacyFlag2,
-            boolean realtime) {
+            boolean ignoredLegacyCapabilityFlag) {
         SiteCapabilitySnapshotEntity entity = new SiteCapabilitySnapshotEntity();
         entity.setSupportsResponses(responses);
         entity.setSupportsEmbeddings(embeddings);
@@ -783,7 +674,6 @@ class SiteCapabilityTruthServiceTests {
         entity.setSupportsModeration(moderation);
         entity.setSupportsFiles(files);
         entity.setSupportsUploads(uploads);
-        entity.setSupportsRealtime(realtime);
         entity.setSupportedProtocols(List.of("openai", "responses"));
         entity.setAuthStrategy(AuthStrategy.BEARER);
         entity.setPathStrategy(PathStrategy.OPENAI_V1);

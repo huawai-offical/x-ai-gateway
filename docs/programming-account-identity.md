@@ -3,7 +3,7 @@
 关联需求：[REQ-20260506-003 第九批任务闭环设计](requirements/REQ-20260506-003-ninth-priority-task-closure-design.md)  
 关联任务：[TASK-20260501-006 编程类账号身份治理](../tasks/done/TASK-20260501-006-programming-account-identity.md)
 
-> 当前状态：控制台中的 `官方账号运行态` 入口已下线。本文描述的是 `GET /admin/accounts/{id}/programming-identity` 等后端治理事实，不再表示账号身份治理仍以独立控制台能力对外暴露。
+> 当前状态：控制台中的 `官方账号运行态` 入口已下线。独立 `GET /admin/accounts/{id}/programming-identity` 已在 2026-05-21 收口；本文保留的是这套身份判定语义与历史实现背景，不再表示当前仍有独立 Admin endpoint 对外暴露。
 
 ## 实现范围
 
@@ -14,8 +14,8 @@
   - `CLAUDE_PLAN`
 - 新增对应本地 refresh adapter，沿用现有 OAuth/session refresh 状态机、冷却和审计。
 - `CredentialMaterialResolver` 与 OAuth connection mapping 已覆盖新增 provider type。
-- 新增管理端 identity summary：`GET /admin/accounts/{id}/programming-identity?clientFamily=CODEX`。
-- identity summary 从账号 metadata 中读取 identity subject、email、adoption decision 和 client family，并结合账号健康、冻结、quota 和 pool client family 判断路由可用性。
+- 历史上曾提供独立 identity summary endpoint：`GET /admin/accounts/{id}/programming-identity?clientFamily=CODEX`。
+- 当前 endpoint 已收口，但 identity summary 对应的判定逻辑仍保留在后端服务与测试中：从账号 metadata 读取 identity subject、email、adoption decision 和 client family，并结合账号健康、冻结、quota 和 pool client family 判断路由可用性。
 
 ## 路由可用性判断
 

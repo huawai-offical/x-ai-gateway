@@ -26,7 +26,7 @@ class CanonicalResourceMapperTests {
             "moderations",
             "files",
             "uploads",
-            "realtime"
+            "removed-object-lifecycle"
     );
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -163,12 +163,11 @@ class CanonicalResourceMapperTests {
     private TranslationResourceType resourceType(TranslationOperation operation) {
         return switch (operation) {
             case EMBEDDING_CREATE -> TranslationResourceType.EMBEDDING;
-            case AUDIO_TRANSCRIPTION, AUDIO_TRANSLATION, AUDIO_SPEECH -> TranslationResourceType.AUDIO;
-            case IMAGE_GENERATION, IMAGE_EDIT, IMAGE_VARIATION -> TranslationResourceType.IMAGE;
+            case AUDIO_TRANSCRIPTION, AUDIO_SPEECH -> TranslationResourceType.AUDIO;
+            case IMAGE_GENERATION -> TranslationResourceType.IMAGE;
             case MODERATION_CREATE -> TranslationResourceType.MODERATION;
             case FILE_CREATE, FILE_LIST, FILE_GET, FILE_CONTENT_GET, FILE_DELETE -> TranslationResourceType.FILE;
             case UPLOAD_CREATE, UPLOAD_GET, UPLOAD_PART_ADD, UPLOAD_COMPLETE, UPLOAD_CANCEL -> TranslationResourceType.UPLOAD;
-            case REALTIME_CLIENT_SECRET_CREATE -> TranslationResourceType.REALTIME;
             default -> TranslationResourceType.UNKNOWN;
         };
     }
@@ -176,12 +175,11 @@ class CanonicalResourceMapperTests {
     private String defaultSurface(TranslationOperation operation) {
         return switch (operation) {
             case EMBEDDING_CREATE -> "embeddings";
-            case AUDIO_TRANSCRIPTION, AUDIO_TRANSLATION, AUDIO_SPEECH -> "audio";
-            case IMAGE_GENERATION, IMAGE_EDIT, IMAGE_VARIATION -> "images";
+            case AUDIO_TRANSCRIPTION, AUDIO_SPEECH -> "audio";
+            case IMAGE_GENERATION -> "images";
             case MODERATION_CREATE -> "moderations";
             case FILE_CREATE, FILE_LIST, FILE_GET, FILE_CONTENT_GET, FILE_DELETE -> "files";
             case UPLOAD_CREATE, UPLOAD_GET, UPLOAD_PART_ADD, UPLOAD_COMPLETE, UPLOAD_CANCEL -> "uploads";
-            case REALTIME_CLIENT_SECRET_CREATE -> "realtime";
             default -> "unknown";
         };
     }
@@ -190,7 +188,6 @@ class CanonicalResourceMapperTests {
         return switch (operation) {
             case EMBEDDING_CREATE -> "/v1/embeddings";
             case AUDIO_TRANSCRIPTION -> "/v1/audio/transcriptions";
-            case AUDIO_TRANSLATION -> "/v1/audio/translations";
             case AUDIO_SPEECH -> "/v1/audio/speech";
             case IMAGE_GENERATION -> "/v1/images/generations";
             case MODERATION_CREATE -> "/v1/moderations";
@@ -202,7 +199,6 @@ class CanonicalResourceMapperTests {
             case UPLOAD_PART_ADD -> "/v1/uploads/upload_1/parts";
             case UPLOAD_COMPLETE -> "/v1/uploads/upload_1/complete";
             case UPLOAD_CANCEL -> "/v1/uploads/upload_1/cancel";
-            case REALTIME_CLIENT_SECRET_CREATE -> "/v1/realtime/client_secrets";
             default -> "/unknown";
         };
     }

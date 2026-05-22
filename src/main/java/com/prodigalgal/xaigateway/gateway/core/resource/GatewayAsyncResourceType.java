@@ -9,7 +9,6 @@ public enum GatewayAsyncResourceType {
     VECTOR_STORE_FILE_BATCH,
     WEBHOOK_EVENT,
     UPLOAD,
-    REALTIME_SESSION,
     VIDEO,
     MUSIC
 }

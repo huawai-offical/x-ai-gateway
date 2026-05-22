@@ -27,7 +27,7 @@ public class AnthropicNativeNamespaceController {
     public ResponseEntity<?> unsupported() {
         return ResponseEntity.status(501).body(java.util.Map.of(
                 "error", "NATIVE_PATH_UNSUPPORTED",
-                "message", "该 Anthropic native path 不属于当前 OpenAI 标准功能区；请使用 /anthropic/v1/messages，或查看 /admin/native-compatibility/matrix。"
+                "message", "该 Anthropic native path 不属于当前 OpenAI 标准功能区；请使用 /anthropic/v1/messages，或查看 /public/docs/compatibility。"
         ));
     }
 }

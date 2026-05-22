@@ -1,7 +1,7 @@
 # REP-20260519 Codex 最高优先级重排
 
-状态：In Progress  
-日期：2026-05-19  
+状态：Completed
+日期：2026-05-19
 关联需求：[REQ-20260519-002](../requirements/REQ-20260519-002-codex-priority-functional-service-api.md)
 
 ## 结论
@@ -14,7 +14,7 @@ Codex 相关开放任务提升为当前最高优先级。项目继续遵循 [ADR
 | --- | --- | --- | --- |
 | P0-CODEX-01 | [TASK-20260519-002 Codex 功能性服务 API 最高优先推进](../../tasks/done/TASK-20260519-002-codex-priority-functional-service-api.md) | Done | 父任务已归档，Codex-first 执行顺序已锁定 |
 | P0-CODEX-02 | [TASK-20260519-002-01 Codex 功能性服务 API 事实源优先收紧](../../tasks/done/TASK-20260519-002-01-codex-functional-truth-source-priority.md) | Done | 第一执行切片已归档；测试按用户当前策略延后 |
-| P0-CODEX-03 | [TASK-20260514-029 对话与 Tools OpenAPI、Catalog、Conformance 与 SDK 事实源统一](../../tasks/in-progress/TASK-20260514-029-openai-openapi-catalog-conformance-sdk.md) | In Progress | 当前执行 coverage matrix source 切片 |
+| P0-CODEX-03 | [TASK-20260514-029 对话与 Tools OpenAPI、Catalog、Conformance 与 SDK 事实源统一](../../tasks/done/TASK-20260514-029-openai-openapi-catalog-conformance-sdk.md) | Done | `TASK-20260514-029-01/02/03/04` 已归档 |
 | P0-CODEX-04 | [TASK-20260519-002-02 Codex Smoke、Record/Replay 与成本防护复核](../../tasks/done/TASK-20260519-002-02-codex-smoke-record-replay-priority.md) | Done | 第二执行切片已归档；测试按用户当前策略延后 |
 | P0-CODEX-05 | [TASK-20260514-031 OpenAI 真实 Smoke 与认证成本防护](../../tasks/backlog/TASK-20260514-031-openai-real-smoke-certification-harness.md) | Backlog | 复用既有 smoke 分类、预算阻断与 fixture 机制 |
 
@@ -42,4 +42,4 @@ Codex 相关开放任务提升为当前最高优先级。项目继续遵循 [ADR
 - `TASK-20260519-002-02` 已补上 Codex Responses smoke 的版本化 `recordReplayFixture`、脱敏 sample fixture 与离线 verifier；默认 replay policy 禁止真实网络、billable 和 write 自动执行，并已按当前测试策略归档。
 - 编译级验证 `.\gradlew.bat compileJava compileTestJava -x test` 通过；按用户要求未运行测试。
 - 目标文件范围的 `git diff --check` 已通过；全仓库 diff check 仍受既有 `web/src/features/keys/keys-page.tsx` EOF 空行影响，本轮未改动该无关文件。
-- `TASK-20260514-029` 已转入 In Progress，并完成 [TASK-20260514-029-01](../../tasks/done/TASK-20260514-029-01-functional-service-api-coverage-matrix-source.md)：建立功能性服务 API coverage matrix source。
+- `TASK-20260514-029` 已在 2026-05-21 完成并归档；[TASK-20260514-029-01](../../tasks/done/TASK-20260514-029-01-functional-service-api-coverage-matrix-source.md) 建立功能性服务 API coverage matrix source，后续切片完成 Codex/OpenAPI/SDK 收口。

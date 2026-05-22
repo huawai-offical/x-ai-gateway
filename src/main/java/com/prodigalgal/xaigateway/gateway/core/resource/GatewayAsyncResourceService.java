@@ -2624,34 +2624,6 @@ public class GatewayAsyncResourceService {
         return downloadMediaTaskArtifact(musicId, distributedKeyId, GatewayAsyncResourceType.MUSIC);
     }
 
-    public JsonNode createRealtimeClientSecret(Long distributedKeyId, JsonNode requestBody) {
-        return createRealtimeClientSecret(distributedKeyId, requestBody, null);
-    }
-
-    public JsonNode createRealtimeClientSecret(Long distributedKeyId, JsonNode requestBody, Long preferredCredentialId) {
-        ObjectNode payload = requireObject(requestBody);
-        UpstreamTarget target;
-        try {
-            target = resolveUpstreamTarget(distributedKeyId, InteropFeature.REALTIME_CLIENT_SECRET, preferredCredentialId);
-        } catch (IllegalArgumentException ex) {
-            String blockedReason = geminiRealtimeBlockedReason(distributedKeyId, preferredCredentialId);
-            if (blockedReason != null) {
-                throw new IllegalArgumentException(blockedReason);
-            }
-            throw ex;
-        }
-        JsonNode upstreamResponse = invokeUpstreamJson(target, "/v1/realtime/client_secrets", payload);
-        return persistUpstreamBackedResource(
-                distributedKeyId,
-                GatewayAsyncResourceType.REALTIME_SESSION,
-                "sess_",
-                payload,
-                upstreamResponse,
-                "realtime.session",
-                target
-        );
-    }
-
     private JsonNode readOrSyncResource(
             String resourceKey,
             Long distributedKeyId,
@@ -3565,43 +3537,6 @@ public class GatewayAsyncResourceService {
                 && siteCapabilityTruthService.supportsFeature(siteProfile, snapshot, InteropFeature.FILE_OBJECT);
     }
 
-    private String geminiRealtimeBlockedReason(Long distributedKeyId, Long preferredCredentialId) {
-        DistributedKeyView distributedKey = distributedKeyQueryService.findActiveById(distributedKeyId)
-                .orElseThrow(() -> new IllegalArgumentException("未找到可用的 DistributedKey。"));
-        Map<Long, UpstreamCredentialEntity> credentials = new LinkedHashMap<>();
-        for (UpstreamCredentialEntity credential : upstreamCredentialRepository.findAllByIdInAndDeletedFalse(
-                distributedKey.bindings().stream().map(DistributedCredentialBindingView::credentialId).toList())) {
-            if (credential.isActive()) {
-                credentials.put(credential.getId(), credential);
-            }
-        }
-
-        if (preferredCredentialId != null) {
-            String preferredReason = geminiRealtimeBlockedReason(credentials.get(preferredCredentialId));
-            if (preferredReason != null) {
-                return preferredReason;
-            }
-        }
-        for (DistributedCredentialBindingView binding : distributedKey.bindings()) {
-            String reason = geminiRealtimeBlockedReason(credentials.get(binding.credentialId()));
-            if (reason != null) {
-                return reason;
-            }
-        }
-        return null;
-    }
-
-    private String geminiRealtimeBlockedReason(UpstreamCredentialEntity credential) {
-        if (credential == null || credential.getSiteProfileId() == null) {
-            return null;
-        }
-        UpstreamSiteProfileEntity siteProfile = resolveSiteProfile(credential.getSiteProfileId()).orElse(null);
-        if (siteProfile == null || siteProfile.getSiteKind() != UpstreamSiteKind.GEMINI_DIRECT) {
-            return null;
-        }
-        return "Gemini ephemeral/live token 不等价于 OpenAI realtime client_secret object，因此当前不开放。";
-    }
-
     private UpstreamTarget resolveUpstreamTarget(Long distributedKeyId, InteropFeature feature) {
         return resolveUpstreamTarget(distributedKeyId, feature, null);
     }
@@ -3959,7 +3894,6 @@ public class GatewayAsyncResourceService {
         return switch (feature) {
             case RESPONSE_OBJECT -> "/v1/responses";
             case UPLOAD_CREATE -> "/v1/uploads";
-            case REALTIME_CLIENT_SECRET -> "/v1/realtime/client_secrets";
             case VIDEO_GENERATION -> "/v1/videos/generations";
             case MUSIC_GENERATION -> "/v1/music/generations";
             default -> throw new IllegalArgumentException("当前 feature 不支持异步资源编排。");
@@ -3970,7 +3904,6 @@ public class GatewayAsyncResourceService {
         return switch (resourceType) {
             case RESPONSE -> InteropFeature.RESPONSE_OBJECT;
             case UPLOAD -> InteropFeature.UPLOAD_CREATE;
-            case REALTIME_SESSION -> InteropFeature.REALTIME_CLIENT_SECRET;
             case VIDEO -> InteropFeature.VIDEO_GENERATION;
             case MUSIC -> InteropFeature.MUSIC_GENERATION;
             default -> throw new IllegalArgumentException("当前资源类型不支持 upstream feature 推断。");
@@ -3980,7 +3913,6 @@ public class GatewayAsyncResourceService {
     private String inferObjectName(GatewayAsyncResourceType resourceType) {
         return switch (resourceType) {
             case UPLOAD -> "upload";
-            case REALTIME_SESSION -> "realtime.session";
             case VIDEO -> "video.generation";
             case MUSIC -> "music.generation";
             case RESPONSE -> "response";

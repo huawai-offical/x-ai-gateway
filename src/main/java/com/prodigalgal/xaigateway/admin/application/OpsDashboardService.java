@@ -2,7 +2,6 @@ package com.prodigalgal.xaigateway.admin.application;
 
 import com.prodigalgal.xaigateway.admin.api.OpsAlertEventResponse;
 import com.prodigalgal.xaigateway.admin.api.OpsOperationAuditResponse;
-import com.prodigalgal.xaigateway.admin.api.OpsScheduledProbeJobResponse;
 import com.prodigalgal.xaigateway.admin.api.OpsSummaryResponse;
 import com.prodigalgal.xaigateway.admin.api.OpsTrafficSnapshotResponse;
 import com.prodigalgal.xaigateway.gateway.core.ops.OpsEventBusService;
@@ -29,7 +28,6 @@ public class OpsDashboardService {
     private final RouteDecisionLogRepository routeDecisionLogRepository;
     private final RequestLogRepository requestLogRepository;
     private final OpsAlertService opsAlertService;
-    private final OpsProbeJobService opsProbeJobService;
     private final OpsAuditService opsAuditService;
     private final OpsEventBusService opsEventBusService;
 
@@ -37,13 +35,11 @@ public class OpsDashboardService {
             RouteDecisionLogRepository routeDecisionLogRepository,
             RequestLogRepository requestLogRepository,
             OpsAlertService opsAlertService,
-            OpsProbeJobService opsProbeJobService,
             OpsAuditService opsAuditService,
             OpsEventBusService opsEventBusService) {
         this.routeDecisionLogRepository = routeDecisionLogRepository;
         this.requestLogRepository = requestLogRepository;
         this.opsAlertService = opsAlertService;
-        this.opsProbeJobService = opsProbeJobService;
         this.opsAuditService = opsAuditService;
         this.opsEventBusService = opsEventBusService;
     }
@@ -53,7 +49,6 @@ public class OpsDashboardService {
         return new OpsSummaryResponse(
                 snapshot,
                 opsAlertService.listEvents("OPEN"),
-                opsProbeJobService.list(),
                 opsAuditService.listRecent().stream().limit(50).toList()
         );
     }

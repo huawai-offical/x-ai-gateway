@@ -38,6 +38,7 @@ export type ProviderSite = {
   errorSchemaStrategy: string
   baseUrlPattern?: string | null
   description?: string | null
+  profileSource: string
   active: boolean
   healthState: string
   blockedReason?: string | null
@@ -48,6 +49,8 @@ export type ProviderSite = {
   fallbackStrategy?: string | null
   cooldownCredentialCount: number
   cooldownUntil?: string | null
+  linkedCredentialCount: number
+  hasSnapshot: boolean
   preferredBackend?: string | null
   supportedBackends: string[]
   features: Record<string, CapabilityResolution>
@@ -58,12 +61,91 @@ export type ProviderSite = {
   updatedAt?: string | null
 }
 
+export type ProviderSitePreset = {
+  code: string
+  profileCode: string
+  displayName: string
+  siteKind: string
+  providerFamily: string
+  authStrategy: string
+  pathStrategy: string
+  modelAddressingStrategy: string
+  errorSchemaStrategy: string
+  defaultBaseUrl: string
+  description?: string | null
+  supportedProtocols: string[]
+  streamTransport?: string | null
+  fallbackStrategy?: string | null
+  capabilityTags: string[]
+  costProfile: string
+  errorMode: string
+  catalogVersion: string
+  catalogSource: string
+  deprecated: boolean
+  conformanceChecks: string[]
+  compatibilitySurface: string
+  supportStrategy: string
+  modelFamilies: string[]
+  pricingMetadata: string
+  unsupportedFeatures: string[]
+  imported: boolean
+  existingSiteProfileId?: number | null
+}
+
+export type ProviderReferenceGapRow = {
+  referenceChannel: string
+  catalogPresetCode?: string | null
+  displayName: string
+  supportStatus: 'SUPPORTED' | 'COMPATIBLE' | 'MISSING' | string
+  supportMode: string
+  currentSurface?: string | null
+  adapterBoundary: string
+  capabilityTags: string[]
+  missingFeatures: string[]
+  notes: string
+}
+
+export type ProviderMediaCapabilityRow = {
+  capability: string
+  endpointSurface: string
+  supportStatus: string
+  providerPresets: string[]
+  governanceBoundary: string
+  smokeHint: string
+}
+
+export type ProviderPricingSyncStatusRow = {
+  providerCode: string
+  displayName: string
+  pricingSource: string
+  syncStrategy: string
+  syncStatus: string
+  lastVerifiedAt?: string | null
+  smokeClassification: string
+  failureClasses: string[]
+  requiresRealKey: boolean
+  notes: string
+}
+
+export type ProviderReferenceGapResponse = {
+  referenceName: string
+  referenceVersion: string
+  catalogVersion: string
+  catalogSource: string
+  generatedAt?: string | null
+  providers: ProviderReferenceGapRow[]
+  mediaCapabilities: ProviderMediaCapabilityRow[]
+  pricingSync: ProviderPricingSyncStatusRow[]
+  recommendedActions: string[]
+}
+
 export type CapabilityMatrixRow = {
   siteProfileId: number
   profileCode: string
   displayName: string
   providerFamily: string
   siteKind: string
+  profileSource: string
   authStrategy: string
   pathStrategy: string
   errorSchemaStrategy: string
@@ -76,6 +158,10 @@ export type CapabilityMatrixRow = {
   fallbackStrategy?: string | null
   cooldownCredentialCount: number
   cooldownUntil?: string | null
+  linkedCredentialCount: number
+  hasSnapshot: boolean
+  modelCount: number
+  refreshedAt?: string | null
   preferredBackend?: string | null
   supportedBackends: string[]
   features: Record<string, CapabilityResolution>
@@ -89,7 +175,6 @@ export type CapabilityMatrixRow = {
   supportsUploads: boolean
   supportsBatches: boolean
   supportsTuning: boolean
-  supportsRealtime: boolean
 }
 
 export type IncidentEntityResponse = {
@@ -338,6 +423,57 @@ export type SiteModelCapability = {
   sourceRefreshedAt?: string | null
 }
 
+type SiteSnapshotSummaryInput = {
+  active: boolean
+  healthState: string
+  hasSnapshot: boolean
+  linkedCredentialCount: number
+  modelCount: number
+}
+
+export function siteProfileSourceLabel(source?: string | null) {
+  switch (source) {
+    case 'AUTO_DISCOVERED':
+      return '自动建档'
+    case 'MANUAL':
+      return '手工建档'
+    default:
+      return source ?? '未知来源'
+  }
+}
+
+export function siteSnapshotStatusLabel(site: SiteSnapshotSummaryInput) {
+  if (!site.active) {
+    return '已停用'
+  }
+  if (!site.hasSnapshot) {
+    return site.linkedCredentialCount > 0 ? '待刷新快照' : '未生成快照'
+  }
+  if (site.modelCount > 0) {
+    return site.healthState === 'BLOCKED' ? '已刷新但阻断' : '已生成模型能力'
+  }
+  return site.linkedCredentialCount > 0 ? '已刷新暂无模型' : '仅策略快照'
+}
+
+export function siteSnapshotHint(site: SiteSnapshotSummaryInput) {
+  if (!site.active) {
+    return '当前站点已停用，如需重新参与模型发现或运行链路，需要先重新启用。'
+  }
+  if (!site.hasSnapshot) {
+    return site.linkedCredentialCount > 0
+      ? '已绑定凭证，但还没有生成 capability snapshot，建议先执行一次能力刷新。'
+      : '当前还没有绑定凭证；可以先创建凭证补齐站点绑定信息，或直接刷新生成策略快照。'
+  }
+  if (site.modelCount > 0) {
+    return site.healthState === 'BLOCKED'
+      ? '当前已有快照和模型能力，但站点处于阻断态，建议继续进入详情页查看 blocker。'
+      : '当前站点已具备快照和模型能力，可以继续进入详情页或调试工作台。'
+  }
+  return site.linkedCredentialCount > 0
+    ? '当前已生成站点快照，但还没有模型能力记录，建议检查凭证刷新结果或上游模型发现。'
+    : '当前只有站点级策略快照，没有绑定凭证，因此不会生成模型能力记录。'
+}
+
 export type TranslationPlan = {
   executable: boolean
   ingressProtocol?: string | null
@@ -530,9 +666,16 @@ export const SITE_KIND_OPTIONS = [
   'OPENAI_COMPATIBLE_GENERIC',
   'AZURE_OPENAI',
   'DEEPSEEK',
+  'QWEN',
+  'MOONSHOT',
+  'SILICONFLOW',
+  'VOLCENGINE',
+  'MINIMAX',
+  'DIFY',
   'GROK',
   'MISTRAL',
   'COHERE',
+  'JINA',
   'TOGETHER',
   'FIREWORKS',
   'OPENROUTER',
@@ -543,16 +686,29 @@ export const SITE_KIND_OPTIONS = [
 ] as const
 
 const FEATURE_LABELS: Record<string, string> = {
+  chat_text: 'Chat',
+  tools: 'Tools',
+  image_input: 'Image Input',
+  file_input: 'File Input',
+  reasoning: 'Reasoning',
   response_object: 'Responses',
   embeddings: 'Embeddings',
   audio_transcription: 'Audio',
+  audio_translation: 'Audio Translation',
+  audio_speech: 'Audio Speech',
   image_generation: 'Images',
+  image_edit: 'Image Edit',
+  image_variation: 'Image Variation',
   moderation: 'Moderation',
   file_object: 'Files',
   upload_create: 'Uploads',
   batch_create: 'Batches',
+  anthropic_message_batch: 'Anthropic Batches',
   tuning_create: 'Tuning',
-  realtime_client_secret: 'Realtime',
+  rerank: 'Rerank',
+  video_generation: 'Video',
+  music_generation: 'Music',
+  web_search: 'Web Search',
 }
 
 export function featureLabel(feature: string) {
@@ -651,7 +807,6 @@ export function isDebugExecutablePath(requestPath: string) {
     || requestPath === '/v1/fine_tuning/jobs'
     || /^\/v1\/fine_tuning\/jobs\/[^/]+$/.test(requestPath)
     || /^\/v1\/fine_tuning\/jobs\/[^/]+\/cancel$/.test(requestPath)
-    || requestPath === '/v1/realtime/client_secrets'
     || requestPath === '/v1/files'
     || /^\/v1\/files\/[^/]+$/.test(requestPath)
     || /^\/v1\/files\/[^/]+\/content$/.test(requestPath)

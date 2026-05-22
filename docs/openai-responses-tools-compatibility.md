@@ -14,7 +14,7 @@
 | `web_search_preview` / `web_search_preview_2025_03_11` | hosted | Blocked | 需要 OpenAI Direct native route、成本预算、外部访问审计和结果透传。 | `TASK-20260514-019` |
 | `file_search` | hosted | Local-bound | 校验当前 Distributed Key 下的本地 `vector_store_ids`，复用本地 Vector Store Search 结果注入 `instructions`，并移除 hosted tool；不生成 hosted `file_search_call` lifecycle。 | `TASK-20260518-003` / `TASK-20260514-023` |
 | `computer_use_preview` | hosted | Blocked | 涉及远程操作、审批和安全审计。 | `TASK-20260514-019` |
-| `code_interpreter` | hosted | Blocked | 依赖 Containers 与 Code Interpreter 文件生命周期。 | `TASK-20260514-024` |
+| `code_interpreter` | hosted | Out of scope | Containers 与 Code Interpreter 文件生命周期不属于当前功能性服务 API 必做范围。 | `ADR-0010` |
 | `image_generation` | hosted | Blocked | 需要原生 Responses hosted tool result passthrough。 | `TASK-20260514-019` |
 | `mcp` | mcp | Blocked | 需要 server allowlist、审批、调用与结果回填。 | `TASK-20260514-019` |
 | `custom` | custom | Blocked | 需要 `custom_tool_call` 输出生命周期。 | `TASK-20260514-019` |
@@ -44,5 +44,5 @@
 - [REQ-20260518-003](requirements/REQ-20260518-003-openai-responses-file-search-local-vector-store-binding.md)
 - [TASK-20260516-014](../tasks/done/TASK-20260516-014-openai-responses-tool-registry-boundary.md)
 - [TASK-20260518-003](../tasks/done/TASK-20260518-003-openai-responses-file-search-local-vector-store-binding.md)
-- [TASK-20260514-019](../tasks/backlog/TASK-20260514-019-openai-conversations-webhooks-tools.md)
-- [TASK-20260514-023](../tasks/backlog/TASK-20260514-023-openai-vector-stores-full-stack.md)
+- [TASK-20260514-019](../tasks/done/TASK-20260514-019-openai-conversations-webhooks-tools.md)
+- [TASK-20260514-023](../tasks/done/TASK-20260514-023-openai-vector-stores-full-stack.md)

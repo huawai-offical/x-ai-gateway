@@ -1,6 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { apiRequest } from '../../lib/api'
 import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { EmptyState } from '@/components/app/empty-state'
+import { InlineError } from '@/components/app/inline-error'
+import { PageSection } from '@/components/app/page-section'
+import { PageSkeleton } from '@/components/app/page-skeleton'
+import { StatusBadge } from '@/components/app/status-badge'
+import { apiRequest } from '@/lib/api'
 
 type ReleaseArtifact = {
   id: number
@@ -37,45 +45,78 @@ export function UpgradesPage() {
   })
 
   return (
-    <section className="page-grid">
-      <div className="panel">
-        <div className="panel-head">
-          <p className="panel-kicker">Release</p>
-          <h2>发布制品</h2>
+    <div className="flex flex-col gap-6">
+      <PageSection kicker="发布制品" title="发布制品">
+        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto]">
+          <label className="flex flex-col gap-2">
+            <span className="text-sm font-medium text-foreground">版本</span>
+            <Input value={versionName} onChange={(event) => setVersionName(event.target.value)} placeholder="版本号" />
+          </label>
+          <label className="flex flex-col gap-2">
+            <span className="text-sm font-medium text-foreground">制品引用</span>
+            <Input value={artifactRef} onChange={(event) => setArtifactRef(event.target.value)} placeholder="制品引用" />
+          </label>
+          <div className="flex items-end">
+            <Button type="button" onClick={() => releaseMutation.mutate()}>登记制品</Button>
+          </div>
         </div>
-        <div className="inline-form">
-          <input value={versionName} onChange={(e) => setVersionName(e.target.value)} placeholder="version" />
-          <input value={artifactRef} onChange={(e) => setArtifactRef(e.target.value)} placeholder="artifact ref" />
-          <button type="button" onClick={() => releaseMutation.mutate()}>登记制品</button>
+        {releaseMutation.error ? <InlineError error={releaseMutation.error} title="登记发布制品失败" /> : null}
+
+        {releasesQuery.isPending ? (
+          <PageSkeleton count={1} />
+        ) : releasesQuery.data?.length ? (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {releasesQuery.data.map((item: ReleaseArtifact) => (
+              <Card key={item.id} className="border-border/60 bg-card/92 shadow-sm">
+                <CardHeader className="gap-2 border-b border-border/60">
+                  <CardTitle className="text-base">{item.versionName}</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-2 p-5 text-sm text-muted-foreground">
+                  <div>{item.artifactRef}</div>
+                  <div>发布制品 #{item.id}</div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <EmptyState title="还没有发布制品" />
+        )}
+      </PageSection>
+
+      <PageSection kicker="升级" title="升级任务">
+        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
+          <label className="flex flex-col gap-2">
+            <span className="text-sm font-medium text-foreground">目标发布 ID</span>
+            <Input value={targetReleaseArtifactId} onChange={(event) => setTargetReleaseArtifactId(event.target.value)} placeholder="目标发布 ID" />
+          </label>
+          <div className="flex items-end">
+            <Button type="button" onClick={() => upgradeMutation.mutate()}>执行升级</Button>
+          </div>
         </div>
-        <div className="card-list">
-          {releasesQuery.data?.map((item: ReleaseArtifact) => (
-            <div key={item.id} className="detail-card">
-              <strong>{item.versionName}</strong>
-              <span>{item.artifactRef}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="panel">
-        <div className="panel-head">
-          <p className="panel-kicker">Upgrade</p>
-          <h2>升级任务</h2>
-        </div>
-        <div className="inline-form">
-          <input value={targetReleaseArtifactId} onChange={(e) => setTargetReleaseArtifactId(e.target.value)} placeholder="target release id" />
-          <button type="button" onClick={() => upgradeMutation.mutate()}>执行升级</button>
-        </div>
-        <div className="card-list">
-          {upgradesQuery.data?.map((item: UpgradeJob) => (
-            <div key={item.id} className="detail-card">
-              <strong>upgrade #{item.id}</strong>
-              <span>{item.status}</span>
-              <span>{item.message}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
+        {upgradeMutation.error ? <InlineError error={upgradeMutation.error} title="执行升级失败" /> : null}
+
+        {upgradesQuery.isPending ? (
+          <PageSkeleton count={1} />
+        ) : upgradesQuery.error ? (
+          <InlineError error={upgradesQuery.error} title="升级任务加载失败" />
+        ) : upgradesQuery.data?.length ? (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {upgradesQuery.data.map((item: UpgradeJob) => (
+              <Card key={item.id} className="border-border/60 bg-card/92 shadow-sm">
+                <CardHeader className="gap-2 border-b border-border/60">
+                  <CardTitle className="text-base">升级任务 #{item.id}</CardTitle>
+                </CardHeader>
+                <CardContent className="p-5">
+                  <div className="mb-3 text-sm text-muted-foreground">{item.message}</div>
+                  <StatusBadge tone={item.status === 'COMPLETED' ? 'success' : 'warning'}>{item.status}</StatusBadge>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <EmptyState title="当前没有升级任务" />
+        )}
+      </PageSection>
+    </div>
   )
 }

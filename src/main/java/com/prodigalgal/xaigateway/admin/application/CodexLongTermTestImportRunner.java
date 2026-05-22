@@ -22,7 +22,7 @@ public class CodexLongTermTestImportRunner implements ApplicationRunner {
     private final OfficialAccountAdminService officialAccountAdminService;
     private final ConfigurableApplicationContext applicationContext;
     private final String authJsonPath;
-    private final String poolName;
+    private final String groupName;
     private final boolean importOnly;
     private final boolean liveSmoke;
 
@@ -31,14 +31,14 @@ public class CodexLongTermTestImportRunner implements ApplicationRunner {
             OfficialAccountAdminService officialAccountAdminService,
             ConfigurableApplicationContext applicationContext,
             @Value("${gateway.codex-test.import-auth-json-path}") String authJsonPath,
-            @Value("${gateway.codex-test.pool-name:codex-long-term-test}") String poolName,
+            @Value("${gateway.codex-test.group-name:codex-long-term-test}") String groupName,
             @Value("${gateway.codex-test.import-only:false}") boolean importOnly,
             @Value("${gateway.codex-test.live-smoke:false}") boolean liveSmoke) {
         this.importService = importService;
         this.officialAccountAdminService = officialAccountAdminService;
         this.applicationContext = applicationContext;
         this.authJsonPath = authJsonPath;
-        this.poolName = poolName;
+        this.groupName = groupName;
         this.importOnly = importOnly;
         this.liveSmoke = liveSmoke;
     }
@@ -46,12 +46,12 @@ public class CodexLongTermTestImportRunner implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) throws Exception {
         String rawJson = Files.readString(Path.of(authJsonPath));
-        CodexLongTermTestImportResult result = importService.importAuthJson(rawJson, poolName);
+        CodexLongTermTestImportResult result = importService.importAuthJson(rawJson, groupName);
         log.info(
-                "Codex 长期测试账号导入完成：status={}, accountId={}, poolId={}, externalAccountId={}, routeEligible={}, routeBlockReason={}, credentialFingerprint={}",
+                "Codex 长期测试账号导入完成：status={}, accountId={}, groupId={}, externalAccountId={}, routeEligible={}, routeBlockReason={}, credentialFingerprint={}",
                 result.status(),
                 result.accountId(),
-                result.poolId(),
+                result.groupId(),
                 result.externalAccountId(),
                 result.routeEligible(),
                 result.routeBlockReason(),

@@ -7,7 +7,7 @@ x-ai-gateway 不以 OpenAI、Anthropic、Gemini、Vertex、Codex 等官方 API �
 ## 当前口径提示
 
 - 2026-05-21 起，控制台已收紧并下线 `官方账号运行态`、`能力矩阵`、`Native 命名空间兼容`、`Provider 参考差距`、`站点档案`、`成本路由策略中心`、`向量检索排障沙盒` 等前端入口；相关 Markdown 若仍保留，多用于历史实现记录、后端保留接口说明或公开 API 兼容事实源。
-- `/admin/accounts*`、`/admin/provider-sites*`、`/admin/vector-stores*` 以及公开 `/v1/vector_stores*`、Responses `file_search` 本地绑定当前暂不删除；阅读相关文档时，应按“控制台已下线、后端/API 暂保留”的状态理解。
+- `/admin/accounts/group/{groupId}`、`/admin/accounts/{id}`、freeze/runtime-reset/import/quota-refresh/smoke、`/admin/provider-sites` + `/{id}/capabilities`、`/admin/vector-stores*` 以及公开 `/v1/vector_stores*`、`/v1/files*`、Responses `file_search` 本地绑定当前保留；阅读相关文档时，应按“控制台已下线、后端/API 仅保留主线支撑面”的状态理解。
 
 ## 需求
 
@@ -82,6 +82,19 @@ x-ai-gateway 不以 OpenAI、Anthropic、Gemini、Vertex、Codex 等官方 API �
 - [REQ-20260521-003 Liquibase 新 Baseline 重建](requirements/REQ-20260521-003-liquibase-baseline-rebuild.md)
 - [REQ-20260521-004 上游凭证入口统一与官方账号概念澄清](requirements/REQ-20260521-004-upstream-credential-entry-and-official-account-clarity.md)
 - [REQ-20260521-005 控制台重复功能下线与向量能力范围收窄](requirements/REQ-20260521-005-console-feature-retirement-and-vector-scope-prune.md)
+- [REQ-20260521-006 冗余接口清理与清库前 Baseline 重建](requirements/REQ-20260521-006-redundant-api-eradication-and-baseline-refresh.md)
+- [REQ-20260521-007 现役 UI 全界面汉化与说明性文案收口](requirements/REQ-20260521-007-ui-chinese-only-localization.md)
+- [REQ-20260521-008 系统默认深色主题与深浅双样式支持](requirements/REQ-20260521-008-system-theme-dark-default-light-dual-mode.md)
+- [REQ-20260521-009 智能运维总览导航整合与重复面板收口](requirements/REQ-20260521-009-ops-overview-navigation-consolidation.md)
+- [REQ-20260521-010 控制台导航可读性、系统参数汉化与 Codex auth.json 导入保活](requirements/REQ-20260521-010-console-navigation-settings-codex-auth-import-refresh.md)
+- [REQ-20260521-011 控制台瘦身、品牌 Logo、上游凭证统一与热数据缓存](requirements/REQ-20260521-011-console-surface-prune-logo-credential-redis.md)
+- [REQ-20260521-012 控制台健康评分、Codex 模型、TLS 画像与调试台体验修正](requirements/REQ-20260521-012-console-health-codex-model-tls-workbench-ux.md)
+- [REQ-20260521-013 全局表格分页](requirements/REQ-20260521-013-global-table-pagination.md)
+- [REQ-20260522-001 账号分组详情入口统一](requirements/REQ-20260522-001-account-group-detail-entry-unification.md)
+- [REQ-20260522-002 网络代理拨测功能下线](requirements/REQ-20260522-002-network-proxy-probe-retirement.md)
+- [REQ-20260522-003 提示气泡化与超大文件组件化拆分](requirements/REQ-20260522-003-toast-feedback-and-component-splitting.md)
+- [REQ-20260522-004 .gitignore 通配符化整理](requirements/REQ-20260522-004-gitignore-wildcard-cleanup.md)
+- [REQ-20260522-005 Model Policy 分层收敛与第三阶段路由治理](requirements/REQ-20260522-005-model-policy-layered-resolution.md)
 
 ## 决策
 

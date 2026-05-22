@@ -6,6 +6,8 @@ Always respond in Chinese (Simplified).
 Workflow requirements
 - 默认使用本地优先协作流程，不再强制使用线上 Notion 或线上 Linear。
 - 只有用户明确要求使用线上 Notion、Linear 或其他 SaaS 工具时，才调用对应线上连接器。
+- 为提高工作效率，在任务边界清晰、写入范围可划分、结果可独立验证时，可以将任务合理分发给 subagents 并行处理；主 agent 负责总体规划、上下文同步、结果集成与最终验收。
+- 已完成、已过时或不再需要的 subagents 必须及时清理回收，避免上下文漂移、重复工作和资源占用。
 - 推荐目录：需求文档放在 `docs/requirements/`，分析报告放在 `docs/reports/`，决策记录放在 `docs/decisions/`，迁移记录放在 `docs/migrations/`，任务放在 `tasks/backlog/`、`tasks/in-progress/`、`tasks/done/`。
 - 任何需求在开始编码前，必须先在当前项目仓库内创建或更新本地 Markdown 文档，记录需求背景、目标、方案、范围、风险和验收标准。
 - 任何需求在开始编码前，必须先在当前项目仓库内创建或更新本地任务文件；任务必须与需求、报告、决策或迁移记录建立清晰关联，避免无归属、无追溯的任务。

@@ -59,7 +59,7 @@ public class AccessGroupEntitlementService {
         ResolvedAccessPolicy inherited = resolveGroups(groups);
         return new ResolvedAccessPolicy(
                 inherited.sourceAccessGroups(),
-                chooseList(key.getAllowedProtocols(), inherited.allowedProtocols()),
+                chooseList(key.getAllowedProtocolSuites(), inherited.allowedProtocolSuites()),
                 chooseList(key.getAllowedModels(), inherited.allowedModels()),
                 chooseList(key.getAllowedProviderTypes(), inherited.allowedProviderTypes()),
                 chooseList(key.getAllowedClientFamilies(), inherited.allowedClientFamilies()),
@@ -119,7 +119,7 @@ public class AccessGroupEntitlementService {
                 .toList();
         return new ResolvedAccessPolicy(
                 activeGroups.stream().map(AccessGroupEntity::getGroupName).distinct().toList(),
-                mergeLists(activeGroups.stream().map(AccessGroupEntity::getAllowedProtocols).toList()),
+                mergeLists(activeGroups.stream().map(AccessGroupEntity::getAllowedProtocolSuites).toList()),
                 mergeModels(activeGroups.stream().map(AccessGroupEntity::getAllowedModels).toList()),
                 mergeLists(activeGroups.stream().map(AccessGroupEntity::getAllowedProviderTypes).toList()),
                 mergeLists(activeGroups.stream().map(AccessGroupEntity::getAllowedClientFamilies).toList()),

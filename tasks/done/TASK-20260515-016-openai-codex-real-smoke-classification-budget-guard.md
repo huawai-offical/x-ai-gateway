@@ -1,10 +1,10 @@
 # TASK-20260515-016 OpenAI/Codex Real Smoke 分类与预算阻断基线
 
-状态：Done  
-优先级：Critical  
-类型：子任务切片  
-父任务：[TASK-20260514-031](../backlog/TASK-20260514-031-openai-real-smoke-certification-harness.md)  
-上游来源：[TASK-20260514-016](../backlog/TASK-20260514-016-openai-full-api-coverage-parent.md)、[REP-20260514 OpenAI 全量覆盖任务拆解](../../docs/reports/REP-20260514-openai-full-api-coverage-task-breakdown.md)
+状态：Done
+优先级：Critical
+类型：子任务切片
+父任务：[TASK-20260514-031](../backlog/TASK-20260514-031-openai-real-smoke-certification-harness.md)
+上游来源：[TASK-20260514-016](../backlog/TASK-20260514-016-functional-service-api-coverage-parent.md)、[REP-20260514 OpenAI 全量覆盖任务拆解](../../docs/reports/REP-20260514-openai-full-api-coverage-task-breakdown.md)
 
 ## 背景
 

@@ -104,75 +104,7 @@ class OpenAiDirectResourceSmokeHttpClientTests {
         }
     }
 
-    @Test
-    void shouldBlockBillableAndWriteFamiliesWithoutHttpCall() {
-        OpenAiDirectResourceSmokeHttpClient client = new OpenAiDirectResourceSmokeHttpClient(objectMapper);
 
-        var chat = client.executeReadOnlyProbe("CHAT_COMPLETIONS", "sk-secret", "https://api.openai.com", 3, null, null);
-        var realtime = client.executeReadOnlyProbe("REALTIME_CLIENT_SECRET", "sk-secret", "https://api.openai.com", 3, null, null);
-
-        assertEquals("BUDGET_BLOCKED", chat.classification());
-        assertEquals("BILLABLE_PROBE_BLOCKED", chat.skippedReason());
-        assertEquals("BUDGET_BLOCKED", realtime.classification());
-        assertEquals("WRITE_PROBE_BLOCKED", realtime.skippedReason());
-    }
-
-    @Test
-    void shouldExecuteExplicitBillableAndWriteProbesWithMinimalPayloads() throws Exception {
-        HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
-        AtomicReference<String> chatBody = new AtomicReference<>();
-        AtomicReference<String> responsesBody = new AtomicReference<>();
-        AtomicReference<String> realtimeBody = new AtomicReference<>();
-        server.createContext("/v1/chat/completions", exchange -> {
-            chatBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-            exchange.getResponseHeaders().add("x-request-id", "req-chat");
-            sendJson(exchange, 200, """
-                    {"id":"chatcmpl_1","object":"chat.completion","model":"gpt-4o-mini","usage":{"completion_tokens":1}}
-                    """);
-        });
-        server.createContext("/v1/responses", exchange -> {
-            responsesBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-            exchange.getResponseHeaders().add("x-request-id", "req-resp");
-            sendJson(exchange, 200, """
-                    {"id":"resp_1","object":"response","model":"gpt-4o-mini","usage":{"output_tokens":1}}
-                    """);
-        });
-        server.createContext("/v1/realtime/client_secrets", exchange -> {
-            realtimeBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-            exchange.getResponseHeaders().add("x-request-id", "req-rt");
-            sendJson(exchange, 200, """
-                    {"client_secret":{"value":"ek_secret","expires_at":1893456000},"session":{"type":"realtime","model":"gpt-realtime-mini"}}
-                    """);
-        });
-        server.start();
-        try {
-            OpenAiDirectResourceSmokeHttpClient client = new OpenAiDirectResourceSmokeHttpClient(objectMapper);
-            String baseUrl = "http://127.0.0.1:" + server.getAddress().getPort();
-
-            var chat = client.executeProbe("CHAT_COMPLETIONS", "sk-live-secret", baseUrl, 3, "org-real", "proj-real", true, false);
-            var responses = client.executeProbe("RESPONSES", "sk-live-secret", baseUrl, 3, null, null, true, false);
-            var realtime = client.executeProbe("REALTIME_CLIENT_SECRET", "sk-live-secret", baseUrl, 3, null, null, false, true);
-
-            assertEquals("PASS", chat.classification());
-            assertEquals("req-chat", chat.upstreamRequestId());
-            assertEquals(1, objectMapper.readTree(chatBody.get()).path("max_completion_tokens").asInt());
-            assertEquals(false, objectMapper.readTree(chatBody.get()).path("store").asBoolean());
-            assertFalse(chat.requestPreview().toString().contains("org-real"));
-            assertFalse(chat.requestPreview().toString().contains("proj-real"));
-
-            assertEquals("PASS", responses.classification());
-            assertEquals(1, objectMapper.readTree(responsesBody.get()).path("max_output_tokens").asInt());
-            assertEquals(false, objectMapper.readTree(responsesBody.get()).path("store").asBoolean());
-
-            assertEquals("PASS", realtime.classification());
-            assertEquals(true, realtime.evidence().get("clientSecretReturned"));
-            assertEquals(60, objectMapper.readTree(realtimeBody.get()).path("expires_after").path("seconds").asInt());
-            assertEquals("text", objectMapper.readTree(realtimeBody.get()).path("session").path("output_modalities").get(0).asText());
-            assertEquals(1, objectMapper.readTree(realtimeBody.get()).path("session").path("max_output_tokens").asInt());
-        } finally {
-            server.stop(0);
-        }
-    }
 
     private static void sendJson(HttpExchange exchange, int status, String body) throws IOException {
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);

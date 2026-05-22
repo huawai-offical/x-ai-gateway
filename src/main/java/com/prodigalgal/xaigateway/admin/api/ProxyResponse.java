@@ -7,10 +7,6 @@ public record ProxyResponse(
         String proxyName,
         String proxyUrl,
         boolean active,
-        String lastStatus,
-        Long lastLatencyMs,
-        String lastErrorMessage,
-        Instant lastProbedAt,
         String description,
         Instant createdAt,
         Instant updatedAt

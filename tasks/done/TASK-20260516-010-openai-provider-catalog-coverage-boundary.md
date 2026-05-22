@@ -1,10 +1,10 @@
 # TASK-20260516-010 OpenAI Provider Catalog 覆盖边界校准
 
-状态：Done  
-优先级：High  
-类型：子任务切片  
-父任务：[TASK-20260514-015](../backlog/TASK-20260514-015-openai-openapi-conformance-truth-source-hardening.md)  
-关联任务：[TASK-20260514-029](../in-progress/TASK-20260514-029-openai-openapi-catalog-conformance-sdk.md)、[TASK-20260514-016](../backlog/TASK-20260514-016-openai-full-api-coverage-parent.md)
+状态：Done
+优先级：High
+类型：子任务切片
+父任务：[TASK-20260514-015](../backlog/TASK-20260514-015-openai-openapi-conformance-truth-source-hardening.md)
+关联任务：[TASK-20260514-029](TASK-20260514-029-openai-openapi-catalog-conformance-sdk.md)、[TASK-20260514-016](../backlog/TASK-20260514-016-functional-service-api-coverage-parent.md)
 
 ## 背景
 

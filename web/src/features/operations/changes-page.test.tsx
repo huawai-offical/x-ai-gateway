@@ -74,6 +74,6 @@ describe('ChangesPage', () => {
     expect(await screen.findByText('变更外发状态')).toBeInTheDocument()
     expect(await screen.findByText('upgrade-main')).toBeInTheDocument()
     expect(await screen.findByText('accepted')).toBeInTheDocument()
-    expect(await screen.findByText(/审批要求：需要审批/)).toBeInTheDocument()
+    expect(await screen.findByText('需要审批')).toBeInTheDocument()
   })
 })

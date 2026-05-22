@@ -8,6 +8,7 @@ import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalReasoningConfi
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequestMetadata;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalStreamEventType;
+import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolCall;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalToolDefinition;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.credential.CredentialAuthKind;
@@ -41,6 +42,7 @@ import tools.jackson.databind.ObjectMapper;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class OpenAiNativeGatewayChatRuntimeTests {
@@ -563,6 +565,153 @@ class OpenAiNativeGatewayChatRuntimeTests {
         assertTrue(compatible.extraBody().containsKey("function_call"));
     }
 
+    @Test
+    void shouldTranslateResponsesConversationToOpenAiCompatibleChatWithReasoningHistory() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+        AtomicReference<String> upstreamPath = new AtomicReference<>();
+        AtomicReference<String> authorization = new AtomicReference<>();
+        AtomicReference<String> requestBody = new AtomicReference<>();
+        server.createContext("/v1/chat/completions", exchange -> {
+            upstreamPath.set(exchange.getRequestURI().getPath());
+            authorization.set(exchange.getRequestHeaders().getFirst("authorization"));
+            requestBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            sendJson(exchange, 200, """
+                    {
+                      "id":"chatcmpl_mimo_1",
+                      "object":"chat.completion",
+                      "model":"mimo-v2.5-pro",
+                      "choices":[
+                        {
+                          "index":0,
+                          "finish_reason":"stop",
+                          "message":{
+                            "role":"assistant",
+                            "content":"上海比北京低 3 度。",
+                            "reasoning_content":"我复用了上一轮工具结果，再比较上海天气。",
+                            "tool_calls":[]
+                          }
+                        }
+                      ],
+                      "usage":{
+                        "prompt_tokens":31,
+                        "completion_tokens":9,
+                        "total_tokens":40,
+                        "completion_tokens_details":{"reasoning_tokens":4}
+                      }
+                    }
+                    """);
+        });
+        server.start();
+        try {
+            var request = new CanonicalRequest(
+                    "sk-gw-test",
+                    CanonicalIngressProtocol.RESPONSES,
+                    "/v1/responses",
+                    "mimo-public",
+                    List.of(
+                            new CanonicalMessage(CanonicalMessageRole.USER, List.of(CanonicalContentPart.text("北京天气怎么样？"))),
+                            new CanonicalMessage(
+                                    CanonicalMessageRole.ASSISTANT,
+                                    List.of(),
+                                    "我需要调用天气工具查询北京。",
+                                    List.of(new CanonicalToolCall("call_mimo_1", "function", "get_weather", "{\"city\":\"北京\"}")),
+                                    null
+                            ),
+                            new CanonicalMessage(
+                                    CanonicalMessageRole.TOOL,
+                                    List.of(CanonicalContentPart.toolResult("call_mimo_1", "get_weather", "北京晴 25 度"))
+                            ),
+                            new CanonicalMessage(CanonicalMessageRole.USER, List.of(CanonicalContentPart.text("那上海呢？和北京比呢？")))
+                    ),
+                    List.of(new CanonicalToolDefinition(
+                            "get_weather",
+                            "查询城市天气",
+                            objectMapper.readTree("{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"]}"),
+                            null
+                    )),
+                    null,
+                    null,
+                    null,
+                    new CanonicalReasoningConfig(objectMapper.readTree("{\"effort\":\"low\"}"), "low"),
+                    objectMapper.readTree("{\"metadata\":{\"client\":\"codex\"}}")
+            );
+            UpstreamCredentialEntity credential = new UpstreamCredentialEntity();
+            credential.setBaseUrl("http://127.0.0.1:" + server.getAddress().getPort() + "/v1");
+            credential.setCredentialMetadataJson(mimoConversationProfileJson());
+            var context = new GatewayChatRuntimeContext(
+                    openAiCompatibleSelection("mimo-public", "mimo-v2.5-pro"),
+                    credential,
+                    new ResolvedCredentialMaterial(1L, 1L, CredentialAuthKind.API_KEY, "mimo-secret", null, Map.of(), null, "test"),
+                    request,
+                    null
+            );
+
+            var response = runtime.execute(context);
+
+            assertEquals("/v1/chat/completions", upstreamPath.get());
+            assertEquals("Bearer mimo-secret", authorization.get());
+            JsonNode sent = objectMapper.readTree(requestBody.get());
+            assertEquals("mimo-v2.5-pro", sent.path("model").asText());
+            assertEquals("codex", sent.path("metadata").path("client").asText());
+            assertEquals("low", sent.path("reasoning_effort").asText());
+            assertEquals("enabled", sent.path("thinking").path("type").asText());
+            JsonNode assistant = sent.path("messages").get(1);
+            assertEquals("assistant", assistant.path("role").asText());
+            assertEquals("我需要调用天气工具查询北京。", assistant.path("reasoning_content").asText());
+            assertEquals("call_mimo_1", assistant.path("tool_calls").get(0).path("id").asText());
+            assertEquals("get_weather", assistant.path("tool_calls").get(0).path("function").path("name").asText());
+            assertEquals("{\"city\":\"北京\"}", assistant.path("tool_calls").get(0).path("function").path("arguments").asText());
+            JsonNode tool = sent.path("messages").get(2);
+            assertEquals("tool", tool.path("role").asText());
+            assertEquals("call_mimo_1", tool.path("tool_call_id").asText());
+            assertEquals("北京晴 25 度", tool.path("content").asText());
+            assertEquals("上海比北京低 3 度。", response.outputText());
+            assertEquals("我复用了上一轮工具结果，再比较上海天气。", response.reasoning());
+            assertEquals(31, response.usage().promptTokens());
+            assertEquals(9, response.usage().completionTokens());
+            assertEquals(4, response.usage().reasoningTokens());
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void shouldRejectAssistantToolCallHistoryWithoutReasoningWhenProviderRequiresReplay() throws Exception {
+        var request = new CanonicalRequest(
+                "sk-gw-test",
+                CanonicalIngressProtocol.RESPONSES,
+                "/v1/responses",
+                "mimo-public",
+                List.of(new CanonicalMessage(
+                        CanonicalMessageRole.ASSISTANT,
+                        List.of(),
+                        null,
+                        List.of(new CanonicalToolCall("call_mimo_1", "function", "get_weather", "{\"city\":\"北京\"}")),
+                        null
+                )),
+                List.of(),
+                null,
+                null,
+                null,
+                null,
+                objectMapper.createObjectNode()
+        );
+        UpstreamCredentialEntity credential = new UpstreamCredentialEntity();
+        credential.setBaseUrl("http://127.0.0.1:65535/v1");
+        credential.setCredentialMetadataJson(mimoConversationProfileJson());
+        var context = new GatewayChatRuntimeContext(
+                openAiCompatibleSelection("mimo-public", "mimo-v2.5-pro"),
+                credential,
+                new ResolvedCredentialMaterial(1L, 1L, CredentialAuthKind.API_KEY, "mimo-secret", null, Map.of(), null, "test"),
+                request,
+                null
+        );
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> runtime.execute(context));
+
+        assertTrue(exception.getMessage().contains("reasoning_content"));
+    }
+
     private RouteSelectionResult openAiDirectSelection(String publicModel, String resolvedModel) {
         var candidate = new CatalogCandidateView(
                 1L,
@@ -604,6 +753,67 @@ class OpenAiNativeGatewayChatRuntimeTests {
                 routeCandidate,
                 List.of(routeCandidate)
         );
+    }
+
+    private RouteSelectionResult openAiCompatibleSelection(String publicModel, String resolvedModel) {
+        var candidate = new CatalogCandidateView(
+                1L,
+                "xiaomi-mimo-openai-compatible",
+                ProviderType.OPENAI_COMPATIBLE,
+                1L,
+                ProviderFamily.OPENAI,
+                UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC,
+                AuthStrategy.BEARER,
+                PathStrategy.OPENAI_V1,
+                ErrorSchemaStrategy.OPENAI_ERROR,
+                "https://api.xiaomimimo.com/v1",
+                publicModel,
+                resolvedModel,
+                List.of("openai_compatible", "responses", "reasoning"),
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                ReasoningTransport.OPENAI_CHAT,
+                InteropCapabilityLevel.EMULATED
+        );
+        var routeCandidate = new RouteCandidateView(candidate, 1L, 0, 100);
+        return new RouteSelectionResult(
+                1L,
+                "sk-gw-test",
+                publicModel,
+                publicModel,
+                resolvedModel,
+                "xiaomi_mimo",
+                "prefix",
+                "fingerprint",
+                "default",
+                RouteSelectionSource.WEIGHTED_HASH,
+                routeCandidate,
+                List.of(routeCandidate)
+        );
+    }
+
+    private String mimoConversationProfileJson() {
+        return """
+                {
+                  "conversationProfile": {
+                    "ingressProtocol": "responses",
+                    "upstreamSurface": "chat_completions",
+                    "responsesCompatibility": {"mode": "emulate_with_chat_completions"},
+                    "reasoning": {
+                      "requestField": "extra_body.thinking",
+                      "requestEnabledValue": {"type": "enabled"},
+                      "assistantReasoningField": "reasoning_content",
+                      "historyReplayPolicy": "required_when_tool_calls"
+                    }
+                  }
+                }
+                """;
     }
 
     private static void sendJson(HttpExchange exchange, int status, String body) throws IOException {
