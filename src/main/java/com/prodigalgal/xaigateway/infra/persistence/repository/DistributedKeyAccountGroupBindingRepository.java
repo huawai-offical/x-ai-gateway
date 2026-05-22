@@ -9,7 +9,7 @@ public interface DistributedKeyAccountGroupBindingRepository extends JpaReposito
     List<DistributedKeyAccountGroupBindingEntity> findAllByDistributedKey_IdAndActiveTrueOrderByPriorityAscCreatedAtAsc(Long distributedKeyId);
     List<DistributedKeyAccountGroupBindingEntity> findAllByDistributedKey_IdAndProviderTypeAndActiveTrueOrderByPriorityAscCreatedAtAsc(Long distributedKeyId, ProviderType providerType);
     List<DistributedKeyAccountGroupBindingEntity> findAllByGroup_Id(Long groupId);
-    long countByDistributedKey_IdAndActiveTrue(Long distributedKeyId);
+    long countByDistributedKey_IdAndActiveTrueAndGroup_ActiveTrue(Long distributedKeyId);
     void deleteAllByGroup_Id(Long groupId);
     void deleteAllByDistributedKey_Id(Long distributedKeyId);
 }

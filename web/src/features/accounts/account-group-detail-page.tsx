@@ -1,4 +1,4 @@
-import { type ChangeEvent, type FormEvent, useMemo, useState } from 'react'
+import { type ChangeEvent, type FormEvent, useEffect, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowUpRightIcon, ClipboardCheckIcon, PlayCircleIcon, RefreshCwIcon, RotateCcwIcon, ShieldOffIcon } from 'lucide-react'
@@ -278,6 +278,7 @@ export function AccountGroupDetailPage() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [distributedKeyId, setDistributedKeyId] = useState('')
+  const [bindingProviderType, setBindingProviderType] = useState('OPENAI_DIRECT')
   const [editOpen, setEditOpen] = useState(false)
   const [editForm, setEditForm] = useState<AccountGroupForm>(createEmptyGroupForm())
   const [editError, setEditError] = useState<string | null>(null)
@@ -369,7 +370,7 @@ export function AccountGroupDetailPage() {
         method: 'POST',
         body: JSON.stringify({
           distributedKeyId: Number(distributedKeyId),
-          providerType: resolveRouteProviderType(groupQuery.data?.providerType),
+          providerType: bindingProviderType,
         }),
       }),
     onSuccess: () => setDistributedKeyId(''),
@@ -586,9 +587,20 @@ export function AccountGroupDetailPage() {
     [accountsQuery.data, group],
   )
   const distributedKeyOptions = useMemo(
-    () => (distributedKeysQuery.data ?? []).filter((key: DistributedKey) => isDistributedKeyCompatibleWithGroup(key, group)),
-    [distributedKeysQuery.data, group],
+    () => (distributedKeysQuery.data ?? []).filter((key: DistributedKey) =>
+      isDistributedKeyCompatibleWithGroup(key, group, credentialsQuery.data ?? [])),
+    [credentialsQuery.data, distributedKeysQuery.data, group],
   )
+  const selectedBindingKey = distributedKeyOptions.find((key) => String(key.id) === distributedKeyId)
+  const bindingProviderOptions = useMemo(
+    () => providerOptionsForDistributedKeyBinding(selectedBindingKey ? [selectedBindingKey] : distributedKeyOptions, group, credentialsQuery.data ?? []),
+    [credentialsQuery.data, distributedKeyOptions, group, selectedBindingKey],
+  )
+  useEffect(() => {
+    if (!bindingProviderOptions.includes(bindingProviderType)) {
+      setBindingProviderType(bindingProviderOptions[0] ?? resolveRouteProviderType(group?.providerType))
+    }
+  }, [bindingProviderOptions, bindingProviderType, group?.providerType])
   const runtimeBatchPreflight = useMemo(
     () => buildRuntimeBatchPreflight(runtimeAccounts),
     [runtimeAccounts],
@@ -718,6 +730,21 @@ export function AccountGroupDetailPage() {
                   {distributedKeyOptions.map((key: DistributedKey) => (
                     <option key={key.id} value={key.id}>
                       {key.keyName} / {key.maskedKey ?? key.keyPrefix ?? `ID ${key.id}`} / {key.allowedClientFamilies?.join(', ') || '通用'}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex min-w-0 flex-1 flex-col gap-2">
+                <span className="text-sm font-medium text-foreground">运行时 provider</span>
+                <select
+                  aria-label="运行时 provider"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={bindingProviderType}
+                  onChange={(event) => setBindingProviderType(event.target.value)}
+                >
+                  {bindingProviderOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
                     </option>
                   ))}
                 </select>
@@ -1806,17 +1833,48 @@ function isCodexRuntimeAccount(account: Account, group: AccountGroup | null | un
   return account.providerType === 'CODEX_OAUTH' || isCodexGroup(group)
 }
 
-function isDistributedKeyCompatibleWithGroup(key: DistributedKey, group: AccountGroup | null | undefined) {
+function isDistributedKeyCompatibleWithGroup(key: DistributedKey, group: AccountGroup | null | undefined, credentials: Credential[]) {
   if (!key.active) {
     return false
   }
   if (!group) {
     return true
   }
-  const groupProviderType = resolveRouteProviderType(group.providerType)
-  const providerMatches = !key.allowedProviderTypes?.length || key.allowedProviderTypes.includes(groupProviderType)
+  const providerTypes = routeProviderCandidates(group, credentials)
+  const providerMatches = !key.allowedProviderTypes?.length || key.allowedProviderTypes.some((providerType) => providerTypes.includes(providerType))
   const clientFamilyMatches = !key.allowedClientFamilies?.length || !group.allowedClientFamilies?.length || key.allowedClientFamilies.some((family) => group.allowedClientFamilies?.includes(family))
   return providerMatches && clientFamilyMatches
+}
+
+function providerOptionsForDistributedKeyBinding(keys: DistributedKey[], group: AccountGroup | null | undefined, credentials: Credential[]) {
+  const allowedByKeys = new Set<string>()
+  keys.forEach((key) => {
+    key.allowedProviderTypes?.forEach((providerType) => allowedByKeys.add(providerType))
+  })
+  if (!allowedByKeys.size) {
+    return ['OPENAI_DIRECT', 'OPENAI_COMPATIBLE', 'ANTHROPIC_DIRECT', 'GEMINI_DIRECT', 'OLLAMA_DIRECT']
+  }
+  const providerTypes = routeProviderCandidates(group, credentials)
+  const ordered = [
+    ...providerTypes,
+    'OPENAI_COMPATIBLE',
+    'OPENAI_DIRECT',
+    'ANTHROPIC_DIRECT',
+    'GEMINI_DIRECT',
+    'OLLAMA_DIRECT',
+  ]
+  return Array.from(new Set(ordered.filter((providerType) => allowedByKeys.has(providerType))))
+}
+
+function routeProviderCandidates(group: AccountGroup | null | undefined, credentials: Credential[]) {
+  const values = new Set<string>()
+  credentials.forEach((credential) => {
+    if (credential.providerType) {
+      values.add(credential.providerType)
+    }
+  })
+  values.add(resolveRouteProviderType(group?.providerType))
+  return Array.from(values)
 }
 
 function buildRuntimeBatchPreflight(accounts: Account[]): RuntimeBatchRecoveryResult {

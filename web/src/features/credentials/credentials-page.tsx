@@ -53,6 +53,8 @@ type BatchCreateResult = {
   failed: BatchCreateFailure[]
 }
 
+type CredentialCreatePayload = ReturnType<typeof buildCredentialPayload>
+
 type CodexImportPayload = {
   sourceLabel: string
   groupId: number
@@ -159,9 +161,11 @@ export function CredentialsPage() {
     () => flattenProviderEndpointOptions(providerSiteOptions),
     [providerSiteOptions],
   )
-  const selectedProviderEndpoint = useMemo(
-    () => findProviderEndpoint(providerEndpointOptions, form.protocolEndpointId),
-    [form.protocolEndpointId, providerEndpointOptions],
+  const selectedProviderEndpoints = useMemo(
+    () => form.protocolEndpointIds
+      .map((endpointId) => findProviderEndpoint(providerEndpointOptions, endpointId))
+      .filter((option): option is ProviderEndpointOption => option != null),
+    [form.protocolEndpointIds, providerEndpointOptions],
   )
   const selectedEditingProviderEndpoint = useMemo(
     () => findProviderEndpoint(providerEndpointOptions, editingForm.protocolEndpointId),
@@ -185,9 +189,9 @@ export function CredentialsPage() {
       ),
     enabled: editingCredentialId != null,
   })
-  const createCredentialMutation = useTypedMutation<CredentialResponse, ReturnType<typeof buildCredentialPayload>>({
+  const createCredentialMutation = useTypedMutation<CredentialResponse[], CredentialCreatePayload>({
     mutationFn: (payload) =>
-      apiRequest<CredentialResponse>('/admin/credentials', {
+      apiRequest<CredentialResponse[]>('/admin/credentials/multi-endpoint', {
         method: 'POST',
         body: JSON.stringify(payload),
       }),
@@ -202,17 +206,17 @@ export function CredentialsPage() {
     },
   })
 
-  const createBatchCredentialMutation = useTypedMutation<BatchCreateResult, { payloads: ReturnType<typeof buildCredentialPayload>[] }>({
+  const createBatchCredentialMutation = useTypedMutation<BatchCreateResult, { payloads: CredentialCreatePayload[] }>({
     mutationFn: async ({ payloads }) => {
       const failed: BatchCreateFailure[] = []
       let success = 0
       for (const payload of payloads) {
         try {
-          await apiRequest<CredentialResponse>('/admin/credentials', {
+          const responses = await apiRequest<CredentialResponse[]>('/admin/credentials/multi-endpoint', {
             method: 'POST',
             body: JSON.stringify(payload),
           })
-          success += 1
+          success += responses.length
         } catch (error) {
           failed.push({
             credentialName: payload.credentialName,
@@ -222,7 +226,7 @@ export function CredentialsPage() {
       }
 
       return {
-        total: payloads.length,
+        total: payloads.reduce((total, payload) => total + Math.max(payload.protocolEndpointIds.length, 1), 0),
         success,
         failed,
       }
@@ -673,6 +677,7 @@ export function CredentialsPage() {
                           groupId: nextGroup ? String(nextGroup.id) : current.groupId,
                           siteProfileId: nextSource === 'codexAuthJson' ? '' : current.siteProfileId,
                           protocolEndpointId: nextSource === 'codexAuthJson' ? '' : current.protocolEndpointId,
+                          protocolEndpointIds: nextSource === 'codexAuthJson' ? [] : current.protocolEndpointIds,
                         }))
                       }}
                     >
@@ -746,24 +751,40 @@ export function CredentialsPage() {
                   </div>
                 ) : (
                   <div className="grid gap-4 md:grid-cols-2">
-                    <label className="flex flex-col gap-2 md:col-span-2">
+                    <div className="flex flex-col gap-2 md:col-span-2">
                       <span className="text-sm font-medium text-foreground">厂商协议入口</span>
-                      <select
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                        value={form.protocolEndpointId}
-                        onChange={(event) => {
-                          setConnectivityResult(null)
-                          setForm((current) => applyProviderEndpointToForm(current, event.target.value, providerEndpointOptions))
-                        }}
-                      >
-                        <option value="" disabled>{providerSitesQuery.isPending ? '加载中' : '请选择厂商协议入口'}</option>
-                        {providerEndpointOptions.map((option) => (
-                          <option key={option.endpoint.id} value={String(option.endpoint.id)} disabled={!isSelectableProviderEndpoint(option)}>
-                            {providerEndpointOptionLabel(option)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                      <div className="grid max-h-64 gap-2 overflow-y-auto rounded-md border border-input bg-background p-2">
+                        {providerSitesQuery.isPending ? (
+                          <div className="px-2 py-1 text-sm text-muted-foreground">加载中</div>
+                        ) : null}
+                        {!providerSitesQuery.isPending && providerEndpointOptions.length === 0 ? (
+                          <div className="px-2 py-1 text-sm text-muted-foreground">暂无可选厂商协议入口</div>
+                        ) : null}
+                        {providerEndpointOptions.map((option) => {
+                          const endpointId = String(option.endpoint.id)
+                          return (
+                            <label
+                              key={option.endpoint.id}
+                              className="flex min-h-10 items-center gap-3 rounded-md px-2 py-2 hover:bg-muted/40"
+                            >
+                              <input
+                                type="checkbox"
+                                className="size-4 rounded border-border"
+                                checked={form.protocolEndpointIds.includes(endpointId)}
+                                disabled={!isSelectableProviderEndpoint(option)}
+                                onChange={() => {
+                                  setConnectivityResult(null)
+                                  setForm((current) => toggleProviderEndpointOnForm(current, endpointId, providerEndpointOptions))
+                                }}
+                              />
+                              <span className="min-w-0 flex-1 text-sm text-foreground">
+                                {providerEndpointOptionLabel(option)}
+                              </span>
+                            </label>
+                          )
+                        })}
+                      </div>
+                    </div>
                     <label className="flex flex-col gap-2">
                       <span className="text-sm font-medium text-foreground">提供方类型</span>
                       <Input value={form.providerType} readOnly />
@@ -784,7 +805,7 @@ export function CredentialsPage() {
                     </label>
                     <label className="flex flex-col gap-2 md:col-span-2">
                       <span className="text-sm font-medium text-foreground">Base URL</span>
-                      <Input value={selectedProviderEndpoint?.endpoint.baseUrl ?? form.baseUrl} readOnly />
+                      <Input value={selectedEndpointBaseUrlPreview(selectedProviderEndpoints, form.baseUrl)} readOnly />
                     </label>
                   </div>
                 )}
@@ -943,7 +964,7 @@ export function CredentialsPage() {
                         <div className="font-medium text-foreground">
                           {createSource === 'codexAuthJson'
                             ? 'CODEX_OAUTH / auth.json'
-                            : `${selectedProviderEndpoint ? providerEndpointOptionLabel(selectedProviderEndpoint) : '未选择'} / ${form.authKind}`}
+                            : `${selectedProviderEndpoints.length ? selectedProviderEndpoints.map(providerEndpointOptionLabel).join('；') : '未选择'} / ${form.authKind}`}
                         </div>
                       </div>
                       <div>
@@ -987,7 +1008,7 @@ export function CredentialsPage() {
                   ) : null}
                   {createSource === 'secret' && createMode === 'batch' ? (
                     <div className="rounded-2xl border border-border/60 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
-                      预计创建 {parsedBulkSecrets.length} 条凭证，名称前缀为 {form.credentialName.trim() || `${form.providerType.toLowerCase()}-secret`}。
+                      预计创建 {parsedBulkSecrets.length * Math.max(selectedProviderEndpoints.length, 1)} 条凭证，名称前缀为 {form.credentialName.trim() || `${form.providerType.toLowerCase()}-secret`}。
                     </div>
                   ) : null}
                   {batchCreateResult ? (
@@ -1034,12 +1055,12 @@ export function CredentialsPage() {
                 下一步
               </Button>
               {canShowConnectivityTest ? (
-                <Button type="button" variant="outline" onClick={handleConnectivityTest} disabled={connectivityMutation.isPending || createMode === 'batch' || !form.protocolEndpointId}>
+                <Button type="button" variant="outline" onClick={handleConnectivityTest} disabled={connectivityMutation.isPending || createMode === 'batch' || form.protocolEndpointIds.length !== 1}>
                   测试联通性
                 </Button>
               ) : null}
               {canShowCreateButton ? (
-                <Button type="submit" disabled={createPending || !form.groupId || (createSource === 'secret' && !form.protocolEndpointId)}>
+                <Button type="submit" disabled={createPending || !form.groupId || (createSource === 'secret' && form.protocolEndpointIds.length === 0)}>
                   {createSource === 'codexAuthJson' ? '导入 auth.json' : (createMode === 'single' ? '创建凭证' : '批量创建')}
                 </Button>
               ) : null}
@@ -1626,6 +1647,7 @@ function applyProviderEndpointToForm(
     return {
       ...form,
       protocolEndpointId,
+      protocolEndpointIds: protocolEndpointId ? [protocolEndpointId] : [],
       siteProfileId: '',
       providerType: 'OPENAI_COMPATIBLE',
       baseUrl: '',
@@ -1634,9 +1656,40 @@ function applyProviderEndpointToForm(
   return {
     ...form,
     protocolEndpointId,
+    protocolEndpointIds: [protocolEndpointId],
     siteProfileId: String(option.endpoint.siteProfileId),
     providerType: option.endpoint.providerType,
     baseUrl: option.endpoint.baseUrl,
+  }
+}
+
+function toggleProviderEndpointOnForm(
+  form: CredentialFormState,
+  protocolEndpointId: string,
+  endpointOptions: ProviderEndpointOption[],
+): CredentialFormState {
+  const nextIds = form.protocolEndpointIds.includes(protocolEndpointId)
+    ? form.protocolEndpointIds.filter((id) => id !== protocolEndpointId)
+    : [...form.protocolEndpointIds, protocolEndpointId]
+  if (!nextIds.length) {
+    return {
+      ...form,
+      protocolEndpointId: '',
+      protocolEndpointIds: [],
+      siteProfileId: '',
+      providerType: 'OPENAI_COMPATIBLE',
+      baseUrl: '',
+    }
+  }
+  const primary = nextIds[0]
+  const option = findProviderEndpoint(endpointOptions, primary)
+  return {
+    ...form,
+    protocolEndpointId: primary,
+    protocolEndpointIds: nextIds,
+    siteProfileId: option ? String(option.endpoint.siteProfileId) : '',
+    providerType: option ? option.endpoint.providerType : form.providerType,
+    baseUrl: option ? option.endpoint.baseUrl : form.baseUrl,
   }
 }
 
@@ -1673,6 +1726,16 @@ function providerEndpointOptionLabel(option: ProviderEndpointOption) {
   const vendor = option.site.vendorName ?? option.site.vendorCode ?? '未归属厂商'
   const status = isSelectableProviderEndpoint(option) ? '' : '（不可用）'
   return `${vendor} / ${option.site.displayName} / ${option.endpoint.displayName} / ${option.endpoint.protocolSuite}${status}`
+}
+
+function selectedEndpointBaseUrlPreview(options: ProviderEndpointOption[], fallback: string) {
+  if (options.length === 0) {
+    return fallback
+  }
+  if (options.length === 1) {
+    return options[0].endpoint.baseUrl
+  }
+  return options.map((option) => `${option.endpoint.displayName}: ${option.endpoint.baseUrl}`).join('；')
 }
 
 function toggleOption(current: string[], nextValue: string) {

@@ -101,6 +101,15 @@ x-ai-gateway 不以 OpenAI、Anthropic、Gemini、Vertex、Codex 等官方 API �
 - [REQ-20260522-010 Observability Redis 超时退避与同步兜底](requirements/REQ-20260522-010-observability-redis-timeout-backoff.md)
 - [REQ-20260522-011 默认厂商 API 入口引导](requirements/REQ-20260522-011-default-provider-site-bootstrap.md)
 - [REQ-20260522-012 上游凭证绑定厂商 API 入口](requirements/REQ-20260522-012-credential-vendor-site-binding.md)
+- [REQ-20260522-013 厂商多协议入口与对话兼容画像升级](requirements/REQ-20260522-013-provider-protocol-endpoints.md)
+- [REQ-20260522-014 协议入口对话兼容画像下发运行时](requirements/REQ-20260522-014-protocol-endpoint-conversation-profile-runtime.md)
+- [REQ-20260522-015 存量凭证协议入口保守回填](requirements/REQ-20260522-015-credential-protocol-endpoint-backfill.md)
+- [REQ-20260522-016 功能性 Provider Smoke 协议入口地址对齐](requirements/REQ-20260522-016-functional-provider-smoke-endpoint-alignment.md)
+- [REQ-20260522-017 上游凭证多协议入口绑定](requirements/REQ-20260522-017-credential-multi-protocol-endpoint-binding.md)
+- [REQ-20260522-018 分发 Key 账号组运行时展开](requirements/REQ-20260522-018-distributed-key-account-group-runtime-expansion.md)
+- [REQ-20260522-019 账号类选择 active 账号组运行时对齐](requirements/REQ-20260522-019-account-selection-active-group-runtime-alignment.md)
+- [REQ-20260522-020 分发 Key 鉴权 active 账号组守卫](requirements/REQ-20260522-020-distributed-key-auth-active-group-guard.md)
+- [REQ-20260522-021 分发 Key 创建时初始账号组绑定](requirements/REQ-20260522-021-distributed-key-create-initial-account-group-binding.md)
 
 ## 决策
 

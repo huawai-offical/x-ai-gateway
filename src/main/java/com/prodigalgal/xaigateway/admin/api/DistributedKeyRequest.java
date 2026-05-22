@@ -21,6 +21,10 @@ public record DistributedKeyRequest(
         Integer concurrencyLimit,
         Integer stickySessionTtlSeconds,
         List<String> allowedClientFamilies,
-        Boolean requireClientFamilyMatch
+        Boolean requireClientFamilyMatch,
+        List<DistributedKeyInitialAccountGroupBindingRequest> initialAccountGroupBindings
 ) {
+    public List<DistributedKeyInitialAccountGroupBindingRequest> resolvedInitialAccountGroupBindings() {
+        return initialAccountGroupBindings == null ? List.of() : List.copyOf(initialAccountGroupBindings);
+    }
 }

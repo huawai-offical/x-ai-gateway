@@ -16,8 +16,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 @Transactional
@@ -53,17 +55,22 @@ public class AccountSelectionService {
 
     @Transactional(readOnly = true)
     public boolean hasHealthyAccountBinding(Long distributedKeyId, ProviderType providerType, GatewayClientFamily clientFamily) {
-        List<DistributedKeyAccountGroupBindingEntity> bindings = distributedKeyAccountGroupBindingRepository
+        List<DistributedKeyAccountGroupBindingEntity> rawBindings = distributedKeyAccountGroupBindingRepository
                 .findAllByDistributedKey_IdAndProviderTypeAndActiveTrueOrderByPriorityAscCreatedAtAsc(distributedKeyId, providerType);
-        if (bindings.isEmpty()) {
+        if (rawBindings.isEmpty()) {
             return true;
+        }
+        List<DistributedKeyAccountGroupBindingEntity> bindings = rawBindings.stream()
+                .filter(this::hasActiveGroup)
+                .toList();
+        if (bindings.isEmpty()) {
+            return false;
         }
         for (DistributedKeyAccountGroupBindingEntity binding : bindings) {
             List<UpstreamAccountEntity> accounts = upstreamAccountRepository
                     .findAllByGroup_IdAndActiveTrueAndFrozenFalseAndHealthyTrueOrderByUpdatedAtDesc(binding.getGroup().getId());
             for (UpstreamAccountEntity account : accounts) {
-                if (!binding.getGroup().getAllowedClientFamilies().isEmpty()
-                        && !binding.getGroup().getAllowedClientFamilies().contains(clientFamily.name())) {
+                if (!isClientFamilyAllowed(binding.getGroup(), clientFamily)) {
                     continue;
                 }
                 if (!isGovernanceHealthy(account)) {
@@ -88,17 +95,24 @@ public class AccountSelectionService {
             int stickyTtlSeconds,
             String sessionAffinityKey) {
         List<DistributedKeyAccountGroupBindingEntity> bindings = distributedKeyAccountGroupBindingRepository
-                .findAllByDistributedKey_IdAndProviderTypeAndActiveTrueOrderByPriorityAscCreatedAtAsc(distributedKeyId, providerType);
+                .findAllByDistributedKey_IdAndProviderTypeAndActiveTrueOrderByPriorityAscCreatedAtAsc(distributedKeyId, providerType)
+                .stream()
+                .filter(this::hasActiveGroup)
+                .toList();
         if (bindings.isEmpty()) {
             return Optional.empty();
         }
 
         String stickyKey = stickyKey(distributedKeyId, providerType, clientFamily, sessionAffinityKey);
+        Set<Long> activeGroupIds = activeGroupIds(bindings);
         String stickyAccountId = stringRedisTemplate.opsForValue().get(stickyKey);
         if (stickyAccountId != null) {
             Optional<UpstreamAccountEntity> sticky = upstreamAccountRepository.findById(Long.parseLong(stickyAccountId))
                     .filter(this::isNetworkHealthy)
-                    .filter(account -> account.isActive() && !account.isFrozen() && account.isHealthy());
+                    .filter(account -> account.isActive() && !account.isFrozen() && account.isHealthy())
+                    .filter(account -> account.getGroup() != null && activeGroupIds.contains(account.getGroup().getId()))
+                    .filter(account -> isClientFamilyAllowed(account.getGroup(), clientFamily))
+                    .filter(this::isGovernanceHealthy);
             if (sticky.isPresent()) {
                 sticky.get().setLastUsedAt(Instant.now());
                 return sticky;
@@ -109,8 +123,7 @@ public class AccountSelectionService {
             List<UpstreamAccountEntity> accounts = upstreamAccountRepository
                     .findAllByGroup_IdAndActiveTrueAndFrozenFalseAndHealthyTrueOrderByUpdatedAtDesc(binding.getGroup().getId());
             for (UpstreamAccountEntity account : accounts) {
-                if (!binding.getGroup().getAllowedClientFamilies().isEmpty()
-                        && !binding.getGroup().getAllowedClientFamilies().contains(clientFamily.name())) {
+                if (!isClientFamilyAllowed(binding.getGroup(), clientFamily)) {
                     continue;
                 }
                 if (!isGovernanceHealthy(account)) {
@@ -125,6 +138,25 @@ public class AccountSelectionService {
             }
         }
         return Optional.empty();
+    }
+
+    private boolean hasActiveGroup(DistributedKeyAccountGroupBindingEntity binding) {
+        return binding.getGroup() != null && binding.getGroup().isActive();
+    }
+
+    private Set<Long> activeGroupIds(List<DistributedKeyAccountGroupBindingEntity> bindings) {
+        return bindings.stream()
+                .map(DistributedKeyAccountGroupBindingEntity::getGroup)
+                .filter(group -> group != null && group.getId() != null && group.isActive())
+                .map(com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountGroupEntity::getId)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private boolean isClientFamilyAllowed(
+            com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountGroupEntity group,
+            GatewayClientFamily clientFamily) {
+        return group.getAllowedClientFamilies().isEmpty()
+                || group.getAllowedClientFamilies().contains(clientFamily.name());
     }
 
     private boolean isNetworkHealthy(UpstreamAccountEntity account) {

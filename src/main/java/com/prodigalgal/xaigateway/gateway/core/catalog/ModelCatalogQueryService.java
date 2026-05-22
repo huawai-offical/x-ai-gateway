@@ -16,9 +16,13 @@ import com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
 import com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendPolicyService;
 import com.prodigalgal.xaigateway.gateway.core.shared.ModelIdNormalizer;
+import com.prodigalgal.xaigateway.gateway.core.shared.ProviderFamily;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProtocolSuite;
+import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
+import com.prodigalgal.xaigateway.infra.persistence.entity.ProviderProtocolEndpointEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SiteModelCapabilityEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
+import com.prodigalgal.xaigateway.infra.persistence.repository.ProviderProtocolEndpointRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.SiteModelCapabilityRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import java.util.Comparator;
@@ -43,6 +47,7 @@ public class ModelCatalogQueryService {
     private final ModelAliasQueryService modelAliasQueryService;
     private final SiteCapabilityTruthService siteCapabilityTruthService;
     private final ExecutionBackendPolicyService executionBackendPolicyService;
+    private final ProviderProtocolEndpointRepository providerProtocolEndpointRepository;
 
     @Autowired
     public ModelCatalogQueryService(
@@ -50,12 +55,14 @@ public class ModelCatalogQueryService {
             UpstreamCredentialRepository upstreamCredentialRepository,
             ModelAliasQueryService modelAliasQueryService,
             SiteCapabilityTruthService siteCapabilityTruthService,
-            ExecutionBackendPolicyService executionBackendPolicyService) {
+            ExecutionBackendPolicyService executionBackendPolicyService,
+            ProviderProtocolEndpointRepository providerProtocolEndpointRepository) {
         this.siteModelCapabilityRepository = siteModelCapabilityRepository;
         this.upstreamCredentialRepository = upstreamCredentialRepository;
         this.modelAliasQueryService = modelAliasQueryService;
         this.siteCapabilityTruthService = siteCapabilityTruthService;
         this.executionBackendPolicyService = executionBackendPolicyService;
+        this.providerProtocolEndpointRepository = providerProtocolEndpointRepository;
     }
 
     public ModelCatalogQueryService(
@@ -68,7 +75,24 @@ public class ModelCatalogQueryService {
                 upstreamCredentialRepository,
                 modelAliasQueryService,
                 siteCapabilityTruthService,
-                new ExecutionBackendPolicyService()
+                new ExecutionBackendPolicyService(),
+                null
+        );
+    }
+
+    public ModelCatalogQueryService(
+            SiteModelCapabilityRepository siteModelCapabilityRepository,
+            UpstreamCredentialRepository upstreamCredentialRepository,
+            ModelAliasQueryService modelAliasQueryService,
+            SiteCapabilityTruthService siteCapabilityTruthService,
+            ExecutionBackendPolicyService executionBackendPolicyService) {
+        this(
+                siteModelCapabilityRepository,
+                upstreamCredentialRepository,
+                modelAliasQueryService,
+                siteCapabilityTruthService,
+                executionBackendPolicyService,
+                null
         );
     }
 
@@ -399,29 +423,57 @@ public class ModelCatalogQueryService {
             credentialsBySiteProfile.computeIfAbsent(credential.getSiteProfileId(), ignored -> new java.util.ArrayList<>())
                     .add(credential);
         }
+        Map<Long, ProviderProtocolEndpointEntity> endpointsById = resolveProtocolEndpoints(credentials);
 
         return capabilities.stream()
                 .flatMap(capability -> credentialsBySiteProfile
                         .getOrDefault(capability.getSiteProfile().getId(), List.of())
                         .stream()
-                        .map(credential -> toCandidateView(credential, capability)))
+                        .map(credential -> toCandidateView(
+                                credential,
+                                capability,
+                                credential.getProtocolEndpointId() == null
+                                        ? null
+                                        : endpointsById.get(credential.getProtocolEndpointId())
+                        )))
                 .sorted(Comparator.comparing(CatalogCandidateView::credentialId))
                 .toList();
     }
 
-    private CatalogCandidateView toCandidateView(UpstreamCredentialEntity credential, SiteModelCapabilityEntity capability) {
+    private Map<Long, ProviderProtocolEndpointEntity> resolveProtocolEndpoints(List<UpstreamCredentialEntity> credentials) {
+        if (providerProtocolEndpointRepository == null) {
+            return Map.of();
+        }
+        Set<Long> endpointIds = credentials.stream()
+                .map(UpstreamCredentialEntity::getProtocolEndpointId)
+                .filter(id -> id != null)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        if (endpointIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, ProviderProtocolEndpointEntity> result = new HashMap<>();
+        providerProtocolEndpointRepository.findAllById(endpointIds)
+                .forEach(endpoint -> result.put(endpoint.getId(), endpoint));
+        return result;
+    }
+
+    private CatalogCandidateView toCandidateView(
+            UpstreamCredentialEntity credential,
+            SiteModelCapabilityEntity capability,
+            ProviderProtocolEndpointEntity endpoint) {
+        UpstreamSiteKind siteKind = endpoint == null ? capability.getSiteProfile().getSiteKind() : endpoint.getSiteKind();
         return new CatalogCandidateView(
                 credential.getId(),
                 credential.getCredentialName(),
-                credential.getProviderType(),
+                endpoint == null ? credential.getProviderType() : endpoint.getProviderType(),
                 capability.getSiteProfile().getId(),
-                capability.getSiteProfile().getProviderFamily(),
+                providerFamilyForEndpoint(capability.getSiteProfile().getProviderFamily(), siteKind),
                 capability.getSiteProfile().getVendorCode(),
-                capability.getSiteProfile().getSiteKind(),
-                capability.getSiteProfile().getAuthStrategy(),
-                capability.getSiteProfile().getPathStrategy(),
-                capability.getSiteProfile().getErrorSchemaStrategy(),
-                credential.getBaseUrl(),
+                siteKind,
+                endpoint == null ? capability.getSiteProfile().getAuthStrategy() : endpoint.getAuthStrategy(),
+                endpoint == null ? capability.getSiteProfile().getPathStrategy() : endpoint.getPathStrategy(),
+                endpoint == null ? capability.getSiteProfile().getErrorSchemaStrategy() : endpoint.getErrorSchemaStrategy(),
+                endpoint == null ? credential.getBaseUrl() : endpoint.getBaseUrl(),
                 capability.getModelName(),
                 capability.getModelKey(),
                 capability.getSupportedProtocols(),
@@ -436,6 +488,18 @@ public class ModelCatalogQueryService {
                 capability.getReasoningTransport(),
                 capability.getCapabilityLevel()
         );
+    }
+
+    private ProviderFamily providerFamilyForEndpoint(ProviderFamily fallback, UpstreamSiteKind siteKind) {
+        if (siteKind == null) {
+            return fallback;
+        }
+        return switch (siteKind) {
+            case ANTHROPIC_DIRECT -> ProviderFamily.ANTHROPIC;
+            case GEMINI_DIRECT -> ProviderFamily.GEMINI;
+            case OLLAMA_DIRECT -> ProviderFamily.OLLAMA;
+            default -> fallback;
+        };
     }
 
     private InteropCapabilityLevel actualCapabilityLevel(CatalogCandidateView candidate) {

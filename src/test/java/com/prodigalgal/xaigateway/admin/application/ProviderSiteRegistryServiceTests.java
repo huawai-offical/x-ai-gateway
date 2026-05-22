@@ -8,6 +8,7 @@ import com.prodigalgal.xaigateway.gateway.core.shared.ErrorSchemaStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ModelAddressingStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.PathStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderFamily;
+import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.shared.ReasoningTransport;
 import com.prodigalgal.xaigateway.gateway.core.shared.SiteProfileSource;
 import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
@@ -15,10 +16,14 @@ import com.prodigalgal.xaigateway.gateway.core.site.UpstreamSitePolicyService;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SiteCapabilitySnapshotEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SiteModelCapabilityEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.ModelPolicyEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.ProviderProtocolEndpointEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamSiteProfileEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.ModelPolicyRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.ProviderProtocolEndpointRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.SiteCapabilitySnapshotRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.SiteModelCapabilityRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamSiteProfileRepository;
 import java.util.List;
 import java.util.Optional;
@@ -225,6 +230,62 @@ class ProviderSiteRegistryServiceTests {
     }
 
     @Test
+    void shouldCreateOpenAiAndAnthropicProtocolEndpointsForMimoPreset() {
+        UpstreamSiteProfileRepository profileRepository = Mockito.mock(UpstreamSiteProfileRepository.class);
+        SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        SiteModelCapabilityRepository modelCapabilityRepository = Mockito.mock(SiteModelCapabilityRepository.class);
+        ProviderProtocolEndpointRepository endpointRepository = Mockito.mock(ProviderProtocolEndpointRepository.class);
+        ProviderSiteRegistryService service = new ProviderSiteRegistryService(
+                profileRepository,
+                snapshotRepository,
+                modelCapabilityRepository,
+                null,
+                endpointRepository,
+                new UpstreamSitePolicyService(),
+                catalog("""
+                        {
+                          "catalogVersion": "test",
+                          "catalogSource": "unit",
+                          "presets": [
+                            {
+                              "code": "xiaomi_mimo",
+                              "displayName": "Xiaomi MiMo",
+                              "vendorCode": "xiaomi_mimo",
+                              "siteKind": "OPENAI_COMPATIBLE_GENERIC",
+                              "defaultBaseUrl": "https://token-plan-sgp.xiaomimimo.com/v1",
+                              "conformanceChecks": ["chat.native"]
+                            }
+                          ]
+                        }
+                        """)
+        );
+        UpstreamSiteProfileEntity savedSite = sampleSite(8L);
+        savedSite.setProfileCode("preset:xiaomi_mimo");
+        savedSite.setBaseUrlPattern("https://token-plan-sgp.xiaomimimo.com/v1");
+
+        Mockito.when(profileRepository.findByProfileCode("preset:xiaomi_mimo")).thenReturn(Optional.empty());
+        Mockito.when(profileRepository.save(any(UpstreamSiteProfileEntity.class))).thenReturn(savedSite);
+        Mockito.when(endpointRepository.findBySiteProfileIdAndProtocolSuite(Mockito.eq(8L), anyString()))
+                .thenReturn(Optional.empty());
+        Mockito.when(endpointRepository.save(any(ProviderProtocolEndpointEntity.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.importPreset("xiaomi_mimo", true, false);
+
+        ArgumentCaptor<ProviderProtocolEndpointEntity> endpointCaptor =
+                ArgumentCaptor.forClass(ProviderProtocolEndpointEntity.class);
+        verify(endpointRepository, Mockito.times(2)).save(endpointCaptor.capture());
+        List<ProviderProtocolEndpointEntity> endpoints = endpointCaptor.getAllValues();
+
+        assertTrue(endpoints.stream().anyMatch(endpoint ->
+                endpoint.getProtocolSuite().equals("xiaomi_mimo.openai_compatible")
+                        && endpoint.getBaseUrl().equals("https://token-plan-sgp.xiaomimimo.com/v1")));
+        assertTrue(endpoints.stream().anyMatch(endpoint ->
+                endpoint.getProtocolSuite().equals("xiaomi_mimo.anthropic_compatible")
+                        && endpoint.getBaseUrl().equals("https://token-plan-sgp.xiaomimimo.com/anthropic")));
+    }
+
+    @Test
     void shouldNotRecreateDisabledPresetModelPolicyOnDefaultImport() {
         UpstreamSiteProfileRepository profileRepository = Mockito.mock(UpstreamSiteProfileRepository.class);
         SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
@@ -282,6 +343,91 @@ class ProviderSiteRegistryServiceTests {
         verify(modelPolicyRepository, never()).save(any(ModelPolicyEntity.class));
     }
 
+    @Test
+    void shouldBackfillCredentialProtocolEndpointWhenEndpointMatchesUniquely() {
+        UpstreamSiteProfileRepository profileRepository = Mockito.mock(UpstreamSiteProfileRepository.class);
+        SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        SiteModelCapabilityRepository modelCapabilityRepository = Mockito.mock(SiteModelCapabilityRepository.class);
+        ProviderProtocolEndpointRepository endpointRepository = Mockito.mock(ProviderProtocolEndpointRepository.class);
+        UpstreamCredentialRepository credentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        ProviderSiteRegistryService service = new ProviderSiteRegistryService(
+                profileRepository,
+                snapshotRepository,
+                modelCapabilityRepository,
+                null,
+                endpointRepository,
+                credentialRepository,
+                new UpstreamSitePolicyService(),
+                new ProviderCatalogLoader(new ObjectMapper())
+        );
+        UpstreamCredentialEntity credential = credential(
+                50L,
+                8L,
+                ProviderType.OPENAI_COMPATIBLE,
+                "https://token-plan-sgp.xiaomimimo.com/v1/"
+        );
+        credential.setCredentialMetadataJson("""
+                {"source":"legacy","conversationProfile":{"customFlag":"keep_user"}}
+                """);
+        ProviderProtocolEndpointEntity endpoint = endpoint(
+                90L,
+                8L,
+                ProviderType.OPENAI_COMPATIBLE,
+                "https://token-plan-sgp.xiaomimimo.com/v1",
+                """
+                        {
+                          "targetProtocol": "openai_chat_or_responses",
+                          "reasoningContent": "pass_through"
+                        }
+                        """
+        );
+
+        when(credentialRepository.findAllByProtocolEndpointIdIsNullAndDeletedFalse()).thenReturn(List.of(credential));
+        when(endpointRepository.findAllBySiteProfileIdAndActiveTrueOrderByDisplayNameAsc(8L)).thenReturn(List.of(endpoint));
+        when(credentialRepository.saveAll(anyIterable())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        int count = service.backfillCredentialProtocolEndpoints();
+
+        assertEquals(1, count);
+        assertEquals(90L, credential.getProtocolEndpointId());
+        assertTrue(credential.getCredentialMetadataJson().contains("\"source\":\"legacy\""));
+        assertTrue(credential.getCredentialMetadataJson().contains("\"targetProtocol\":\"openai_chat_or_responses\""));
+        assertTrue(credential.getCredentialMetadataJson().contains("\"reasoningContent\":\"pass_through\""));
+        assertTrue(credential.getCredentialMetadataJson().contains("\"customFlag\":\"keep_user\""));
+        verify(credentialRepository).saveAll(anyIterable());
+    }
+
+    @Test
+    void shouldSkipCredentialProtocolEndpointBackfillWhenEndpointMatchIsAmbiguous() {
+        UpstreamSiteProfileRepository profileRepository = Mockito.mock(UpstreamSiteProfileRepository.class);
+        SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        SiteModelCapabilityRepository modelCapabilityRepository = Mockito.mock(SiteModelCapabilityRepository.class);
+        ProviderProtocolEndpointRepository endpointRepository = Mockito.mock(ProviderProtocolEndpointRepository.class);
+        UpstreamCredentialRepository credentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        ProviderSiteRegistryService service = new ProviderSiteRegistryService(
+                profileRepository,
+                snapshotRepository,
+                modelCapabilityRepository,
+                null,
+                endpointRepository,
+                credentialRepository,
+                new UpstreamSitePolicyService(),
+                new ProviderCatalogLoader(new ObjectMapper())
+        );
+        UpstreamCredentialEntity credential = credential(51L, 8L, ProviderType.OPENAI_COMPATIBLE, "https://api.example.com/v1");
+        ProviderProtocolEndpointEntity first = endpoint(91L, 8L, ProviderType.OPENAI_COMPATIBLE, "https://api.example.com/v1", null);
+        ProviderProtocolEndpointEntity second = endpoint(92L, 8L, ProviderType.OPENAI_COMPATIBLE, "https://api.example.com/v1/", null);
+
+        when(credentialRepository.findAllByProtocolEndpointIdIsNullAndDeletedFalse()).thenReturn(List.of(credential));
+        when(endpointRepository.findAllBySiteProfileIdAndActiveTrueOrderByDisplayNameAsc(8L)).thenReturn(List.of(first, second));
+
+        int count = service.backfillCredentialProtocolEndpoints();
+
+        assertEquals(0, count);
+        assertEquals(null, credential.getProtocolEndpointId());
+        verify(credentialRepository, never()).saveAll(anyIterable());
+    }
+
     private ProviderSiteRegistryService newService(UpstreamSiteProfileRepository profileRepository) {
         return new ProviderSiteRegistryService(
                 profileRepository,
@@ -313,6 +459,42 @@ class ProviderSiteRegistryServiceTests {
         entity.setErrorSchemaStrategy(ErrorSchemaStrategy.OPENAI_ERROR);
         entity.setActive(true);
         ReflectionTestUtils.setField(entity, "id", id);
+        return entity;
+    }
+
+    private UpstreamCredentialEntity credential(
+            Long id,
+            Long siteProfileId,
+            ProviderType providerType,
+            String baseUrl) {
+        UpstreamCredentialEntity entity = new UpstreamCredentialEntity();
+        ReflectionTestUtils.setField(entity, "id", id);
+        entity.setSiteProfileId(siteProfileId);
+        entity.setProviderType(providerType);
+        entity.setBaseUrl(baseUrl);
+        entity.setCredentialName("credential-" + id);
+        entity.setActive(true);
+        entity.setDeleted(false);
+        return entity;
+    }
+
+    private ProviderProtocolEndpointEntity endpoint(
+            Long id,
+            Long siteProfileId,
+            ProviderType providerType,
+            String baseUrl,
+            String conversationProfileJson) {
+        ProviderProtocolEndpointEntity entity = new ProviderProtocolEndpointEntity();
+        ReflectionTestUtils.setField(entity, "id", id);
+        entity.setSiteProfileId(siteProfileId);
+        entity.setEndpointCode("endpoint-" + id);
+        entity.setDisplayName("Endpoint " + id);
+        entity.setProtocolSuite("suite-" + id);
+        entity.setProviderType(providerType);
+        entity.setSiteKind(UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC);
+        entity.setBaseUrl(baseUrl);
+        entity.setConversationProfileJson(conversationProfileJson);
+        entity.setActive(true);
         return entity;
     }
 

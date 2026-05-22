@@ -1,4 +1,4 @@
-import { type FormEvent, useMemo, useState } from 'react'
+import { type FormEvent, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { ArrowUpRightIcon } from 'lucide-react'
@@ -54,6 +54,15 @@ type DistributedKey = {
   updatedAt?: string | null
 }
 
+type AccountGroupOption = {
+  id: number
+  groupName: string
+  providerType: string
+  allowedClientFamilies?: string[]
+  active?: boolean
+  defaultGroup?: boolean
+}
+
 type CreateKeyForm = {
   keyName: string
   description: string
@@ -71,6 +80,9 @@ type CreateKeyForm = {
   allowedClientFamilies: string[]
   requireClientFamilyMatch: boolean
   expiresAt: string
+  initialAccountGroupId: string
+  initialBindingProviderType: string
+  initialBindingPriority: string
 }
 
 type CreateKeyResponse = {
@@ -199,6 +211,10 @@ export function KeysPage() {
     queryKey: ['distributed-keys'],
     queryFn: () => apiRequest<DistributedKey[]>('/admin/distributed-keys'),
   })
+  const accountGroupsQuery = useQuery({
+    queryKey: ['account-groups', 'key-create-options'],
+    queryFn: () => apiRequest<AccountGroupOption[]>('/admin/account-groups'),
+  })
 
   const createMutation = useMutation({
     mutationFn: (payload: ReturnType<typeof buildCreatePayload>) =>
@@ -246,6 +262,35 @@ export function KeysPage() {
   const canGoPrev = currentStepIndex > 0
   const canGoNext = currentStepIndex < STEPS.length - 1
   const keys = (keysQuery.data ?? []) as DistributedKey[]
+  const activeAccountGroups = useMemo(
+    () => ((accountGroupsQuery.data ?? []) as AccountGroupOption[]).filter((group) => group.active !== false),
+    [accountGroupsQuery.data],
+  )
+  const selectedInitialGroup = activeAccountGroups.find((group) => String(group.id) === form.initialAccountGroupId)
+
+  useEffect(() => {
+    if (!createOpen || form.initialAccountGroupId || !activeAccountGroups.length) {
+      return
+    }
+    const defaultGroup = activeAccountGroups.find((group) => group.defaultGroup) ?? activeAccountGroups[0]
+    setForm((current) => ({
+      ...current,
+      initialAccountGroupId: String(defaultGroup.id),
+      initialBindingProviderType: resolveRouteProviderType(defaultGroup.providerType),
+    }))
+  }, [activeAccountGroups, createOpen, form.initialAccountGroupId])
+
+  useEffect(() => {
+    if (!selectedInitialGroup) {
+      return
+    }
+    const providerType = resolveRouteProviderType(selectedInitialGroup.providerType)
+    setForm((current) => (
+      current.initialBindingProviderType === providerType
+        ? current
+        : { ...current, initialBindingProviderType: providerType }
+    ))
+  }, [selectedInitialGroup])
 
   const filteredModels = useMemo(() => {
     const normalizedKeyword = modelKeyword.trim().toLowerCase()
@@ -644,6 +689,70 @@ export function KeysPage() {
                     />
                     <span className="text-sm font-medium text-foreground">创建后立即启用</span>
                   </label>
+                  <div className="grid gap-4 rounded-2xl border border-border/60 bg-muted/10 p-4 md:col-span-2 md:grid-cols-3">
+                    <label className="flex flex-col gap-2">
+                      <span className="text-sm font-medium text-foreground">初始账号组</span>
+                      <Select
+                        value={form.initialAccountGroupId}
+                        onValueChange={(value) => {
+                          const nextGroup = activeAccountGroups.find((group) => String(group.id) === value)
+                          setForm((current) => ({
+                            ...current,
+                            initialAccountGroupId: value,
+                            initialBindingProviderType: nextGroup
+                              ? resolveRouteProviderType(nextGroup.providerType)
+                              : current.initialBindingProviderType,
+                          }))
+                        }}
+                      >
+                        <SelectTrigger className="w-full bg-background" aria-label="初始账号组">
+                          <SelectValue placeholder={accountGroupsQuery.isPending ? '正在加载账号组' : '选择账号组'} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            {activeAccountGroups.map((group) => (
+                              <SelectItem key={group.id} value={String(group.id)}>
+                                {group.groupName} / {group.providerType}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    </label>
+                    <label className="flex flex-col gap-2">
+                      <span className="text-sm font-medium text-foreground">绑定运行时 provider</span>
+                      <Select
+                        value={form.initialBindingProviderType}
+                        onValueChange={(value) => setForm((current) => ({ ...current, initialBindingProviderType: value }))}
+                      >
+                        <SelectTrigger className="w-full bg-background" aria-label="绑定运行时 provider">
+                          <SelectValue placeholder="选择 provider" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            {PROVIDER_OPTIONS.map((option) => (
+                              <SelectItem key={option} value={option}>
+                                {option}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                    </label>
+                    <label className="flex flex-col gap-2">
+                      <span className="text-sm font-medium text-foreground">绑定优先级</span>
+                      <Input
+                        type="number"
+                        value={form.initialBindingPriority}
+                        onChange={(event) => setForm((current) => ({ ...current, initialBindingPriority: event.target.value }))}
+                      />
+                    </label>
+                    {accountGroupsQuery.error ? (
+                      <div className="md:col-span-3">
+                        <InlineError error={accountGroupsQuery.error} title="账号组列表加载失败" />
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               </TabsContent>
 
@@ -735,6 +844,9 @@ function createEmptyForm(): CreateKeyForm {
     allowedClientFamilies: ['GENERIC_OPENAI'],
     requireClientFamilyMatch: true,
     expiresAt: toDatetimeLocalValue(30),
+    initialAccountGroupId: '',
+    initialBindingProviderType: 'OPENAI_DIRECT',
+    initialBindingPriority: '100',
   }
 }
 
@@ -743,6 +855,7 @@ function buildCreatePayload(form: CreateKeyForm) {
   if (!keyName) {
     throw new Error('访问密钥名称不能为空。')
   }
+  const initialBindings = buildInitialAccountGroupBindings(form)
 
   return {
     keyName,
@@ -760,7 +873,30 @@ function buildCreatePayload(form: CreateKeyForm) {
     stickySessionTtlSeconds: parseOptionalNumber(form.stickySessionTtlSeconds),
     allowedClientFamilies: Array.from(new Set(form.allowedClientFamilies.map((item) => item.toUpperCase()))),
     requireClientFamilyMatch: form.requireClientFamilyMatch,
+    initialAccountGroupBindings: initialBindings,
   }
+}
+
+function buildInitialAccountGroupBindings(form: CreateKeyForm) {
+  const groupId = form.initialAccountGroupId.trim()
+  const providerType = form.initialBindingProviderType.trim().toUpperCase()
+  if (!groupId) {
+    if (form.active) {
+      throw new Error('创建后立即启用时必须选择初始账号组。')
+    }
+    return []
+  }
+  if (!providerType) {
+    throw new Error('初始账号组绑定必须选择运行时 provider。')
+  }
+  return [
+    {
+      groupId: Number(groupId),
+      providerType,
+      priority: parseOptionalNumber(form.initialBindingPriority) ?? 100,
+      active: true,
+    },
+  ]
 }
 
 function toggleOption(current: string[], nextValue: string) {
@@ -772,6 +908,16 @@ function toggleOption(current: string[], nextValue: string) {
 
 function normalizeProtocolSuite(value: string) {
   return value.trim().toLowerCase().replaceAll('-', '_').replaceAll('/', '.')
+}
+
+function resolveRouteProviderType(providerType: string | undefined) {
+  if (providerType === 'GEMINI_OAUTH' || providerType === 'ANTIGRAVITY_OAUTH') {
+    return 'GEMINI_DIRECT'
+  }
+  if (providerType === 'CLAUDE_ACCOUNT' || providerType === 'CLAUDE_PLAN') {
+    return 'ANTHROPIC_DIRECT'
+  }
+  return 'OPENAI_DIRECT'
 }
 
 function parseOptionalNumber(value: string) {

@@ -92,6 +92,40 @@ const { apiRequestMock } = vi.hoisted(() => ({
           modelAddressingStrategy: 'MODEL_NAME',
           errorSchemaStrategy: 'OPENAI_ERROR',
           baseUrlPattern: 'https://api.openai.com',
+          protocolEndpoints: [
+            {
+              id: 101,
+              siteProfileId: 10,
+              endpointCode: 'openai:default',
+              displayName: 'OpenAI 默认入口',
+              protocolSuite: 'openai.native',
+              providerType: 'OPENAI_DIRECT',
+              siteKind: 'OPENAI_DIRECT',
+              baseUrl: 'https://api.openai.com',
+              authStrategy: 'BEARER',
+              pathStrategy: 'OPENAI_V1',
+              modelAddressingStrategy: 'MODEL_NAME',
+              errorSchemaStrategy: 'OPENAI_ERROR',
+              active: true,
+              linkedCredentialCount: 0,
+            },
+            {
+              id: 102,
+              siteProfileId: 10,
+              endpointCode: 'openai:anthropic',
+              displayName: 'OpenAI Anthropic 入口',
+              protocolSuite: 'openai.anthropic_compatible',
+              providerType: 'ANTHROPIC_DIRECT',
+              siteKind: 'ANTHROPIC_DIRECT',
+              baseUrl: 'https://api.openai.com/anthropic',
+              authStrategy: 'BEARER',
+              pathStrategy: 'ANTHROPIC_V1_MESSAGES',
+              modelAddressingStrategy: 'MODEL_NAME',
+              errorSchemaStrategy: 'ANTHROPIC_ERROR',
+              active: true,
+              linkedCredentialCount: 0,
+            },
+          ],
           profileSource: 'PRESET',
           active: true,
           healthState: 'UNKNOWN',
@@ -119,6 +153,24 @@ const { apiRequestMock } = vi.hoisted(() => ({
           modelAddressingStrategy: 'MODEL_NAME',
           errorSchemaStrategy: 'GOOGLE_ERROR',
           baseUrlPattern: 'https://generativelanguage.googleapis.com',
+          protocolEndpoints: [
+            {
+              id: 201,
+              siteProfileId: 20,
+              endpointCode: 'gemini:default',
+              displayName: 'Gemini 默认入口',
+              protocolSuite: 'gemini.native',
+              providerType: 'GEMINI_DIRECT',
+              siteKind: 'GEMINI_DIRECT',
+              baseUrl: 'https://generativelanguage.googleapis.com',
+              authStrategy: 'API_KEY_QUERY',
+              pathStrategy: 'GEMINI_V1BETA',
+              modelAddressingStrategy: 'MODEL_NAME',
+              errorSchemaStrategy: 'GOOGLE_ERROR',
+              active: true,
+              linkedCredentialCount: 0,
+            },
+          ],
           profileSource: 'PRESET',
           active: true,
           healthState: 'UNKNOWN',
@@ -141,10 +193,10 @@ const { apiRequestMock } = vi.hoisted(() => ({
     if (typeof url === 'string' && url.startsWith('/admin/account-groups/model-catalog')) {
       return ['gpt-5.4', 'gpt-5.3-codex']
     }
-    if (url === '/admin/credentials' && init?.method === 'POST') {
+    if (url === '/admin/credentials/multi-endpoint' && init?.method === 'POST') {
       const payload = init.body ? JSON.parse(String(init.body)) : {}
-      return {
-        id: 1,
+      return (payload.protocolEndpointIds ?? [payload.protocolEndpointId]).map((protocolEndpointId: number, index: number) => ({
+        id: index + 1,
         credentialName: payload.credentialName ?? 'OpenAI Key',
         providerType: payload.providerType ?? 'OPENAI_DIRECT',
         baseUrl: payload.baseUrl ?? 'https://api.openai.com',
@@ -152,7 +204,8 @@ const { apiRequestMock } = vi.hoisted(() => ({
         secretFingerprint: 'fp',
         credentialMetadata: {},
         active: true,
-      }
+        protocolEndpointId,
+      }))
     }
     if (url === '/admin/accounts/import-auth-json' && init?.method === 'POST') {
       const payload = init.body ? JSON.parse(String(init.body)) : {}
@@ -206,7 +259,8 @@ describe('CredentialsPage', () => {
 
     fireEvent.change(within(createDialog).getByPlaceholderText('例如：OpenAI 主账号 Key'), { target: { value: 'OpenAI Key' } })
     fireEvent.click(within(createDialog).getByRole('button', { name: '下一步' }))
-    fireEvent.change(await within(createDialog).findByRole('combobox', { name: '厂商/API 入口' }), { target: { value: '10' } })
+    fireEvent.click(await within(createDialog).findByLabelText(/OpenAI 默认入口/))
+    fireEvent.click(await within(createDialog).findByLabelText(/OpenAI Anthropic 入口/))
     fireEvent.click(within(createDialog).getByRole('button', { name: '下一步' }))
     fireEvent.change(await within(createDialog).findByPlaceholderText('输入上游密钥'), { target: { value: 'secret-token' } })
     fireEvent.click(within(createDialog).getByRole('button', { name: '下一步' }))
@@ -228,10 +282,12 @@ describe('CredentialsPage', () => {
     fireEvent.click(within(createDialog).getByRole('button', { name: '创建凭证' }))
 
     await waitFor(() => {
-      const call = apiRequestMock.mock.calls.find(([url, init]) => url === '/admin/credentials' && init?.method === 'POST')
+      const call = apiRequestMock.mock.calls.find(([url, init]) => url === '/admin/credentials/multi-endpoint' && init?.method === 'POST')
       expect(call).toBeTruthy()
       expect(JSON.parse(String(call?.[1]?.body))).toMatchObject({
         siteProfileId: 10,
+        protocolEndpointId: 101,
+        protocolEndpointIds: [101, 102],
         providerType: 'OPENAI_DIRECT',
         baseUrl: 'https://api.openai.com',
         proxyId: 9,
@@ -257,7 +313,7 @@ describe('CredentialsPage', () => {
     fireEvent.change(within(createDialog).getByRole('combobox', { name: '创建模式' }), { target: { value: 'batch' } })
     fireEvent.change(within(createDialog).getByPlaceholderText('例如：OpenAI-Prod'), { target: { value: 'BatchOpenAI' } })
     fireEvent.click(within(createDialog).getByRole('button', { name: '下一步' }))
-    fireEvent.change(await within(createDialog).findByRole('combobox', { name: '厂商/API 入口' }), { target: { value: '10' } })
+    fireEvent.click(await within(createDialog).findByLabelText(/OpenAI 默认入口/))
     fireEvent.click(within(createDialog).getByRole('button', { name: '下一步' }))
     fireEvent.change(await within(createDialog).findByRole('textbox', { name: '批量密钥文本（每行一条）' }), { target: { value: 'sk-a\nsk-b' } })
     fireEvent.click(within(createDialog).getByRole('button', { name: '下一步' }))
@@ -268,7 +324,7 @@ describe('CredentialsPage', () => {
     fireEvent.click(within(createDialog).getByRole('button', { name: '批量创建' }))
 
     await waitFor(() => {
-      const calls = apiRequestMock.mock.calls.filter(([url, init]) => url === '/admin/credentials' && init?.method === 'POST')
+      const calls = apiRequestMock.mock.calls.filter(([url, init]) => url === '/admin/credentials/multi-endpoint' && init?.method === 'POST')
       expect(calls.length).toBeGreaterThanOrEqual(2)
     })
   })

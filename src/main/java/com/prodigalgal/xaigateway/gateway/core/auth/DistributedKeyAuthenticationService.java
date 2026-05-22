@@ -2,6 +2,7 @@ package com.prodigalgal.xaigateway.gateway.core.auth;
 
 import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyEntity;
 import com.prodigalgal.xaigateway.infra.config.GatewayProperties;
+import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAccountGroupBindingRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyRepository;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
@@ -16,18 +17,21 @@ public class DistributedKeyAuthenticationService {
     private final AuthCacheStore authCacheStore;
     private final GatewayProperties gatewayProperties;
     private final AccessGroupEntitlementService accessGroupEntitlementService;
+    private final DistributedKeyAccountGroupBindingRepository accountGroupBindingRepository;
 
     public DistributedKeyAuthenticationService(
             DistributedKeyRepository distributedKeyRepository,
             DistributedKeySecretService distributedKeySecretService,
             AuthCacheStore authCacheStore,
             GatewayProperties gatewayProperties,
-            AccessGroupEntitlementService accessGroupEntitlementService) {
+            AccessGroupEntitlementService accessGroupEntitlementService,
+            DistributedKeyAccountGroupBindingRepository accountGroupBindingRepository) {
         this.distributedKeyRepository = distributedKeyRepository;
         this.distributedKeySecretService = distributedKeySecretService;
         this.authCacheStore = authCacheStore;
         this.gatewayProperties = gatewayProperties;
         this.accessGroupEntitlementService = accessGroupEntitlementService;
+        this.accountGroupBindingRepository = accountGroupBindingRepository;
     }
 
     public AuthenticatedDistributedKey authenticateBearerToken(String authorizationHeader) {
@@ -55,6 +59,7 @@ public class DistributedKeyAuthenticationService {
         String secretHash = distributedKeySecretService.hashSecret(secret);
         DistributedKeyAuthSnapshot snapshot = authCacheStore.get(keyPrefix)
                 .orElseGet(() -> loadAndCache(keyPrefix));
+        assertHasActiveAccountGroupBinding(snapshot.distributedKeyId());
         if (!secretHash.equals(snapshot.secretHash())) {
             throw new GatewayUnauthorizedException("网关 key 校验失败。");
         }
@@ -70,6 +75,10 @@ public class DistributedKeyAuthenticationService {
     private DistributedKeyAuthSnapshot loadAndCache(String keyPrefix) {
         DistributedKeyEntity entity = distributedKeyRepository.findByKeyPrefixAndActiveTrue(keyPrefix)
                 .orElseThrow(() -> new GatewayUnauthorizedException("未找到可用的网关 key。"));
+        long activeAccountGroupBindingCount = activeAccountGroupBindingCount(entity.getId());
+        if (activeAccountGroupBindingCount <= 0) {
+            throw new GatewayUnauthorizedException("网关 key 未绑定启用中的账号分组。");
+        }
         ResolvedAccessPolicy policy = accessGroupEntitlementService.resolveForDistributedKey(entity);
         DistributedKeyAuthSnapshot snapshot = new DistributedKeyAuthSnapshot(
                 entity.getId(),
@@ -77,10 +86,21 @@ public class DistributedKeyAuthenticationService {
                 entity.getKeyName(),
                 entity.getMaskedKey(),
                 entity.getSecretHash(),
-                policy.allowedClientFamilies()
+                policy.allowedClientFamilies(),
+                activeAccountGroupBindingCount
         );
         authCacheStore.put(snapshot, gatewayProperties.getCache().getAuthTtl());
         return snapshot;
+    }
+
+    private void assertHasActiveAccountGroupBinding(Long distributedKeyId) {
+        if (activeAccountGroupBindingCount(distributedKeyId) <= 0) {
+            throw new GatewayUnauthorizedException("网关 key 未绑定启用中的账号分组。");
+        }
+    }
+
+    private long activeAccountGroupBindingCount(Long distributedKeyId) {
+        return accountGroupBindingRepository.countByDistributedKey_IdAndActiveTrueAndGroup_ActiveTrue(distributedKeyId);
     }
 
     private String extractBearerToken(String authorizationHeader) {

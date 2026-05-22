@@ -19,9 +19,11 @@ import com.prodigalgal.xaigateway.gateway.core.shared.ProviderFamily;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.shared.ReasoningTransport;
 import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
+import com.prodigalgal.xaigateway.infra.persistence.entity.ProviderProtocolEndpointEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SiteModelCapabilityEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamSiteProfileEntity;
+import com.prodigalgal.xaigateway.infra.persistence.repository.ProviderProtocolEndpointRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.SiteModelCapabilityRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import java.util.List;
@@ -231,6 +233,62 @@ class ModelCatalogQueryServiceTests {
         assertEquals("claude-sonnet-4", resolved.publicModel());
         assertEquals(1, resolved.candidates().size());
         assertEquals(101L, resolved.candidates().get(0).credentialId());
+    }
+
+    @Test
+    void shouldPreferProtocolEndpointMetadataWhenExpandingCandidates() {
+        SiteModelCapabilityRepository siteModelCapabilityRepository = Mockito.mock(SiteModelCapabilityRepository.class);
+        UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        ProviderProtocolEndpointRepository endpointRepository = Mockito.mock(ProviderProtocolEndpointRepository.class);
+        ModelAliasQueryService modelAliasQueryService = Mockito.mock(ModelAliasQueryService.class);
+        SiteCapabilityTruthService siteCapabilityTruthService = Mockito.mock(SiteCapabilityTruthService.class);
+        Mockito.when(siteCapabilityTruthService.resolve(Mockito.any(), Mockito.any()))
+                .thenReturn(nativeResolutionReport());
+        ModelCatalogQueryService service = new ModelCatalogQueryService(
+                siteModelCapabilityRepository,
+                upstreamCredentialRepository,
+                modelAliasQueryService,
+                siteCapabilityTruthService,
+                new com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendPolicyService(),
+                endpointRepository
+        );
+        UpstreamCredentialEntity credential = credentialEntity(101L, 1001L);
+        credential.setProtocolEndpointId(411L);
+        ProviderProtocolEndpointEntity endpoint = new ProviderProtocolEndpointEntity();
+        org.springframework.test.util.ReflectionTestUtils.setField(endpoint, "id", 411L);
+        endpoint.setSiteProfileId(1001L);
+        endpoint.setProviderType(ProviderType.ANTHROPIC_DIRECT);
+        endpoint.setSiteKind(UpstreamSiteKind.ANTHROPIC_DIRECT);
+        endpoint.setAuthStrategy(AuthStrategy.BEARER);
+        endpoint.setPathStrategy(PathStrategy.ANTHROPIC_V1_MESSAGES);
+        endpoint.setErrorSchemaStrategy(ErrorSchemaStrategy.ANTHROPIC_ERROR);
+        endpoint.setBaseUrl("https://api.deepseek.com/anthropic");
+
+        when(siteModelCapabilityRepository.findAllByModelKeyAndActiveTrue("deepseek-chat"))
+                .thenReturn(List.of(siteCapabilityEntity(1001L, "deepseek-chat", List.of("openai"))));
+        when(upstreamCredentialRepository.findAllBySiteProfileIdInAndDeletedFalseAndActiveTrue(argThat(ids ->
+                ids != null && ids.contains(1001L) && ids.size() == 1)))
+                .thenReturn(List.of(credential));
+        when(endpointRepository.findAllById(argThat(ids -> {
+            List<Long> values = new java.util.ArrayList<>();
+            if (ids != null) {
+                ids.forEach(values::add);
+            }
+            return values.contains(411L) && values.size() == 1;
+        })))
+                .thenReturn(List.of(endpoint));
+        when(modelAliasQueryService.findEnabledAlias("deepseek-chat"))
+                .thenReturn(Optional.empty());
+
+        ResolvedModelView resolved = service.resolveRequestedModel("deepseek-chat", "anthropic_native")
+                .orElseThrow();
+
+        CatalogCandidateView candidate = resolved.candidates().get(0);
+        assertEquals(ProviderType.ANTHROPIC_DIRECT, candidate.providerType());
+        assertEquals(ProviderFamily.ANTHROPIC, candidate.providerFamily());
+        assertEquals(UpstreamSiteKind.ANTHROPIC_DIRECT, candidate.siteKind());
+        assertEquals(PathStrategy.ANTHROPIC_V1_MESSAGES, candidate.pathStrategy());
+        assertEquals("https://api.deepseek.com/anthropic", candidate.baseUrl());
     }
 
     private UpstreamCredentialEntity credentialEntity(Long credentialId, Long siteProfileId) {

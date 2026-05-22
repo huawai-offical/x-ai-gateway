@@ -64,6 +64,11 @@ public class CredentialAdminController {
         return credentialAdminService.create(request);
     }
 
+    @PostMapping("/multi-endpoint")
+    public List<CredentialResponse> createMultiEndpoint(@Valid @RequestBody CredentialRequest request) {
+        return credentialAdminService.createForProtocolEndpoints(request);
+    }
+
     @PostMapping("/test-connectivity")
     public CredentialConnectivityResponse testConnectivity(
             @Valid @RequestBody CredentialConnectivityRequest request) {

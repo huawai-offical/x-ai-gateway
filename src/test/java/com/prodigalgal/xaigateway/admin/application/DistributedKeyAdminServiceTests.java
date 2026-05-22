@@ -1,18 +1,24 @@
 package com.prodigalgal.xaigateway.admin.application;
 
 import com.prodigalgal.xaigateway.admin.api.DistributedKeyClientConfigResponse;
+import com.prodigalgal.xaigateway.admin.api.DistributedKeyInitialAccountGroupBindingRequest;
 import com.prodigalgal.xaigateway.admin.api.DistributedKeyRequest;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeySecretService;
 import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeySecrets;
+import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
+import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyAccountGroupBindingEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeySecretExportGrantEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountGroupEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAccountGroupBindingRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAccessGroupGrantRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyBindingRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeySecretExportGrantRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayUserRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountGroupRepository;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
@@ -39,6 +45,7 @@ class DistributedKeyAdminServiceTests {
                 Mockito.mock(DistributedKeyAccessGroupGrantRepository.class),
                 grantRepository,
                 Mockito.mock(GatewayUserRepository.class),
+                Mockito.mock(UpstreamAccountGroupRepository.class),
                 Mockito.mock(CredentialCryptoService.class),
                 Optional.empty()
         );
@@ -75,6 +82,7 @@ class DistributedKeyAdminServiceTests {
                 Mockito.mock(DistributedKeyAccessGroupGrantRepository.class),
                 Mockito.mock(DistributedKeySecretExportGrantRepository.class),
                 Mockito.mock(GatewayUserRepository.class),
+                Mockito.mock(UpstreamAccountGroupRepository.class),
                 Mockito.mock(CredentialCryptoService.class),
                 Optional.empty()
         );
@@ -122,6 +130,42 @@ class DistributedKeyAdminServiceTests {
     }
 
     @Test
+    void shouldRejectActivationWithoutActiveAccountGroupBinding() {
+        DistributedKeyRepository keyRepository = Mockito.mock(DistributedKeyRepository.class);
+        DistributedKeyAccountGroupBindingRepository accountGroupBindingRepository =
+                Mockito.mock(DistributedKeyAccountGroupBindingRepository.class);
+        DistributedKeyAdminService service = new DistributedKeyAdminService(
+                keyRepository,
+                Mockito.mock(DistributedKeySecretService.class),
+                Mockito.mock(DistributedKeyBindingRepository.class),
+                accountGroupBindingRepository,
+                Mockito.mock(DistributedKeyAccessGroupGrantRepository.class),
+                Mockito.mock(DistributedKeySecretExportGrantRepository.class),
+                Mockito.mock(GatewayUserRepository.class),
+                Mockito.mock(UpstreamAccountGroupRepository.class),
+                Mockito.mock(CredentialCryptoService.class),
+                Optional.empty()
+        );
+        DistributedKeyEntity entity = new DistributedKeyEntity();
+        ReflectionTestUtils.setField(entity, "id", 12L);
+        entity.setKeyName("gateway-key");
+        entity.setKeyPrefix("sk-gw-test");
+        entity.setMaskedKey("sk-gw-test...cret");
+        entity.setActive(false);
+        Mockito.when(keyRepository.findById(12L)).thenReturn(Optional.of(entity));
+        Mockito.when(accountGroupBindingRepository.countByDistributedKey_IdAndActiveTrueAndGroup_ActiveTrue(12L))
+                .thenReturn(0L);
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> service.toggle(12L, true)
+        );
+
+        assertTrue(exception.getMessage().contains("已启用的账号分组"));
+        Mockito.verify(keyRepository, Mockito.never()).save(Mockito.any());
+    }
+
+    @Test
     void shouldCreateOneTimeSecretExportGrantAndConsumeOnlyOnce() {
         DistributedKeyRepository keyRepository = Mockito.mock(DistributedKeyRepository.class);
         DistributedKeySecretExportGrantRepository grantRepository =
@@ -137,6 +181,7 @@ class DistributedKeyAdminServiceTests {
                 Mockito.mock(DistributedKeyAccessGroupGrantRepository.class),
                 grantRepository,
                 Mockito.mock(GatewayUserRepository.class),
+                Mockito.mock(UpstreamAccountGroupRepository.class),
                 cryptoService,
                 Optional.empty()
         );
@@ -197,7 +242,8 @@ class DistributedKeyAdminServiceTests {
                 null,
                 null,
                 java.util.List.of("CODEX"),
-                false
+                false,
+                List.of()
         ));
 
         assertEquals("sk-gw-test-full-secret", created.fullKey());
@@ -240,6 +286,7 @@ class DistributedKeyAdminServiceTests {
                 Mockito.mock(DistributedKeyAccessGroupGrantRepository.class),
                 grantRepository,
                 Mockito.mock(GatewayUserRepository.class),
+                Mockito.mock(UpstreamAccountGroupRepository.class),
                 cryptoService,
                 Optional.empty()
         );
@@ -270,5 +317,146 @@ class DistributedKeyAdminServiceTests {
                 "https://gateway.example.com"
         ));
         Mockito.verify(cryptoService, Mockito.never()).decrypt(Mockito.anyString());
+    }
+
+    @Test
+    void shouldCreateActiveKeyWithInitialAccountGroupBinding() {
+        DistributedKeyRepository keyRepository = Mockito.mock(DistributedKeyRepository.class);
+        DistributedKeyAccountGroupBindingRepository accountGroupBindingRepository =
+                Mockito.mock(DistributedKeyAccountGroupBindingRepository.class);
+        UpstreamAccountGroupRepository groupRepository = Mockito.mock(UpstreamAccountGroupRepository.class);
+        DistributedKeySecretService secretService = Mockito.mock(DistributedKeySecretService.class);
+        DistributedKeySecretExportGrantRepository grantRepository =
+                Mockito.mock(DistributedKeySecretExportGrantRepository.class);
+        CredentialCryptoService cryptoService = Mockito.mock(CredentialCryptoService.class);
+        AtomicReference<DistributedKeyAccountGroupBindingEntity> persistedBinding = new AtomicReference<>();
+        DistributedKeyAdminService service = new DistributedKeyAdminService(
+                keyRepository,
+                secretService,
+                Mockito.mock(DistributedKeyBindingRepository.class),
+                accountGroupBindingRepository,
+                Mockito.mock(DistributedKeyAccessGroupGrantRepository.class),
+                grantRepository,
+                Mockito.mock(GatewayUserRepository.class),
+                groupRepository,
+                cryptoService,
+                Optional.empty()
+        );
+        Mockito.when(secretService.generate()).thenReturn(new DistributedKeySecrets(
+                "sk-gw-active",
+                "sk-gw-active-full-secret",
+                "hash",
+                "sk-gw-active...cret"
+        ));
+        Mockito.when(keyRepository.save(Mockito.any())).thenAnswer(invocation -> {
+            DistributedKeyEntity entity = invocation.getArgument(0);
+            ReflectionTestUtils.setField(entity, "id", 31L);
+            return entity;
+        });
+        UpstreamAccountGroupEntity group = new UpstreamAccountGroupEntity();
+        ReflectionTestUtils.setField(group, "id", 4L);
+        group.setGroupName("MiMo Group");
+        group.setActive(true);
+        Mockito.when(groupRepository.findById(4L)).thenReturn(Optional.of(group));
+        Mockito.when(accountGroupBindingRepository.save(Mockito.any())).thenAnswer(invocation -> {
+            DistributedKeyAccountGroupBindingEntity binding = invocation.getArgument(0);
+            persistedBinding.set(binding);
+            return binding;
+        });
+        Mockito.when(accountGroupBindingRepository.countByDistributedKey_IdAndActiveTrueAndGroup_ActiveTrue(31L))
+                .thenReturn(1L);
+        Mockito.when(cryptoService.fingerprint(Mockito.anyString())).thenReturn("grant-token-hash");
+        Mockito.when(cryptoService.encrypt("sk-gw-active-full-secret")).thenReturn("cipher-full-key");
+
+        var created = service.create(new DistributedKeyRequest(
+                "active-key",
+                null,
+                null,
+                true,
+                List.of("xiaomi_mimo.openai_compatible"),
+                List.of("mimo-v2-pro"),
+                List.of("OPENAI_COMPATIBLE"),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                List.of("GENERIC_OPENAI"),
+                false,
+                List.of(new DistributedKeyInitialAccountGroupBindingRequest(
+                        4L,
+                        ProviderType.OPENAI_COMPATIBLE,
+                        10,
+                        true
+                ))
+        ));
+
+        assertTrue(created.record().active());
+        assertEquals("active-key", created.record().keyName());
+        assertEquals(ProviderType.OPENAI_COMPATIBLE, persistedBinding.get().getProviderType());
+        assertEquals(10, persistedBinding.get().getPriority());
+        assertEquals(31L, persistedBinding.get().getDistributedKey().getId());
+        assertEquals(4L, persistedBinding.get().getGroup().getId());
+    }
+
+    @Test
+    void shouldRejectActiveCreateWithoutInitialActiveGroupBinding() {
+        DistributedKeyRepository keyRepository = Mockito.mock(DistributedKeyRepository.class);
+        DistributedKeyAccountGroupBindingRepository accountGroupBindingRepository =
+                Mockito.mock(DistributedKeyAccountGroupBindingRepository.class);
+        DistributedKeySecretService secretService = Mockito.mock(DistributedKeySecretService.class);
+        DistributedKeyAdminService service = new DistributedKeyAdminService(
+                keyRepository,
+                secretService,
+                Mockito.mock(DistributedKeyBindingRepository.class),
+                accountGroupBindingRepository,
+                Mockito.mock(DistributedKeyAccessGroupGrantRepository.class),
+                Mockito.mock(DistributedKeySecretExportGrantRepository.class),
+                Mockito.mock(GatewayUserRepository.class),
+                Mockito.mock(UpstreamAccountGroupRepository.class),
+                Mockito.mock(CredentialCryptoService.class),
+                Optional.empty()
+        );
+        Mockito.when(secretService.generate()).thenReturn(new DistributedKeySecrets(
+                "sk-gw-active",
+                "sk-gw-active-full-secret",
+                "hash",
+                "sk-gw-active...cret"
+        ));
+        Mockito.when(keyRepository.save(Mockito.any())).thenAnswer(invocation -> {
+            DistributedKeyEntity entity = invocation.getArgument(0);
+            ReflectionTestUtils.setField(entity, "id", 32L);
+            return entity;
+        });
+        Mockito.when(accountGroupBindingRepository.countByDistributedKey_IdAndActiveTrueAndGroup_ActiveTrue(32L))
+                .thenReturn(0L);
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> service.create(new DistributedKeyRequest(
+                        "active-key",
+                        null,
+                        null,
+                        true,
+                        List.of("openai.native"),
+                        List.of("gpt-4o-mini"),
+                        List.of("OPENAI_DIRECT"),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        List.of("GENERIC_OPENAI"),
+                        false,
+                        List.of()
+                ))
+        );
+
+        assertTrue(exception.getMessage().contains("已启用的账号分组"));
+        Mockito.verify(accountGroupBindingRepository, Mockito.never()).save(Mockito.any());
     }
 }

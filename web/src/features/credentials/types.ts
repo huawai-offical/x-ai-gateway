@@ -125,6 +125,7 @@ export type CredentialFormState = {
   tlsFingerprintProfileId: string
   siteProfileId: string
   protocolEndpointId: string
+  protocolEndpointIds: string[]
   groupId: string
   supportedModels: string[]
 }
@@ -156,6 +157,7 @@ export function createEmptyCredentialForm(): CredentialFormState {
     tlsFingerprintProfileId: '',
     siteProfileId: '',
     protocolEndpointId: '',
+    protocolEndpointIds: [],
     groupId: '',
     supportedModels: [],
   }
@@ -176,6 +178,7 @@ export function credentialToFormState(credential: CredentialResponse): Credentia
     tlsFingerprintProfileId: credential.tlsFingerprintProfileId == null ? '' : String(credential.tlsFingerprintProfileId),
     siteProfileId: credential.siteProfileId == null ? '' : String(credential.siteProfileId),
     protocolEndpointId: credential.protocolEndpointId == null ? '' : String(credential.protocolEndpointId),
+    protocolEndpointIds: credential.protocolEndpointId == null ? [] : [String(credential.protocolEndpointId)],
     groupId: credential.groupId == null ? '' : String(credential.groupId),
     supportedModels: Array.isArray(credential.supportedModels) ? credential.supportedModels : [],
   }
@@ -183,7 +186,8 @@ export function credentialToFormState(credential: CredentialResponse): Credentia
 
 export function buildCredentialPayload(form: CredentialFormState) {
   const metadata = parseCredentialMetadata(form.metadataJson)
-  if (!form.protocolEndpointId.trim()) {
+  const protocolEndpointIds = normalizedProtocolEndpointIds(form)
+  if (!protocolEndpointIds.length) {
     throw new Error('请选择厂商协议入口后再保存上游凭证。')
   }
   return {
@@ -197,10 +201,26 @@ export function buildCredentialPayload(form: CredentialFormState) {
     proxyId: parseOptionalNumber(form.proxyId),
     tlsFingerprintProfileId: parseOptionalNumber(form.tlsFingerprintProfileId),
     siteProfileId: parseOptionalNumber(form.siteProfileId),
-    protocolEndpointId: parseOptionalNumber(form.protocolEndpointId),
+    protocolEndpointId: protocolEndpointIds[0],
+    protocolEndpointIds,
     groupId: parseOptionalNumber(form.groupId),
     supportedModels: normalizeModels(form.supportedModels),
   }
+}
+
+function normalizedProtocolEndpointIds(form: CredentialFormState) {
+  const values = form.protocolEndpointIds.length ? form.protocolEndpointIds : [form.protocolEndpointId]
+  const ids: number[] = []
+  for (const value of values) {
+    if (!value.trim()) {
+      continue
+    }
+    const parsed = parseOptionalNumber(value)
+    if (parsed != null && !ids.includes(parsed)) {
+      ids.push(parsed)
+    }
+  }
+  return ids
 }
 
 function parseCredentialMetadata(metadataJson: string) {

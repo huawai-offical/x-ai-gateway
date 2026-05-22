@@ -22,6 +22,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AccountSelectionServiceTests {
@@ -130,5 +131,128 @@ class AccountSelectionServiceTests {
         Optional<UpstreamAccountEntity> resolved = service.resolveActiveAccount(1L, ProviderType.OPENAI_DIRECT, GatewayClientFamily.GENERIC_OPENAI, 120);
 
         assertTrue(resolved.isEmpty());
+    }
+
+    @Test
+    void shouldRejectHealthyBindingWhenOnlyInactiveGroupsAreBound() {
+        DistributedKeyAccountGroupBindingRepository bindingRepository = Mockito.mock(DistributedKeyAccountGroupBindingRepository.class);
+        UpstreamAccountRepository upstreamAccountRepository = Mockito.mock(UpstreamAccountRepository.class);
+        NetworkProxyRepository networkProxyRepository = Mockito.mock(NetworkProxyRepository.class);
+        StringRedisTemplate stringRedisTemplate = Mockito.mock(StringRedisTemplate.class);
+        AccountSelectionService service = new AccountSelectionService(
+                bindingRepository,
+                upstreamAccountRepository,
+                networkProxyRepository,
+                stringRedisTemplate
+        );
+        DistributedKeyAccountGroupBindingEntity binding = binding(99L, ProviderType.OPENAI_DIRECT, false);
+
+        Mockito.when(bindingRepository.findAllByDistributedKey_IdAndProviderTypeAndActiveTrueOrderByPriorityAscCreatedAtAsc(1L, ProviderType.OPENAI_DIRECT))
+                .thenReturn(List.of(binding));
+
+        assertFalse(service.hasHealthyAccountBinding(1L, ProviderType.OPENAI_DIRECT, GatewayClientFamily.CODEX));
+        Mockito.verifyNoInteractions(upstreamAccountRepository);
+    }
+
+    @Test
+    void shouldSkipInactiveGroupWhenResolvingActiveAccount() {
+        DistributedKeyAccountGroupBindingRepository bindingRepository = Mockito.mock(DistributedKeyAccountGroupBindingRepository.class);
+        UpstreamAccountRepository upstreamAccountRepository = Mockito.mock(UpstreamAccountRepository.class);
+        NetworkProxyRepository networkProxyRepository = Mockito.mock(NetworkProxyRepository.class);
+        StringRedisTemplate stringRedisTemplate = Mockito.mock(StringRedisTemplate.class);
+        @SuppressWarnings("unchecked")
+        ValueOperations<String, String> valueOperations = Mockito.mock(ValueOperations.class);
+        Mockito.when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+        AccountSelectionService service = new AccountSelectionService(
+                bindingRepository,
+                upstreamAccountRepository,
+                networkProxyRepository,
+                stringRedisTemplate
+        );
+        DistributedKeyAccountGroupBindingEntity binding = binding(99L, ProviderType.OPENAI_DIRECT, false);
+
+        Mockito.when(bindingRepository.findAllByDistributedKey_IdAndProviderTypeAndActiveTrueOrderByPriorityAscCreatedAtAsc(1L, ProviderType.OPENAI_DIRECT))
+                .thenReturn(List.of(binding));
+
+        Optional<UpstreamAccountEntity> resolved = service.resolveActiveAccount(
+                1L,
+                ProviderType.OPENAI_DIRECT,
+                GatewayClientFamily.CODEX,
+                120
+        );
+
+        assertTrue(resolved.isEmpty());
+        Mockito.verifyNoInteractions(upstreamAccountRepository);
+        Mockito.verifyNoInteractions(valueOperations);
+    }
+
+    @Test
+    void shouldNotReuseStickyAccountOutsideActiveBoundGroups() {
+        DistributedKeyAccountGroupBindingRepository bindingRepository = Mockito.mock(DistributedKeyAccountGroupBindingRepository.class);
+        UpstreamAccountRepository upstreamAccountRepository = Mockito.mock(UpstreamAccountRepository.class);
+        NetworkProxyRepository networkProxyRepository = Mockito.mock(NetworkProxyRepository.class);
+        StringRedisTemplate stringRedisTemplate = Mockito.mock(StringRedisTemplate.class);
+        @SuppressWarnings("unchecked")
+        ValueOperations<String, String> valueOperations = Mockito.mock(ValueOperations.class);
+        Mockito.when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+        AccountSelectionService service = new AccountSelectionService(
+                bindingRepository,
+                upstreamAccountRepository,
+                networkProxyRepository,
+                stringRedisTemplate
+        );
+        DistributedKeyAccountGroupBindingEntity activeBinding = binding(100L, ProviderType.OPENAI_DIRECT, true);
+        UpstreamAccountGroupEntity inactiveGroup = group(99L, false);
+        UpstreamAccountEntity stickyAccount = account(77L, inactiveGroup, UpstreamAccountProviderType.CODEX_OAUTH);
+        UpstreamAccountEntity fallbackAccount = account(88L, activeBinding.getGroup(), UpstreamAccountProviderType.CODEX_OAUTH);
+
+        Mockito.when(bindingRepository.findAllByDistributedKey_IdAndProviderTypeAndActiveTrueOrderByPriorityAscCreatedAtAsc(1L, ProviderType.OPENAI_DIRECT))
+                .thenReturn(List.of(activeBinding));
+        Mockito.when(valueOperations.get(Mockito.anyString())).thenReturn("77");
+        Mockito.when(upstreamAccountRepository.findById(77L)).thenReturn(Optional.of(stickyAccount));
+        Mockito.when(upstreamAccountRepository.findAllByGroup_IdAndActiveTrueAndFrozenFalseAndHealthyTrueOrderByUpdatedAtDesc(100L))
+                .thenReturn(List.of(fallbackAccount));
+
+        Optional<UpstreamAccountEntity> resolved = service.resolveActiveAccount(
+                1L,
+                ProviderType.OPENAI_DIRECT,
+                GatewayClientFamily.CODEX,
+                120
+        );
+
+        assertTrue(resolved.isPresent());
+        assertTrue(resolved.get().getId().equals(88L));
+        Mockito.verify(valueOperations).set(Mockito.anyString(), Mockito.eq("88"), Mockito.any(Duration.class));
+    }
+
+    private DistributedKeyAccountGroupBindingEntity binding(Long groupId, ProviderType providerType, boolean groupActive) {
+        DistributedKeyAccountGroupBindingEntity binding = new DistributedKeyAccountGroupBindingEntity();
+        binding.setGroup(group(groupId, groupActive));
+        binding.setProviderType(providerType);
+        binding.setActive(true);
+        return binding;
+    }
+
+    private UpstreamAccountGroupEntity group(Long id, boolean active) {
+        UpstreamAccountGroupEntity group = new UpstreamAccountGroupEntity();
+        ReflectionTestUtils.setField(group, "id", id);
+        group.setActive(active);
+        group.setAllowedClientFamilies(List.of("CODEX"));
+        return group;
+    }
+
+    private UpstreamAccountEntity account(
+            Long id,
+            UpstreamAccountGroupEntity group,
+            UpstreamAccountProviderType providerType) {
+        UpstreamAccountEntity account = new UpstreamAccountEntity();
+        ReflectionTestUtils.setField(account, "id", id);
+        account.setGroup(group);
+        account.setAccountName("account-" + id);
+        account.setProviderType(providerType);
+        account.setActive(true);
+        account.setFrozen(false);
+        account.setHealthy(true);
+        return account;
     }
 }

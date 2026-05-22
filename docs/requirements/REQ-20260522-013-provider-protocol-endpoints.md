@@ -41,9 +41,34 @@
 ## 风险
 
 - 现有运行时仍以 credential 的 provider type/baseUrl 作为主要事实源，本轮先通过凭证继承协议入口来推进，不强行改全链路。
-- 存量凭证没有 protocol endpoint 时需要兼容已有 site profile；后续可做迁移任务逐步补全。
+- 存量凭证没有 protocol endpoint 时需要兼容已有 site profile；已通过 `REQ-20260522-015` 增加启动期保守回填。
 - 多协议 endpoint 的 conversation profile 需要持续沉淀真实厂商差异，本轮先落结构和默认值。
 
 ## 当前状态
 
-In Progress
+Done
+
+## 实现结果
+
+- 新增 `provider_protocol_endpoint` 厂商协议入口表，并让 `upstream_credential` 记录 `protocol_endpoint_id`，凭证唯一约束同步纳入协议入口维度。
+- 新增协议入口 entity、repository、request/response DTO 与 `/admin/provider-sites/{id}/protocol-endpoints` 管理 API，支持列表、新增、编辑和删除。
+- 默认厂商预设导入会自动生成协议入口；MiMo 与 DeepSeek 会生成 OpenAI-compatible 和 Anthropic-compatible 两个入口。
+- API Key 上游凭证创建必须绑定具体协议入口，并从入口继承 `providerType`、`siteKind` 和 `baseUrl`；存量凭证读取与编辑仍保留站点档案兜底。
+- 厂商管理详情页展示协议入口、Base URL、协议簇、绑定凭证数和入口级 conversation profile，并提供入口维护弹窗。
+- 上游凭证创建/编辑流程改为选择“厂商协议入口”，Base URL 改为由入口派生，避免用户重复手填厂商 URL。
+
+## 验证记录
+
+- `.\gradlew.bat compileJava compileTestJava`
+- `.\gradlew.bat test --tests "com.prodigalgal.xaigateway.admin.application.ProviderSiteRegistryServiceTests"`
+- `.\gradlew.bat test --tests "com.prodigalgal.xaigateway.admin.application.ProviderSiteRegistryServiceTests" --tests "com.prodigalgal.xaigateway.admin.application.ProviderSiteAdminServiceTests" --tests "com.prodigalgal.xaigateway.admin.application.CredentialAdminServiceTests" --tests "com.prodigalgal.xaigateway.admin.api.ProviderSiteAdminControllerTests" --tests "com.prodigalgal.xaigateway.admin.api.CredentialAdminControllerTests"`
+- `bun run typecheck`
+- `bun run test -- credentials-page provider-site-detail-page provider-sites-page`
+- 当前本地库 `x_ai_gateway` 已执行 Liquibase `0004-provider-protocol-endpoints`，并确认存在 `provider_protocol_endpoint` 表与 `upstream_credential.protocol_endpoint_id` 字段。
+- 当前本地库已确认默认导入 MiMo/DeepSeek 双协议入口：`xiaomi_mimo.openai_compatible`、`xiaomi_mimo.anthropic_compatible`、`deepseek.openai_compatible`、`deepseek.anthropic_compatible`。
+
+## 遗留问题与后续建议
+
+- 本轮没有执行真实外部厂商调用；MiMo 与 DeepSeek 的真实双协议 smoke 可在后续接入测试窗口执行。
+- runtime 深层路由仍主要使用凭证上的 provider type 与 Base URL；本轮通过凭证继承协议入口先把配置事实源串起来，后续可继续推进“按入口协议动态选择执行器”。
+- 存量凭证保守回填已在 `REQ-20260522-015` 完成；无法唯一匹配的历史凭证仍需人工选择协议入口。

@@ -20,6 +20,7 @@ public record CredentialRequest(
         Long tlsFingerprintProfileId,
         Long siteProfileId,
         Long protocolEndpointId,
+        List<Long> protocolEndpointIds,
         Long groupId,
         List<String> supportedModels
 ) {
@@ -36,6 +37,19 @@ public record CredentialRequest(
 
     public Map<String, Object> resolvedCredentialMetadata() {
         return credentialMetadata == null ? Map.of() : Map.copyOf(credentialMetadata);
+    }
+
+    public List<Long> resolvedProtocolEndpointIds() {
+        java.util.LinkedHashSet<Long> ids = new java.util.LinkedHashSet<>();
+        if (protocolEndpointIds != null) {
+            protocolEndpointIds.stream()
+                    .filter(id -> id != null)
+                    .forEach(ids::add);
+        }
+        if (ids.isEmpty() && protocolEndpointId != null) {
+            ids.add(protocolEndpointId);
+        }
+        return List.copyOf(ids);
     }
 
     public List<String> resolvedSupportedModels() {

@@ -34,8 +34,8 @@ class FunctionalProviderSmokeHttpClient {
     static final String TOOL_USE = "TOOL_USE";
 
     private static final String DEFAULT_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com";
-    private static final String DEFAULT_MIMO_OPENAI_BASE_URL = "https://api.mimo-v2.com/v1";
-    private static final String DEFAULT_MIMO_ANTHROPIC_BASE_URL = "https://api.mimo-v2.com/anthropic";
+    private static final String DEFAULT_MIMO_OPENAI_BASE_URL = "https://token-plan-sgp.xiaomimimo.com/v1";
+    private static final String DEFAULT_MIMO_ANTHROPIC_BASE_URL = "https://token-plan-sgp.xiaomimimo.com/anthropic";
     private static final String DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
     private static final String DEFAULT_MIMO_MODEL = "mimo-v2-pro";
 

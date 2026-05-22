@@ -111,6 +111,36 @@ class CredentialAdminControllerTests {
     }
 
     @Test
+    void shouldCreateCredentialForMultipleProtocolEndpoints() {
+        Mockito.when(credentialAdminService.createForProtocolEndpoints(Mockito.any()))
+                .thenReturn(List.of(
+                        credentialResponse(11L, "DeepSeek - OpenAI-compatible"),
+                        credentialResponse(12L, "DeepSeek - Anthropic-compatible")
+                ));
+
+        webTestClient.post()
+                .uri("/admin/credentials/multi-endpoint")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {
+                          "credentialName":"DeepSeek",
+                          "authKind":"API_KEY",
+                          "secret":"token",
+                          "siteProfileId":41,
+                          "protocolEndpointIds":[410,411],
+                          "groupId":15
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$[0].credentialName").isEqualTo("DeepSeek - OpenAI-compatible")
+                .jsonPath("$[1].credentialName").isEqualTo("DeepSeek - Anthropic-compatible");
+
+        Mockito.verify(credentialAdminService).createForProtocolEndpoints(Mockito.any(CredentialRequest.class));
+    }
+
+    @Test
     void shouldRunOpenAiDirectCredentialSmoke() {
         Mockito.when(credentialAdminService.openAiDirectSmoke(Mockito.eq(7L), Mockito.any()))
                 .thenReturn(new OpenAiDirectSmokeResponse(

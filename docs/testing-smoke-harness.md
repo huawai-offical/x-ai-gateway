@@ -113,13 +113,13 @@ Invoke-RestMethod `
 关联需求：[REQ-20260519-001](requirements/REQ-20260519-001-functional-real-smoke-gemini-mimo.md)
 关联任务：[TASK-20260519-001](../tasks/done/TASK-20260519-001-functional-real-smoke-gemini-mimo.md)
 
-当前没有 OpenAI Direct key 时，真实 smoke 可以先使用 Google Gemini key 与小米 MiMo key，但只用于功能性服务 API。MiMo 官方文档显示其 OpenAI-compatible Base URL 为 `https://api.mimo-v2.com/v1`，Anthropic-compatible Base URL 为 `https://api.mimo-v2.com/anthropic`；这证明它可用于对话协议兼容 smoke，不证明 OpenAI Direct 全量资源族。
+当前没有 OpenAI Direct key 时，真实 smoke 可以先使用 Google Gemini key 与小米 MiMo key，但只用于功能性服务 API。当前项目 MiMo 预设与本地协议入口使用 token-plan 地址：OpenAI-compatible Base URL 为 `https://token-plan-sgp.xiaomimimo.com/v1`，Anthropic-compatible Base URL 为 `https://token-plan-sgp.xiaomimimo.com/anthropic`；这证明它可用于对话协议兼容 smoke，不证明 OpenAI Direct 全量资源族。
 
 | Provider | Protocol | Default base URL | Auth strategy | 默认模型 | 默认 family | 默认 live 行为 | 明确排除 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Gemini | Gemini native | `https://generativelanguage.googleapis.com` | `API_KEY_QUERY` / profile 驱动 | `gemini-2.5-flash` | `generate_content`、`stream_generate_content`、`tool_calling` | dry-run；live 需 `allowLive=true` 与 key 引用 | batch prediction、pipeline/job/admin、tuning |
-| MiMo | OpenAI-compatible | `https://api.mimo-v2.com/v1` | profile 驱动，优先允许 `api-key`，兼容 SDK-style key 配置 | `mimo-v2-pro` | `chat_completions`、`chat_streaming`、`chat_tools` | dry-run；billable live 需显式 allow | Responses、Files、Uploads、Vector Stores、Realtime client secret、Batches、Fine-tuning、Evals、Admin |
-| MiMo | Anthropic-compatible | `https://api.mimo-v2.com/anthropic` | profile 驱动，`api-key` / Anthropic-compatible header 由站点档案声明 | `mimo-v2-pro` | `messages`、`messages_streaming`、`tool_use` | dry-run；billable live 需显式 allow | Message Batches、Admin、Files、Evals |
+| MiMo | OpenAI-compatible | `https://token-plan-sgp.xiaomimimo.com/v1` | profile 驱动，优先允许 `api-key`，兼容 SDK-style key 配置 | `mimo-v2-pro` | `chat_completions`、`chat_streaming`、`chat_tools` | dry-run；billable live 需显式 allow | Responses、Files、Uploads、Vector Stores、Realtime client secret、Batches、Fine-tuning、Evals、Admin |
+| MiMo | Anthropic-compatible | `https://token-plan-sgp.xiaomimimo.com/anthropic` | profile 驱动，`api-key` / Anthropic-compatible header 由站点档案声明 | `mimo-v2-pro` | `messages`、`messages_streaming`、`tool_use` | dry-run；billable live 需显式 allow | Message Batches、Admin、Files、Evals |
 
 默认分类规则：
 
@@ -138,7 +138,7 @@ POST /admin/credentials/{id}/functional-provider/smoke
 请求字段：
 
 - `protocol`：可选，支持 `gemini_native`、`mimo_openai` / `openai_compatible`、`mimo_anthropic` / `anthropic_compatible`；未传时按 credential `providerType` 推断。
-- `baseUrl`：可选，覆盖 credential base URL；MiMo OpenAI-compatible 可传 `https://api.mimo-v2.com/v1`，runner 会生成 `/v1/chat/completions`。
+- `baseUrl`：可选，覆盖 credential base URL；MiMo OpenAI-compatible 可传 `https://token-plan-sgp.xiaomimimo.com/v1`，runner 会生成 `/v1/chat/completions`。
 - `model`：可选，默认 Gemini `gemini-2.5-flash`、MiMo `mimo-v2-pro`。
 - `resourceFamilies`：可选；未传时使用矩阵默认 family，显式传入范围外 family 时返回 `UNSUPPORTED`。
 - `dryRun`：默认 `true`；`false` 表示请求 live，但仍需 `allowLive=true`。

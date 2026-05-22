@@ -72,6 +72,15 @@
 | P0-CODEX-06f | [TASK-20260522-011 厂商管理中心补齐](done/TASK-20260522-011-vendor-management-center.md) | Done | 恢复并补齐厂商管理、API 入口 CRUD、预设导入、能力刷新和 capability matrix |
 | P0-CODEX-06g | [TASK-20260522-012 默认厂商 API 入口引导](done/TASK-20260522-012-default-provider-site-bootstrap.md) | Done | 启动时自动导入非 deprecated provider preset，生成默认厂商 API 入口和站点级快照 |
 | P0-CODEX-06h | [TASK-20260522-013 上游凭证绑定厂商 API 入口](done/TASK-20260522-013-credential-vendor-site-binding.md) | Done | 新增/编辑 API Key 上游凭证改为选择厂商/API 入口，并由入口派生 provider type 与 Base URL |
+| P0-CODEX-06i | [TASK-20260522-014 厂商多协议入口与对话兼容画像升级](done/TASK-20260522-014-provider-protocol-endpoints.md) | Done | 厂商/API 入口下挂多协议 endpoint，MiMo/DeepSeek 支持 OpenAI-compatible + Anthropic-compatible，凭证绑定 protocolEndpointId |
+| P0-CODEX-06j | [TASK-20260522-015 协议入口对话兼容画像下发运行时](done/TASK-20260522-015-protocol-endpoint-conversation-profile-runtime.md) | Done | 凭证绑定协议入口时合并 endpoint conversation profile 到 credential metadata，运行时可读取 |
+| P0-CODEX-06k | [TASK-20260522-016 存量凭证协议入口保守回填](done/TASK-20260522-016-credential-protocol-endpoint-backfill.md) | Done | 启动默认资源引导时唯一匹配回填历史凭证 protocolEndpointId 和入口 conversation profile |
+| P0-CODEX-06l | [TASK-20260522-017 功能性 Provider Smoke 协议入口地址对齐](done/TASK-20260522-017-functional-provider-smoke-endpoint-alignment.md) | Done | 将 MiMo 功能性 smoke 默认地址与当前 token-plan 协议入口对齐 |
+| P0-CODEX-06m | [TASK-20260522-018 上游凭证多协议入口绑定](done/TASK-20260522-018-credential-multi-protocol-endpoint-binding.md) | Done | API Key 凭证创建支持多选协议入口，并让运行时候选优先读取 endpoint 元数据 |
+| P0-CODEX-06n | [TASK-20260522-019 分发 Key 账号组运行时展开](done/TASK-20260522-019-distributed-key-account-group-runtime-expansion.md) | Done | runtime 查询从 DistributedKey 账号组绑定展开组内 API Key 凭证候选 |
+| P0-CODEX-06o | [TASK-20260522-020 账号类选择 active 账号组运行时对齐](done/TASK-20260522-020-account-selection-active-group-runtime-alignment.md) | Done | OAuth/auth.json 账号选择、sticky account 与 Model Policy 上下文排除停用账号组 |
+| P0-CODEX-06p | [TASK-20260522-021 分发 Key 鉴权 active 账号组守卫](done/TASK-20260522-021-distributed-key-auth-active-group-guard.md) | Done | Key 鉴权和 auth cache 命中均要求存在启用账号组绑定 |
+| P0-CODEX-06q | [TASK-20260522-022 分发 Key 创建时初始账号组绑定](done/TASK-20260522-022-distributed-key-create-initial-account-group-binding.md) | Done | 创建访问密钥时原子写入初始账号组绑定，并支持账号组详情显式选择运行时 provider |
 | P0-FUNC-01 | [TASK-20260514-020 OpenAI 多模态支撑参数边界收紧](done/TASK-20260514-020-openai-multimodal-supporting-parameters.md) | Done | 已清理 Audio translations 与 Images edits/variations 残留，并固定多模态支撑参数 |
 | P0-FUNC-02 | [TASK-20260514-021 OpenAI Files、Uploads、Models 功能性支撑面](done/TASK-20260514-021-openai-files-uploads-models-functional-support.md) | Done | 已补 Files list 参数与 envelope，并确认 Batches/Fine-tuning 不回到公开支持面 |
 | P0-CODEX-05 | [TASK-20260514-031 OpenAI 真实 Smoke 与认证成本防护](backlog/TASK-20260514-031-openai-real-smoke-certification-harness.md) | Backlog | Critical；承接 Codex/OpenAI-compatible smoke 机制，等待恢复测试或真实 key 执行窗口 |

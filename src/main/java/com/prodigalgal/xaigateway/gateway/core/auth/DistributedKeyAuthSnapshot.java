@@ -8,6 +8,7 @@ public record DistributedKeyAuthSnapshot(
         String keyName,
         String maskedKey,
         String secretHash,
-        List<String> allowedClientFamilies
+        List<String> allowedClientFamilies,
+        long activeAccountGroupBindingCount
 ) {
 }

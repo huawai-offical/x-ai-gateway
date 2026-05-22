@@ -16,6 +16,10 @@ public interface UpstreamCredentialRepository extends JpaRepository<UpstreamCred
 
     List<UpstreamCredentialEntity> findAllByGroupIdAndDeletedFalseOrderByCreatedAtDesc(Long groupId);
 
+    List<UpstreamCredentialEntity> findAllByGroupIdAndProviderTypeAndDeletedFalseAndActiveTrueOrderByCreatedAtAsc(
+            Long groupId,
+            ProviderType providerType);
+
     List<UpstreamCredentialEntity> findAllByIdInAndDeletedFalse(Collection<Long> ids);
 
     List<UpstreamCredentialEntity> findAllByProviderTypeAndDeletedFalseAndActiveTrue(ProviderType providerType);
@@ -25,6 +29,8 @@ public interface UpstreamCredentialRepository extends JpaRepository<UpstreamCred
     List<UpstreamCredentialEntity> findAllBySiteProfileIdAndDeletedFalseAndActiveTrueOrderByCreatedAtDesc(Long siteProfileId);
 
     List<UpstreamCredentialEntity> findAllBySiteProfileIdInAndDeletedFalseAndActiveTrue(Collection<Long> siteProfileIds);
+
+    List<UpstreamCredentialEntity> findAllByProtocolEndpointIdIsNullAndDeletedFalse();
 
     long countBySiteProfileIdAndDeletedFalse(Long siteProfileId);
 
@@ -38,11 +44,25 @@ public interface UpstreamCredentialRepository extends JpaRepository<UpstreamCred
             String baseUrl,
             Long siteProfileId);
 
+    Optional<UpstreamCredentialEntity> findByApiKeyFingerprintAndProviderTypeAndBaseUrlAndSiteProfileIdAndProtocolEndpointIdAndDeletedFalse(
+            String apiKeyFingerprint,
+            ProviderType providerType,
+            String baseUrl,
+            Long siteProfileId,
+            Long protocolEndpointId);
+
     Optional<UpstreamCredentialEntity> findFirstByApiKeyFingerprintAndProviderTypeAndBaseUrlAndSiteProfileIdOrderByUpdatedAtDesc(
             String apiKeyFingerprint,
             ProviderType providerType,
             String baseUrl,
             Long siteProfileId);
+
+    Optional<UpstreamCredentialEntity> findFirstByApiKeyFingerprintAndProviderTypeAndBaseUrlAndSiteProfileIdAndProtocolEndpointIdOrderByUpdatedAtDesc(
+            String apiKeyFingerprint,
+            ProviderType providerType,
+            String baseUrl,
+            Long siteProfileId,
+            Long protocolEndpointId);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("update UpstreamCredentialEntity credential set credential.groupId = null where credential.groupId = :groupId")

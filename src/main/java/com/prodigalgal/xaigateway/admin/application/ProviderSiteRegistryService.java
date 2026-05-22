@@ -15,11 +15,13 @@ import com.prodigalgal.xaigateway.infra.persistence.entity.ProviderProtocolEndpo
 import com.prodigalgal.xaigateway.infra.persistence.entity.SiteCapabilitySnapshotEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.ModelPolicyEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SiteModelCapabilityEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamSiteProfileEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.ModelPolicyRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.ProviderProtocolEndpointRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.SiteCapabilitySnapshotRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.SiteModelCapabilityRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamSiteProfileRepository;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -44,10 +46,10 @@ public class ProviderSiteRegistryService {
     private final SiteModelCapabilityRepository siteModelCapabilityRepository;
     private final ModelPolicyRepository modelPolicyRepository;
     private final ProviderProtocolEndpointRepository providerProtocolEndpointRepository;
+    private final UpstreamCredentialRepository upstreamCredentialRepository;
     private final UpstreamSitePolicyService upstreamSitePolicyService;
     private final ProviderCatalogLoader providerCatalogLoader;
 
-    @Autowired
     public ProviderSiteRegistryService(
             UpstreamSiteProfileRepository upstreamSiteProfileRepository,
             SiteCapabilitySnapshotRepository siteCapabilitySnapshotRepository,
@@ -61,9 +63,30 @@ public class ProviderSiteRegistryService {
                 siteModelCapabilityRepository,
                 modelPolicyRepository,
                 null,
+                null,
                 upstreamSitePolicyService,
                 providerCatalogLoader
         );
+    }
+
+    @Autowired
+    public ProviderSiteRegistryService(
+            UpstreamSiteProfileRepository upstreamSiteProfileRepository,
+            SiteCapabilitySnapshotRepository siteCapabilitySnapshotRepository,
+            SiteModelCapabilityRepository siteModelCapabilityRepository,
+            ModelPolicyRepository modelPolicyRepository,
+            ProviderProtocolEndpointRepository providerProtocolEndpointRepository,
+            UpstreamCredentialRepository upstreamCredentialRepository,
+            UpstreamSitePolicyService upstreamSitePolicyService,
+            ProviderCatalogLoader providerCatalogLoader) {
+        this.upstreamSiteProfileRepository = upstreamSiteProfileRepository;
+        this.siteCapabilitySnapshotRepository = siteCapabilitySnapshotRepository;
+        this.siteModelCapabilityRepository = siteModelCapabilityRepository;
+        this.modelPolicyRepository = modelPolicyRepository;
+        this.providerProtocolEndpointRepository = providerProtocolEndpointRepository;
+        this.upstreamCredentialRepository = upstreamCredentialRepository;
+        this.upstreamSitePolicyService = upstreamSitePolicyService;
+        this.providerCatalogLoader = providerCatalogLoader;
     }
 
     public ProviderSiteRegistryService(
@@ -74,13 +97,16 @@ public class ProviderSiteRegistryService {
             ProviderProtocolEndpointRepository providerProtocolEndpointRepository,
             UpstreamSitePolicyService upstreamSitePolicyService,
             ProviderCatalogLoader providerCatalogLoader) {
-        this.upstreamSiteProfileRepository = upstreamSiteProfileRepository;
-        this.siteCapabilitySnapshotRepository = siteCapabilitySnapshotRepository;
-        this.siteModelCapabilityRepository = siteModelCapabilityRepository;
-        this.modelPolicyRepository = modelPolicyRepository;
-        this.providerProtocolEndpointRepository = providerProtocolEndpointRepository;
-        this.upstreamSitePolicyService = upstreamSitePolicyService;
-        this.providerCatalogLoader = providerCatalogLoader;
+        this(
+                upstreamSiteProfileRepository,
+                siteCapabilitySnapshotRepository,
+                siteModelCapabilityRepository,
+                modelPolicyRepository,
+                providerProtocolEndpointRepository,
+                null,
+                upstreamSitePolicyService,
+                providerCatalogLoader
+        );
     }
 
     public ProviderSiteRegistryService(
@@ -93,6 +119,7 @@ public class ProviderSiteRegistryService {
                 upstreamSiteProfileRepository,
                 siteCapabilitySnapshotRepository,
                 siteModelCapabilityRepository,
+                null,
                 null,
                 null,
                 upstreamSitePolicyService,
@@ -138,6 +165,45 @@ public class ProviderSiteRegistryService {
                 .filter(preset -> !preset.deprecated())
                 .map(preset -> importPreset(preset, true, true))
                 .toList();
+    }
+
+    public int backfillCredentialProtocolEndpoints() {
+        if (providerProtocolEndpointRepository == null || upstreamCredentialRepository == null) {
+            return 0;
+        }
+        List<UpstreamCredentialEntity> credentials = upstreamCredentialRepository.findAllByProtocolEndpointIdIsNullAndDeletedFalse();
+        if (credentials.isEmpty()) {
+            return 0;
+        }
+        Map<Long, List<ProviderProtocolEndpointEntity>> endpointsBySite = new LinkedHashMap<>();
+        List<UpstreamCredentialEntity> changed = new ArrayList<>();
+        for (UpstreamCredentialEntity credential : credentials) {
+            if (credential.getSiteProfileId() == null || credential.getProviderType() == null || credential.getBaseUrl() == null) {
+                continue;
+            }
+            List<ProviderProtocolEndpointEntity> endpoints = endpointsBySite.computeIfAbsent(
+                    credential.getSiteProfileId(),
+                    providerProtocolEndpointRepository::findAllBySiteProfileIdAndActiveTrueOrderByDisplayNameAsc
+            );
+            List<ProviderProtocolEndpointEntity> matches = endpoints.stream()
+                    .filter(endpoint -> endpoint.getProviderType() == credential.getProviderType())
+                    .filter(endpoint -> normalizedBaseUrl(endpoint.getBaseUrl()).equals(normalizedBaseUrl(credential.getBaseUrl())))
+                    .toList();
+            if (matches.size() != 1) {
+                continue;
+            }
+            ProviderProtocolEndpointEntity endpoint = matches.getFirst();
+            credential.setProtocolEndpointId(endpoint.getId());
+            credential.setCredentialMetadataJson(writeJson(metadataWithEndpointConversationProfile(
+                    readJsonObject(credential.getCredentialMetadataJson()),
+                    readJsonObject(endpoint.getConversationProfileJson())
+            )));
+            changed.add(credential);
+        }
+        if (!changed.isEmpty()) {
+            upstreamCredentialRepository.saveAll(changed);
+        }
+        return changed.size();
     }
 
     private UpstreamSiteProfileEntity importPreset(
@@ -245,16 +311,16 @@ public class ProviderSiteRegistryService {
     private List<ProtocolEndpointSeed> protocolEndpointSeeds(ProviderPresetDefinition preset) {
         ProtocolEndpointSeed openAiEndpoint = new ProtocolEndpointSeed(
                 preset.code() + ":openai-compatible",
-                preset.displayName() + " OpenAI-compatible",
+                preset.displayName() + " " + defaultEndpointLabel(preset.siteKind()),
                 ProtocolSuite.fromVendorAndSiteKind(preset.vendorCode(), preset.siteKind()),
-                ProviderType.OPENAI_COMPATIBLE,
+                providerTypeForSiteKind(preset.siteKind()),
                 preset.siteKind(),
                 preset.defaultBaseUrl(),
                 mergeConversationProfile(
                         preset.conversationProfile(),
                         Map.of(
-                                "protocolEndpoint", "openai_compatible",
-                                "targetProtocol", "openai_chat_or_responses",
+                                "protocolEndpoint", defaultProtocolEndpointName(preset.siteKind()),
+                                "targetProtocol", defaultTargetProtocol(preset.siteKind()),
                                 "reasoningContent", "pass_through"
                         )
                 )
@@ -282,6 +348,61 @@ public class ProviderSiteRegistryService {
                 )
         );
         return List.of(openAiEndpoint, anthropicEndpoint);
+    }
+
+    private ProviderType providerTypeForSiteKind(UpstreamSiteKind siteKind) {
+        if (siteKind == null) {
+            return ProviderType.OPENAI_COMPATIBLE;
+        }
+        return switch (siteKind) {
+            case OPENAI_DIRECT, AZURE_OPENAI -> ProviderType.OPENAI_DIRECT;
+            case ANTHROPIC_DIRECT -> ProviderType.ANTHROPIC_DIRECT;
+            case GEMINI_DIRECT, VERTEX_AI -> ProviderType.GEMINI_DIRECT;
+            case OLLAMA_DIRECT -> ProviderType.OLLAMA_DIRECT;
+            default -> ProviderType.OPENAI_COMPATIBLE;
+        };
+    }
+
+    private String defaultEndpointLabel(UpstreamSiteKind siteKind) {
+        if (siteKind == null) {
+            return "OpenAI-compatible";
+        }
+        return switch (siteKind) {
+            case OPENAI_DIRECT -> "OpenAI Native";
+            case AZURE_OPENAI -> "Azure OpenAI";
+            case ANTHROPIC_DIRECT -> "Anthropic Messages";
+            case GEMINI_DIRECT -> "Gemini Native";
+            case VERTEX_AI -> "Vertex Gemini Native";
+            case OLLAMA_DIRECT -> "Ollama Native";
+            default -> "OpenAI-compatible";
+        };
+    }
+
+    private String defaultProtocolEndpointName(UpstreamSiteKind siteKind) {
+        if (siteKind == null) {
+            return "openai_compatible";
+        }
+        return switch (siteKind) {
+            case OPENAI_DIRECT -> "openai_native";
+            case AZURE_OPENAI -> "azure_openai";
+            case ANTHROPIC_DIRECT -> "anthropic_native";
+            case GEMINI_DIRECT -> "gemini_native";
+            case VERTEX_AI -> "vertex_gemini_native";
+            case OLLAMA_DIRECT -> "ollama_native";
+            default -> "openai_compatible";
+        };
+    }
+
+    private String defaultTargetProtocol(UpstreamSiteKind siteKind) {
+        if (siteKind == null) {
+            return "openai_chat_or_responses";
+        }
+        return switch (siteKind) {
+            case ANTHROPIC_DIRECT -> "anthropic_messages";
+            case GEMINI_DIRECT, VERTEX_AI -> "gemini_generate_content";
+            case OLLAMA_DIRECT -> "ollama_chat";
+            default -> "openai_chat_or_responses";
+        };
     }
 
     private ProviderProtocolEndpointEntity toEndpointEntity(
@@ -372,6 +493,59 @@ public class ProviderSiteRegistryService {
         } catch (Exception exception) {
             throw new IllegalArgumentException("站点档案对话画像无法序列化。", exception);
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> readJsonObject(String json) {
+        if (json == null || json.isBlank()) {
+            return Map.of();
+        }
+        try {
+            Object value = providerCatalogLoader.objectMapper().readValue(json, Map.class);
+            return value instanceof Map<?, ?> map ? stringKeyMap(map) : Map.of();
+        } catch (Exception exception) {
+            return Map.of();
+        }
+    }
+
+    private Map<String, Object> metadataWithEndpointConversationProfile(
+            Map<String, Object> existingMetadata,
+            Map<String, Object> endpointConversationProfile) {
+        Map<String, Object> metadata = new LinkedHashMap<>(
+                existingMetadata == null ? Map.of() : existingMetadata
+        );
+        Map<String, Object> mergedConversationProfile = new LinkedHashMap<>(
+                endpointConversationProfile == null ? Map.of() : endpointConversationProfile
+        );
+        Object existingConversationProfile = metadata.get("conversationProfile");
+        if (existingConversationProfile instanceof Map<?, ?> existingProfile) {
+            mergedConversationProfile.putAll(stringKeyMap(existingProfile));
+        }
+        if (!mergedConversationProfile.isEmpty()) {
+            metadata.put("conversationProfile", mergedConversationProfile);
+        }
+        return metadata;
+    }
+
+    private Map<String, Object> stringKeyMap(Map<?, ?> input) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        input.forEach((key, value) -> {
+            if (key instanceof String name) {
+                result.put(name, value);
+            }
+        });
+        return result;
+    }
+
+    private String normalizedBaseUrl(String baseUrl) {
+        if (baseUrl == null || baseUrl.isBlank()) {
+            return "";
+        }
+        String value = baseUrl.trim();
+        while (value.endsWith("/") && value.length() > 1) {
+            value = value.substring(0, value.length() - 1);
+        }
+        return value.toLowerCase(Locale.ROOT);
     }
 
     private void importPresetModelPolicies(ProviderPresetDefinition preset, UpstreamSiteProfileEntity siteProfile) {

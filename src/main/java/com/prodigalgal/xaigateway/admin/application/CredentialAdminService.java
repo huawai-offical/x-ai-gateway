@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -79,6 +80,7 @@ public class CredentialAdminService {
         );
     }
 
+    @Autowired
     public CredentialAdminService(
             UpstreamCredentialRepository upstreamCredentialRepository,
             CredentialCryptoService credentialCryptoService,
@@ -138,28 +140,31 @@ public class CredentialAdminService {
         String fingerprint = credentialCryptoService.fingerprint(secret);
         UpstreamAccountGroupEntity group = resolveGroup(request.groupId());
         CredentialEndpointBinding endpointBinding = requireCredentialProtocolEndpoint(request.protocolEndpointId());
-        UpstreamSiteProfileEntity siteProfile = endpointBinding.siteProfile();
-        ProviderType providerType = endpointBinding.providerType();
-        String baseUrl = endpointBinding.baseUrl();
-        UpstreamCredentialEntity entity = upstreamCredentialRepository
-                .findFirstByApiKeyFingerprintAndProviderTypeAndBaseUrlAndSiteProfileIdOrderByUpdatedAtDesc(
-                        fingerprint,
-                        providerType,
-                        baseUrl,
-                        siteProfile.getId()
-                )
-                .map(existing -> {
-                    if (!existing.isDeleted()) {
-                        throw new IllegalArgumentException("已存在相同上游接入面的凭证密钥。");
-                    }
-                    existing.setDeleted(false);
-                    return existing;
-                })
-                .orElseGet(UpstreamCredentialEntity::new);
+        return toResponse(createForEndpoint(request, secret, fingerprint, group, endpointBinding, request.credentialName()));
+    }
 
-        apply(entity, request, true, group, siteProfile, providerType, baseUrl);
-        entity.setProtocolEndpointId(endpointBinding.protocolEndpointId());
-        return toResponse(upstreamCredentialRepository.save(entity));
+    public List<CredentialResponse> createForProtocolEndpoints(CredentialRequest request) {
+        String secret = requireSecret(request.resolvedSecret());
+        String fingerprint = credentialCryptoService.fingerprint(secret);
+        UpstreamAccountGroupEntity group = resolveGroup(request.groupId());
+        List<CredentialEndpointBinding> endpointBindings = request.resolvedProtocolEndpointIds().stream()
+                .map(this::requireCredentialProtocolEndpoint)
+                .toList();
+        if (endpointBindings.isEmpty()) {
+            throw new IllegalArgumentException("API Key 上游凭证必须至少绑定一个厂商协议入口。");
+        }
+        boolean multiEndpoint = endpointBindings.size() > 1;
+        return endpointBindings.stream()
+                .map(endpointBinding -> createForEndpoint(
+                        request,
+                        secret,
+                        fingerprint,
+                        group,
+                        endpointBinding,
+                        credentialNameForEndpoint(request.credentialName(), endpointBinding, multiEndpoint)
+                ))
+                .map(this::toResponse)
+                .toList();
     }
 
     public CredentialResponse update(Long id, CredentialRequest request) {
@@ -993,7 +998,10 @@ public class CredentialAdminService {
                 endpoint.getId(),
                 siteProfile,
                 endpoint.getProviderType(),
-                baseUrlForEndpoint(endpoint)
+                baseUrlForEndpoint(endpoint),
+                endpoint.getDisplayName(),
+                endpoint.getProtocolSuite(),
+                readMetadata(endpoint.getConversationProfileJson())
         );
     }
 
@@ -1011,7 +1019,10 @@ public class CredentialAdminService {
                 null,
                 siteProfile,
                 providerTypeForSite(siteProfile),
-                baseUrlForSite(siteProfile)
+                baseUrlForSite(siteProfile),
+                null,
+                null,
+                Map.of()
         );
     }
 
@@ -1035,11 +1046,87 @@ public class CredentialAdminService {
         return baseUrl.trim();
     }
 
+    private UpstreamCredentialEntity createForEndpoint(
+            CredentialRequest request,
+            String secret,
+            String fingerprint,
+            UpstreamAccountGroupEntity group,
+            CredentialEndpointBinding endpointBinding,
+            String credentialName) {
+        UpstreamSiteProfileEntity siteProfile = endpointBinding.siteProfile();
+        ProviderType providerType = endpointBinding.providerType();
+        String baseUrl = endpointBinding.baseUrl();
+        UpstreamCredentialEntity entity = upstreamCredentialRepository
+                .findFirstByApiKeyFingerprintAndProviderTypeAndBaseUrlAndSiteProfileIdAndProtocolEndpointIdOrderByUpdatedAtDesc(
+                        fingerprint,
+                        providerType,
+                        baseUrl,
+                        siteProfile.getId(),
+                        endpointBinding.protocolEndpointId()
+                )
+                .map(existing -> {
+                    if (!existing.isDeleted()) {
+                        throw new IllegalArgumentException("已存在相同上游接入面的凭证密钥。");
+                    }
+                    existing.setDeleted(false);
+                    return existing;
+                })
+                .orElseGet(UpstreamCredentialEntity::new);
+        applySecret(
+                entity,
+                secret,
+                true,
+                providerType,
+                baseUrl,
+                siteProfile.getId(),
+                endpointBinding.protocolEndpointId()
+        );
+        applyCommon(
+                entity,
+                request,
+                group,
+                siteProfile,
+                providerType,
+                baseUrl,
+                endpointBinding.conversationProfile(),
+                credentialName
+        );
+        entity.setProtocolEndpointId(endpointBinding.protocolEndpointId());
+        return upstreamCredentialRepository.save(entity);
+    }
+
+    private String credentialNameForEndpoint(
+            String credentialName,
+            CredentialEndpointBinding endpointBinding,
+            boolean multiEndpoint) {
+        String baseName = credentialName == null ? "" : credentialName.trim();
+        if (!multiEndpoint) {
+            return baseName;
+        }
+        String endpointName = endpointBinding.displayName();
+        if (endpointName == null || endpointName.isBlank()) {
+            endpointName = endpointBinding.protocolSuite();
+        }
+        if (endpointName == null || endpointName.isBlank()) {
+            endpointName = "入口 " + endpointBinding.protocolEndpointId();
+        }
+        return baseName + " - " + endpointName.trim();
+    }
+
     private void apply(UpstreamCredentialEntity entity, CredentialRequest request, boolean requireSecret) {
         UpstreamAccountGroupEntity group = resolveGroup(request.groupId());
         CredentialEndpointBinding endpointBinding = resolveCredentialEndpointBinding(entity, request);
-        apply(entity, request, requireSecret, group, endpointBinding.siteProfile(), endpointBinding.providerType(), endpointBinding.baseUrl());
         entity.setProtocolEndpointId(endpointBinding.protocolEndpointId());
+        apply(
+                entity,
+                request,
+                requireSecret,
+                group,
+                endpointBinding.siteProfile(),
+                endpointBinding.providerType(),
+                endpointBinding.baseUrl(),
+                endpointBinding.conversationProfile()
+        );
     }
 
     private void apply(
@@ -1049,20 +1136,46 @@ public class CredentialAdminService {
             UpstreamAccountGroupEntity group,
             UpstreamSiteProfileEntity siteProfile,
             ProviderType providerType,
-            String baseUrl) {
+            String baseUrl,
+            Map<String, Object> endpointConversationProfile) {
         applySecret(
                 entity,
                 request.resolvedSecret(),
                 requireSecret,
                 providerType,
                 baseUrl,
-                siteProfile.getId()
+                siteProfile.getId(),
+                entity.getProtocolEndpointId()
         );
-        entity.setCredentialName(request.credentialName().trim());
+        applyCommon(
+                entity,
+                request,
+                group,
+                siteProfile,
+                providerType,
+                baseUrl,
+                endpointConversationProfile,
+                request.credentialName()
+        );
+    }
+
+    private void applyCommon(
+            UpstreamCredentialEntity entity,
+            CredentialRequest request,
+            UpstreamAccountGroupEntity group,
+            UpstreamSiteProfileEntity siteProfile,
+            ProviderType providerType,
+            String baseUrl,
+            Map<String, Object> endpointConversationProfile,
+            String credentialName) {
+        entity.setCredentialName(credentialName.trim());
         entity.setProviderType(providerType);
         entity.setBaseUrl(baseUrl);
         entity.setAuthKind(request.resolvedAuthKind());
-        entity.setCredentialMetadataJson(writeMetadata(request.resolvedCredentialMetadata()));
+        entity.setCredentialMetadataJson(writeMetadata(metadataWithEndpointConversationProfile(
+                request.resolvedCredentialMetadata(),
+                endpointConversationProfile
+        )));
         entity.setSupportedModels(supportedModelCatalogService.resolveForCredentialImport(
                 providerType,
                 group,
@@ -1079,7 +1192,10 @@ public class CredentialAdminService {
             Long protocolEndpointId,
             UpstreamSiteProfileEntity siteProfile,
             ProviderType providerType,
-            String baseUrl
+            String baseUrl,
+            String displayName,
+            String protocolSuite,
+            Map<String, Object> conversationProfile
     ) {
     }
 
@@ -1089,18 +1205,28 @@ public class CredentialAdminService {
             boolean required,
             ProviderType providerType,
             String baseUrl,
-            Long siteProfileId) {
+            Long siteProfileId,
+            Long protocolEndpointId) {
         if (!required && (rawSecret == null || rawSecret.isBlank())) {
             return;
         }
         String secret = requireSecret(rawSecret);
         String fingerprint = credentialCryptoService.fingerprint(secret);
-        upstreamCredentialRepository.findByApiKeyFingerprintAndProviderTypeAndBaseUrlAndSiteProfileIdAndDeletedFalse(
-                        fingerprint,
-                        providerType,
-                        baseUrl,
-                        siteProfileId
-                )
+        Optional<UpstreamCredentialEntity> existingCredential = protocolEndpointId == null
+                ? upstreamCredentialRepository.findByApiKeyFingerprintAndProviderTypeAndBaseUrlAndSiteProfileIdAndDeletedFalse(
+                fingerprint,
+                providerType,
+                baseUrl,
+                siteProfileId
+        )
+                : upstreamCredentialRepository.findByApiKeyFingerprintAndProviderTypeAndBaseUrlAndSiteProfileIdAndProtocolEndpointIdAndDeletedFalse(
+                fingerprint,
+                providerType,
+                baseUrl,
+                siteProfileId,
+                protocolEndpointId
+        );
+        existingCredential
                 .filter(existing -> !Objects.equals(existing.getId(), entity.getId()))
                 .ifPresent(existing -> {
                     throw new IllegalArgumentException("已存在相同上游接入面的凭证密钥。");
@@ -1237,6 +1363,31 @@ public class CredentialAdminService {
         } catch (JacksonException exception) {
             throw new IllegalArgumentException("无法序列化凭证 metadata。", exception);
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> metadataWithEndpointConversationProfile(
+            Map<String, Object> requestMetadata,
+            Map<String, Object> endpointConversationProfile) {
+        Map<String, Object> metadata = new java.util.LinkedHashMap<>(
+                requestMetadata == null ? Map.of() : requestMetadata
+        );
+        Map<String, Object> mergedConversationProfile = new java.util.LinkedHashMap<>(
+                endpointConversationProfile == null ? Map.of() : endpointConversationProfile
+        );
+        Object requestConversationProfile = metadata.get("conversationProfile");
+        if (requestConversationProfile instanceof Map<?, ?> requestProfile) {
+            requestProfile.forEach((key, value) -> {
+                if (key instanceof String name) {
+                    mergedConversationProfile.put(name, value);
+                }
+            });
+        }
+        if (mergedConversationProfile.isEmpty()) {
+            return metadata;
+        }
+        metadata.put("conversationProfile", mergedConversationProfile);
+        return metadata;
     }
 
     @SuppressWarnings("unchecked")

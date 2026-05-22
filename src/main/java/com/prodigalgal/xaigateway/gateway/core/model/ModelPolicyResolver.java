@@ -494,6 +494,7 @@ public class ModelPolicyResolver {
         return bindings.stream()
                 .map(DistributedKeyAccountGroupBindingEntity::getGroup)
                 .filter(Objects::nonNull)
+                .filter(UpstreamAccountGroupEntity::isActive)
                 .map(UpstreamAccountGroupEntity::getId)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
     }

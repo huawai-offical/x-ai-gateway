@@ -30,7 +30,7 @@ class RedisAuthCacheStoreTests {
     @Test
     void shouldReadCachedSnapshot() throws Exception {
         RedisAuthCacheStore store = new RedisAuthCacheStore(stringRedisTemplate, objectMapper, gatewayProperties);
-        DistributedKeyAuthSnapshot snapshot = new DistributedKeyAuthSnapshot(1L, "sk-gw-test", "test", "masked", "hash", List.of("CODEX"));
+        DistributedKeyAuthSnapshot snapshot = new DistributedKeyAuthSnapshot(1L, "sk-gw-test", "test", "masked", "hash", List.of("CODEX"), 1L);
         Mockito.when(valueOperations.get("xag:auth:key:sk-gw-test"))
                 .thenReturn(objectMapper.writeValueAsString(snapshot));
 
@@ -43,7 +43,7 @@ class RedisAuthCacheStoreTests {
     @Test
     void shouldWriteCachedSnapshotWithTtl() {
         RedisAuthCacheStore store = new RedisAuthCacheStore(stringRedisTemplate, objectMapper, gatewayProperties);
-        DistributedKeyAuthSnapshot snapshot = new DistributedKeyAuthSnapshot(1L, "sk-gw-test", "test", "masked", "hash", List.of("CODEX"));
+        DistributedKeyAuthSnapshot snapshot = new DistributedKeyAuthSnapshot(1L, "sk-gw-test", "test", "masked", "hash", List.of("CODEX"), 1L);
 
         store.put(snapshot, Duration.ofMinutes(3));
 

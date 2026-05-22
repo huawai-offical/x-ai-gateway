@@ -29,7 +29,7 @@ class FunctionalProviderSmokeHttpClientTests {
                 ProviderType.OPENAI_COMPATIBLE,
                 protocol,
                 families.getFirst(),
-                "https://api.mimo-v2.com/v1",
+                null,
                 null
         );
 
@@ -39,10 +39,32 @@ class FunctionalProviderSmokeHttpClientTests {
         assertEquals("SKIPPED", item.classification());
         assertEquals("DRY_RUN", item.skippedReason());
         assertEquals("/v1/chat/completions", item.path());
-        assertEquals("https://api.mimo-v2.com", item.requestPreview().get("baseUrl"));
+        assertEquals("https://token-plan-sgp.xiaomimimo.com", item.requestPreview().get("baseUrl"));
         assertEquals("mimo-v2-pro", item.model());
         assertTrue(item.requestPreview().toString().contains("api-key=***"));
         assertFalse(item.requestPreview().toString().contains("Bearer ***"));
+    }
+
+    @Test
+    void shouldBuildMimoAnthropicCompatibleDryRunFromCurrentDefaultEndpoint() {
+        FunctionalProviderSmokeHttpClient client = new FunctionalProviderSmokeHttpClient(objectMapper);
+        String protocol = client.resolveProtocol(ProviderType.ANTHROPIC_DIRECT, "mimo_anthropic", null);
+        List<String> families = client.normalizeFamilies(ProviderType.ANTHROPIC_DIRECT, protocol, null);
+
+        var item = client.dryRunItem(
+                ProviderType.ANTHROPIC_DIRECT,
+                protocol,
+                families.getFirst(),
+                null,
+                null
+        );
+
+        assertEquals("ANTHROPIC_COMPATIBLE", protocol);
+        assertEquals("MESSAGES", item.resourceFamily());
+        assertEquals("/v1/messages", item.path());
+        assertEquals("https://token-plan-sgp.xiaomimimo.com/anthropic", item.requestPreview().get("baseUrl"));
+        assertTrue(item.requestPreview().toString().contains("anthropic-version=2023-06-01"));
+        assertTrue(item.requestPreview().toString().contains("api-key=***"));
     }
 
     @Test

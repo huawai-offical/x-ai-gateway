@@ -35,10 +35,12 @@ public class DefaultResourceBootstrapService {
         var defaultGroup = accountGroupAdminService.ensureDefaultGroup();
         networkGovernanceService.ensureDefaultTlsProfiles();
         var providerSites = providerSiteRegistryService.importDefaultPresets();
+        int backfilledCredentials = providerSiteRegistryService.backfillCredentialProtocolEndpoints();
         log.info(
-                "默认资源引导完成：default 账号分组 id={}，TLS 指纹默认画像已校验，默认厂商 API 入口={} 个。",
+                "默认资源引导完成：default 账号分组 id={}，TLS 指纹默认画像已校验，默认厂商 API 入口={} 个，回填协议入口凭证={} 个。",
                 defaultGroup.getId(),
-                providerSites.size()
+                providerSites.size(),
+                backfilledCredentials
         );
     }
 }

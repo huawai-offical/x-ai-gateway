@@ -2,6 +2,7 @@ package com.prodigalgal.xaigateway.gateway.core.auth;
 
 import com.prodigalgal.xaigateway.infra.config.GatewayProperties;
 import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyEntity;
+import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAccountGroupBindingRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyRepository;
 import java.util.List;
 import java.util.Optional;
@@ -9,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 
@@ -21,18 +23,23 @@ class DistributedKeyAuthenticationServiceTests {
         AuthCacheStore authCacheStore = Mockito.mock(AuthCacheStore.class);
         GatewayProperties gatewayProperties = new GatewayProperties();
         AccessGroupEntitlementService accessGroupEntitlementService = Mockito.mock(AccessGroupEntitlementService.class);
+        DistributedKeyAccountGroupBindingRepository accountGroupBindingRepository =
+                Mockito.mock(DistributedKeyAccountGroupBindingRepository.class);
         DistributedKeyAuthenticationService service = new DistributedKeyAuthenticationService(
                 repository,
                 secretService,
                 authCacheStore,
                 gatewayProperties,
-                accessGroupEntitlementService
+                accessGroupEntitlementService,
+                accountGroupBindingRepository
         );
 
         Mockito.when(secretService.hashSecret("secret")).thenReturn("hash");
         Mockito.when(authCacheStore.get("sk-gw-test")).thenReturn(Optional.of(
-                new DistributedKeyAuthSnapshot(1L, "sk-gw-test", "test", "masked", "hash", List.of("CODEX"))
+                new DistributedKeyAuthSnapshot(1L, "sk-gw-test", "test", "masked", "hash", List.of("CODEX"), 1L)
         ));
+        Mockito.when(accountGroupBindingRepository.countByDistributedKey_IdAndActiveTrueAndGroup_ActiveTrue(1L))
+                .thenReturn(1L);
 
         AuthenticatedDistributedKey result = service.authenticateRawToken("sk-gw-test.secret");
 
@@ -47,12 +54,15 @@ class DistributedKeyAuthenticationServiceTests {
         AuthCacheStore authCacheStore = Mockito.mock(AuthCacheStore.class);
         GatewayProperties gatewayProperties = new GatewayProperties();
         AccessGroupEntitlementService accessGroupEntitlementService = Mockito.mock(AccessGroupEntitlementService.class);
+        DistributedKeyAccountGroupBindingRepository accountGroupBindingRepository =
+                Mockito.mock(DistributedKeyAccountGroupBindingRepository.class);
         DistributedKeyAuthenticationService service = new DistributedKeyAuthenticationService(
                 repository,
                 secretService,
                 authCacheStore,
                 gatewayProperties,
-                accessGroupEntitlementService
+                accessGroupEntitlementService,
+                accountGroupBindingRepository
         );
         DistributedKeyEntity entity = new DistributedKeyEntity();
         entity.setKeyName("test");
@@ -65,6 +75,8 @@ class DistributedKeyAuthenticationServiceTests {
         Mockito.when(secretService.hashSecret("secret")).thenReturn("hash");
         Mockito.when(authCacheStore.get("sk-gw-test")).thenReturn(Optional.empty());
         Mockito.when(repository.findByKeyPrefixAndActiveTrue("sk-gw-test")).thenReturn(Optional.of(entity));
+        Mockito.when(accountGroupBindingRepository.countByDistributedKey_IdAndActiveTrueAndGroup_ActiveTrue(1L))
+                .thenReturn(2L);
         Mockito.when(accessGroupEntitlementService.resolveForDistributedKey(entity)).thenReturn(
                 new ResolvedAccessPolicy(List.of("default"), List.of(), List.of(), List.of(), List.of("CODEX"), null, null, null, null)
         );
@@ -72,5 +84,69 @@ class DistributedKeyAuthenticationServiceTests {
         service.authenticateRawToken("sk-gw-test.secret");
 
         Mockito.verify(authCacheStore).put(any(DistributedKeyAuthSnapshot.class), eq(gatewayProperties.getCache().getAuthTtl()));
+    }
+
+    @Test
+    void shouldRejectCachedSnapshotWhenActiveAccountGroupBindingIsGone() {
+        DistributedKeyRepository repository = Mockito.mock(DistributedKeyRepository.class);
+        DistributedKeySecretService secretService = Mockito.mock(DistributedKeySecretService.class);
+        AuthCacheStore authCacheStore = Mockito.mock(AuthCacheStore.class);
+        GatewayProperties gatewayProperties = new GatewayProperties();
+        AccessGroupEntitlementService accessGroupEntitlementService = Mockito.mock(AccessGroupEntitlementService.class);
+        DistributedKeyAccountGroupBindingRepository accountGroupBindingRepository =
+                Mockito.mock(DistributedKeyAccountGroupBindingRepository.class);
+        DistributedKeyAuthenticationService service = new DistributedKeyAuthenticationService(
+                repository,
+                secretService,
+                authCacheStore,
+                gatewayProperties,
+                accessGroupEntitlementService,
+                accountGroupBindingRepository
+        );
+
+        Mockito.when(secretService.hashSecret("secret")).thenReturn("hash");
+        Mockito.when(authCacheStore.get("sk-gw-test")).thenReturn(Optional.of(
+                new DistributedKeyAuthSnapshot(1L, "sk-gw-test", "test", "masked", "hash", List.of("CODEX"), 1L)
+        ));
+        Mockito.when(accountGroupBindingRepository.countByDistributedKey_IdAndActiveTrueAndGroup_ActiveTrue(1L))
+                .thenReturn(0L);
+
+        assertThrows(GatewayUnauthorizedException.class, () -> service.authenticateRawToken("sk-gw-test.secret"));
+        Mockito.verify(repository, Mockito.never()).findByKeyPrefixAndActiveTrue(any());
+    }
+
+    @Test
+    void shouldRejectCacheMissWhenNoActiveAccountGroupBindingExists() {
+        DistributedKeyRepository repository = Mockito.mock(DistributedKeyRepository.class);
+        DistributedKeySecretService secretService = Mockito.mock(DistributedKeySecretService.class);
+        AuthCacheStore authCacheStore = Mockito.mock(AuthCacheStore.class);
+        GatewayProperties gatewayProperties = new GatewayProperties();
+        AccessGroupEntitlementService accessGroupEntitlementService = Mockito.mock(AccessGroupEntitlementService.class);
+        DistributedKeyAccountGroupBindingRepository accountGroupBindingRepository =
+                Mockito.mock(DistributedKeyAccountGroupBindingRepository.class);
+        DistributedKeyAuthenticationService service = new DistributedKeyAuthenticationService(
+                repository,
+                secretService,
+                authCacheStore,
+                gatewayProperties,
+                accessGroupEntitlementService,
+                accountGroupBindingRepository
+        );
+        DistributedKeyEntity entity = new DistributedKeyEntity();
+        entity.setKeyName("test");
+        entity.setKeyPrefix("sk-gw-test");
+        entity.setMaskedKey("masked");
+        entity.setSecretHash("hash");
+        org.springframework.test.util.ReflectionTestUtils.setField(entity, "id", 1L);
+
+        Mockito.when(secretService.hashSecret("secret")).thenReturn("hash");
+        Mockito.when(authCacheStore.get("sk-gw-test")).thenReturn(Optional.empty());
+        Mockito.when(repository.findByKeyPrefixAndActiveTrue("sk-gw-test")).thenReturn(Optional.of(entity));
+        Mockito.when(accountGroupBindingRepository.countByDistributedKey_IdAndActiveTrueAndGroup_ActiveTrue(1L))
+                .thenReturn(0L);
+
+        assertThrows(GatewayUnauthorizedException.class, () -> service.authenticateRawToken("sk-gw-test.secret"));
+        Mockito.verify(authCacheStore, Mockito.never()).put(any(), any());
+        Mockito.verifyNoInteractions(accessGroupEntitlementService);
     }
 }

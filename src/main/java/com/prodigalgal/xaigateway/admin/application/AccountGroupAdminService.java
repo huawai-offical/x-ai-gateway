@@ -142,7 +142,8 @@ public class AccountGroupAdminService {
                     return;
                 }
                 long activeBindingCount =
-                        distributedKeyAccountGroupBindingRepository.countByDistributedKey_IdAndActiveTrue(distributedKeyId);
+                        distributedKeyAccountGroupBindingRepository
+                                .countByDistributedKey_IdAndActiveTrueAndGroup_ActiveTrue(distributedKeyId);
                 if (activeBindingCount == 0) {
                     distributedKey.setActive(false);
                     distributedKeyRepository.save(distributedKey);

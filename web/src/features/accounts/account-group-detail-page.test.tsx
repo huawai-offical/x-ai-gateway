@@ -120,7 +120,14 @@ const { apiRequestMock } = vi.hoisted(() => ({
       }
     }
     if (url === '/admin/credentials/group/1') {
-      return []
+      return [
+        {
+          id: 21,
+          credentialName: 'MiMo OpenAI-compatible key',
+          providerType: 'OPENAI_COMPATIBLE',
+          active: true,
+        },
+      ]
     }
     if (url === '/admin/credentials/group/2') {
       return []
@@ -133,8 +140,8 @@ const { apiRequestMock } = vi.hoisted(() => ({
           keyPrefix: 'xag_codex',
           maskedKey: 'xag_codex_****',
           active: true,
-          allowedProtocolSuites: ['openai.native'],
-          allowedProviderTypes: ['OPENAI_DIRECT'],
+          allowedProtocolSuites: ['xiaomi_mimo.openai_compatible'],
+          allowedProviderTypes: ['OPENAI_COMPATIBLE'],
           allowedClientFamilies: ['CODEX'],
         },
       ]
@@ -427,6 +434,17 @@ describe('AccountGroupDetailPage', () => {
 
     expect(await screen.findByText('Codex Group')).toBeInTheDocument()
     expect(await screen.findByRole('combobox', { name: '分布式 Key' })).toHaveTextContent('Codex access key')
+    expect(screen.getByRole('combobox', { name: '运行时 provider' })).toHaveDisplayValue('OPENAI_COMPATIBLE')
+    fireEvent.change(screen.getByRole('combobox', { name: '分布式 Key' }), { target: { value: '5' } })
+    fireEvent.submit(screen.getByRole('button', { name: '绑定到访问密钥' }).closest('form')!)
+    await waitFor(() => {
+      const bindCall = apiRequestMock.mock.calls.find(([url, init]) =>
+        url === '/admin/account-groups/1/bindings' && init?.method === 'POST')
+      expect(JSON.parse(String(bindCall?.[1]?.body))).toMatchObject({
+        distributedKeyId: 5,
+        providerType: 'OPENAI_COMPATIBLE',
+      })
+    })
     expect(screen.queryByText(/避免手写裸 ID 绑定错误/)).not.toBeInTheDocument()
   })
 

@@ -28,5 +28,6 @@ class DefaultResourceBootstrapServiceTests {
         Mockito.verify(accountGroupAdminService).ensureDefaultGroup();
         Mockito.verify(networkGovernanceService).ensureDefaultTlsProfiles();
         Mockito.verify(providerSiteRegistryService).importDefaultPresets();
+        Mockito.verify(providerSiteRegistryService).backfillCredentialProtocolEndpoints();
     }
 }

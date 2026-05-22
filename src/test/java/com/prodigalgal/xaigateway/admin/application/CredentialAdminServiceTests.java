@@ -8,11 +8,17 @@ import com.prodigalgal.xaigateway.admin.api.OpenAiDirectResourceSmokeRequest;
 import com.prodigalgal.xaigateway.gateway.core.account.UpstreamAccountProviderType;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CredentialModelDiscoveryService;
 import com.prodigalgal.xaigateway.gateway.core.credential.CredentialAuthKind;
+import com.prodigalgal.xaigateway.gateway.core.shared.AuthStrategy;
+import com.prodigalgal.xaigateway.gateway.core.shared.ErrorSchemaStrategy;
+import com.prodigalgal.xaigateway.gateway.core.shared.ModelAddressingStrategy;
+import com.prodigalgal.xaigateway.gateway.core.shared.PathStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
+import com.prodigalgal.xaigateway.infra.persistence.entity.ProviderProtocolEndpointEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountGroupEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamSiteProfileEntity;
+import com.prodigalgal.xaigateway.infra.persistence.repository.ProviderProtocolEndpointRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountGroupRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import com.sun.net.httpserver.HttpExchange;
@@ -45,12 +51,14 @@ class CredentialAdminServiceTests {
         SupportedModelCatalogService modelCatalogService = Mockito.mock(SupportedModelCatalogService.class);
         UpstreamAccountGroupRepository groupRepository = Mockito.mock(UpstreamAccountGroupRepository.class);
         ProviderSiteRegistryService siteRegistryService = Mockito.mock(ProviderSiteRegistryService.class);
+        ProviderProtocolEndpointRepository endpointRepository = Mockito.mock(ProviderProtocolEndpointRepository.class);
         CredentialAdminService service = service(
                 credentialRepository,
                 cryptoService,
                 modelCatalogService,
                 groupRepository,
-                siteRegistryService
+                siteRegistryService,
+                endpointRepository
         );
         UpstreamAccountGroupEntity group = new UpstreamAccountGroupEntity();
         ReflectionTestUtils.setField(group, "id", 3L);
@@ -67,11 +75,12 @@ class CredentialAdminServiceTests {
 
         Mockito.when(cryptoService.fingerprint("gemini-secret")).thenReturn("fp-gemini");
         Mockito.when(cryptoService.encrypt("gemini-secret")).thenReturn("enc-gemini-secret");
-        Mockito.when(credentialRepository.findFirstByApiKeyFingerprintAndProviderTypeAndBaseUrlAndSiteProfileIdOrderByUpdatedAtDesc(
+        Mockito.when(credentialRepository.findFirstByApiKeyFingerprintAndProviderTypeAndBaseUrlAndSiteProfileIdAndProtocolEndpointIdOrderByUpdatedAtDesc(
                         "fp-gemini",
                         ProviderType.GEMINI_DIRECT,
                         "https://generativelanguage.googleapis.com",
-                        9L
+                        9L,
+                        90L
                 ))
                 .thenReturn(Optional.of(deleted));
         Mockito.when(groupRepository.findById(3L)).thenReturn(Optional.of(group));
@@ -83,6 +92,8 @@ class CredentialAdminServiceTests {
         Mockito.when(modelCatalogService.normalize(Mockito.anyList())).thenAnswer(invocation -> invocation.getArgument(0));
         Mockito.when(siteRegistryService.ensureSiteProfile(null, null, 9L))
                 .thenReturn(siteProfile);
+        Mockito.when(endpointRepository.findById(90L))
+                .thenReturn(Optional.of(protocolEndpoint(90L, 9L, ProviderType.GEMINI_DIRECT, UpstreamSiteKind.GEMINI_DIRECT, "https://generativelanguage.googleapis.com")));
         Mockito.when(credentialRepository.save(Mockito.any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         CredentialResponse response = service.create(new CredentialRequest(
@@ -97,6 +108,7 @@ class CredentialAdminServiceTests {
                 null,
                 null,
                 9L,
+                90L,
                 null,
                 3L,
                 List.of("gemini-2.5-pro")
@@ -117,12 +129,14 @@ class CredentialAdminServiceTests {
         SupportedModelCatalogService modelCatalogService = Mockito.mock(SupportedModelCatalogService.class);
         UpstreamAccountGroupRepository groupRepository = Mockito.mock(UpstreamAccountGroupRepository.class);
         ProviderSiteRegistryService siteRegistryService = Mockito.mock(ProviderSiteRegistryService.class);
+        ProviderProtocolEndpointRepository endpointRepository = Mockito.mock(ProviderProtocolEndpointRepository.class);
         CredentialAdminService service = service(
                 credentialRepository,
                 cryptoService,
                 modelCatalogService,
                 groupRepository,
-                siteRegistryService
+                siteRegistryService,
+                endpointRepository
         );
         UpstreamAccountGroupEntity openAiGroup = new UpstreamAccountGroupEntity();
         ReflectionTestUtils.setField(openAiGroup, "id", 4L);
@@ -138,18 +152,22 @@ class CredentialAdminServiceTests {
         Mockito.when(groupRepository.findById(4L)).thenReturn(Optional.of(openAiGroup));
         Mockito.when(siteRegistryService.ensureSiteProfile(null, null, 41L))
                 .thenReturn(openAiSite);
-        Mockito.when(credentialRepository.findFirstByApiKeyFingerprintAndProviderTypeAndBaseUrlAndSiteProfileIdOrderByUpdatedAtDesc(
+        Mockito.when(endpointRepository.findById(410L))
+                .thenReturn(Optional.of(protocolEndpoint(410L, 41L, ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.DEEPSEEK, "https://api.deepseek.com")));
+        Mockito.when(credentialRepository.findFirstByApiKeyFingerprintAndProviderTypeAndBaseUrlAndSiteProfileIdAndProtocolEndpointIdOrderByUpdatedAtDesc(
                         "fp-shared",
                         ProviderType.OPENAI_COMPATIBLE,
                         "https://api.deepseek.com",
-                        41L
+                        41L,
+                        410L
                 ))
                 .thenReturn(Optional.empty());
-        Mockito.when(credentialRepository.findByApiKeyFingerprintAndProviderTypeAndBaseUrlAndSiteProfileIdAndDeletedFalse(
+        Mockito.when(credentialRepository.findByApiKeyFingerprintAndProviderTypeAndBaseUrlAndSiteProfileIdAndProtocolEndpointIdAndDeletedFalse(
                         "fp-shared",
                         ProviderType.OPENAI_COMPATIBLE,
                         "https://api.deepseek.com",
-                        41L
+                        41L,
+                        410L
                 ))
                 .thenReturn(Optional.empty());
         Mockito.when(modelCatalogService.resolveForCredentialImport(
@@ -176,18 +194,292 @@ class CredentialAdminServiceTests {
                 null,
                 null,
                 41L,
+                410L,
                 null,
                 4L,
                 List.of("deepseek-chat")
         ));
 
         assertEquals(100L, response.id());
-        Mockito.verify(credentialRepository).findFirstByApiKeyFingerprintAndProviderTypeAndBaseUrlAndSiteProfileIdOrderByUpdatedAtDesc(
+        Mockito.verify(credentialRepository).findFirstByApiKeyFingerprintAndProviderTypeAndBaseUrlAndSiteProfileIdAndProtocolEndpointIdOrderByUpdatedAtDesc(
                 "fp-shared",
                 ProviderType.OPENAI_COMPATIBLE,
                 "https://api.deepseek.com",
-                41L
+                41L,
+                410L
         );
+    }
+
+    @Test
+    void shouldCreateSameSecretForMultipleProtocolEndpoints() {
+        UpstreamCredentialRepository credentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        CredentialCryptoService cryptoService = Mockito.mock(CredentialCryptoService.class);
+        SupportedModelCatalogService modelCatalogService = Mockito.mock(SupportedModelCatalogService.class);
+        UpstreamAccountGroupRepository groupRepository = Mockito.mock(UpstreamAccountGroupRepository.class);
+        ProviderSiteRegistryService siteRegistryService = Mockito.mock(ProviderSiteRegistryService.class);
+        ProviderProtocolEndpointRepository endpointRepository = Mockito.mock(ProviderProtocolEndpointRepository.class);
+        CredentialAdminService service = service(
+                credentialRepository,
+                cryptoService,
+                modelCatalogService,
+                groupRepository,
+                siteRegistryService,
+                endpointRepository
+        );
+        UpstreamAccountGroupEntity group = new UpstreamAccountGroupEntity();
+        ReflectionTestUtils.setField(group, "id", 4L);
+        UpstreamSiteProfileEntity site = siteProfile(41L, UpstreamSiteKind.DEEPSEEK, "https://api.deepseek.com");
+        ProviderProtocolEndpointEntity openAiEndpoint = protocolEndpoint(
+                410L,
+                41L,
+                ProviderType.OPENAI_COMPATIBLE,
+                UpstreamSiteKind.DEEPSEEK,
+                "https://api.deepseek.com"
+        );
+        openAiEndpoint.setDisplayName("OpenAI-compatible");
+        ProviderProtocolEndpointEntity anthropicEndpoint = protocolEndpoint(
+                411L,
+                41L,
+                ProviderType.ANTHROPIC_DIRECT,
+                UpstreamSiteKind.ANTHROPIC_DIRECT,
+                "https://api.deepseek.com/anthropic"
+        );
+        anthropicEndpoint.setDisplayName("Anthropic-compatible");
+
+        Mockito.when(cryptoService.fingerprint("shared-secret")).thenReturn("fp-shared");
+        Mockito.when(cryptoService.encrypt("shared-secret")).thenReturn("enc-shared");
+        Mockito.when(groupRepository.findById(4L)).thenReturn(Optional.of(group));
+        Mockito.when(siteRegistryService.ensureSiteProfile(null, null, 41L)).thenReturn(site);
+        Mockito.when(endpointRepository.findById(410L)).thenReturn(Optional.of(openAiEndpoint));
+        Mockito.when(endpointRepository.findById(411L)).thenReturn(Optional.of(anthropicEndpoint));
+        Mockito.when(credentialRepository.findFirstByApiKeyFingerprintAndProviderTypeAndBaseUrlAndSiteProfileIdAndProtocolEndpointIdOrderByUpdatedAtDesc(
+                Mockito.eq("fp-shared"),
+                Mockito.any(),
+                Mockito.anyString(),
+                Mockito.eq(41L),
+                Mockito.anyLong()
+        )).thenReturn(Optional.empty());
+        Mockito.when(credentialRepository.findByApiKeyFingerprintAndProviderTypeAndBaseUrlAndSiteProfileIdAndProtocolEndpointIdAndDeletedFalse(
+                Mockito.eq("fp-shared"),
+                Mockito.any(),
+                Mockito.anyString(),
+                Mockito.eq(41L),
+                Mockito.anyLong()
+        )).thenReturn(Optional.empty());
+        Mockito.when(modelCatalogService.resolveForCredentialImport(Mockito.any(), Mockito.eq(group), Mockito.eq(List.of("deepseek-chat"))))
+                .thenAnswer(invocation -> invocation.getArgument(2));
+        Mockito.when(modelCatalogService.normalize(Mockito.anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+        Mockito.when(credentialRepository.save(Mockito.any())).thenAnswer(invocation -> {
+            UpstreamCredentialEntity entity = invocation.getArgument(0);
+            ReflectionTestUtils.setField(entity, "id", entity.getProtocolEndpointId());
+            return entity;
+        });
+
+        List<CredentialResponse> responses = service.createForProtocolEndpoints(new CredentialRequest(
+                "DeepSeek",
+                null,
+                null,
+                CredentialAuthKind.API_KEY,
+                "shared-secret",
+                null,
+                Map.of(),
+                true,
+                null,
+                null,
+                41L,
+                null,
+                List.of(410L, 411L),
+                4L,
+                List.of("deepseek-chat")
+        ));
+
+        assertEquals(2, responses.size());
+        assertEquals(List.of(410L, 411L), responses.stream().map(CredentialResponse::protocolEndpointId).toList());
+        assertEquals("DeepSeek - OpenAI-compatible", responses.get(0).credentialName());
+        assertEquals("DeepSeek - Anthropic-compatible", responses.get(1).credentialName());
+        Mockito.verify(credentialRepository, Mockito.times(2)).save(Mockito.any(UpstreamCredentialEntity.class));
+    }
+
+    @Test
+    void shouldMergeProtocolEndpointConversationProfileIntoCredentialMetadataOnCreate() {
+        UpstreamCredentialRepository credentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        CredentialCryptoService cryptoService = Mockito.mock(CredentialCryptoService.class);
+        SupportedModelCatalogService modelCatalogService = Mockito.mock(SupportedModelCatalogService.class);
+        UpstreamAccountGroupRepository groupRepository = Mockito.mock(UpstreamAccountGroupRepository.class);
+        ProviderSiteRegistryService siteRegistryService = Mockito.mock(ProviderSiteRegistryService.class);
+        ProviderProtocolEndpointRepository endpointRepository = Mockito.mock(ProviderProtocolEndpointRepository.class);
+        CredentialAdminService service = service(
+                credentialRepository,
+                cryptoService,
+                modelCatalogService,
+                groupRepository,
+                siteRegistryService,
+                endpointRepository
+        );
+        UpstreamAccountGroupEntity group = new UpstreamAccountGroupEntity();
+        ReflectionTestUtils.setField(group, "id", 4L);
+        UpstreamSiteProfileEntity site = siteProfile(41L, UpstreamSiteKind.DEEPSEEK, "https://api.deepseek.com");
+        ProviderProtocolEndpointEntity endpoint = protocolEndpoint(
+                411L,
+                41L,
+                ProviderType.ANTHROPIC_DIRECT,
+                UpstreamSiteKind.ANTHROPIC_DIRECT,
+                "https://api.deepseek.com/anthropic",
+                """
+                        {
+                          "targetProtocol": "anthropic_messages",
+                          "reasoningTransport": "thinking_blocks",
+                          "protocolEndpoint": "anthropic_compatible"
+                        }
+                        """
+        );
+
+        Mockito.when(cryptoService.fingerprint("shared-secret")).thenReturn("fp-shared");
+        Mockito.when(cryptoService.encrypt("shared-secret")).thenReturn("enc-shared");
+        Mockito.when(groupRepository.findById(4L)).thenReturn(Optional.of(group));
+        Mockito.when(siteRegistryService.ensureSiteProfile(null, null, 41L)).thenReturn(site);
+        Mockito.when(endpointRepository.findById(411L)).thenReturn(Optional.of(endpoint));
+        Mockito.when(credentialRepository.findFirstByApiKeyFingerprintAndProviderTypeAndBaseUrlAndSiteProfileIdAndProtocolEndpointIdOrderByUpdatedAtDesc(
+                        "fp-shared",
+                        ProviderType.ANTHROPIC_DIRECT,
+                        "https://api.deepseek.com/anthropic",
+                        41L,
+                        411L
+                ))
+                .thenReturn(Optional.empty());
+        Mockito.when(credentialRepository.findByApiKeyFingerprintAndProviderTypeAndBaseUrlAndSiteProfileIdAndProtocolEndpointIdAndDeletedFalse(
+                        "fp-shared",
+                        ProviderType.ANTHROPIC_DIRECT,
+                        "https://api.deepseek.com/anthropic",
+                        41L,
+                        411L
+                ))
+                .thenReturn(Optional.empty());
+        Mockito.when(modelCatalogService.resolveForCredentialImport(
+                Mockito.eq(ProviderType.ANTHROPIC_DIRECT),
+                Mockito.eq(group),
+                Mockito.eq(List.of("deepseek-chat"))
+        )).thenReturn(List.of("deepseek-chat"));
+        Mockito.when(modelCatalogService.normalize(Mockito.anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+        Mockito.when(credentialRepository.save(Mockito.any())).thenAnswer(invocation -> {
+            UpstreamCredentialEntity entity = invocation.getArgument(0);
+            ReflectionTestUtils.setField(entity, "id", 101L);
+            return entity;
+        });
+
+        CredentialResponse response = service.create(new CredentialRequest(
+                "DeepSeek Anthropic",
+                null,
+                null,
+                CredentialAuthKind.API_KEY,
+                "shared-secret",
+                null,
+                Map.of(
+                        "source", "manual",
+                        "conversationProfile", Map.of(
+                                "reasoningTransport", "reasoning_content_delta",
+                                "customFlag", "user_override"
+                        )
+                ),
+                true,
+                null,
+                null,
+                41L,
+                411L,
+                null,
+                4L,
+                List.of("deepseek-chat")
+        ));
+
+        assertEquals(101L, response.id());
+        assertEquals(411L, response.protocolEndpointId());
+        assertEquals("manual", response.credentialMetadata().get("source"));
+        Map<?, ?> conversationProfile = (Map<?, ?>) response.credentialMetadata().get("conversationProfile");
+        assertNotNull(conversationProfile);
+        assertEquals("anthropic_messages", conversationProfile.get("targetProtocol"));
+        assertEquals("anthropic_compatible", conversationProfile.get("protocolEndpoint"));
+        assertEquals("reasoning_content_delta", conversationProfile.get("reasoningTransport"));
+        assertEquals("user_override", conversationProfile.get("customFlag"));
+    }
+
+    @Test
+    void shouldRefreshConversationProfileWhenCredentialSwitchesProtocolEndpoint() {
+        UpstreamCredentialRepository credentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        CredentialCryptoService cryptoService = Mockito.mock(CredentialCryptoService.class);
+        SupportedModelCatalogService modelCatalogService = Mockito.mock(SupportedModelCatalogService.class);
+        UpstreamAccountGroupRepository groupRepository = Mockito.mock(UpstreamAccountGroupRepository.class);
+        ProviderSiteRegistryService siteRegistryService = Mockito.mock(ProviderSiteRegistryService.class);
+        ProviderProtocolEndpointRepository endpointRepository = Mockito.mock(ProviderProtocolEndpointRepository.class);
+        CredentialAdminService service = service(
+                credentialRepository,
+                cryptoService,
+                modelCatalogService,
+                groupRepository,
+                siteRegistryService,
+                endpointRepository
+        );
+        UpstreamCredentialEntity existing = credential(201L, ProviderType.OPENAI_COMPATIBLE);
+        existing.setSiteProfileId(41L);
+        existing.setProtocolEndpointId(410L);
+        existing.setGroupId(4L);
+        existing.setCredentialMetadataJson("""
+                {"conversationProfile":{"targetProtocol":"openai_chat_or_responses"}}
+                """);
+        UpstreamAccountGroupEntity group = new UpstreamAccountGroupEntity();
+        ReflectionTestUtils.setField(group, "id", 4L);
+        UpstreamSiteProfileEntity site = siteProfile(41L, UpstreamSiteKind.DEEPSEEK, "https://api.deepseek.com");
+        ProviderProtocolEndpointEntity endpoint = protocolEndpoint(
+                411L,
+                41L,
+                ProviderType.ANTHROPIC_DIRECT,
+                UpstreamSiteKind.ANTHROPIC_DIRECT,
+                "https://api.deepseek.com/anthropic",
+                """
+                        {
+                          "targetProtocol": "anthropic_messages",
+                          "reasoningTransport": "thinking_blocks"
+                        }
+                        """
+        );
+
+        Mockito.when(credentialRepository.findById(201L)).thenReturn(Optional.of(existing));
+        Mockito.when(groupRepository.findById(4L)).thenReturn(Optional.of(group));
+        Mockito.when(siteRegistryService.ensureSiteProfile(null, null, 41L)).thenReturn(site);
+        Mockito.when(endpointRepository.findById(411L)).thenReturn(Optional.of(endpoint));
+        Mockito.when(modelCatalogService.resolveForCredentialImport(
+                Mockito.eq(ProviderType.ANTHROPIC_DIRECT),
+                Mockito.eq(group),
+                Mockito.eq(List.of("deepseek-chat"))
+        )).thenReturn(List.of("deepseek-chat"));
+        Mockito.when(modelCatalogService.normalize(Mockito.anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+        Mockito.when(credentialRepository.save(Mockito.any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CredentialResponse response = service.update(201L, new CredentialRequest(
+                "DeepSeek Anthropic",
+                null,
+                null,
+                CredentialAuthKind.API_KEY,
+                null,
+                null,
+                Map.of("source", "endpoint_switch"),
+                true,
+                null,
+                null,
+                41L,
+                411L,
+                null,
+                4L,
+                List.of("deepseek-chat")
+        ));
+
+        assertEquals(411L, response.protocolEndpointId());
+        assertEquals(ProviderType.ANTHROPIC_DIRECT, response.providerType());
+        assertEquals("https://api.deepseek.com/anthropic", response.baseUrl());
+        assertEquals("endpoint_switch", response.credentialMetadata().get("source"));
+        Map<?, ?> conversationProfile = (Map<?, ?>) response.credentialMetadata().get("conversationProfile");
+        assertNotNull(conversationProfile);
+        assertEquals("anthropic_messages", conversationProfile.get("targetProtocol"));
+        assertEquals("thinking_blocks", conversationProfile.get("reasoningTransport"));
     }
 
     @Test
@@ -222,11 +514,12 @@ class CredentialAdminServiceTests {
                 null,
                 null,
                 null,
+                null,
                 4L,
                 List.of()
         )));
 
-        assertEquals("API Key 上游凭证必须绑定厂商/API 入口。", exception.getMessage());
+        assertEquals("API Key 上游凭证必须绑定厂商协议入口。", exception.getMessage());
         Mockito.verify(siteRegistryService, Mockito.never()).ensureSiteProfile(Mockito.any(), Mockito.any(), Mockito.any());
         Mockito.verify(credentialRepository, Mockito.never()).save(Mockito.any());
     }
@@ -669,11 +962,29 @@ class CredentialAdminServiceTests {
             SupportedModelCatalogService modelCatalogService,
             UpstreamAccountGroupRepository accountGroupRepository,
             ProviderSiteRegistryService siteRegistryService) {
+        return service(
+                credentialRepository,
+                cryptoService,
+                modelCatalogService,
+                accountGroupRepository,
+                siteRegistryService,
+                Mockito.mock(ProviderProtocolEndpointRepository.class)
+        );
+    }
+
+    private CredentialAdminService service(
+            UpstreamCredentialRepository credentialRepository,
+            CredentialCryptoService cryptoService,
+            SupportedModelCatalogService modelCatalogService,
+            UpstreamAccountGroupRepository accountGroupRepository,
+            ProviderSiteRegistryService siteRegistryService,
+            ProviderProtocolEndpointRepository endpointRepository) {
         return new CredentialAdminService(
                 credentialRepository,
                 cryptoService,
                 Mockito.mock(CredentialModelDiscoveryService.class),
                 siteRegistryService,
+                endpointRepository,
                 accountGroupRepository,
                 new ObjectMapper(),
                 modelCatalogService,
@@ -703,6 +1014,44 @@ class CredentialAdminServiceTests {
         entity.setDisplayName(siteKind.name());
         entity.setSiteKind(siteKind);
         entity.setBaseUrlPattern(baseUrlPattern);
+        entity.setActive(true);
+        return entity;
+    }
+
+    private ProviderProtocolEndpointEntity protocolEndpoint(
+            Long id,
+            Long siteProfileId,
+            ProviderType providerType,
+            UpstreamSiteKind siteKind,
+            String baseUrl) {
+        return protocolEndpoint(id, siteProfileId, providerType, siteKind, baseUrl, null);
+    }
+
+    private ProviderProtocolEndpointEntity protocolEndpoint(
+            Long id,
+            Long siteProfileId,
+            ProviderType providerType,
+            UpstreamSiteKind siteKind,
+            String baseUrl,
+            String conversationProfileJson) {
+        ProviderProtocolEndpointEntity entity = new ProviderProtocolEndpointEntity();
+        ReflectionTestUtils.setField(entity, "id", id);
+        entity.setSiteProfileId(siteProfileId);
+        entity.setEndpointCode("endpoint:" + id);
+        entity.setDisplayName("endpoint-" + id);
+        entity.setProtocolSuite("suite:" + id);
+        entity.setProviderType(providerType);
+        entity.setSiteKind(siteKind);
+        entity.setBaseUrl(baseUrl);
+        entity.setAuthStrategy(AuthStrategy.BEARER);
+        entity.setPathStrategy(siteKind == UpstreamSiteKind.ANTHROPIC_DIRECT
+                ? PathStrategy.ANTHROPIC_V1_MESSAGES
+                : PathStrategy.OPENAI_V1);
+        entity.setModelAddressingStrategy(ModelAddressingStrategy.MODEL_NAME);
+        entity.setErrorSchemaStrategy(siteKind == UpstreamSiteKind.ANTHROPIC_DIRECT
+                ? ErrorSchemaStrategy.ANTHROPIC_ERROR
+                : ErrorSchemaStrategy.OPENAI_ERROR);
+        entity.setConversationProfileJson(conversationProfileJson);
         entity.setActive(true);
         return entity;
     }

@@ -2,6 +2,7 @@ package com.prodigalgal.xaigateway.admin.application;
 
 import com.prodigalgal.xaigateway.admin.api.DistributedKeyCreateResponse;
 import com.prodigalgal.xaigateway.admin.api.DistributedKeyClientConfigResponse;
+import com.prodigalgal.xaigateway.admin.api.DistributedKeyInitialAccountGroupBindingRequest;
 import com.prodigalgal.xaigateway.admin.api.DistributedKeyOnboardingDeepLinkResponse;
 import com.prodigalgal.xaigateway.admin.api.DistributedKeyOnboardingPackResponse;
 import com.prodigalgal.xaigateway.admin.api.DistributedKeyOnboardingSnippetResponse;
@@ -14,24 +15,29 @@ import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeySecrets;
 import com.prodigalgal.xaigateway.gateway.core.shared.ModelIdNormalizer;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProtocolSuite;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
+import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyAccountGroupBindingEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeySecretExportGrantEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayUserEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountGroupEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAccountGroupBindingRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAccessGroupGrantRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyBindingRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeySecretExportGrantRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.GatewayUserRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountGroupRepository;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,6 +53,7 @@ public class DistributedKeyAdminService {
     private final DistributedKeyAccessGroupGrantRepository keyGrantRepository;
     private final DistributedKeySecretExportGrantRepository secretExportGrantRepository;
     private final GatewayUserRepository gatewayUserRepository;
+    private final UpstreamAccountGroupRepository upstreamAccountGroupRepository;
     private final CredentialCryptoService credentialCryptoService;
     private final Optional<OpsAuditService> opsAuditService;
     private static final Duration SECRET_EXPORT_TTL = Duration.ofMinutes(15);
@@ -59,6 +66,7 @@ public class DistributedKeyAdminService {
             DistributedKeyAccessGroupGrantRepository keyGrantRepository,
             DistributedKeySecretExportGrantRepository secretExportGrantRepository,
             GatewayUserRepository gatewayUserRepository,
+            UpstreamAccountGroupRepository upstreamAccountGroupRepository,
             CredentialCryptoService credentialCryptoService,
             Optional<OpsAuditService> opsAuditService) {
         this.distributedKeyRepository = distributedKeyRepository;
@@ -68,6 +76,7 @@ public class DistributedKeyAdminService {
         this.keyGrantRepository = keyGrantRepository;
         this.secretExportGrantRepository = secretExportGrantRepository;
         this.gatewayUserRepository = gatewayUserRepository;
+        this.upstreamAccountGroupRepository = upstreamAccountGroupRepository;
         this.credentialCryptoService = credentialCryptoService;
         this.opsAuditService = opsAuditService;
     }
@@ -84,13 +93,14 @@ public class DistributedKeyAdminService {
         DistributedKeySecrets secrets = distributedKeySecretService.generate();
         DistributedKeyEntity entity = new DistributedKeyEntity();
         apply(entity, request, true);
-        if (entity.isActive()) {
-            throw new IllegalArgumentException("分发 key 启用前必须先绑定账号分组。");
-        }
         entity.setKeyPrefix(secrets.keyPrefix());
         entity.setSecretHash(secrets.secretHash());
         entity.setMaskedKey(secrets.maskedKey());
         DistributedKeyEntity saved = distributedKeyRepository.save(entity);
+        createInitialAccountGroupBindings(saved, request.resolvedInitialAccountGroupBindings());
+        if (saved.isActive()) {
+            assertHasActiveGroupBinding(saved.getId());
+        }
         IssuedSecretExportGrant grant = registerSecretExportGrant(saved, secrets.fullKey(), "CREATE");
         return new DistributedKeyCreateResponse(toResponse(saved), secrets.fullKey(), grant.token(), grant.expiresAt());
     }
@@ -411,9 +421,41 @@ public class DistributedKeyAdminService {
 
     private void assertHasActiveGroupBinding(Long distributedKeyId) {
         long activeBindings = distributedKeyAccountGroupBindingRepository
-                .countByDistributedKey_IdAndActiveTrue(distributedKeyId);
+                .countByDistributedKey_IdAndActiveTrueAndGroup_ActiveTrue(distributedKeyId);
         if (activeBindings <= 0) {
-            throw new IllegalArgumentException("分发 key 启用前必须先绑定账号分组。");
+            throw new IllegalArgumentException("分发 key 启用前必须先绑定已启用的账号分组。");
+        }
+    }
+
+    private void createInitialAccountGroupBindings(
+            DistributedKeyEntity distributedKey,
+            List<DistributedKeyInitialAccountGroupBindingRequest> bindings) {
+        if (bindings == null || bindings.isEmpty()) {
+            return;
+        }
+        Set<String> seenScopes = new LinkedHashSet<>();
+        for (DistributedKeyInitialAccountGroupBindingRequest binding : bindings) {
+            if (binding == null) {
+                continue;
+            }
+            Long groupId = binding.groupId();
+            ProviderType providerType = binding.providerType();
+            if (groupId == null || providerType == null) {
+                throw new IllegalArgumentException("初始账号分组绑定必须包含账号分组和运行时 provider。");
+            }
+            String scope = groupId + ":" + providerType.name();
+            if (!seenScopes.add(scope)) {
+                throw new IllegalArgumentException("初始账号分组绑定存在重复账号分组和运行时 provider。");
+            }
+            UpstreamAccountGroupEntity group = upstreamAccountGroupRepository.findById(groupId)
+                    .orElseThrow(() -> new IllegalArgumentException("未找到初始绑定的账号分组。"));
+            DistributedKeyAccountGroupBindingEntity entity = new DistributedKeyAccountGroupBindingEntity();
+            entity.setDistributedKey(distributedKey);
+            entity.setGroup(group);
+            entity.setProviderType(providerType);
+            entity.setPriority(binding.priority() == null ? 100 : binding.priority());
+            entity.setActive(binding.active() == null || binding.active());
+            distributedKeyAccountGroupBindingRepository.save(entity);
         }
     }
 

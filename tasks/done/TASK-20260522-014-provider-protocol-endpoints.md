@@ -74,12 +74,12 @@
 
 ## 验收标准
 
-- [ ] 新增协议入口表和 JPA entity/repository。
-- [ ] 默认预设导入生成协议入口。
-- [ ] API Key 凭证可以绑定 `protocolEndpointId` 并继承 provider type/Base URL。
-- [ ] 厂商管理 UI 展示协议入口。
-- [ ] 上游凭证 UI 选择协议入口。
-- [ ] 后端和前端验证通过。
+- [x] 新增协议入口表和 JPA entity/repository。
+- [x] 默认预设导入生成协议入口。
+- [x] API Key 凭证可以绑定 `protocolEndpointId` 并继承 provider type/Base URL。
+- [x] 厂商管理 UI 展示协议入口。
+- [x] 上游凭证 UI 选择协议入口。
+- [x] 后端和前端验证通过。
 
 ## 测试边界
 
@@ -101,4 +101,29 @@
 
 ## 当前状态
 
-In Progress
+Done
+
+## 实现结果
+
+- 新增 `ProviderProtocolEndpointEntity`、`ProviderProtocolEndpointRepository` 与 Liquibase `db.changelog-0004-provider-protocol-endpoints.yaml`。
+- 厂商/API 入口 response 带 `protocolEndpoints`，厂商详情页可展示、创建、编辑和删除协议入口。
+- 预设导入会创建默认协议入口；MiMo/DeepSeek 自动生成 OpenAI-compatible 与 Anthropic-compatible 双入口。
+- `CredentialRequest`、`CredentialResponse` 与上游凭证库存 response 带 `protocolEndpointId`，API Key 凭证创建必须选择具体协议入口。
+- 上游凭证 UI 改为选择“厂商协议入口”，并从入口派生 provider type、site kind 与 Base URL。
+- 补充 MiMo 双协议入口生成后端回归测试，以及凭证页、厂商详情页前端测试。
+
+## 验证记录
+
+- `.\gradlew.bat compileJava compileTestJava`
+- `.\gradlew.bat test --tests "com.prodigalgal.xaigateway.admin.application.ProviderSiteRegistryServiceTests"`
+- `.\gradlew.bat test --tests "com.prodigalgal.xaigateway.admin.application.ProviderSiteRegistryServiceTests" --tests "com.prodigalgal.xaigateway.admin.application.ProviderSiteAdminServiceTests" --tests "com.prodigalgal.xaigateway.admin.application.CredentialAdminServiceTests" --tests "com.prodigalgal.xaigateway.admin.api.ProviderSiteAdminControllerTests" --tests "com.prodigalgal.xaigateway.admin.api.CredentialAdminControllerTests"`
+- `bun run typecheck`
+- `bun run test -- credentials-page provider-site-detail-page provider-sites-page`
+- 当前本地库 `x_ai_gateway` 已执行 `0004-provider-protocol-endpoints`，并确认 MiMo/DeepSeek 双协议入口落库。
+
+## 遗留边界
+
+- 不包含真实外部 API 调用。
+- 不包含 runtime 按请求协议动态切换 endpoint 的深层路由改造。
+- 不强制迁移 OAuth/auth.json 账号导入。
+- 存量 API Key 凭证回填由 `TASK-20260522-016` 承接并完成。
