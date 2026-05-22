@@ -789,8 +789,38 @@ class CredentialAdminServiceTests {
         assertEquals(3, response.items().size());
         assertEquals(3, response.summary().get("SKIPPED"));
         assertTrue(response.items().stream().anyMatch(item -> "CHAT_TOOLS".equals(item.resourceFamily())));
-        assertTrue(response.toString().contains("api-key=***"));
-        assertFalse(response.toString().contains("Bearer ***"));
+        assertTrue(response.toString().contains("authorization=Bearer ***"));
+        assertFalse(response.toString().contains("mimo-secret"));
+        Mockito.verify(cryptoService, Mockito.never()).decrypt(Mockito.anyString());
+        Mockito.verify(credentialRepository, Mockito.never()).save(Mockito.any());
+    }
+
+    @Test
+    void shouldKeepAnthropicCompatibleFunctionalSmokeApiKeyHeaderPreview() {
+        UpstreamCredentialRepository credentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        CredentialCryptoService cryptoService = Mockito.mock(CredentialCryptoService.class);
+        CredentialAdminService service = service(credentialRepository, cryptoService);
+        UpstreamCredentialEntity credential = credential(171L, ProviderType.ANTHROPIC_DIRECT);
+        credential.setBaseUrl("https://api.deepseek.com/anthropic");
+        Mockito.when(credentialRepository.findById(171L)).thenReturn(Optional.of(credential));
+
+        var response = service.functionalProviderSmoke(171L, new FunctionalProviderSmokeRequest(
+                true,
+                null,
+                "anthropic_compatible",
+                null,
+                null,
+                null,
+                List.of("messages"),
+                null
+        ));
+
+        assertEquals("DRY_RUN_READY", response.status());
+        assertEquals("ANTHROPIC_COMPATIBLE", response.protocol());
+        String preview = response.items().getFirst().requestPreview().toString();
+        assertTrue(preview.contains("anthropic-version=2023-06-01"));
+        assertTrue(preview.contains("api-key=***"));
+        assertFalse(preview.contains("authorization"));
         Mockito.verify(cryptoService, Mockito.never()).decrypt(Mockito.anyString());
         Mockito.verify(credentialRepository, Mockito.never()).save(Mockito.any());
     }
@@ -852,9 +882,9 @@ class CredentialAdminServiceTests {
     @Test
     void shouldExecuteFunctionalProviderSmokeWhenLiveAndBillableAreExplicitlyAllowed() throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
-        AtomicReference<String> apiKey = new AtomicReference<>();
+        AtomicReference<String> authorization = new AtomicReference<>();
         server.createContext("/v1/chat/completions", exchange -> {
-            apiKey.set(exchange.getRequestHeaders().getFirst("api-key"));
+            authorization.set(exchange.getRequestHeaders().getFirst("authorization"));
             exchange.getResponseHeaders().add("x-request-id", "req-functional-provider");
             sendJson(exchange, 200, """
                     {"id":"chatcmpl_1","object":"chat.completion","model":"mimo-v2-pro","usage":{"completion_tokens":1},"choices":[{"index":0}]}
@@ -886,7 +916,7 @@ class CredentialAdminServiceTests {
             assertEquals("PASS", response.classification());
             assertEquals(1, response.summary().get("PASS"));
             assertEquals("req-functional-provider", response.items().getFirst().upstreamRequestId());
-            assertEquals("mimo-secret", apiKey.get());
+            assertEquals("Bearer mimo-secret", authorization.get());
             assertNotNull(credential.getLastUsedAt());
             assertEquals(null, credential.getLastErrorCode());
             assertFalse(response.toString().contains("mimo-secret"));

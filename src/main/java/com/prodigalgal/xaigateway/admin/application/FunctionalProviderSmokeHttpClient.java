@@ -473,7 +473,7 @@ class FunctionalProviderSmokeHttpClient {
             headers.put("api-key", secret);
             return headers;
         }
-        headers.put("api-key", secret);
+        headers.put("authorization", "Bearer " + secret);
         return headers;
     }
 
@@ -489,7 +489,7 @@ class FunctionalProviderSmokeHttpClient {
             headers.put("anthropic-version", "2023-06-01");
             headers.put("api-key", "***");
         } else {
-            headers.put("api-key", "***");
+            headers.put("authorization", "Bearer ***");
         }
         Map<String, Object> preview = new LinkedHashMap<>();
         preview.put("providerType", plan.providerType() == null ? null : plan.providerType().name());

@@ -110,6 +110,7 @@ x-ai-gateway 不以 OpenAI、Anthropic、Gemini、Vertex、Codex 等官方 API �
 - [REQ-20260522-019 账号类选择 active 账号组运行时对齐](requirements/REQ-20260522-019-account-selection-active-group-runtime-alignment.md)
 - [REQ-20260522-020 分发 Key 鉴权 active 账号组守卫](requirements/REQ-20260522-020-distributed-key-auth-active-group-guard.md)
 - [REQ-20260522-021 分发 Key 创建时初始账号组绑定](requirements/REQ-20260522-021-distributed-key-create-initial-account-group-binding.md)
+- [REQ-20260522-022 功能性 Provider Smoke 认证策略对齐](requirements/REQ-20260522-022-functional-provider-smoke-auth-strategy.md)
 
 ## 决策
 

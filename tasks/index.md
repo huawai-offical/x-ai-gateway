@@ -81,6 +81,7 @@
 | P0-CODEX-06o | [TASK-20260522-020 账号类选择 active 账号组运行时对齐](done/TASK-20260522-020-account-selection-active-group-runtime-alignment.md) | Done | OAuth/auth.json 账号选择、sticky account 与 Model Policy 上下文排除停用账号组 |
 | P0-CODEX-06p | [TASK-20260522-021 分发 Key 鉴权 active 账号组守卫](done/TASK-20260522-021-distributed-key-auth-active-group-guard.md) | Done | Key 鉴权和 auth cache 命中均要求存在启用账号组绑定 |
 | P0-CODEX-06q | [TASK-20260522-022 分发 Key 创建时初始账号组绑定](done/TASK-20260522-022-distributed-key-create-initial-account-group-binding.md) | Done | 创建访问密钥时原子写入初始账号组绑定，并支持账号组详情显式选择运行时 provider |
+| P0-CODEX-06r | [TASK-20260522-023 功能性 Provider Smoke 认证策略对齐](done/TASK-20260522-023-functional-provider-smoke-auth-strategy.md) | Done | OpenAI-compatible 功能性 smoke 改为 Bearer 认证，避免 MiMo/DeepSeek 真实验证误报 |
 | P0-FUNC-01 | [TASK-20260514-020 OpenAI 多模态支撑参数边界收紧](done/TASK-20260514-020-openai-multimodal-supporting-parameters.md) | Done | 已清理 Audio translations 与 Images edits/variations 残留，并固定多模态支撑参数 |
 | P0-FUNC-02 | [TASK-20260514-021 OpenAI Files、Uploads、Models 功能性支撑面](done/TASK-20260514-021-openai-files-uploads-models-functional-support.md) | Done | 已补 Files list 参数与 envelope，并确认 Batches/Fine-tuning 不回到公开支持面 |
 | P0-CODEX-05 | [TASK-20260514-031 OpenAI 真实 Smoke 与认证成本防护](backlog/TASK-20260514-031-openai-real-smoke-certification-harness.md) | Backlog | Critical；承接 Codex/OpenAI-compatible smoke 机制，等待恢复测试或真实 key 执行窗口 |
