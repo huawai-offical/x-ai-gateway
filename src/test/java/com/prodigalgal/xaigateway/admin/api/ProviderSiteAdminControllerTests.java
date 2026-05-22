@@ -186,6 +186,7 @@ class ProviderSiteAdminControllerTests {
                 List.of("openai", "responses"),
                 "openai",
                 List.of("api_key"),
+                List.of(),
                 "sse",
                 "provider-native",
                 1,

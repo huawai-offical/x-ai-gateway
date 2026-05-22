@@ -5,16 +5,19 @@ import com.prodigalgal.xaigateway.gateway.core.catalog.DiscoveredModelDefinition
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
 import com.prodigalgal.xaigateway.gateway.core.model.ModelPolicyScopeType;
 import com.prodigalgal.xaigateway.gateway.core.shared.ModelIdNormalizer;
+import com.prodigalgal.xaigateway.gateway.core.shared.ProtocolSuite;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.shared.ReasoningTransport;
 import com.prodigalgal.xaigateway.gateway.core.shared.SiteProfileSource;
 import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
 import com.prodigalgal.xaigateway.gateway.core.site.UpstreamSitePolicyService;
+import com.prodigalgal.xaigateway.infra.persistence.entity.ProviderProtocolEndpointEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SiteCapabilitySnapshotEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.ModelPolicyEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SiteModelCapabilityEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamSiteProfileEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.ModelPolicyRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.ProviderProtocolEndpointRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.SiteCapabilitySnapshotRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.SiteModelCapabilityRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamSiteProfileRepository;
@@ -40,6 +43,7 @@ public class ProviderSiteRegistryService {
     private final SiteCapabilitySnapshotRepository siteCapabilitySnapshotRepository;
     private final SiteModelCapabilityRepository siteModelCapabilityRepository;
     private final ModelPolicyRepository modelPolicyRepository;
+    private final ProviderProtocolEndpointRepository providerProtocolEndpointRepository;
     private final UpstreamSitePolicyService upstreamSitePolicyService;
     private final ProviderCatalogLoader providerCatalogLoader;
 
@@ -51,10 +55,30 @@ public class ProviderSiteRegistryService {
             ModelPolicyRepository modelPolicyRepository,
             UpstreamSitePolicyService upstreamSitePolicyService,
             ProviderCatalogLoader providerCatalogLoader) {
+        this(
+                upstreamSiteProfileRepository,
+                siteCapabilitySnapshotRepository,
+                siteModelCapabilityRepository,
+                modelPolicyRepository,
+                null,
+                upstreamSitePolicyService,
+                providerCatalogLoader
+        );
+    }
+
+    public ProviderSiteRegistryService(
+            UpstreamSiteProfileRepository upstreamSiteProfileRepository,
+            SiteCapabilitySnapshotRepository siteCapabilitySnapshotRepository,
+            SiteModelCapabilityRepository siteModelCapabilityRepository,
+            ModelPolicyRepository modelPolicyRepository,
+            ProviderProtocolEndpointRepository providerProtocolEndpointRepository,
+            UpstreamSitePolicyService upstreamSitePolicyService,
+            ProviderCatalogLoader providerCatalogLoader) {
         this.upstreamSiteProfileRepository = upstreamSiteProfileRepository;
         this.siteCapabilitySnapshotRepository = siteCapabilitySnapshotRepository;
         this.siteModelCapabilityRepository = siteModelCapabilityRepository;
         this.modelPolicyRepository = modelPolicyRepository;
+        this.providerProtocolEndpointRepository = providerProtocolEndpointRepository;
         this.upstreamSitePolicyService = upstreamSitePolicyService;
         this.providerCatalogLoader = providerCatalogLoader;
     }
@@ -69,6 +93,7 @@ public class ProviderSiteRegistryService {
                 upstreamSiteProfileRepository,
                 siteCapabilitySnapshotRepository,
                 siteModelCapabilityRepository,
+                null,
                 null,
                 upstreamSitePolicyService,
                 providerCatalogLoader
@@ -122,6 +147,7 @@ public class ProviderSiteRegistryService {
         String profileCode = preset.profileCode();
         Optional<UpstreamSiteProfileEntity> existing = upstreamSiteProfileRepository.findByProfileCode(profileCode);
         UpstreamSiteProfileEntity entity = existing.orElseGet(() -> upstreamSiteProfileRepository.save(createProfile(preset, active)));
+        ensurePresetProtocolEndpoints(preset, entity);
         importPresetModelPolicies(preset, entity);
         if (refreshCapabilities) {
             refreshCapabilities(entity, List.of());
@@ -203,6 +229,91 @@ public class ProviderSiteRegistryService {
         entity.setProfileSource(SiteProfileSource.PRESET);
         entity.setActive(active);
         return entity;
+    }
+
+    private void ensurePresetProtocolEndpoints(ProviderPresetDefinition preset, UpstreamSiteProfileEntity siteProfile) {
+        if (providerProtocolEndpointRepository == null || siteProfile.getId() == null) {
+            return;
+        }
+        List<ProtocolEndpointSeed> seeds = protocolEndpointSeeds(preset);
+        for (ProtocolEndpointSeed seed : seeds) {
+            providerProtocolEndpointRepository.findBySiteProfileIdAndProtocolSuite(siteProfile.getId(), seed.protocolSuite())
+                    .orElseGet(() -> providerProtocolEndpointRepository.save(toEndpointEntity(siteProfile, seed)));
+        }
+    }
+
+    private List<ProtocolEndpointSeed> protocolEndpointSeeds(ProviderPresetDefinition preset) {
+        ProtocolEndpointSeed openAiEndpoint = new ProtocolEndpointSeed(
+                preset.code() + ":openai-compatible",
+                preset.displayName() + " OpenAI-compatible",
+                ProtocolSuite.fromVendorAndSiteKind(preset.vendorCode(), preset.siteKind()),
+                ProviderType.OPENAI_COMPATIBLE,
+                preset.siteKind(),
+                preset.defaultBaseUrl(),
+                mergeConversationProfile(
+                        preset.conversationProfile(),
+                        Map.of(
+                                "protocolEndpoint", "openai_compatible",
+                                "targetProtocol", "openai_chat_or_responses",
+                                "reasoningContent", "pass_through"
+                        )
+                )
+        );
+        String vendor = ProtocolSuite.normalize(preset.vendorCode());
+        if (!"xiaomi_mimo".equals(vendor) && !"mimo".equals(vendor) && !"deepseek".equals(vendor)) {
+            return List.of(openAiEndpoint);
+        }
+        ProtocolEndpointSeed anthropicEndpoint = new ProtocolEndpointSeed(
+                preset.code() + ":anthropic-compatible",
+                preset.displayName() + " Anthropic-compatible",
+                "deepseek".equals(vendor)
+                        ? ProtocolSuite.DEEPSEEK_ANTHROPIC_COMPATIBLE
+                        : ProtocolSuite.XIAOMI_MIMO_ANTHROPIC_COMPATIBLE,
+                ProviderType.ANTHROPIC_DIRECT,
+                UpstreamSiteKind.ANTHROPIC_DIRECT,
+                preset.defaultBaseUrl().replaceAll("/v1/?$", "") + "/anthropic",
+                mergeConversationProfile(
+                        preset.conversationProfile(),
+                        Map.of(
+                                "protocolEndpoint", "anthropic_compatible",
+                                "targetProtocol", "anthropic_messages",
+                                "reasoningTransport", "thinking_blocks"
+                        )
+                )
+        );
+        return List.of(openAiEndpoint, anthropicEndpoint);
+    }
+
+    private ProviderProtocolEndpointEntity toEndpointEntity(
+            UpstreamSiteProfileEntity siteProfile,
+            ProtocolEndpointSeed seed) {
+        UpstreamSitePolicyService.SitePolicy policy = upstreamSitePolicyService.policy(seed.siteKind());
+        ProviderProtocolEndpointEntity entity = new ProviderProtocolEndpointEntity();
+        entity.setSiteProfileId(siteProfile.getId());
+        entity.setEndpointCode(seed.endpointCode());
+        entity.setDisplayName(seed.displayName());
+        entity.setProtocolSuite(seed.protocolSuite());
+        entity.setProviderType(seed.providerType());
+        entity.setSiteKind(seed.siteKind());
+        entity.setBaseUrl(seed.baseUrl());
+        entity.setAuthStrategy(policy.authStrategy());
+        entity.setPathStrategy(policy.pathStrategy());
+        entity.setModelAddressingStrategy(policy.modelAddressingStrategy());
+        entity.setErrorSchemaStrategy(policy.errorSchemaStrategy());
+        entity.setStreamTransport(policy.streamTransport());
+        entity.setConversationProfileJson(writeJson(seed.conversationProfile()));
+        entity.setActive(siteProfile.isActive());
+        return entity;
+    }
+
+    private Map<String, Object> mergeConversationProfile(Map<String, Object> base, Map<String, Object> overrides) {
+        Map<String, Object> merged = new LinkedHashMap<>();
+        if (base != null) {
+            merged.putAll(base);
+        }
+        merged.putAll(overrides);
+        merged.put("source", "provider_protocol_endpoint_default");
+        return Map.copyOf(merged);
     }
 
     private ProviderPresetDefinition findPreset(String code) {
@@ -479,6 +590,17 @@ public class ProviderSiteRegistryService {
         Set<String> values = new LinkedHashSet<>(normalizeProtocols(left));
         values.addAll(normalizeProtocols(right));
         return List.copyOf(values);
+    }
+
+    private record ProtocolEndpointSeed(
+            String endpointCode,
+            String displayName,
+            String protocolSuite,
+            ProviderType providerType,
+            UpstreamSiteKind siteKind,
+            String baseUrl,
+            Map<String, Object> conversationProfile
+    ) {
     }
 
     private void applySiteModelCapability(

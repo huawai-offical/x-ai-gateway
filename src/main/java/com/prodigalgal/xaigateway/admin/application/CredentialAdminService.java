@@ -20,9 +20,11 @@ import com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendPolicyS
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
+import com.prodigalgal.xaigateway.infra.persistence.entity.ProviderProtocolEndpointEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamAccountGroupEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamSiteProfileEntity;
+import com.prodigalgal.xaigateway.infra.persistence.repository.ProviderProtocolEndpointRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamAccountGroupRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import java.time.Instant;
@@ -44,6 +46,7 @@ public class CredentialAdminService {
     private final CredentialCryptoService credentialCryptoService;
     private final CredentialModelDiscoveryService credentialModelDiscoveryService;
     private final ProviderSiteRegistryService providerSiteRegistryService;
+    private final ProviderProtocolEndpointRepository providerProtocolEndpointRepository;
     private final UpstreamAccountGroupRepository upstreamAccountGroupRepository;
     private final ObjectMapper objectMapper;
     private final SupportedModelCatalogService supportedModelCatalogService;
@@ -63,10 +66,34 @@ public class CredentialAdminService {
             ObjectMapper objectMapper,
             SupportedModelCatalogService supportedModelCatalogService,
             ExecutionBackendPolicyService executionBackendPolicyService) {
+        this(
+                upstreamCredentialRepository,
+                credentialCryptoService,
+                credentialModelDiscoveryService,
+                providerSiteRegistryService,
+                null,
+                upstreamAccountGroupRepository,
+                objectMapper,
+                supportedModelCatalogService,
+                executionBackendPolicyService
+        );
+    }
+
+    public CredentialAdminService(
+            UpstreamCredentialRepository upstreamCredentialRepository,
+            CredentialCryptoService credentialCryptoService,
+            CredentialModelDiscoveryService credentialModelDiscoveryService,
+            ProviderSiteRegistryService providerSiteRegistryService,
+            ProviderProtocolEndpointRepository providerProtocolEndpointRepository,
+            UpstreamAccountGroupRepository upstreamAccountGroupRepository,
+            ObjectMapper objectMapper,
+            SupportedModelCatalogService supportedModelCatalogService,
+            ExecutionBackendPolicyService executionBackendPolicyService) {
         this.upstreamCredentialRepository = upstreamCredentialRepository;
         this.credentialCryptoService = credentialCryptoService;
         this.credentialModelDiscoveryService = credentialModelDiscoveryService;
         this.providerSiteRegistryService = providerSiteRegistryService;
+        this.providerProtocolEndpointRepository = providerProtocolEndpointRepository;
         this.upstreamAccountGroupRepository = upstreamAccountGroupRepository;
         this.objectMapper = objectMapper;
         this.supportedModelCatalogService = supportedModelCatalogService;
@@ -110,9 +137,10 @@ public class CredentialAdminService {
         String secret = requireSecret(request.resolvedSecret());
         String fingerprint = credentialCryptoService.fingerprint(secret);
         UpstreamAccountGroupEntity group = resolveGroup(request.groupId());
-        UpstreamSiteProfileEntity siteProfile = requireCredentialSiteProfile(request.siteProfileId());
-        ProviderType providerType = providerTypeForSite(siteProfile);
-        String baseUrl = baseUrlForSite(siteProfile);
+        CredentialEndpointBinding endpointBinding = requireCredentialProtocolEndpoint(request.protocolEndpointId());
+        UpstreamSiteProfileEntity siteProfile = endpointBinding.siteProfile();
+        ProviderType providerType = endpointBinding.providerType();
+        String baseUrl = endpointBinding.baseUrl();
         UpstreamCredentialEntity entity = upstreamCredentialRepository
                 .findFirstByApiKeyFingerprintAndProviderTypeAndBaseUrlAndSiteProfileIdOrderByUpdatedAtDesc(
                         fingerprint,
@@ -130,6 +158,7 @@ public class CredentialAdminService {
                 .orElseGet(UpstreamCredentialEntity::new);
 
         apply(entity, request, true, group, siteProfile, providerType, baseUrl);
+        entity.setProtocolEndpointId(endpointBinding.protocolEndpointId());
         return toResponse(upstreamCredentialRepository.save(entity));
     }
 
@@ -947,6 +976,45 @@ public class CredentialAdminService {
         return requireCredentialSiteProfile(entity.getSiteProfileId());
     }
 
+    private CredentialEndpointBinding requireCredentialProtocolEndpoint(Long protocolEndpointId) {
+        if (protocolEndpointId == null) {
+            throw new IllegalArgumentException("API Key 上游凭证必须绑定厂商协议入口。");
+        }
+        if (providerProtocolEndpointRepository == null) {
+            throw new IllegalStateException("协议入口仓库未启用。");
+        }
+        ProviderProtocolEndpointEntity endpoint = providerProtocolEndpointRepository.findById(protocolEndpointId)
+                .orElseThrow(() -> new IllegalArgumentException("未找到指定的厂商协议入口。"));
+        if (!endpoint.isActive()) {
+            throw new IllegalArgumentException("指定的厂商协议入口已停用，不能绑定上游凭证。");
+        }
+        UpstreamSiteProfileEntity siteProfile = requireCredentialSiteProfile(endpoint.getSiteProfileId());
+        return new CredentialEndpointBinding(
+                endpoint.getId(),
+                siteProfile,
+                endpoint.getProviderType(),
+                baseUrlForEndpoint(endpoint)
+        );
+    }
+
+    private CredentialEndpointBinding resolveCredentialEndpointBinding(UpstreamCredentialEntity entity, CredentialRequest request) {
+        if (request.protocolEndpointId() != null) {
+            return requireCredentialProtocolEndpoint(request.protocolEndpointId());
+        }
+        if (entity.getProtocolEndpointId() != null) {
+            return requireCredentialProtocolEndpoint(entity.getProtocolEndpointId());
+        }
+        UpstreamSiteProfileEntity siteProfile = request.siteProfileId() == null
+                ? requireExistingCredentialSiteProfile(entity)
+                : requireCredentialSiteProfile(request.siteProfileId());
+        return new CredentialEndpointBinding(
+                null,
+                siteProfile,
+                providerTypeForSite(siteProfile),
+                baseUrlForSite(siteProfile)
+        );
+    }
+
     private ProviderType providerTypeForSite(UpstreamSiteProfileEntity siteProfile) {
         return executionBackendPolicyService.providerTypeForSite(siteProfile.getSiteKind());
     }
@@ -959,14 +1027,19 @@ public class CredentialAdminService {
         return baseUrl.trim();
     }
 
+    private String baseUrlForEndpoint(ProviderProtocolEndpointEntity endpoint) {
+        String baseUrl = endpoint.getBaseUrl();
+        if (baseUrl == null || baseUrl.isBlank()) {
+            throw new IllegalArgumentException("指定的厂商协议入口未配置 Base URL，不能绑定上游凭证。");
+        }
+        return baseUrl.trim();
+    }
+
     private void apply(UpstreamCredentialEntity entity, CredentialRequest request, boolean requireSecret) {
         UpstreamAccountGroupEntity group = resolveGroup(request.groupId());
-        UpstreamSiteProfileEntity siteProfile = request.siteProfileId() == null
-                ? requireExistingCredentialSiteProfile(entity)
-                : requireCredentialSiteProfile(request.siteProfileId());
-        ProviderType providerType = providerTypeForSite(siteProfile);
-        String baseUrl = baseUrlForSite(siteProfile);
-        apply(entity, request, requireSecret, group, siteProfile, providerType, baseUrl);
+        CredentialEndpointBinding endpointBinding = resolveCredentialEndpointBinding(entity, request);
+        apply(entity, request, requireSecret, group, endpointBinding.siteProfile(), endpointBinding.providerType(), endpointBinding.baseUrl());
+        entity.setProtocolEndpointId(endpointBinding.protocolEndpointId());
     }
 
     private void apply(
@@ -1000,6 +1073,14 @@ public class CredentialAdminService {
         entity.setTlsFingerprintProfileId(request.tlsFingerprintProfileId());
         entity.setSiteProfileId(siteProfile.getId());
         entity.setGroupId(group == null ? null : group.getId());
+    }
+
+    private record CredentialEndpointBinding(
+            Long protocolEndpointId,
+            UpstreamSiteProfileEntity siteProfile,
+            ProviderType providerType,
+            String baseUrl
+    ) {
     }
 
     private void applySecret(

@@ -100,6 +100,24 @@ databaseChangeLog:
               - column:
                   name: protocol_endpoint_id
                   type: BIGINT
+        - sql:
+            dbms: postgresql
+            splitStatements: false
+            sql: |
+              ALTER TABLE upstream_credential
+              DROP CONSTRAINT IF EXISTS uk_upstream_credential_scope_fingerprint;
+              ALTER TABLE upstream_credential
+              ADD CONSTRAINT uk_upstream_credential_scope_fingerprint
+              UNIQUE (api_key_fingerprint, provider_type, base_url, site_profile_id, protocol_endpoint_id);
+        - sql:
+            dbms: h2
+            splitStatements: false
+            sql: |
+              ALTER TABLE upstream_credential
+              DROP CONSTRAINT IF EXISTS uk_upstream_credential_scope_fingerprint;
+              ALTER TABLE upstream_credential
+              ADD CONSTRAINT uk_upstream_credential_scope_fingerprint
+              UNIQUE (api_key_fingerprint, provider_type, base_url, site_profile_id, protocol_endpoint_id);
         - addUniqueConstraint:
             tableName: provider_protocol_endpoint
             columnNames: site_profile_id, protocol_suite

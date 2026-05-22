@@ -35,6 +35,7 @@ export type CredentialResponse = {
   proxyId?: number | null
   tlsFingerprintProfileId?: number | null
   siteProfileId?: number | null
+  protocolEndpointId?: number | null
   groupId?: number | null
   groupName?: string | null
   createdAt?: string | null
@@ -69,6 +70,7 @@ export type UpstreamCredentialInventoryResponse = {
   proxyId?: number | null
   tlsFingerprintProfileId?: number | null
   siteProfileId?: number | null
+  protocolEndpointId?: number | null
   groupId?: number | null
   groupName?: string | null
   totalRequestCount?: number
@@ -122,6 +124,7 @@ export type CredentialFormState = {
   proxyId: string
   tlsFingerprintProfileId: string
   siteProfileId: string
+  protocolEndpointId: string
   groupId: string
   supportedModels: string[]
 }
@@ -152,6 +155,7 @@ export function createEmptyCredentialForm(): CredentialFormState {
     proxyId: '',
     tlsFingerprintProfileId: '',
     siteProfileId: '',
+    protocolEndpointId: '',
     groupId: '',
     supportedModels: [],
   }
@@ -171,6 +175,7 @@ export function credentialToFormState(credential: CredentialResponse): Credentia
     proxyId: credential.proxyId == null ? '' : String(credential.proxyId),
     tlsFingerprintProfileId: credential.tlsFingerprintProfileId == null ? '' : String(credential.tlsFingerprintProfileId),
     siteProfileId: credential.siteProfileId == null ? '' : String(credential.siteProfileId),
+    protocolEndpointId: credential.protocolEndpointId == null ? '' : String(credential.protocolEndpointId),
     groupId: credential.groupId == null ? '' : String(credential.groupId),
     supportedModels: Array.isArray(credential.supportedModels) ? credential.supportedModels : [],
   }
@@ -178,8 +183,8 @@ export function credentialToFormState(credential: CredentialResponse): Credentia
 
 export function buildCredentialPayload(form: CredentialFormState) {
   const metadata = parseCredentialMetadata(form.metadataJson)
-  if (!form.siteProfileId.trim()) {
-    throw new Error('请选择厂商/API 入口后再保存上游凭证。')
+  if (!form.protocolEndpointId.trim()) {
+    throw new Error('请选择厂商协议入口后再保存上游凭证。')
   }
   return {
     credentialName: form.credentialName.trim(),
@@ -192,6 +197,7 @@ export function buildCredentialPayload(form: CredentialFormState) {
     proxyId: parseOptionalNumber(form.proxyId),
     tlsFingerprintProfileId: parseOptionalNumber(form.tlsFingerprintProfileId),
     siteProfileId: parseOptionalNumber(form.siteProfileId),
+    protocolEndpointId: parseOptionalNumber(form.protocolEndpointId),
     groupId: parseOptionalNumber(form.groupId),
     supportedModels: normalizeModels(form.supportedModels),
   }

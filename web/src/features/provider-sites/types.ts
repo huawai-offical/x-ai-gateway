@@ -26,6 +26,27 @@ export type SurfaceCapability = {
   featureResolutions: Record<string, CapabilityResolution>
 }
 
+export type ProviderProtocolEndpoint = {
+  id: number
+  siteProfileId: number
+  endpointCode: string
+  displayName: string
+  protocolSuite: string
+  providerType: string
+  siteKind: string
+  baseUrl: string
+  authStrategy: string
+  pathStrategy: string
+  modelAddressingStrategy: string
+  errorSchemaStrategy: string
+  streamTransport?: string | null
+  conversationProfile?: Record<string, unknown>
+  active: boolean
+  linkedCredentialCount: number
+  createdAt?: string | null
+  updatedAt?: string | null
+}
+
 export type ProviderSite = {
   id: number
   profileCode: string
@@ -48,6 +69,7 @@ export type ProviderSite = {
   supportedProtocols: string[]
   compatibilitySurface: string
   credentialRequirements: string[]
+  protocolEndpoints: ProviderProtocolEndpoint[]
   streamTransport?: string | null
   fallbackStrategy?: string | null
   cooldownCredentialCount: number

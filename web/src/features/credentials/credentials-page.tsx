@@ -22,7 +22,7 @@ import { PaginatedRows } from '@/components/app/table-pagination'
 import { formatInstant } from '@/lib/format'
 import { apiRequest } from '@/lib/api'
 import { useTypedMutation, useTypedQuery } from '@/lib/typed-react-query'
-import type { ProviderSite } from '../provider-sites/types'
+import type { ProviderProtocolEndpoint, ProviderSite } from '../provider-sites/types'
 import {
   AUTH_KIND_OPTIONS,
   buildCredentialPayload,
@@ -103,6 +103,11 @@ type TlsProfileOption = {
 
 type StatusTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger'
 
+type ProviderEndpointOption = {
+  site: ProviderSite
+  endpoint: ProviderProtocolEndpoint
+}
+
 export function CredentialsPage() {
   const queryClient = useQueryClient()
   const [form, setForm] = useState<CredentialFormState>(createEmptyCredentialForm())
@@ -150,13 +155,17 @@ export function CredentialsPage() {
     () => normalizeCredentialProviderSites(providerSitesQuery.data ?? []),
     [providerSitesQuery.data],
   )
-  const selectedProviderSite = useMemo(
-    () => findProviderSite(providerSiteOptions, form.siteProfileId),
-    [form.siteProfileId, providerSiteOptions],
+  const providerEndpointOptions = useMemo(
+    () => flattenProviderEndpointOptions(providerSiteOptions),
+    [providerSiteOptions],
   )
-  const selectedEditingProviderSite = useMemo(
-    () => findProviderSite(providerSiteOptions, editingForm.siteProfileId),
-    [editingForm.siteProfileId, providerSiteOptions],
+  const selectedProviderEndpoint = useMemo(
+    () => findProviderEndpoint(providerEndpointOptions, form.protocolEndpointId),
+    [form.protocolEndpointId, providerEndpointOptions],
+  )
+  const selectedEditingProviderEndpoint = useMemo(
+    () => findProviderEndpoint(providerEndpointOptions, editingForm.protocolEndpointId),
+    [editingForm.protocolEndpointId, providerEndpointOptions],
   )
   const modelCatalogQuery = useTypedQuery<string[]>({
     queryKey: ['credentials', 'model-catalog', createSource, form.providerType, form.groupId],
@@ -663,6 +672,7 @@ export function CredentialsPage() {
                           ...current,
                           groupId: nextGroup ? String(nextGroup.id) : current.groupId,
                           siteProfileId: nextSource === 'codexAuthJson' ? '' : current.siteProfileId,
+                          protocolEndpointId: nextSource === 'codexAuthJson' ? '' : current.protocolEndpointId,
                         }))
                       }}
                     >
@@ -737,19 +747,19 @@ export function CredentialsPage() {
                 ) : (
                   <div className="grid gap-4 md:grid-cols-2">
                     <label className="flex flex-col gap-2 md:col-span-2">
-                      <span className="text-sm font-medium text-foreground">厂商/API 入口</span>
+                      <span className="text-sm font-medium text-foreground">厂商协议入口</span>
                       <select
                         className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                        value={form.siteProfileId}
+                        value={form.protocolEndpointId}
                         onChange={(event) => {
                           setConnectivityResult(null)
-                          setForm((current) => applyProviderSiteToForm(current, event.target.value, providerSiteOptions))
+                          setForm((current) => applyProviderEndpointToForm(current, event.target.value, providerEndpointOptions))
                         }}
                       >
-                        <option value="" disabled>{providerSitesQuery.isPending ? '加载中' : '请选择厂商/API 入口'}</option>
-                        {providerSiteOptions.map((site) => (
-                          <option key={site.id} value={String(site.id)} disabled={!isSelectableProviderSite(site)}>
-                            {providerSiteOptionLabel(site)}
+                        <option value="" disabled>{providerSitesQuery.isPending ? '加载中' : '请选择厂商协议入口'}</option>
+                        {providerEndpointOptions.map((option) => (
+                          <option key={option.endpoint.id} value={String(option.endpoint.id)} disabled={!isSelectableProviderEndpoint(option)}>
+                            {providerEndpointOptionLabel(option)}
                           </option>
                         ))}
                       </select>
@@ -774,7 +784,7 @@ export function CredentialsPage() {
                     </label>
                     <label className="flex flex-col gap-2 md:col-span-2">
                       <span className="text-sm font-medium text-foreground">Base URL</span>
-                      <Input value={selectedProviderSite?.baseUrlPattern ?? form.baseUrl} readOnly />
+                      <Input value={selectedProviderEndpoint?.endpoint.baseUrl ?? form.baseUrl} readOnly />
                     </label>
                   </div>
                 )}
@@ -933,7 +943,7 @@ export function CredentialsPage() {
                         <div className="font-medium text-foreground">
                           {createSource === 'codexAuthJson'
                             ? 'CODEX_OAUTH / auth.json'
-                            : `${selectedProviderSite ? providerSiteOptionLabel(selectedProviderSite) : '未选择'} / ${form.authKind}`}
+                            : `${selectedProviderEndpoint ? providerEndpointOptionLabel(selectedProviderEndpoint) : '未选择'} / ${form.authKind}`}
                         </div>
                       </div>
                       <div>
@@ -1024,12 +1034,12 @@ export function CredentialsPage() {
                 下一步
               </Button>
               {canShowConnectivityTest ? (
-                <Button type="button" variant="outline" onClick={handleConnectivityTest} disabled={connectivityMutation.isPending || createMode === 'batch' || !form.siteProfileId}>
+                <Button type="button" variant="outline" onClick={handleConnectivityTest} disabled={connectivityMutation.isPending || createMode === 'batch' || !form.protocolEndpointId}>
                   测试联通性
                 </Button>
               ) : null}
               {canShowCreateButton ? (
-                <Button type="submit" disabled={createPending || !form.groupId || (createSource === 'secret' && !form.siteProfileId)}>
+                <Button type="submit" disabled={createPending || !form.groupId || (createSource === 'secret' && !form.protocolEndpointId)}>
                   {createSource === 'codexAuthJson' ? '导入 auth.json' : (createMode === 'single' ? '创建凭证' : '批量创建')}
                 </Button>
               ) : null}
@@ -1077,16 +1087,16 @@ export function CredentialsPage() {
                 </select>
               </label>
               <label className="flex flex-col gap-2 md:col-span-2">
-                <span className="text-sm font-medium text-foreground">厂商/API 入口</span>
+                <span className="text-sm font-medium text-foreground">厂商协议入口</span>
                 <select
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  value={editingForm.siteProfileId}
-                  onChange={(event) => setEditingForm((current) => applyProviderSiteToForm(current, event.target.value, providerSiteOptions))}
+                  value={editingForm.protocolEndpointId}
+                  onChange={(event) => setEditingForm((current) => applyProviderEndpointToForm(current, event.target.value, providerEndpointOptions))}
                 >
-                  <option value="" disabled>{providerSitesQuery.isPending ? '加载中' : '请选择厂商/API 入口'}</option>
-                  {providerSiteOptions.map((site) => (
-                    <option key={site.id} value={String(site.id)} disabled={!isSelectableProviderSite(site)}>
-                      {providerSiteOptionLabel(site)}
+                  <option value="" disabled>{providerSitesQuery.isPending ? '加载中' : '请选择厂商协议入口'}</option>
+                  {providerEndpointOptions.map((option) => (
+                    <option key={option.endpoint.id} value={String(option.endpoint.id)} disabled={!isSelectableProviderEndpoint(option)}>
+                      {providerEndpointOptionLabel(option)}
                     </option>
                   ))}
                 </select>
@@ -1111,7 +1121,7 @@ export function CredentialsPage() {
               </label>
               <label className="flex flex-col gap-2 md:col-span-2">
                 <span className="text-sm font-medium text-foreground">Base URL</span>
-                <Input value={selectedEditingProviderSite?.baseUrlPattern ?? editingForm.baseUrl} readOnly />
+                <Input value={selectedEditingProviderEndpoint?.endpoint.baseUrl ?? editingForm.baseUrl} readOnly />
               </label>
               <label className="flex flex-col gap-2 md:col-span-2">
                 <span className="text-sm font-medium text-foreground">更新密钥（可选）</span>
@@ -1487,6 +1497,7 @@ function buildCodexImportPayloads({
     proxyId: parseOptionalInputNumber(form.proxyId),
     tlsFingerprintProfileId: parseOptionalInputNumber(form.tlsFingerprintProfileId),
     siteProfileId: parseOptionalInputNumber(form.siteProfileId),
+    protocolEndpointId: parseOptionalInputNumber(form.protocolEndpointId),
     supportedModels: normalizeModelSelection(form.supportedModels),
   }
 
@@ -1596,34 +1607,45 @@ function normalizeCredentialProviderSites(sites: ProviderSite[]) {
     })
 }
 
-function applyProviderSiteToForm(
+function flattenProviderEndpointOptions(sites: ProviderSite[]): ProviderEndpointOption[] {
+  return sites.flatMap((site) =>
+    (site.protocolEndpoints ?? []).map((endpoint) => ({
+      site,
+      endpoint,
+    })),
+  )
+}
+
+function applyProviderEndpointToForm(
   form: CredentialFormState,
-  siteProfileId: string,
-  providerSites: ProviderSite[],
+  protocolEndpointId: string,
+  endpointOptions: ProviderEndpointOption[],
 ): CredentialFormState {
-  const site = findProviderSite(providerSites, siteProfileId)
-  if (!site) {
+  const option = findProviderEndpoint(endpointOptions, protocolEndpointId)
+  if (!option) {
     return {
       ...form,
-      siteProfileId,
+      protocolEndpointId,
+      siteProfileId: '',
       providerType: 'OPENAI_COMPATIBLE',
       baseUrl: '',
     }
   }
   return {
     ...form,
-    siteProfileId,
-    providerType: providerTypeForSiteKind(site.siteKind),
-    baseUrl: site.baseUrlPattern ?? '',
+    protocolEndpointId,
+    siteProfileId: String(option.endpoint.siteProfileId),
+    providerType: option.endpoint.providerType,
+    baseUrl: option.endpoint.baseUrl,
   }
 }
 
-function findProviderSite(providerSites: ProviderSite[], siteProfileId: string) {
-  const id = Number(siteProfileId)
+function findProviderEndpoint(endpointOptions: ProviderEndpointOption[], protocolEndpointId: string) {
+  const id = Number(protocolEndpointId)
   if (!Number.isFinite(id)) {
     return null
   }
-  return providerSites.find((site) => site.id === id) ?? null
+  return endpointOptions.find((option) => option.endpoint.id === id) ?? null
 }
 
 function providerTypeForSiteKind(siteKind: string) {
@@ -1643,14 +1665,14 @@ function providerTypeForSiteKind(siteKind: string) {
   }
 }
 
-function isSelectableProviderSite(site: ProviderSite) {
-  return site.active && Boolean(site.baseUrlPattern?.trim())
+function isSelectableProviderEndpoint(option: ProviderEndpointOption) {
+  return option.site.active && option.endpoint.active && Boolean(option.endpoint.baseUrl?.trim())
 }
 
-function providerSiteOptionLabel(site: ProviderSite) {
-  const vendor = site.vendorName ?? site.vendorCode ?? '未归属厂商'
-  const status = isSelectableProviderSite(site) ? '' : '（不可用）'
-  return `${vendor} / ${site.displayName}${status}`
+function providerEndpointOptionLabel(option: ProviderEndpointOption) {
+  const vendor = option.site.vendorName ?? option.site.vendorCode ?? '未归属厂商'
+  const status = isSelectableProviderEndpoint(option) ? '' : '（不可用）'
+  return `${vendor} / ${option.site.displayName} / ${option.endpoint.displayName} / ${option.endpoint.protocolSuite}${status}`
 }
 
 function toggleOption(current: string[], nextValue: string) {
@@ -1697,14 +1719,17 @@ function rowStatusTone(row: UpstreamCredentialInventoryResponse): StatusTone {
 }
 
 function inventoryRowToCredential(row: UpstreamCredentialInventoryResponse, providerSites: ProviderSite[]): CredentialResponse {
-  const site = row.siteProfileId == null
+  const endpointOption = row.protocolEndpointId == null
     ? null
-    : providerSites.find((item) => item.id === row.siteProfileId)
+    : flattenProviderEndpointOptions(providerSites).find((option) => option.endpoint.id === row.protocolEndpointId)
+  const site = endpointOption?.site ?? (row.siteProfileId == null
+    ? null
+    : providerSites.find((item) => item.id === row.siteProfileId))
   return {
     id: row.sourceId,
     credentialName: row.displayName,
-    providerType: site == null ? row.providerType : providerTypeForSiteKind(site.siteKind),
-    baseUrl: site?.baseUrlPattern ?? row.baseUrl ?? '',
+    providerType: endpointOption?.endpoint.providerType ?? (site == null ? row.providerType : providerTypeForSiteKind(site.siteKind)),
+    baseUrl: endpointOption?.endpoint.baseUrl ?? site?.baseUrlPattern ?? row.baseUrl ?? '',
     authKind: row.authKind ?? 'API_KEY',
     supportedModels: row.supportedModels ?? [],
     secretFingerprint: row.secretFingerprint ?? '',
@@ -1737,6 +1762,7 @@ function inventoryRowToCredential(row: UpstreamCredentialInventoryResponse, prov
     proxyId: row.proxyId,
     tlsFingerprintProfileId: row.tlsFingerprintProfileId,
     siteProfileId: row.siteProfileId,
+    protocolEndpointId: row.protocolEndpointId,
     groupId: row.groupId,
     groupName: row.groupName,
     createdAt: row.createdAt,

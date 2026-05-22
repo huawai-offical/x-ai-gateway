@@ -3,6 +3,8 @@ package com.prodigalgal.xaigateway.admin.application;
 import com.prodigalgal.xaigateway.admin.api.CapabilityMatrixRowResponse;
 import com.prodigalgal.xaigateway.admin.api.ProviderSitePresetImportRequest;
 import com.prodigalgal.xaigateway.admin.api.ProviderSitePresetResponse;
+import com.prodigalgal.xaigateway.admin.api.ProviderProtocolEndpointRequest;
+import com.prodigalgal.xaigateway.admin.api.ProviderProtocolEndpointResponse;
 import com.prodigalgal.xaigateway.admin.api.ProviderSiteRequest;
 import com.prodigalgal.xaigateway.admin.api.ProviderSiteResponse;
 import com.prodigalgal.xaigateway.admin.api.SiteModelCapabilityResponse;
@@ -20,11 +22,19 @@ import com.prodigalgal.xaigateway.gateway.core.interop.SupportStatus;
 import com.prodigalgal.xaigateway.gateway.core.interop.SurfaceCompatibilityReport;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
+import com.prodigalgal.xaigateway.gateway.core.shared.AuthStrategy;
+import com.prodigalgal.xaigateway.gateway.core.shared.ErrorSchemaStrategy;
+import com.prodigalgal.xaigateway.gateway.core.shared.ModelAddressingStrategy;
+import com.prodigalgal.xaigateway.gateway.core.shared.PathStrategy;
+import com.prodigalgal.xaigateway.gateway.core.shared.ProtocolSuite;
 import com.prodigalgal.xaigateway.gateway.core.shared.SiteProfileSource;
+import com.prodigalgal.xaigateway.gateway.core.site.UpstreamSitePolicyService;
+import com.prodigalgal.xaigateway.infra.persistence.entity.ProviderProtocolEndpointEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SiteCapabilitySnapshotEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SiteModelCapabilityEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamSiteProfileEntity;
+import com.prodigalgal.xaigateway.infra.persistence.repository.ProviderProtocolEndpointRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.SiteCapabilitySnapshotRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.SiteModelCapabilityRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
@@ -47,6 +57,7 @@ public class ProviderSiteAdminService {
     private final SiteCapabilitySnapshotRepository siteCapabilitySnapshotRepository;
     private final SiteModelCapabilityRepository siteModelCapabilityRepository;
     private final UpstreamCredentialRepository upstreamCredentialRepository;
+    private final ProviderProtocolEndpointRepository providerProtocolEndpointRepository;
     private final ProviderSiteRegistryService providerSiteRegistryService;
     private final CredentialModelDiscoveryService credentialModelDiscoveryService;
     private final SiteCapabilityTruthService siteCapabilityTruthService;
@@ -60,6 +71,7 @@ public class ProviderSiteAdminService {
             SiteCapabilitySnapshotRepository siteCapabilitySnapshotRepository,
             SiteModelCapabilityRepository siteModelCapabilityRepository,
             UpstreamCredentialRepository upstreamCredentialRepository,
+            ProviderProtocolEndpointRepository providerProtocolEndpointRepository,
             ProviderSiteRegistryService providerSiteRegistryService,
             CredentialModelDiscoveryService credentialModelDiscoveryService,
             SiteCapabilityTruthService siteCapabilityTruthService,
@@ -70,6 +82,7 @@ public class ProviderSiteAdminService {
                 siteCapabilitySnapshotRepository,
                 siteModelCapabilityRepository,
                 upstreamCredentialRepository,
+                providerProtocolEndpointRepository,
                 providerSiteRegistryService,
                 credentialModelDiscoveryService,
                 siteCapabilityTruthService,
@@ -84,6 +97,7 @@ public class ProviderSiteAdminService {
             SiteCapabilitySnapshotRepository siteCapabilitySnapshotRepository,
             SiteModelCapabilityRepository siteModelCapabilityRepository,
             UpstreamCredentialRepository upstreamCredentialRepository,
+            ProviderProtocolEndpointRepository providerProtocolEndpointRepository,
             ProviderSiteRegistryService providerSiteRegistryService,
             CredentialModelDiscoveryService credentialModelDiscoveryService,
             SiteCapabilityTruthService siteCapabilityTruthService,
@@ -94,6 +108,7 @@ public class ProviderSiteAdminService {
         this.siteCapabilitySnapshotRepository = siteCapabilitySnapshotRepository;
         this.siteModelCapabilityRepository = siteModelCapabilityRepository;
         this.upstreamCredentialRepository = upstreamCredentialRepository;
+        this.providerProtocolEndpointRepository = providerProtocolEndpointRepository;
         this.providerSiteRegistryService = providerSiteRegistryService;
         this.credentialModelDiscoveryService = credentialModelDiscoveryService;
         this.siteCapabilityTruthService = siteCapabilityTruthService;
@@ -109,12 +124,37 @@ public class ProviderSiteAdminService {
             UpstreamCredentialRepository upstreamCredentialRepository,
             ProviderSiteRegistryService providerSiteRegistryService,
             CredentialModelDiscoveryService credentialModelDiscoveryService,
+            SiteCapabilityTruthService siteCapabilityTruthService,
+            ExecutionBackendPolicyService executionBackendPolicyService,
+            SecurityPolicyService securityPolicyService) {
+        this(
+                upstreamSiteProfileRepository,
+                siteCapabilitySnapshotRepository,
+                siteModelCapabilityRepository,
+                upstreamCredentialRepository,
+                null,
+                providerSiteRegistryService,
+                credentialModelDiscoveryService,
+                siteCapabilityTruthService,
+                executionBackendPolicyService,
+                securityPolicyService
+        );
+    }
+
+    public ProviderSiteAdminService(
+            UpstreamSiteProfileRepository upstreamSiteProfileRepository,
+            SiteCapabilitySnapshotRepository siteCapabilitySnapshotRepository,
+            SiteModelCapabilityRepository siteModelCapabilityRepository,
+            UpstreamCredentialRepository upstreamCredentialRepository,
+            ProviderSiteRegistryService providerSiteRegistryService,
+            CredentialModelDiscoveryService credentialModelDiscoveryService,
             SiteCapabilityTruthService siteCapabilityTruthService) {
         this(
                 upstreamSiteProfileRepository,
                 siteCapabilitySnapshotRepository,
                 siteModelCapabilityRepository,
                 upstreamCredentialRepository,
+                null,
                 providerSiteRegistryService,
                 credentialModelDiscoveryService,
                 siteCapabilityTruthService,
@@ -137,6 +177,7 @@ public class ProviderSiteAdminService {
                 siteCapabilitySnapshotRepository,
                 siteModelCapabilityRepository,
                 upstreamCredentialRepository,
+                null,
                 providerSiteRegistryService,
                 credentialModelDiscoveryService,
                 siteCapabilityTruthService,
@@ -161,7 +202,9 @@ public class ProviderSiteAdminService {
     public ProviderSiteResponse create(ProviderSiteRequest request) {
         UpstreamSiteProfileEntity entity = new UpstreamSiteProfileEntity();
         apply(entity, request);
-        return toResponse(upstreamSiteProfileRepository.save(entity));
+        UpstreamSiteProfileEntity saved = upstreamSiteProfileRepository.save(entity);
+        ensureManualDefaultEndpoint(saved);
+        return toResponse(saved);
     }
 
     @Transactional(readOnly = true)
@@ -183,7 +226,9 @@ public class ProviderSiteAdminService {
     public ProviderSiteResponse update(Long id, ProviderSiteRequest request) {
         UpstreamSiteProfileEntity entity = getRequired(id);
         apply(entity, request);
-        return toResponse(upstreamSiteProfileRepository.save(entity));
+        UpstreamSiteProfileEntity saved = upstreamSiteProfileRepository.save(entity);
+        ensureManualDefaultEndpoint(saved);
+        return toResponse(saved);
     }
 
     public void delete(Long id) {
@@ -194,7 +239,49 @@ public class ProviderSiteAdminService {
         }
         siteModelCapabilityRepository.deleteAllBySiteProfile_Id(id);
         siteCapabilitySnapshotRepository.findBySiteProfile_Id(id).ifPresent(siteCapabilitySnapshotRepository::delete);
+        if (providerProtocolEndpointRepository != null) {
+            providerProtocolEndpointRepository.deleteAllBySiteProfileId(id);
+        }
         upstreamSiteProfileRepository.delete(entity);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProviderProtocolEndpointResponse> listProtocolEndpoints(Long siteProfileId) {
+        getRequired(siteProfileId);
+        if (providerProtocolEndpointRepository == null) {
+            return List.of();
+        }
+        return providerProtocolEndpointRepository.findAllBySiteProfileIdOrderByDisplayNameAsc(siteProfileId).stream()
+                .map(this::toEndpointResponse)
+                .toList();
+    }
+
+    public ProviderProtocolEndpointResponse createProtocolEndpoint(
+            Long siteProfileId,
+            ProviderProtocolEndpointRequest request) {
+        getRequired(siteProfileId);
+        ProviderProtocolEndpointEntity entity = new ProviderProtocolEndpointEntity();
+        entity.setSiteProfileId(siteProfileId);
+        applyEndpoint(entity, request);
+        return toEndpointResponse(providerProtocolEndpointRepository.save(entity));
+    }
+
+    public ProviderProtocolEndpointResponse updateProtocolEndpoint(
+            Long siteProfileId,
+            Long endpointId,
+            ProviderProtocolEndpointRequest request) {
+        ProviderProtocolEndpointEntity entity = getEndpointRequired(siteProfileId, endpointId);
+        applyEndpoint(entity, request);
+        return toEndpointResponse(providerProtocolEndpointRepository.save(entity));
+    }
+
+    public void deleteProtocolEndpoint(Long siteProfileId, Long endpointId) {
+        ProviderProtocolEndpointEntity entity = getEndpointRequired(siteProfileId, endpointId);
+        long linkedCredentialCount = upstreamCredentialRepository.countByProtocolEndpointIdAndDeletedFalse(endpointId);
+        if (linkedCredentialCount > 0) {
+            throw new IllegalArgumentException("该协议入口仍有绑定凭证，请先解除绑定后再删除。");
+        }
+        providerProtocolEndpointRepository.delete(entity);
     }
 
     public ProviderSiteResponse refreshCapabilities(Long id) {
@@ -327,6 +414,7 @@ public class ProviderSiteAdminService {
                 snapshot == null ? List.of() : snapshot.getSupportedProtocols(),
                 compatibilitySurface(entity),
                 credentialRequirements(entity),
+                protocolEndpoints(entity.getId()),
                 snapshot == null ? null : snapshot.getStreamTransport(),
                 snapshot == null ? null : snapshot.getFallbackStrategy(),
                 cooldown.credentialCount(),
@@ -339,6 +427,38 @@ public class ProviderSiteAdminService {
                 buildSurfaceViews(entity, snapshot),
                 modelCount,
                 snapshot == null ? null : snapshot.getRefreshedAt(),
+                entity.getCreatedAt(),
+                entity.getUpdatedAt()
+        );
+    }
+
+    private List<ProviderProtocolEndpointResponse> protocolEndpoints(Long siteProfileId) {
+        if (providerProtocolEndpointRepository == null || siteProfileId == null) {
+            return List.of();
+        }
+        return providerProtocolEndpointRepository.findAllBySiteProfileIdOrderByDisplayNameAsc(siteProfileId).stream()
+                .map(this::toEndpointResponse)
+                .toList();
+    }
+
+    private ProviderProtocolEndpointResponse toEndpointResponse(ProviderProtocolEndpointEntity entity) {
+        return new ProviderProtocolEndpointResponse(
+                entity.getId(),
+                entity.getSiteProfileId(),
+                entity.getEndpointCode(),
+                entity.getDisplayName(),
+                entity.getProtocolSuite(),
+                entity.getProviderType(),
+                entity.getSiteKind(),
+                entity.getBaseUrl(),
+                entity.getAuthStrategy(),
+                entity.getPathStrategy(),
+                entity.getModelAddressingStrategy(),
+                entity.getErrorSchemaStrategy(),
+                entity.getStreamTransport(),
+                readObjectMap(entity.getConversationProfileJson()),
+                entity.isActive(),
+                entity.getId() == null ? 0L : upstreamCredentialRepository.countByProtocolEndpointIdAndDeletedFalse(entity.getId()),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
         );
@@ -671,6 +791,44 @@ public class ProviderSiteAdminService {
         return entity.get();
     }
 
+    private ProviderProtocolEndpointEntity getEndpointRequired(Long siteProfileId, Long endpointId) {
+        if (providerProtocolEndpointRepository == null) {
+            throw new IllegalStateException("协议入口仓库未启用。");
+        }
+        ProviderProtocolEndpointEntity entity = providerProtocolEndpointRepository.findById(endpointId)
+                .orElseThrow(() -> new IllegalArgumentException("未找到指定的协议入口。"));
+        if (!java.util.Objects.equals(entity.getSiteProfileId(), siteProfileId)) {
+            throw new IllegalArgumentException("协议入口不属于指定站点档案。");
+        }
+        return entity;
+    }
+
+    private void ensureManualDefaultEndpoint(UpstreamSiteProfileEntity siteProfile) {
+        if (providerProtocolEndpointRepository == null || siteProfile.getId() == null) {
+            return;
+        }
+        if (providerProtocolEndpointRepository.countBySiteProfileId(siteProfile.getId()) > 0) {
+            return;
+        }
+        UpstreamSitePolicyService.SitePolicy policy = providerSiteRegistryService.policy(siteProfile.getSiteKind());
+        ProviderProtocolEndpointEntity endpoint = new ProviderProtocolEndpointEntity();
+        endpoint.setSiteProfileId(siteProfile.getId());
+        endpoint.setEndpointCode(siteProfile.getProfileCode() + ":default");
+        endpoint.setDisplayName(siteProfile.getDisplayName() + " 默认入口");
+        endpoint.setProtocolSuite(ProtocolSuite.fromVendorAndSiteKind(siteProfile.getVendorCode(), siteProfile.getSiteKind()));
+        endpoint.setProviderType(executionBackendPolicyService.providerTypeForSite(siteProfile.getSiteKind()));
+        endpoint.setSiteKind(siteProfile.getSiteKind());
+        endpoint.setBaseUrl(baseUrlForEndpoint(siteProfile.getBaseUrlPattern()));
+        endpoint.setAuthStrategy(policy.authStrategy());
+        endpoint.setPathStrategy(policy.pathStrategy());
+        endpoint.setModelAddressingStrategy(policy.modelAddressingStrategy());
+        endpoint.setErrorSchemaStrategy(policy.errorSchemaStrategy());
+        endpoint.setStreamTransport(policy.streamTransport());
+        endpoint.setConversationProfileJson(siteProfile.getConversationProfileJson());
+        endpoint.setActive(siteProfile.isActive());
+        providerProtocolEndpointRepository.save(endpoint);
+    }
+
     private void apply(UpstreamSiteProfileEntity entity, ProviderSiteRequest request) {
         var policy = providerSiteRegistryService.policy(request.siteKind());
         if (securityPolicyService != null) {
@@ -693,6 +851,37 @@ public class ProviderSiteAdminService {
             entity.setProfileSource(SiteProfileSource.MANUAL);
         }
         entity.setActive(request.active() == null || request.active());
+    }
+
+    private void applyEndpoint(ProviderProtocolEndpointEntity entity, ProviderProtocolEndpointRequest request) {
+        if (securityPolicyService != null) {
+            securityPolicyService.assertUrlAllowed(request.baseUrl());
+        }
+        UpstreamSitePolicyService.SitePolicy policy = providerSiteRegistryService.policy(request.siteKind());
+        entity.setEndpointCode(request.endpointCode().trim());
+        entity.setDisplayName(request.displayName().trim());
+        entity.setProtocolSuite(ProtocolSuite.normalize(request.protocolSuite()));
+        entity.setProviderType(request.providerType());
+        entity.setSiteKind(request.siteKind());
+        entity.setBaseUrl(baseUrlForEndpoint(request.baseUrl()));
+        entity.setAuthStrategy(defaultValue(request.authStrategy(), policy.authStrategy()));
+        entity.setPathStrategy(defaultValue(request.pathStrategy(), policy.pathStrategy()));
+        entity.setModelAddressingStrategy(defaultValue(request.modelAddressingStrategy(), policy.modelAddressingStrategy()));
+        entity.setErrorSchemaStrategy(defaultValue(request.errorSchemaStrategy(), policy.errorSchemaStrategy()));
+        entity.setStreamTransport(blankToNull(request.streamTransport()) == null ? policy.streamTransport() : request.streamTransport().trim());
+        entity.setConversationProfileJson(writeObjectJson(request.conversationProfile()));
+        entity.setActive(request.active() == null || request.active());
+    }
+
+    private String baseUrlForEndpoint(String baseUrl) {
+        if (baseUrl == null || baseUrl.isBlank()) {
+            throw new IllegalArgumentException("协议入口 Base URL 不能为空。");
+        }
+        return baseUrl.trim();
+    }
+
+    private <T> T defaultValue(T value, T fallback) {
+        return value == null ? fallback : value;
     }
 
     private String blankToNull(String value) {

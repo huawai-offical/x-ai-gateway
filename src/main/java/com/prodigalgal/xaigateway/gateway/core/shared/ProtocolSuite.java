@@ -11,7 +11,9 @@ public final class ProtocolSuite {
     public static final String OPENAI_COMPATIBLE_GENERIC = "openai_compatible.generic";
     public static final String AZURE_OPENAI_COMPATIBLE = "azure_openai.openai_compatible";
     public static final String DEEPSEEK_OPENAI_COMPATIBLE = "deepseek.openai_compatible";
+    public static final String DEEPSEEK_ANTHROPIC_COMPATIBLE = "deepseek.anthropic_compatible";
     public static final String XIAOMI_MIMO_OPENAI_COMPATIBLE = "xiaomi_mimo.openai_compatible";
+    public static final String XIAOMI_MIMO_ANTHROPIC_COMPATIBLE = "xiaomi_mimo.anthropic_compatible";
     public static final String QWEN_OPENAI_COMPATIBLE = "qwen.openai_compatible";
     public static final String MOONSHOT_OPENAI_COMPATIBLE = "moonshot.openai_compatible";
     public static final String SILICONFLOW_OPENAI_COMPATIBLE = "siliconflow.openai_compatible";
@@ -30,6 +32,12 @@ public final class ProtocolSuite {
     public static final String GEMINI_NATIVE = "gemini.native";
     public static final String VERTEX_AI_GEMINI_NATIVE = "vertex_ai.gemini_native";
     public static final String OLLAMA_NATIVE = "ollama.native";
+
+    public static final List<String> ANTHROPIC_COMPATIBLE_FAMILY = List.of(
+            ANTHROPIC_NATIVE,
+            DEEPSEEK_ANTHROPIC_COMPATIBLE,
+            XIAOMI_MIMO_ANTHROPIC_COMPATIBLE
+    );
 
     public static final List<String> OPENAI_COMPATIBLE_FAMILY = List.of(
             OPENAI_NATIVE,

@@ -85,4 +85,31 @@ public class ProviderSiteAdminController {
     public List<SiteModelCapabilityResponse> capabilities(@PathVariable Long id) {
         return providerSiteAdminService.listCapabilities(id);
     }
+
+    @GetMapping("/{id}/protocol-endpoints")
+    public List<ProviderProtocolEndpointResponse> protocolEndpoints(@PathVariable Long id) {
+        return providerSiteAdminService.listProtocolEndpoints(id);
+    }
+
+    @PostMapping("/{id}/protocol-endpoints")
+    public ProviderProtocolEndpointResponse createProtocolEndpoint(
+            @PathVariable Long id,
+            @Valid @RequestBody ProviderProtocolEndpointRequest request) {
+        return providerSiteAdminService.createProtocolEndpoint(id, request);
+    }
+
+    @PutMapping("/{id}/protocol-endpoints/{endpointId}")
+    public ProviderProtocolEndpointResponse updateProtocolEndpoint(
+            @PathVariable Long id,
+            @PathVariable Long endpointId,
+            @Valid @RequestBody ProviderProtocolEndpointRequest request) {
+        return providerSiteAdminService.updateProtocolEndpoint(id, endpointId, request);
+    }
+
+    @DeleteMapping("/{id}/protocol-endpoints/{endpointId}")
+    public void deleteProtocolEndpoint(
+            @PathVariable Long id,
+            @PathVariable Long endpointId) {
+        providerSiteAdminService.deleteProtocolEndpoint(id, endpointId);
+    }
 }
