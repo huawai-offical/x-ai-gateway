@@ -38,11 +38,14 @@ public class RoutingPreviewController {
                 request.requestedModel(),
                 request.requestBody(),
                 request.clientFamily() == null ? GatewayClientFamily.GENERIC_OPENAI : GatewayClientFamily.from(request.clientFamily()),
-                false
+                false,
+                null,
+                request.httpMethod()
         ));
         CanonicalExecutionPlanCompilation compilation = translationExecutionPlanCompiler.compilePreview(
                 request.distributedKeyPrefix(),
                 request.protocol(),
+                request.httpMethod(),
                 request.requestPath(),
                 request.requestedModel(),
                 GatewayDegradationPolicy.ALLOW_LOSSY,

@@ -293,7 +293,7 @@ public class ExecutionBackendPolicyService {
             return false;
         }
         return switch (semantics.operation()) {
-            case AUDIO_TRANSCRIPTION, AUDIO_SPEECH, IMAGE_GENERATION, MODERATION_CREATE -> true;
+            case AUDIO_TRANSCRIPTION, AUDIO_SPEECH, IMAGE_GENERATION, IMAGE_EDIT, MODERATION_CREATE -> true;
             default -> false;
         };
     }

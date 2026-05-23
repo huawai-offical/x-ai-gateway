@@ -163,8 +163,8 @@ class CanonicalResourceMapperTests {
     private TranslationResourceType resourceType(TranslationOperation operation) {
         return switch (operation) {
             case EMBEDDING_CREATE -> TranslationResourceType.EMBEDDING;
-            case AUDIO_TRANSCRIPTION, AUDIO_SPEECH -> TranslationResourceType.AUDIO;
-            case IMAGE_GENERATION -> TranslationResourceType.IMAGE;
+            case AUDIO_TRANSCRIPTION, AUDIO_TRANSLATION, AUDIO_SPEECH -> TranslationResourceType.AUDIO;
+            case IMAGE_GENERATION, IMAGE_EDIT, IMAGE_VARIATION -> TranslationResourceType.IMAGE;
             case MODERATION_CREATE -> TranslationResourceType.MODERATION;
             case FILE_CREATE, FILE_LIST, FILE_GET, FILE_CONTENT_GET, FILE_DELETE -> TranslationResourceType.FILE;
             case UPLOAD_CREATE, UPLOAD_GET, UPLOAD_PART_ADD, UPLOAD_COMPLETE, UPLOAD_CANCEL -> TranslationResourceType.UPLOAD;
@@ -175,8 +175,8 @@ class CanonicalResourceMapperTests {
     private String defaultSurface(TranslationOperation operation) {
         return switch (operation) {
             case EMBEDDING_CREATE -> "embeddings";
-            case AUDIO_TRANSCRIPTION, AUDIO_SPEECH -> "audio";
-            case IMAGE_GENERATION -> "images";
+            case AUDIO_TRANSCRIPTION, AUDIO_TRANSLATION, AUDIO_SPEECH -> "audio";
+            case IMAGE_GENERATION, IMAGE_EDIT, IMAGE_VARIATION -> "images";
             case MODERATION_CREATE -> "moderations";
             case FILE_CREATE, FILE_LIST, FILE_GET, FILE_CONTENT_GET, FILE_DELETE -> "files";
             case UPLOAD_CREATE, UPLOAD_GET, UPLOAD_PART_ADD, UPLOAD_COMPLETE, UPLOAD_CANCEL -> "uploads";
@@ -188,8 +188,11 @@ class CanonicalResourceMapperTests {
         return switch (operation) {
             case EMBEDDING_CREATE -> "/v1/embeddings";
             case AUDIO_TRANSCRIPTION -> "/v1/audio/transcriptions";
+            case AUDIO_TRANSLATION -> "/v1/audio/translations";
             case AUDIO_SPEECH -> "/v1/audio/speech";
             case IMAGE_GENERATION -> "/v1/images/generations";
+            case IMAGE_EDIT -> "/v1/images/edits";
+            case IMAGE_VARIATION -> "/v1/images/variations";
             case MODERATION_CREATE -> "/v1/moderations";
             case FILE_CREATE, FILE_LIST -> "/v1/files";
             case FILE_GET, FILE_DELETE -> "/v1/files/file_123";

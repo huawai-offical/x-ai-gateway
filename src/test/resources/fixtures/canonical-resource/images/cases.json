@@ -9,5 +9,27 @@
     "expectedObjectId": null,
     "expectedEventCount": 2,
     "expectedDegradationCount": 0
+  },
+  {
+    "operation": "IMAGE_EDIT",
+    "mode": "json",
+    "rawJson": { "created": 123, "data": [ { "b64_json": "AQID" } ] },
+    "expectedResponseKind": "list",
+    "expectedObjectType": "image.list",
+    "expectedStatus": "completed",
+    "expectedObjectId": null,
+    "expectedEventCount": 2,
+    "expectedDegradationCount": 0
+  },
+  {
+    "operation": "IMAGE_VARIATION",
+    "mode": "json",
+    "rawJson": { "created": 123, "data": [ { "url": "https://example.com/b.png" } ] },
+    "expectedResponseKind": "list",
+    "expectedObjectType": "image.list",
+    "expectedStatus": "completed",
+    "expectedObjectId": null,
+    "expectedEventCount": 2,
+    "expectedDegradationCount": 0
   }
 ]

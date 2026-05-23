@@ -172,7 +172,7 @@ class GatewayChatExecutionServiceTests {
         Mockito.when(routeSelectionService.select(Mockito.any())).thenReturn(selectionResultWithFallbackCandidates());
         Mockito.when(translationExecutionPlanCompiler.compileSelected(Mockito.any(), Mockito.any(CanonicalRequest.class), Mockito.any(), Mockito.any()))
                 .thenReturn(canonicalCompilation("openai", "/v1/chat/completions", "gpt-4o"));
-        Mockito.when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.any()))
+        Mockito.when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.anyString(), Mockito.any()))
                 .thenReturn(new GatewayRequestSemantics(
                         TranslationResourceType.CHAT,
                         TranslationOperation.CHAT_COMPLETION,
@@ -277,7 +277,7 @@ class GatewayChatExecutionServiceTests {
         Mockito.when(routeSelectionService.select(Mockito.any())).thenReturn(selectionResultWithFallbackCandidates());
         Mockito.when(translationExecutionPlanCompiler.compileSelected(Mockito.any(), Mockito.any(CanonicalRequest.class), Mockito.any(), Mockito.any()))
                 .thenReturn(canonicalCompilation("openai", "/v1/responses", "gpt-4o"));
-        Mockito.when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.any()))
+        Mockito.when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.anyString(), Mockito.any()))
                 .thenReturn(new GatewayRequestSemantics(
                         TranslationResourceType.RESPONSE,
                         TranslationOperation.RESPONSE_CREATE,
@@ -365,7 +365,7 @@ class GatewayChatExecutionServiceTests {
         Mockito.when(routingPolicyRuntimeConfigService.maxAttempts(3, 2)).thenReturn(1);
         Mockito.when(translationExecutionPlanCompiler.compileSelected(Mockito.any(), Mockito.any(CanonicalRequest.class), Mockito.any(), Mockito.any()))
                 .thenReturn(canonicalCompilation("openai", "/v1/chat/completions", "gpt-4o"));
-        Mockito.when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.any()))
+        Mockito.when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.anyString(), Mockito.any()))
                 .thenReturn(new GatewayRequestSemantics(
                         TranslationResourceType.CHAT,
                         TranslationOperation.CHAT_COMPLETION,
@@ -457,7 +457,7 @@ class GatewayChatExecutionServiceTests {
         Mockito.when(routeSelectionService.select(Mockito.any())).thenReturn(selectionResultWithFallbackCandidates());
         Mockito.when(translationExecutionPlanCompiler.compileSelected(Mockito.any(), Mockito.any(CanonicalRequest.class), Mockito.any(), Mockito.any()))
                 .thenReturn(canonicalCompilation("openai", "/v1/chat/completions", "gpt-4o"));
-        Mockito.when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.any()))
+        Mockito.when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.anyString(), Mockito.any()))
                 .thenReturn(new GatewayRequestSemantics(
                         TranslationResourceType.CHAT,
                         TranslationOperation.CHAT_COMPLETION,
@@ -565,7 +565,7 @@ class GatewayChatExecutionServiceTests {
         });
         Mockito.when(translationExecutionPlanCompiler.compileSelected(Mockito.any(), Mockito.any(CanonicalRequest.class), Mockito.any(), Mockito.any()))
                 .thenReturn(canonicalCompilation("openai", "/v1/chat/completions", "gpt-4o"));
-        Mockito.when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.any()))
+        Mockito.when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.anyString(), Mockito.any()))
                 .thenReturn(new GatewayRequestSemantics(
                         TranslationResourceType.CHAT,
                         TranslationOperation.CHAT_COMPLETION,
@@ -803,3 +803,4 @@ class GatewayChatExecutionServiceTests {
         );
     }
 }
+

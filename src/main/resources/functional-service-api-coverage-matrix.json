@@ -53,7 +53,7 @@
           "paths": [
             "/v1/chat/completions"
           ],
-          "contract": "MiMo 等 OpenAI-compatible key 只作为 chat/tools 功能性验证，不承诺 OpenAI object lifecycle。"
+          "contract": "MiMo 等 OpenAI-compatible key 的 chat/tools 与 file/uploads 分开建模；file/uploads 仅在 capability snapshot 声明后通过 gateway orchestration 开放。"
         },
         {
           "provider": "anthropic",
@@ -119,7 +119,7 @@
           "paths": [
             "/v1/chat/completions"
           ],
-          "contract": "仅按 compatible chat streaming 验证，不推导 Responses 或 object lifecycle。"
+          "contract": "仅按 compatible chat streaming 验证，不从 streaming 推导 Responses、file/uploads 或其他 object lifecycle。"
         },
         {
           "provider": "anthropic",

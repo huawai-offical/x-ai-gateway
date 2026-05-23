@@ -17,7 +17,6 @@ import { Textarea } from '@/components/ui/textarea'
 import { EmptyState } from '@/components/app/empty-state'
 import { InfoGrid } from '@/components/app/info-grid'
 import { InlineError } from '@/components/app/inline-error'
-import { PageSection } from '@/components/app/page-section'
 import { PageSkeleton } from '@/components/app/page-skeleton'
 import { StatusBadge } from '@/components/app/status-badge'
 import { PaginatedRows } from '@/components/app/table-pagination'
@@ -191,22 +190,17 @@ export function ProviderSitesPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageSection
-        kicker="上游接入"
-        title="厂商管理中心"
-        actions={(
-          <>
-            <Button type="button" variant="outline" onClick={() => refreshMutation.mutate(undefined)} disabled={refreshMutation.isPending}>
-              <RefreshCwIcon data-icon="inline-start" />
-              刷新能力
-            </Button>
-            <Button type="button" onClick={openCreate}>
-              <PlusIcon data-icon="inline-start" />
-              新增自定义入口
-            </Button>
-          </>
-        )}
-      >
+      <section className="flex flex-col gap-5">
+        <div className="flex flex-wrap items-center justify-end gap-2.5">
+          <Button type="button" variant="outline" onClick={() => refreshMutation.mutate(undefined)} disabled={refreshMutation.isPending}>
+            <RefreshCwIcon data-icon="inline-start" />
+            刷新能力
+          </Button>
+          <Button type="button" onClick={openCreate}>
+            <PlusIcon data-icon="inline-start" />
+            新增自定义入口
+          </Button>
+        </div>
         {firstError ? <InlineError error={firstError} title="厂商管理操作失败" /> : null}
         {sitesQuery.isPending || presetsQuery.isPending ? (
           <PageSkeleton count={2} />
@@ -248,14 +242,11 @@ export function ProviderSitesPage() {
             </div>
           </>
         )}
-      </PageSection>
+      </section>
 
       <section className="flex flex-col gap-4">
-        <div className="flex flex-col gap-2">
-          <div className="text-xs font-medium uppercase text-muted-foreground">
-            厂商目录
-          </div>
-          <h2 className="text-xl font-semibold tracking-tight text-foreground">厂商与 API 入口</h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl font-semibold tracking-tight text-foreground">厂商目录</h2>
         </div>
         {sitesQuery.isPending || presetsQuery.isPending ? (
           <PageSkeleton count={1} />
@@ -266,11 +257,11 @@ export function ProviderSitesPage() {
             paginationClassName="rounded-none border-x-0 border-b-0 bg-transparent px-0"
           >
             {({ pageItems }) => (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto rounded-xl border border-border/60 bg-card/92">
                 <table className="w-full min-w-[1100px] table-fixed text-sm">
-                  <thead>
+                  <thead className="bg-muted/30">
                     <tr>
-                      <th className="w-[22%] border-b border-border/60 px-3 py-3 text-left font-medium text-muted-foreground">厂商目录</th>
+                      <th className="w-[22%] border-b border-border/60 px-3 py-3 text-left font-medium text-muted-foreground">厂商 / API 入口</th>
                       <th className="w-[16%] border-b border-border/60 px-3 py-3 text-left font-medium text-muted-foreground">状态</th>
                       <th className="w-[18%] border-b border-border/60 px-3 py-3 text-left font-medium text-muted-foreground">默认站点类型</th>
                       <th className="w-[22%] border-b border-border/60 px-3 py-3 text-left font-medium text-muted-foreground">协议入口</th>

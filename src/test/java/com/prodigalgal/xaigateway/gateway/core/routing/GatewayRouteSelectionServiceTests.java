@@ -143,7 +143,7 @@ class GatewayRouteSelectionServiceTests {
                 ));
         when(modelPolicyResolver.evaluateCandidate(Mockito.eq(keyView), Mockito.eq("responses"), Mockito.eq("gpt-5-codex"), Mockito.eq("gpt-5-codex"), Mockito.any()))
                 .thenReturn(new ModelPolicyCandidateDecision(routeCandidate, true, List.of(), List.of("allow_policy=1")));
-        when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.any()))
+        when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.anyString(), Mockito.any()))
                 .thenReturn(new GatewayRequestSemantics(
                         TranslationResourceType.RESPONSE,
                         TranslationOperation.RESPONSE_CREATE,
@@ -271,7 +271,7 @@ class GatewayRouteSelectionServiceTests {
                         false,
                         List.of(candidate)
                 )));
-        when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.any()))
+        when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.anyString(), Mockito.any()))
                 .thenReturn(new GatewayRequestSemantics(
                         TranslationResourceType.CHAT,
                         TranslationOperation.CHAT_COMPLETION,
@@ -409,7 +409,7 @@ class GatewayRouteSelectionServiceTests {
                         false,
                         List.of(candidate)
                 )));
-        when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.any()))
+        when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.anyString(), Mockito.any()))
                 .thenReturn(new GatewayRequestSemantics(
                         TranslationResourceType.CHAT,
                         TranslationOperation.CHAT_COMPLETION,
@@ -505,7 +505,7 @@ class GatewayRouteSelectionServiceTests {
         when(distributedKeyQueryService.findActiveByKeyPrefix("sk-gw-test")).thenReturn(Optional.of(keyView));
         when(distributedKeyGovernanceService.evaluate(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.anyBoolean()))
                 .thenReturn(new DistributedKeyGovernanceService.GovernanceDecision(List.of("当前 DistributedKey 已超过 RPM 限制。"), List.of(), 1L, 1000L, null));
-        when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.any()))
+        when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.anyString(), Mockito.any()))
                 .thenReturn(new GatewayRequestSemantics(
                         TranslationResourceType.CHAT,
                         TranslationOperation.CHAT_COMPLETION,
@@ -608,7 +608,7 @@ class GatewayRouteSelectionServiceTests {
                         false,
                         List.of(candidate)
                 )));
-        when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.any()))
+        when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.anyString(), Mockito.any()))
                 .thenReturn(new GatewayRequestSemantics(
                         TranslationResourceType.UPLOAD,
                         TranslationOperation.UPLOAD_CREATE,
@@ -748,7 +748,7 @@ class GatewayRouteSelectionServiceTests {
         when(distributedKeyQueryService.findActiveByKeyPrefix("sk-gw-test")).thenReturn(Optional.of(keyView));
         when(distributedKeyGovernanceService.evaluate(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.anyBoolean()))
                 .thenReturn(new DistributedKeyGovernanceService.GovernanceDecision(List.of(), List.of(), 1L, 1_000L, null));
-        when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.any()))
+        when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.anyString(), Mockito.any()))
                 .thenReturn(new GatewayRequestSemantics(
                         TranslationResourceType.CHAT,
                         TranslationOperation.CHAT_COMPLETION,
@@ -819,3 +819,4 @@ class GatewayRouteSelectionServiceTests {
                 isNull());
     }
 }
+

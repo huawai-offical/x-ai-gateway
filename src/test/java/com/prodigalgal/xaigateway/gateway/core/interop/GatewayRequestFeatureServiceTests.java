@@ -167,6 +167,26 @@ class GatewayRequestFeatureServiceTests {
     }
 
     @Test
+    void shouldDescribeOpenAiStyleAudioAndImageResourceGaps() {
+        GatewayRequestSemantics audioTranslation = service.describe("POST", "/v1/audio/translations", null);
+        GatewayRequestSemantics imageEdit = service.describe("POST", "/v1/images/edits", null);
+        GatewayRequestSemantics imageVariation = service.describe("POST", "/v1/images/variations", null);
+
+        assertEquals(TranslationResourceType.AUDIO, audioTranslation.resourceType());
+        assertEquals(TranslationOperation.AUDIO_TRANSLATION, audioTranslation.operation());
+        assertEquals(List.of(InteropFeature.AUDIO_TRANSLATION), audioTranslation.requiredFeatures());
+        assertEquals(RouteSelectionMode.CATALOG_SELECTION, audioTranslation.routeSelectionMode());
+
+        assertEquals(TranslationResourceType.IMAGE, imageEdit.resourceType());
+        assertEquals(TranslationOperation.IMAGE_EDIT, imageEdit.operation());
+        assertEquals(List.of(InteropFeature.IMAGE_EDIT), imageEdit.requiredFeatures());
+
+        assertEquals(TranslationResourceType.IMAGE, imageVariation.resourceType());
+        assertEquals(TranslationOperation.IMAGE_VARIATION, imageVariation.operation());
+        assertEquals(List.of(InteropFeature.IMAGE_VARIATION), imageVariation.requiredFeatures());
+    }
+
+    @Test
     void shouldDescribeGoogleNativeEmbeddingsAndFilesWithSelectionModes() {
         GatewayRequestSemantics embedSemantics = service.describe("POST", "/v1beta/models/text-embedding-004:embedContent", null);
         GatewayRequestSemantics googleNamespaceEmbedSemantics = service.describe("POST", "/google/v1beta/models/text-embedding-004:embedContent", null);

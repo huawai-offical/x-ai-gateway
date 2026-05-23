@@ -119,10 +119,11 @@ describe('ProviderSitesPage', () => {
   it('renders a single vendor catalog and creates custom provider site', async () => {
     renderPage()
 
-    expect(await screen.findByText('厂商管理中心')).toBeInTheDocument()
     expect(await screen.findByText('OpenAI 主站')).toBeInTheDocument()
+    expect(screen.queryByText('厂商管理中心')).not.toBeInTheDocument()
     expect(await screen.findByText('MiMo OpenAI 入口')).toBeInTheDocument()
-    expect(await screen.findByText('厂商与 API 入口')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '厂商目录' })).toBeInTheDocument()
+    expect(await screen.findByRole('columnheader', { name: '厂商 / API 入口' })).toBeInTheDocument()
     expect(screen.getByText('可导入')).toBeInTheDocument()
     expect(screen.queryByText('厂商聚合')).not.toBeInTheDocument()
     expect(screen.queryByText('预设导入')).not.toBeInTheDocument()

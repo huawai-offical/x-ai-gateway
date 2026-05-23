@@ -264,9 +264,10 @@ public class GatewayChatExecutionService {
                 routeBody,
                 effectiveClientFamily,
                 true,
-                sessionAffinityKey(filteredRequest)
+                sessionAffinityKey(filteredRequest),
+                "POST"
         ));
-        GatewayRequestSemantics semantics = gatewayRequestFeatureService.describe(filteredRequest.requestPath(), routeBody);
+        GatewayRequestSemantics semantics = gatewayRequestFeatureService.describe("POST", filteredRequest.requestPath(), routeBody);
         gatewayRequestLifecycleService.startRequest(requestId, selectionResult, filteredRequest, false, startedAt);
 
         try {
@@ -398,9 +399,10 @@ public class GatewayChatExecutionService {
                 routeBody,
                 effectiveClientFamily,
                 true,
-                sessionAffinityKey(filteredRequest)
+                sessionAffinityKey(filteredRequest),
+                "POST"
         ));
-        GatewayRequestSemantics semantics = gatewayRequestFeatureService.describe(filteredRequest.requestPath(), routeBody);
+        GatewayRequestSemantics semantics = gatewayRequestFeatureService.describe("POST", filteredRequest.requestPath(), routeBody);
         gatewayRequestLifecycleService.startRequest(requestId, selectionResult, filteredRequest, true, startedAt);
         AtomicReference<CanonicalUsage> lastVisibleUsage = new AtomicReference<>(CanonicalUsage.empty());
         AtomicBoolean terminalRecorded = new AtomicBoolean(false);

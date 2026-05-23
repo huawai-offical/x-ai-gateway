@@ -315,6 +315,10 @@ class SiteConformanceHarnessTests {
             root.put("prompt", "hi");
             return root;
         }
+        if ("/v1/images/edits".equals(fixture.requestPath())) {
+            root.put("prompt", "edit hi");
+            return root;
+        }
         if ("/upload/v1beta/files".equals(fixture.requestPath())) {
             root.remove("model");
             root.put("fileName", "doc.txt");

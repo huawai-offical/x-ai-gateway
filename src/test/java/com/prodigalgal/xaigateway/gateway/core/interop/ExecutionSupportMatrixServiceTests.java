@@ -82,6 +82,36 @@ class ExecutionSupportMatrixServiceTests {
         );
     }
 
+    @Test
+    void shouldExposeOpenAiCompatibleFilesAndUploadsWhenSnapshotAllowsObjectLifecycle() {
+        CatalogCandidateView candidate = openAiCandidate(
+                ProviderType.OPENAI_COMPATIBLE,
+                UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC
+        );
+
+        GatewayRequestSemantics fileSemantics = new GatewayRequestSemantics(
+                TranslationResourceType.FILE,
+                TranslationOperation.FILE_CREATE,
+                List.of(InteropFeature.FILE_OBJECT),
+                true
+        );
+        GatewayRequestSemantics uploadSemantics = new GatewayRequestSemantics(
+                TranslationResourceType.UPLOAD,
+                TranslationOperation.UPLOAD_CREATE,
+                List.of(InteropFeature.UPLOAD_CREATE, InteropFeature.FILE_OBJECT),
+                true
+        );
+
+        assertEquals(
+                InteropCapabilityLevel.NATIVE,
+                service.implementedLevel(candidate, fileSemantics, InteropFeature.FILE_OBJECT)
+        );
+        assertEquals(
+                InteropCapabilityLevel.NATIVE,
+                service.implementedLevel(candidate, uploadSemantics, InteropFeature.UPLOAD_CREATE)
+        );
+    }
+
 
     @Test
     void shouldOnlyExposeWebSearchForOpenAiAndPerplexityAdapters() {
@@ -103,6 +133,39 @@ class ExecutionSupportMatrixServiceTests {
         assertEquals(
                 InteropCapabilityLevel.UNSUPPORTED,
                 service.implementedLevel(openAiCandidate(ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC), webSearchSemantics, InteropFeature.WEB_SEARCH)
+        );
+    }
+
+    @Test
+    void shouldExposeNewAudioImageResourceGapsForOpenAiStyleAndGeminiEditSites() {
+        GatewayRequestSemantics audioTranslation = new GatewayRequestSemantics(
+                TranslationResourceType.AUDIO,
+                TranslationOperation.AUDIO_TRANSLATION,
+                List.of(InteropFeature.AUDIO_TRANSLATION),
+                true
+        );
+        GatewayRequestSemantics imageEdit = new GatewayRequestSemantics(
+                TranslationResourceType.IMAGE,
+                TranslationOperation.IMAGE_EDIT,
+                List.of(InteropFeature.IMAGE_EDIT),
+                true
+        );
+
+        assertEquals(
+                InteropCapabilityLevel.NATIVE,
+                service.implementedLevel(openAiCandidate(ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC), audioTranslation, InteropFeature.AUDIO_TRANSLATION)
+        );
+        assertEquals(
+                InteropCapabilityLevel.NATIVE,
+                service.implementedLevel(openAiCandidate(ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC), imageEdit, InteropFeature.IMAGE_EDIT)
+        );
+        assertEquals(
+                InteropCapabilityLevel.UNSUPPORTED,
+                service.implementedLevel(geminiCandidate(UpstreamSiteKind.GEMINI_DIRECT), audioTranslation, InteropFeature.AUDIO_TRANSLATION)
+        );
+        assertEquals(
+                InteropCapabilityLevel.NATIVE,
+                service.implementedLevel(geminiCandidate(UpstreamSiteKind.GEMINI_DIRECT), imageEdit, InteropFeature.IMAGE_EDIT)
         );
     }
 

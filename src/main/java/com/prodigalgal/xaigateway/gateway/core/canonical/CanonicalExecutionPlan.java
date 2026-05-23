@@ -2,6 +2,7 @@ package com.prodigalgal.xaigateway.gateway.core.canonical;
 
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature;
+import com.prodigalgal.xaigateway.gateway.core.interop.ResourceSurfaceRegistry;
 import com.prodigalgal.xaigateway.gateway.core.interop.RouteSelectionMode;
 import com.prodigalgal.xaigateway.gateway.core.interop.SupportStatus;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation;
@@ -290,52 +291,10 @@ public record CanonicalExecutionPlan(
     }
 
     private static String defaultSurface(TranslationResourceType resourceType, TranslationOperation operation) {
-        return switch (operation == null ? TranslationOperation.UNKNOWN : operation) {
-            case CHAT_COMPLETION -> "chat.completions";
-            case RESPONSE_CREATE -> "responses";
-            case EMBEDDING_CREATE -> "embeddings";
-            case AUDIO_TRANSCRIPTION, AUDIO_SPEECH -> "audio";
-            case IMAGE_GENERATION -> "images";
-            case MODERATION_CREATE -> "moderations";
-            case FILE_CREATE, FILE_LIST, FILE_GET, FILE_CONTENT_GET, FILE_DELETE -> "files";
-            case UPLOAD_CREATE, UPLOAD_GET, UPLOAD_PART_ADD, UPLOAD_COMPLETE, UPLOAD_CANCEL -> "uploads";
-            case RERANK_CREATE -> "rerank";
-            case VIDEO_GENERATION_CREATE, VIDEO_GENERATION_GET, VIDEO_GENERATION_CANCEL -> "videos";
-            case MUSIC_GENERATION_CREATE, MUSIC_GENERATION_GET, MUSIC_GENERATION_CANCEL -> "music";
-            case TASK_GET, TASK_CANCEL -> "tasks";
-            case WEB_SEARCH_CREATE -> "web_search";
-            case UNKNOWN -> resourceType == null ? "unknown" : resourceType.wireName();
-        };
+        return ResourceSurfaceRegistry.defaultSurface(resourceType, operation);
     }
 
     private static String defaultNormalizedPath(TranslationResourceType resourceType, TranslationOperation operation) {
-        return switch (operation == null ? TranslationOperation.UNKNOWN : operation) {
-            case CHAT_COMPLETION -> "/v1/chat/completions";
-            case RESPONSE_CREATE -> "/v1/responses";
-            case EMBEDDING_CREATE -> "/v1/embeddings";
-            case AUDIO_TRANSCRIPTION -> "/v1/audio/transcriptions";
-            case AUDIO_SPEECH -> "/v1/audio/speech";
-            case IMAGE_GENERATION -> "/v1/images/generations";
-            case MODERATION_CREATE -> "/v1/moderations";
-            case FILE_CREATE, FILE_LIST -> "/v1/files";
-            case FILE_GET, FILE_DELETE -> "/v1/files/{fileId}";
-            case FILE_CONTENT_GET -> "/v1/files/{fileId}/content";
-            case UPLOAD_CREATE -> "/v1/uploads";
-            case UPLOAD_GET -> "/v1/uploads/{uploadId}";
-            case UPLOAD_PART_ADD -> "/v1/uploads/{uploadId}/parts";
-            case UPLOAD_COMPLETE -> "/v1/uploads/{uploadId}/complete";
-            case UPLOAD_CANCEL -> "/v1/uploads/{uploadId}/cancel";
-            case RERANK_CREATE -> "/v1/rerank";
-            case VIDEO_GENERATION_CREATE -> "/v1/videos/generations";
-            case VIDEO_GENERATION_GET -> "/v1/videos/{taskId}";
-            case VIDEO_GENERATION_CANCEL -> "/v1/videos/{taskId}/cancel";
-            case MUSIC_GENERATION_CREATE -> "/v1/music/generations";
-            case MUSIC_GENERATION_GET -> "/v1/music/{taskId}";
-            case MUSIC_GENERATION_CANCEL -> "/v1/music/{taskId}/cancel";
-            case TASK_GET -> "/v1/tasks/{taskId}";
-            case TASK_CANCEL -> "/v1/tasks/{taskId}/cancel";
-            case WEB_SEARCH_CREATE -> "/v1/web_search";
-            case UNKNOWN -> resourceType == null ? null : "/" + resourceType.wireName();
-        };
+        return ResourceSurfaceRegistry.defaultNormalizedPath(resourceType, operation);
     }
 }

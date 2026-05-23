@@ -116,11 +116,7 @@ export function ProviderSiteDetailPage() {
       .sort(([left], [right]) => left.localeCompare(right)),
     [site?.surfaces],
   )
-  const features = useMemo<Array<[string, CapabilityResolution]>>(
-    () => Object.entries((site?.features ?? {}) as Record<string, CapabilityResolution>)
-      .sort(([left], [right]) => left.localeCompare(right)),
-    [site?.features],
-  )
+  const featureMap = (site?.features ?? {}) as Record<string, CapabilityResolution>
   const protocolEndpoints = (site?.protocolEndpoints ?? []) as ProviderProtocolEndpoint[]
   const firstError = siteQuery.error ?? capabilitiesQuery.error ?? refreshMutation.error
 
@@ -512,10 +508,11 @@ export function ProviderSiteDetailPage() {
                         <thead className="bg-muted/30">
                           <tr>
                             <th className="w-[22%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">Surface</th>
-                            <th className="w-[18%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">状态</th>
-                            <th className="w-[20%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">路径</th>
-                            <th className="w-[20%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">能力等级</th>
-                            <th className="w-[20%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">阻断原因</th>
+                            <th className="w-[14%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">状态</th>
+                            <th className="w-[18%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">路径</th>
+                            <th className="w-[18%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">能力等级</th>
+                            <th className="w-[20%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">特性解析</th>
+                            <th className="w-[8%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">阻断</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -534,6 +531,9 @@ export function ProviderSiteDetailPage() {
                                 <div>渲染：{surface.renderCapabilityLevel ?? '-'}</div>
                                 <div>综合：{surface.overallCapabilityLevel ?? '-'}</div>
                               </td>
+                              <td className="px-4 py-3 text-muted-foreground">
+                                <FeatureResolutionSummary surface={surface} featureMap={featureMap} />
+                              </td>
                               <td className="px-4 py-3 text-muted-foreground">{summarizeList(surface.blockerReasons, '无', 2)}</td>
                             </tr>
                           ))}
@@ -546,32 +546,38 @@ export function ProviderSiteDetailPage() {
                 <EmptyState title="暂无 surface 能力记录" />
               )}
             </PageSection>
-
-            <PageSection kicker="Feature" title="特性解析">
-              {features.length ? (
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                  {features.map(([key, resolution]) => (
-                    <div key={key} className="rounded-2xl border border-border/60 bg-muted/20 p-4">
-                      <div className="mb-2 flex items-center justify-between gap-2">
-                        <div className="font-medium text-foreground">{key}</div>
-                        <StatusBadge tone={supportTone(resolution.supportStatus)}>{resolution.supportStatus ?? resolution.effectiveLevel ?? 'unknown'}</StatusBadge>
-                      </div>
-                      <div className="text-xs leading-5 text-muted-foreground">
-                        <div>声明：{resolution.declaredLevel ?? '-'}</div>
-                        <div>实现：{resolution.implementedLevel ?? '-'}</div>
-                        <div>有效：{resolution.effectiveLevel ?? '-'}</div>
-                        <div>阻断：{summarizeList(resolution.blockedReasons, '无', 2)}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState title="暂无特性解析记录" />
-              )}
-            </PageSection>
           </div>
         </TabsContent>
       </Tabs>
+    </div>
+  )
+}
+
+function FeatureResolutionSummary({
+  surface,
+  featureMap,
+}: {
+  surface: SurfaceCapability
+  featureMap: Record<string, CapabilityResolution>
+}) {
+  const featureKeys = surface.requiredFeatures.length
+    ? surface.requiredFeatures
+    : Object.keys(surface.featureResolutions ?? {})
+  if (!featureKeys.length) {
+    return <span>无</span>
+  }
+  return (
+    <div className="flex flex-col gap-1">
+      {featureKeys.map((featureKey) => {
+        const resolution = surface.featureResolutions?.[featureKey] ?? featureMap[featureKey]
+        const status = resolution?.supportStatus ?? resolution?.effectiveLevel ?? 'unknown'
+        return (
+          <div key={featureKey} className="flex min-w-0 items-center justify-between gap-2">
+            <span className="truncate" title={featureKey}>{featureKey}</span>
+            <StatusBadge tone={supportTone(status)}>{status}</StatusBadge>
+          </div>
+        )
+      })}
     </div>
   )
 }

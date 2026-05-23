@@ -1,5 +1,8 @@
 package com.prodigalgal.xaigateway.gateway.core.execution;
 
+import com.google.genai.types.EditImageConfig;
+import com.google.genai.types.EditImageResponse;
+import com.google.genai.types.ReferenceImage;
 import com.google.genai.types.GenerateImagesConfig;
 import com.google.genai.types.GenerateImagesResponse;
 import com.google.genai.types.GeneratedImage;
@@ -7,6 +10,7 @@ import com.google.genai.types.Image;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest;
+import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileService;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
@@ -32,6 +36,7 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -45,6 +50,7 @@ class GeminiImagesGatewayResourceExecutorTests {
         TestGeminiImagesExecutor executor = new TestGeminiImagesExecutor(singleImageResponse(new byte[] {1, 2, 3}));
 
         assertTrue(executor.supports(request("/v1/images/generations", TranslationOperation.IMAGE_GENERATION), candidate(UpstreamSiteKind.GEMINI_DIRECT)));
+        assertTrue(executor.supports(request("/v1/images/edits", TranslationOperation.IMAGE_EDIT), candidate(UpstreamSiteKind.GEMINI_DIRECT)));
         assertFalse(executor.supports(request("/v1/moderations", TranslationOperation.MODERATION_CREATE), candidate(UpstreamSiteKind.GEMINI_DIRECT)));
         assertTrue(executor.supports(request("/v1/images/generations", TranslationOperation.IMAGE_GENERATION), candidate(UpstreamSiteKind.VERTEX_AI)));
     }
@@ -99,8 +105,77 @@ class GeminiImagesGatewayResourceExecutorTests {
         assertEquals("Gemini images executor 当前仅支持 /v1/images/generations。", error.getMessage());
     }
 
+    @Test
+    void shouldReturnOpenAiCompatibleB64JsonForEditAndReferenceInputImage() {
+        byte[] imageBytes = new byte[] {9, 8, 7};
+        byte[] editedBytes = new byte[] {1, 4, 9};
+        TestGeminiImagesExecutor executor = new TestGeminiImagesExecutor(singleEditImageResponse(editedBytes));
+
+        ResponseEntity<JsonNode> response = executor.executeEdit(
+                context(TranslationOperation.IMAGE_EDIT, "/v1/images/edits"),
+                "把背景换成蓝色",
+                java.util.Map.of("n", "2", "output_format", "webp"),
+                new GeminiGatewayResourceSupport.ResolvedBinaryFile("input.png", "image/png", imageBytes),
+                null
+        );
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(Base64.getEncoder().encodeToString(editedBytes), response.getBody().path("data").get(0).path("b64_json").asText());
+        assertEquals(2, executor.lastEditConfig.numberOfImages().orElseThrow());
+        assertEquals("image/webp", executor.lastEditConfig.outputMimeType().orElseThrow());
+        assertEquals(1, executor.lastReferenceImages.size());
+        assertArrayEquals(imageBytes, executor.lastReferenceImages.get(0).toReferenceImageAPI().referenceImage().orElseThrow().imageBytes().orElseThrow());
+    }
+
+    @Test
+    void shouldUseProvidedMaskForGeminiImageEdit() {
+        byte[] imageBytes = new byte[] {1, 2};
+        byte[] maskBytes = new byte[] {3, 4};
+        TestGeminiImagesExecutor executor = new TestGeminiImagesExecutor(singleEditImageResponse(new byte[] {5}));
+
+        executor.executeEdit(
+                context(TranslationOperation.IMAGE_EDIT, "/v1/images/edits"),
+                "只替换遮罩区域",
+                java.util.Map.of(),
+                new GeminiGatewayResourceSupport.ResolvedBinaryFile("input.png", "image/png", imageBytes),
+                new GeminiGatewayResourceSupport.ResolvedBinaryFile("mask.png", "image/png", maskBytes)
+        );
+
+        assertEquals(2, executor.lastReferenceImages.size());
+        assertArrayEquals(maskBytes, executor.lastReferenceImages.get(1).toReferenceImageAPI().referenceImage().orElseThrow().imageBytes().orElseThrow());
+        assertTrue(executor.lastReferenceImages.get(1).toReferenceImageAPI().maskImageConfig().isPresent());
+    }
+
+    @Test
+    void shouldRejectUnsupportedEditOutputFormat() {
+        TestGeminiImagesExecutor executor = new TestGeminiImagesExecutor(singleEditImageResponse(new byte[] {1}));
+
+        IllegalArgumentException error = assertThrows(
+                IllegalArgumentException.class,
+                () -> executor.executeEdit(
+                        context(TranslationOperation.IMAGE_EDIT, "/v1/images/edits"),
+                        "edit",
+                        java.util.Map.of("output_format", "gif"),
+                        new GeminiGatewayResourceSupport.ResolvedBinaryFile("input.png", "image/png", new byte[] {1}),
+                        null
+                )
+        );
+
+        assertEquals("Gemini image edit 当前仅支持 output_format 为 png、jpeg 或 webp。", error.getMessage());
+    }
+
     private GenerateImagesResponse singleImageResponse(byte[] imageBytes) {
         return GenerateImagesResponse.builder()
+                .generatedImages(
+                        GeneratedImage.builder()
+                                .image(Image.builder().imageBytes(imageBytes).mimeType("image/png").build())
+                                .build()
+                )
+                .build();
+    }
+
+    private EditImageResponse singleEditImageResponse(byte[] imageBytes) {
+        return EditImageResponse.builder()
                 .generatedImages(
                         GeneratedImage.builder()
                                 .image(Image.builder().imageBytes(imageBytes).mimeType("image/png").build())
@@ -192,12 +267,22 @@ class GeminiImagesGatewayResourceExecutorTests {
     private final class TestGeminiImagesExecutor extends GeminiImagesGatewayResourceExecutor {
 
         private final GenerateImagesResponse response;
+        private final EditImageResponse editResponse;
         private GenerateImagesConfig lastConfig;
+        private EditImageConfig lastEditConfig;
         private String lastPrompt;
+        private java.util.List<ReferenceImage> lastReferenceImages;
 
         private TestGeminiImagesExecutor(GenerateImagesResponse response) {
-            super(Mockito.mock(GeminiChatModelFactory.class), objectMapper);
+            super(Mockito.mock(GeminiChatModelFactory.class), Mockito.mock(GatewayFileService.class), objectMapper);
             this.response = response;
+            this.editResponse = null;
+        }
+
+        private TestGeminiImagesExecutor(EditImageResponse editResponse) {
+            super(Mockito.mock(GeminiChatModelFactory.class), Mockito.mock(GatewayFileService.class), objectMapper);
+            this.response = null;
+            this.editResponse = editResponse;
         }
 
         @Override
@@ -208,6 +293,18 @@ class GeminiImagesGatewayResourceExecutorTests {
             this.lastPrompt = prompt;
             this.lastConfig = config;
             return response;
+        }
+
+        @Override
+        EditImageResponse editImage(
+                GatewayResourceExecutionContext context,
+                String prompt,
+                java.util.List<ReferenceImage> referenceImages,
+                EditImageConfig config) {
+            this.lastPrompt = prompt;
+            this.lastReferenceImages = referenceImages;
+            this.lastEditConfig = config;
+            return editResponse;
         }
     }
 }

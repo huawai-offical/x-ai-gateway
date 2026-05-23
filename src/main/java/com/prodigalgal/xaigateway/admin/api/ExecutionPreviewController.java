@@ -52,11 +52,14 @@ public class ExecutionPreviewController {
                 request.requestedModel(),
                 request.requestBody(),
                 GatewayClientFamily.GENERIC_OPENAI,
-                false
+                false,
+                null,
+                request.httpMethod()
         ));
         CanonicalExecutionPlanCompilation compilation = translationExecutionPlanCompiler.compilePreview(
                 request.distributedKeyPrefix(),
                 request.protocol(),
+                request.httpMethod(),
                 request.requestPath(),
                 request.requestedModel(),
                 GatewayDegradationPolicy.ALLOW_LOSSY,

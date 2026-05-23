@@ -3,6 +3,7 @@ package com.prodigalgal.xaigateway.gateway.core.interop;
 import tools.jackson.databind.JsonNode;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import com.prodigalgal.xaigateway.protocol.ingress.google.GeminiGenerateContentModeResolver;
 import com.prodigalgal.xaigateway.protocol.ingress.google.GeminiGenerateContentRequest;
@@ -32,12 +33,16 @@ public class GatewayRequestFeatureService {
         if ("/v1/chat/completions".equals(normalizedPath)) {
             features.add(InteropFeature.CHAT_TEXT);
             collectChatFeatures(features, body);
-            return semantics("chat.completions", normalizedPath, TranslationResourceType.CHAT, TranslationOperation.CHAT_COMPLETION, features, RouteSelectionMode.CATALOG_SELECTION);
+            return ResourceSurfaceRegistry.find(method, normalizedPath)
+                    .map(definition -> definition.toSemantics(features))
+                    .orElseGet(() -> semantics("chat.completions", normalizedPath, TranslationResourceType.CHAT, TranslationOperation.CHAT_COMPLETION, features, RouteSelectionMode.CATALOG_SELECTION));
         }
         if ("/v1/responses".equals(normalizedPath)) {
             features.add(InteropFeature.RESPONSE_OBJECT);
             collectResponsesFeatures(features, body);
-            return semantics("responses", normalizedPath, TranslationResourceType.RESPONSE, TranslationOperation.RESPONSE_CREATE, features, RouteSelectionMode.CATALOG_SELECTION);
+            return ResourceSurfaceRegistry.find(method, normalizedPath)
+                    .map(definition -> definition.toSemantics(features))
+                    .orElseGet(() -> semantics("responses", normalizedPath, TranslationResourceType.RESPONSE, TranslationOperation.RESPONSE_CREATE, features, RouteSelectionMode.CATALOG_SELECTION));
         }
         if ("/v1/messages".equals(normalizedPath)) {
             features.add(InteropFeature.CHAT_TEXT);
@@ -79,140 +84,9 @@ public class GatewayRequestFeatureService {
                 }
             };
         }
-        if ("POST".equals(method) && "/v1beta/models/{model}:embedContent".equals(normalizedPath)) {
-            return semantics(
-                    "embeddings",
-                    normalizedPath,
-                    TranslationResourceType.EMBEDDING,
-                    TranslationOperation.EMBEDDING_CREATE,
-                    List.of(InteropFeature.EMBEDDINGS),
-                    RouteSelectionMode.CATALOG_SELECTION
-            );
-        }
-        if ("POST".equals(method) && "/v1beta/models/{model}:batchEmbedContents".equals(normalizedPath)) {
-            return semantics(
-                    "embeddings",
-                    normalizedPath,
-                    TranslationResourceType.EMBEDDING,
-                    TranslationOperation.EMBEDDING_CREATE,
-                    List.of(InteropFeature.EMBEDDINGS),
-                    RouteSelectionMode.CATALOG_SELECTION
-            );
-        }
-        if ("POST".equals(method) && "/upload/v1beta/files".equals(normalizedPath)) {
-            return semantics(
-                    "files",
-                    normalizedPath,
-                    TranslationResourceType.FILE,
-                    TranslationOperation.FILE_CREATE,
-                    List.of(InteropFeature.FILE_OBJECT),
-                    RouteSelectionMode.CATALOG_SELECTION
-            );
-        }
-        if ("GET".equals(method) && "/v1beta/files".equals(normalizedPath)) {
-            return semantics(
-                    "files",
-                    normalizedPath,
-                    TranslationResourceType.FILE,
-                    TranslationOperation.FILE_LIST,
-                    List.of(InteropFeature.FILE_OBJECT),
-                    RouteSelectionMode.LOCAL_CATALOG
-            );
-        }
-        if ("GET".equals(method) && "/v1beta/files/{fileName}".equals(normalizedPath)) {
-            return semantics(
-                    "files",
-                    normalizedPath,
-                    TranslationResourceType.FILE,
-                    TranslationOperation.FILE_GET,
-                    List.of(InteropFeature.FILE_OBJECT),
-                    RouteSelectionMode.STORED_LINEAGE
-            );
-        }
-        if ("DELETE".equals(method) && "/v1beta/files/{fileName}".equals(normalizedPath)) {
-            return semantics(
-                    "files",
-                    normalizedPath,
-                    TranslationResourceType.FILE,
-                    TranslationOperation.FILE_DELETE,
-                    List.of(InteropFeature.FILE_OBJECT),
-                    RouteSelectionMode.STORED_LINEAGE
-            );
-        }
-        if ("POST".equals(method) && "/v1/embeddings".equals(normalizedPath)) {
-            return semantics("embeddings", normalizedPath, TranslationResourceType.EMBEDDING, TranslationOperation.EMBEDDING_CREATE, List.of(InteropFeature.EMBEDDINGS), RouteSelectionMode.CATALOG_SELECTION);
-        }
-        if ("POST".equals(method) && "/v1/files".equals(normalizedPath)) {
-            return semantics("files", normalizedPath, TranslationResourceType.FILE, TranslationOperation.FILE_CREATE, List.of(InteropFeature.FILE_OBJECT), RouteSelectionMode.CATALOG_SELECTION);
-        }
-        if ("GET".equals(method) && "/v1/files".equals(normalizedPath)) {
-            return semantics("files", normalizedPath, TranslationResourceType.FILE, TranslationOperation.FILE_LIST, List.of(InteropFeature.FILE_OBJECT), RouteSelectionMode.LOCAL_CATALOG);
-        }
-        if ("GET".equals(method) && "/v1/files/{fileId}".equals(normalizedPath)) {
-            return semantics("files", normalizedPath, TranslationResourceType.FILE, TranslationOperation.FILE_GET, List.of(InteropFeature.FILE_OBJECT), RouteSelectionMode.STORED_LINEAGE);
-        }
-        if ("GET".equals(method) && "/v1/files/{fileId}/content".equals(normalizedPath)) {
-            return semantics("files", normalizedPath, TranslationResourceType.FILE, TranslationOperation.FILE_CONTENT_GET, List.of(InteropFeature.FILE_OBJECT), RouteSelectionMode.STORED_LINEAGE);
-        }
-        if ("DELETE".equals(method) && "/v1/files/{fileId}".equals(normalizedPath)) {
-            return semantics("files", normalizedPath, TranslationResourceType.FILE, TranslationOperation.FILE_DELETE, List.of(InteropFeature.FILE_OBJECT), RouteSelectionMode.STORED_LINEAGE);
-        }
-        if ("POST".equals(method) && "/v1/audio/transcriptions".equals(normalizedPath)) {
-            return semantics("audio", normalizedPath, TranslationResourceType.AUDIO, TranslationOperation.AUDIO_TRANSCRIPTION, List.of(InteropFeature.AUDIO_TRANSCRIPTION), RouteSelectionMode.CATALOG_SELECTION);
-        }
-        if ("POST".equals(method) && "/v1/audio/speech".equals(normalizedPath)) {
-            return semantics("audio", normalizedPath, TranslationResourceType.AUDIO, TranslationOperation.AUDIO_SPEECH, List.of(InteropFeature.AUDIO_SPEECH), RouteSelectionMode.CATALOG_SELECTION);
-        }
-        if ("POST".equals(method) && "/v1/images/generations".equals(normalizedPath)) {
-            return semantics("images", normalizedPath, TranslationResourceType.IMAGE, TranslationOperation.IMAGE_GENERATION, List.of(InteropFeature.IMAGE_GENERATION), RouteSelectionMode.CATALOG_SELECTION);
-        }
-        if ("POST".equals(method) && "/v1/moderations".equals(normalizedPath)) {
-            return semantics("moderations", normalizedPath, TranslationResourceType.MODERATION, TranslationOperation.MODERATION_CREATE, List.of(InteropFeature.MODERATION), RouteSelectionMode.CATALOG_SELECTION);
-        }
-        if ("POST".equals(method) && "/v1/rerank".equals(normalizedPath)) {
-            return semantics("rerank", normalizedPath, TranslationResourceType.RERANK, TranslationOperation.RERANK_CREATE, List.of(InteropFeature.RERANK), RouteSelectionMode.CATALOG_SELECTION);
-        }
-        if ("POST".equals(method) && "/v1/videos/generations".equals(normalizedPath)) {
-            return semantics("videos", normalizedPath, TranslationResourceType.VIDEO, TranslationOperation.VIDEO_GENERATION_CREATE, List.of(InteropFeature.VIDEO_GENERATION, InteropFeature.ASYNC_TASK), RouteSelectionMode.CATALOG_SELECTION);
-        }
-        if ("GET".equals(method) && "/v1/videos/{taskId}".equals(normalizedPath)) {
-            return semantics("videos", normalizedPath, TranslationResourceType.VIDEO, TranslationOperation.VIDEO_GENERATION_GET, List.of(InteropFeature.ASYNC_TASK), RouteSelectionMode.STORED_LINEAGE);
-        }
-        if ("POST".equals(method) && "/v1/videos/{taskId}/cancel".equals(normalizedPath)) {
-            return semantics("videos", normalizedPath, TranslationResourceType.VIDEO, TranslationOperation.VIDEO_GENERATION_CANCEL, List.of(InteropFeature.ASYNC_TASK), RouteSelectionMode.STORED_LINEAGE);
-        }
-        if ("POST".equals(method) && "/v1/music/generations".equals(normalizedPath)) {
-            return semantics("music", normalizedPath, TranslationResourceType.MUSIC, TranslationOperation.MUSIC_GENERATION_CREATE, List.of(InteropFeature.MUSIC_GENERATION, InteropFeature.ASYNC_TASK), RouteSelectionMode.CATALOG_SELECTION);
-        }
-        if ("GET".equals(method) && "/v1/music/{taskId}".equals(normalizedPath)) {
-            return semantics("music", normalizedPath, TranslationResourceType.MUSIC, TranslationOperation.MUSIC_GENERATION_GET, List.of(InteropFeature.ASYNC_TASK), RouteSelectionMode.STORED_LINEAGE);
-        }
-        if ("POST".equals(method) && "/v1/music/{taskId}/cancel".equals(normalizedPath)) {
-            return semantics("music", normalizedPath, TranslationResourceType.MUSIC, TranslationOperation.MUSIC_GENERATION_CANCEL, List.of(InteropFeature.ASYNC_TASK), RouteSelectionMode.STORED_LINEAGE);
-        }
-        if ("GET".equals(method) && "/v1/tasks/{taskId}".equals(normalizedPath)) {
-            return semantics("tasks", normalizedPath, TranslationResourceType.TASK, TranslationOperation.TASK_GET, List.of(InteropFeature.ASYNC_TASK), RouteSelectionMode.STORED_LINEAGE);
-        }
-        if ("POST".equals(method) && "/v1/tasks/{taskId}/cancel".equals(normalizedPath)) {
-            return semantics("tasks", normalizedPath, TranslationResourceType.TASK, TranslationOperation.TASK_CANCEL, List.of(InteropFeature.ASYNC_TASK), RouteSelectionMode.STORED_LINEAGE);
-        }
-        if ("POST".equals(method) && "/v1/web_search".equals(normalizedPath)) {
-            return semantics("web_search", normalizedPath, TranslationResourceType.WEB_SEARCH, TranslationOperation.WEB_SEARCH_CREATE, List.of(InteropFeature.WEB_SEARCH), RouteSelectionMode.CATALOG_SELECTION);
-        }
-        if ("POST".equals(method) && "/v1/uploads".equals(normalizedPath)) {
-            return semantics("uploads", normalizedPath, TranslationResourceType.UPLOAD, TranslationOperation.UPLOAD_CREATE, List.of(InteropFeature.UPLOAD_CREATE, InteropFeature.FILE_OBJECT), RouteSelectionMode.CATALOG_SELECTION);
-        }
-        if ("GET".equals(method) && "/v1/uploads/{uploadId}".equals(normalizedPath)) {
-            return semantics("uploads", normalizedPath, TranslationResourceType.UPLOAD, TranslationOperation.UPLOAD_GET, List.of(InteropFeature.UPLOAD_CREATE), RouteSelectionMode.STORED_LINEAGE);
-        }
-        if ("POST".equals(method) && "/v1/uploads/{uploadId}/parts".equals(normalizedPath)) {
-            return semantics("uploads", normalizedPath, TranslationResourceType.UPLOAD, TranslationOperation.UPLOAD_PART_ADD, List.of(InteropFeature.UPLOAD_CREATE, InteropFeature.FILE_OBJECT), RouteSelectionMode.STORED_LINEAGE);
-        }
-        if ("POST".equals(method) && "/v1/uploads/{uploadId}/complete".equals(normalizedPath)) {
-            return semantics("uploads", normalizedPath, TranslationResourceType.UPLOAD, TranslationOperation.UPLOAD_COMPLETE, List.of(InteropFeature.UPLOAD_CREATE), RouteSelectionMode.STORED_LINEAGE);
-        }
-        if ("POST".equals(method) && "/v1/uploads/{uploadId}/cancel".equals(normalizedPath)) {
-            return semantics("uploads", normalizedPath, TranslationResourceType.UPLOAD, TranslationOperation.UPLOAD_CANCEL, List.of(InteropFeature.UPLOAD_CREATE), RouteSelectionMode.STORED_LINEAGE);
+        Optional<ResourceSurfaceDefinition> staticSurface = ResourceSurfaceRegistry.find(method, normalizedPath);
+        if (staticSurface.isPresent()) {
+            return staticSurface.get().toSemantics();
         }
         return semantics("unknown", normalizedPath, TranslationResourceType.UNKNOWN, TranslationOperation.UNKNOWN, List.of(InteropFeature.CHAT_TEXT), RouteSelectionMode.CATALOG_SELECTION);
     }

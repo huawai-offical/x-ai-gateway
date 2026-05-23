@@ -11,6 +11,7 @@ import com.prodigalgal.xaigateway.gateway.core.interop.CapabilityResolutionView;
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature;
+import com.prodigalgal.xaigateway.gateway.core.interop.ResourceSurfaceRegistry;
 import com.prodigalgal.xaigateway.gateway.core.interop.SiteCapabilityTruthService;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
@@ -393,6 +394,7 @@ public class ModelCatalogQueryService {
                 resolutionReport.overallEffectiveLevel(),
                 renderLevel,
                 CanonicalRenderCapabilitySupport.minimum(resolutionReport.overallEffectiveLevel(), renderLevel),
+                ResourceSurfaceRegistry.defaultRouteSelectionMode(resourceType, operation),
                 requiredFeatures.stream().map(InteropFeature::wireName).toList(),
                 resolutionReport.featureResolutions().entrySet().stream()
                         .collect(java.util.stream.Collectors.toMap(

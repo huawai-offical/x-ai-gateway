@@ -5,11 +5,13 @@ import { PageSkeleton } from '@/components/app/page-skeleton'
 import { AppLayout } from './layout'
 import { RequireAdminAuth } from '@/features/auth/auth-provider'
 import { consoleLegacyRoutes, toConsolePath } from './route-surfaces'
+import { RouteErrorBoundary, RouteNotFoundPage } from './route-error-boundary'
 
 type RouteModule = Record<string, ComponentType>
 type LazyHydrateRoute = {
   lazy?: unknown
   HydrateFallback?: ComponentType
+  errorElement?: unknown
   children?: LazyHydrateRoute[]
   [key: string]: unknown
 }
@@ -31,12 +33,13 @@ function lazyPage<TModule extends RouteModule>(loader: () => Promise<TModule>, e
   }
 }
 
-function withLazyRouteHydrateFallback<TRoute extends LazyHydrateRoute>(routes: TRoute[]): TRoute[] {
+function withRouteDefaults<TRoute extends LazyHydrateRoute>(routes: TRoute[]): TRoute[] {
   return routes.map((route) => {
-    const children = route.children ? withLazyRouteHydrateFallback(route.children) : undefined
+    const children = route.children ? withRouteDefaults(route.children) : undefined
     return {
       ...route,
       ...(route.lazy && !route.HydrateFallback ? { HydrateFallback: RouteHydrateFallback } : {}),
+      ...(!route.errorElement ? { errorElement: <RouteErrorBoundary /> } : {}),
       ...(children ? { children } : {}),
     } as TRoute
   })
@@ -106,6 +109,7 @@ const consoleChildren = [
   { path: 'integrations/deliveries', lazy: lazyPage(() => import('../features/integrations/deliveries-page'), 'DeliveriesPage') },
   { path: 'integrations/external-apps', lazy: lazyPage(() => import('../features/integrations/external-apps-page'), 'ExternalAppsPage') },
   { path: 'integrations/extensions/:slug', lazy: lazyPage(() => import('../features/integrations/extension-runtime-page'), 'ExtensionRuntimePage') },
+  { path: '*', element: <RouteNotFoundPage /> },
 ]
 
 const legacyConsoleRedirectRoutes = consoleLegacyRoutes
@@ -194,8 +198,12 @@ const appRoutesBase = [
     element: <Navigate to="/" replace />,
   },
   ...legacyConsoleRedirectRoutes,
+  {
+    path: '*',
+    element: <RouteNotFoundPage />,
+  },
 ]
 
-export const appRoutes = withLazyRouteHydrateFallback(appRoutesBase)
+export const appRoutes = withRouteDefaults(appRoutesBase)
 
 export const router = createBrowserRouter(appRoutes)

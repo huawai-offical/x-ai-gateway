@@ -70,7 +70,7 @@ class NonChatRoutePolicyServiceTests {
     }
 
     @Test
-    void shouldFreezeOpenAiCompatibleObjectLifecycleAsBlockedAcceptedException() {
+    void shouldExposeOpenAiCompatibleObjectLifecycleWhenTruthAllowsIt() {
         GatewayRequestSemantics semantics = new GatewayRequestSemantics(
                 TranslationResourceType.FILE,
                 TranslationOperation.FILE_CREATE,
@@ -93,10 +93,9 @@ class NonChatRoutePolicyServiceTests {
                 true,
                 ReasoningTransport.OPENAI_CHAT
         );
-        String blocker = "OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；files 仍作为 accepted exception，不在当前实现面内。";
 
         Mockito.when(siteCapabilityTruthService.resolve(Mockito.eq(candidate), Mockito.eq(semantics)))
-                .thenReturn(report(InteropFeature.FILE_OBJECT, InteropCapabilityLevel.UNSUPPORTED, List.of(blocker)));
+                .thenReturn(report(InteropFeature.FILE_OBJECT, InteropCapabilityLevel.NATIVE, List.of()));
 
         NonChatRoutePolicyDecision decision = service.evaluateCandidate(
                 "openai",
@@ -107,9 +106,9 @@ class NonChatRoutePolicyServiceTests {
                 null
         );
 
-        assertEquals(SupportStatus.BLOCKED, decision.supportStatus());
-        assertEquals(InteropCapabilityLevel.UNSUPPORTED, decision.overallCapabilityLevel());
-        assertTrue(decision.blockedReasons().stream().anyMatch(reason -> reason.contains("accepted exception")));
+        assertEquals(SupportStatus.ORCHESTRATION, decision.supportStatus());
+        assertEquals(InteropCapabilityLevel.NATIVE, decision.overallCapabilityLevel());
+        assertTrue(decision.blockedReasons().isEmpty());
     }
 
     @Test

@@ -155,6 +155,9 @@ class PublicDocsBundleServiceTests {
         assertTrue(openApi.path("paths").has("/v1/models"));
         assertTrue(openApi.path("paths").has("/v1/models/{model}"));
         assertFalse(openApi.path("paths").path("/v1/models/{model}").has("delete"));
+        assertTrue(openApi.path("paths").has("/v1/audio/translations"));
+        assertTrue(openApi.path("paths").has("/v1/images/edits"));
+        assertTrue(openApi.path("paths").has("/v1/images/variations"));
         assertTrue(openApi.path("paths").has("/v1/web_search"));
         assertTrue(openApi.path("paths").has("/api/v1/media/provider-matrix"));
         var chatProperties = openApi.path("paths")

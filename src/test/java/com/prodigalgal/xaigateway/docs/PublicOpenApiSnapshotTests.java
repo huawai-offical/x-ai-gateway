@@ -50,6 +50,9 @@ class PublicOpenApiSnapshotTests {
         assertTrue(root.path("paths").has("/v1/models"));
         assertTrue(root.path("paths").has("/v1/models/{model}"));
         assertFalse(root.path("paths").path("/v1/models/{model}").has("delete"));
+        assertTrue(root.path("paths").has("/v1/audio/translations"));
+        assertTrue(root.path("paths").has("/v1/images/edits"));
+        assertTrue(root.path("paths").has("/v1/images/variations"));
         JsonNode chatProperties = root.path("paths")
                 .path("/v1/chat/completions")
                 .path("post")

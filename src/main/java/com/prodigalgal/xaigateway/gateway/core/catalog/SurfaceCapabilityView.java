@@ -2,6 +2,7 @@ package com.prodigalgal.xaigateway.gateway.core.catalog;
 
 import com.prodigalgal.xaigateway.gateway.core.interop.CapabilityResolutionView;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
+import com.prodigalgal.xaigateway.gateway.core.interop.RouteSelectionMode;
 import com.prodigalgal.xaigateway.gateway.core.interop.SupportStatus;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
@@ -22,11 +23,44 @@ public record SurfaceCapabilityView(
         InteropCapabilityLevel executionCapabilityLevel,
         InteropCapabilityLevel renderCapabilityLevel,
         InteropCapabilityLevel overallCapabilityLevel,
+        RouteSelectionMode routeSelectionMode,
         List<String> blockerReasons,
         List<String> lossReasons,
         List<String> requiredFeatures,
         Map<String, CapabilityResolutionView> featureResolutions
 ) {
+    public SurfaceCapabilityView(
+            TranslationResourceType resourceType,
+            TranslationOperation operation,
+            ExecutionBackend preferredBackend,
+            List<ExecutionBackend> supportedBackends,
+            InteropCapabilityLevel executionCapabilityLevel,
+            InteropCapabilityLevel renderCapabilityLevel,
+            InteropCapabilityLevel overallCapabilityLevel,
+            RouteSelectionMode routeSelectionMode,
+            List<String> requiredFeatures,
+            Map<String, CapabilityResolutionView> featureResolutions
+    ) {
+        this(
+                resourceType,
+                operation,
+                defaultSurface(resourceType, operation),
+                defaultNormalizedPath(resourceType, operation),
+                preferredBackend,
+                supportedBackends,
+                SupportStatus.resolve(preferredBackend, overallCapabilityLevel, collectBlockedReasons(featureResolutions)),
+                SupportStatus.normalizeDegradationLevel(overallCapabilityLevel, collectBlockedReasons(featureResolutions)),
+                executionCapabilityLevel,
+                renderCapabilityLevel,
+                overallCapabilityLevel,
+                routeSelectionMode,
+                collectBlockedReasons(featureResolutions),
+                collectLossReasons(featureResolutions),
+                requiredFeatures,
+                featureResolutions
+        );
+    }
+
     public SurfaceCapabilityView(
             TranslationResourceType resourceType,
             TranslationOperation operation,
@@ -50,6 +84,7 @@ public record SurfaceCapabilityView(
                 executionCapabilityLevel,
                 renderCapabilityLevel,
                 overallCapabilityLevel,
+                defaultRouteSelectionMode(resourceType, operation),
                 collectBlockedReasons(featureResolutions),
                 collectLossReasons(featureResolutions),
                 requiredFeatures,
@@ -78,6 +113,7 @@ public record SurfaceCapabilityView(
                 executionCapabilityLevel,
                 renderCapabilityLevel,
                 overallCapabilityLevel,
+                defaultRouteSelectionMode(resourceType, operation),
                 collectBlockedReasons(featureResolutions),
                 collectLossReasons(featureResolutions),
                 requiredFeatures,
@@ -101,6 +137,9 @@ public record SurfaceCapabilityView(
         degradationLevel = degradationLevel == null
                 ? SupportStatus.normalizeDegradationLevel(overallCapabilityLevel, blockerReasons)
                 : degradationLevel;
+        routeSelectionMode = routeSelectionMode == null
+                ? defaultRouteSelectionMode(resourceType, operation)
+                : routeSelectionMode;
     }
 
     private static String defaultSurface(TranslationResourceType resourceType, TranslationOperation operation) {
@@ -109,6 +148,10 @@ public record SurfaceCapabilityView(
 
     private static String defaultNormalizedPath(TranslationResourceType resourceType, TranslationOperation operation) {
         return new GatewayRequestSemantics(resourceType, operation, List.of(), true).normalizedPath();
+    }
+
+    private static RouteSelectionMode defaultRouteSelectionMode(TranslationResourceType resourceType, TranslationOperation operation) {
+        return new GatewayRequestSemantics(resourceType, operation, List.of(), (RouteSelectionMode) null).routeSelectionMode();
     }
 
     private static List<String> collectBlockedReasons(Map<String, CapabilityResolutionView> featureResolutions) {

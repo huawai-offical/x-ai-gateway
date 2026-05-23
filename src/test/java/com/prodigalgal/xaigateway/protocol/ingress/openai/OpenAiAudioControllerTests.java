@@ -73,6 +73,43 @@ class OpenAiAudioControllerTests {
     }
 
     @Test
+    void shouldCreateTranslation() {
+        ObjectNode body = objectMapper.createObjectNode();
+        body.put("text", "hello");
+
+        Mockito.when(gatewayTokenAuthenticationResolver.authenticate("Bearer sk-gw-test.secret", null, null, null))
+                .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayResourceExecutionService.executeMultipartJson(
+                        Mockito.eq("sk-gw-test"),
+                        Mockito.eq("/v1/audio/translations"),
+                        Mockito.eq("whisper-1"),
+                        Mockito.argThat(fields -> "whisper-1".equals(fields.get("model"))
+                                && "json".equals(fields.get("response_format"))),
+                        Mockito.anyMap()))
+                .thenReturn(Mono.just(ResponseEntity.ok(body)));
+
+        MultipartBodyBuilder builder = new MultipartBodyBuilder();
+        builder.part("model", "whisper-1");
+        builder.part("response_format", "json");
+        builder.part("file", new ByteArrayResource("voice".getBytes(StandardCharsets.UTF_8)) {
+            @Override
+            public String getFilename() {
+                return "voice.wav";
+            }
+        }).header(HttpHeaders.CONTENT_TYPE, "audio/wav");
+
+        webTestClient.post()
+                .uri("/v1/audio/translations")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .bodyValue(builder.build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.text").isEqualTo("hello");
+    }
+
+    @Test
     void shouldCreateSpeech() {
         Mockito.when(gatewayTokenAuthenticationResolver.authenticate("Bearer sk-gw-test.secret", null, null, null))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));

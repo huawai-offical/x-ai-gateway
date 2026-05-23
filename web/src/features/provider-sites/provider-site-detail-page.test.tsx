@@ -95,8 +95,17 @@ const { apiRequestMock } = vi.hoisted(() => ({
             overallCapabilityLevel: 'NATIVE',
             blockerReasons: [],
             lossReasons: [],
-            requiredFeatures: ['chat_text'],
-            featureResolutions: {},
+            requiredFeatures: ['response_object'],
+            featureResolutions: {
+              response_object: {
+                declaredLevel: 'NATIVE',
+                implementedLevel: 'EMULATED',
+                effectiveLevel: 'EMULATED',
+                supportStatus: 'emulated',
+                blockedReasons: [],
+                lossReasons: [],
+              },
+            },
           },
         },
         modelCount: 1,
@@ -178,6 +187,7 @@ describe('ProviderSiteDetailPage', () => {
     fireEvent.click(diagnosticsTab)
     expect(await screen.findByText('chat_completion')).toBeInTheDocument()
     expect(await screen.findByText('response_object')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: '特性解析' })).not.toBeInTheDocument()
   })
 
   it('creates provider protocol endpoint from detail page', async () => {

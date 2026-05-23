@@ -328,6 +328,7 @@ public class GatewayRouteSelectionService {
         }
 
         GatewayRequestSemantics semantics = gatewayRequestFeatureService.describe(
+                request.httpMethod(),
                 request.requestPath(),
                 request.requestBody() instanceof tools.jackson.databind.JsonNode jsonNode ? jsonNode : null
         );

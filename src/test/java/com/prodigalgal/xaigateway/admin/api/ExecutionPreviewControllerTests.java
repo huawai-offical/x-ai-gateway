@@ -52,7 +52,7 @@ class ExecutionPreviewControllerTests {
     void shouldReturnExecutionPreview() {
         RouteSelectionResult selectionResult = selectionResult();
         Mockito.when(gatewayRouteSelectionService.select(Mockito.any())).thenReturn(selectionResult);
-        Mockito.when(translationExecutionPlanCompiler.compilePreview(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
+        Mockito.when(translationExecutionPlanCompiler.compilePreview(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
                 .thenReturn(compilation(selectionResult));
         Mockito.when(providerExecutionSupportService.prepareOpenAi(
                         Mockito.any(),

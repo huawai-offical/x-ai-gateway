@@ -449,9 +449,24 @@ public class SiteCapabilityTruthService {
                             && supportsUpstreamAudio(siteKind)
                             ? InteropCapabilityLevel.NATIVE
                             : InteropCapabilityLevel.UNSUPPORTED;
+            case AUDIO_TRANSLATION ->
+                    hasSnapshotCapability(snapshot, SiteCapabilitySnapshotEntity::isSupportsAudio)
+                            && supportsOpenAiStyleResources(siteKind)
+                            ? InteropCapabilityLevel.NATIVE
+                            : InteropCapabilityLevel.UNSUPPORTED;
             case IMAGE_GENERATION ->
                     hasSnapshotCapability(snapshot, SiteCapabilitySnapshotEntity::isSupportsImages)
                             && supportsUpstreamImageGeneration(siteKind)
+                            ? InteropCapabilityLevel.NATIVE
+                            : InteropCapabilityLevel.UNSUPPORTED;
+            case IMAGE_EDIT ->
+                    hasSnapshotCapability(snapshot, SiteCapabilitySnapshotEntity::isSupportsImages)
+                            && supportsUpstreamImageEdit(siteKind)
+                            ? InteropCapabilityLevel.NATIVE
+                            : InteropCapabilityLevel.UNSUPPORTED;
+            case IMAGE_VARIATION ->
+                    hasSnapshotCapability(snapshot, SiteCapabilitySnapshotEntity::isSupportsImages)
+                            && supportsOpenAiStyleResources(siteKind)
                             ? InteropCapabilityLevel.NATIVE
                             : InteropCapabilityLevel.UNSUPPORTED;
             case MODERATION -> hasSnapshotCapability(snapshot, SiteCapabilitySnapshotEntity::isSupportsModeration)
@@ -497,6 +512,10 @@ public class SiteCapabilityTruthService {
         return supportsOpenAiStyleResources(siteKind) || supportsGoogleGenAiSite(siteKind);
     }
 
+    private boolean supportsUpstreamImageEdit(UpstreamSiteKind siteKind) {
+        return supportsOpenAiStyleResources(siteKind) || supportsGoogleGenAiSite(siteKind);
+    }
+
     private boolean supportsUpstreamModeration(UpstreamSiteKind siteKind) {
         return supportsOpenAiStyleResources(siteKind) || supportsGoogleGenAiSite(siteKind);
     }
@@ -512,14 +531,22 @@ public class SiteCapabilityTruthService {
     private boolean supportsUpstreamFileObjects(UpstreamSiteKind siteKind) {
         return switch (siteKind) {
             case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, OPENROUTER, TOGETHER, FIREWORKS, DEEPSEEK, QWEN,
-                    MOONSHOT, SILICONFLOW, VOLCENGINE, MINIMAX, DIFY, GROK, MISTRAL, COHERE, JINA,
+                    MOONSHOT, SILICONFLOW, VOLCENGINE, MINIMAX, MISTRAL,
                     ANTHROPIC_DIRECT, GEMINI_DIRECT, VERTEX_AI -> true;
             default -> false;
         };
     }
 
     private boolean supportsUpstreamUploads(UpstreamSiteKind siteKind) {
-        return siteKind == UpstreamSiteKind.OPENAI_DIRECT;
+        return siteKind == UpstreamSiteKind.OPENAI_DIRECT || supportsOpenAiStyleFileLifecycleResources(siteKind);
+    }
+
+    private boolean supportsOpenAiStyleFileLifecycleResources(UpstreamSiteKind siteKind) {
+        return switch (siteKind) {
+            case OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE, MINIMAX, MISTRAL,
+                    TOGETHER, FIREWORKS, OPENROUTER -> true;
+            default -> false;
+        };
     }
 
     private boolean supportsUpstreamRerank(UpstreamSiteKind siteKind) {
@@ -593,14 +620,18 @@ public class SiteCapabilityTruthService {
             case GEMINI_DIRECT -> switch (feature) {
                 case UPLOAD_CREATE ->
                         "Gemini Files API 存在，但不等价于 OpenAI /v1/uploads 的 create/parts/complete/cancel contract，因此仅开放 gateway-local orchestration surface。";
+                case AUDIO_TRANSLATION ->
+                        "Gemini 当前没有等价 OpenAI /v1/audio/translations 的稳定资源端点，因此当前不开放。";
+                case IMAGE_VARIATION ->
+                        "Gemini 当前没有等价 OpenAI /v1/images/variations 的稳定资源端点，因此当前不开放。";
                 default -> null;
             };
             case ANTHROPIC_DIRECT -> switch (feature) {
                 case EMBEDDINGS ->
                         "Anthropic 当前没有稳定的原生 embeddings API，因此当前不开放。";
-                case AUDIO_TRANSCRIPTION, AUDIO_SPEECH ->
+                case AUDIO_TRANSCRIPTION, AUDIO_TRANSLATION, AUDIO_SPEECH ->
                         "Anthropic 当前没有稳定的原生 audio API，因此当前不开放。";
-                case IMAGE_GENERATION ->
+                case IMAGE_GENERATION, IMAGE_EDIT, IMAGE_VARIATION ->
                         "Anthropic 当前没有稳定的原生 image API，因此当前不开放。";
                 case MODERATION ->
                         "Anthropic 当前没有稳定的原生 moderation API，因此当前不开放。";
@@ -617,12 +648,33 @@ public class SiteCapabilityTruthService {
                         "Dify 当前在本仓库仅作为 workflow/chat compatible preset，不把 rerank 标记为稳定 native 能力。";
                 default -> null;
             };
-            case OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE, MINIMAX, GROK, MISTRAL,
-                    COHERE, TOGETHER, FIREWORKS, OPENROUTER, PERPLEXITY -> switch (feature) {
+            case OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE, MINIMAX, MISTRAL,
+                    TOGETHER, FIREWORKS, OPENROUTER -> switch (feature) {
                 case FILE_OBJECT ->
-                        "OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；files 仍作为 accepted exception，不在当前实现面内。";
+                        "OpenAI-compatible 站点只有在 capability snapshot 声明 supports_files=true 时才开放 files 编排；当前站点未声明可用。";
                 case UPLOAD_CREATE ->
-                        "OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；uploads 仍作为 accepted exception，不在当前实现面内。";
+                        "OpenAI-compatible 站点只有在 capability snapshot 声明 supports_uploads=true 时才开放 uploads 编排；当前站点未声明可用。";
+                default -> null;
+            };
+            case GROK -> switch (feature) {
+                case FILE_OBJECT ->
+                        "xAI Files API 存在，但当前 gateway 不把它泛化为 OpenAI object lifecycle。";
+                case UPLOAD_CREATE ->
+                        "xAI 当前不开放与 OpenAI /v1/uploads 等价的稳定对象生命周期。";
+                default -> null;
+            };
+            case COHERE -> switch (feature) {
+                case FILE_OBJECT ->
+                        "Cohere compatibility API 当前不视为稳定 file object lifecycle provider。";
+                case UPLOAD_CREATE ->
+                        "Cohere 当前不开放与 OpenAI /v1/uploads 等价的稳定对象生命周期。";
+                default -> null;
+            };
+            case PERPLEXITY -> switch (feature) {
+                case FILE_OBJECT ->
+                        "Perplexity 当前作为 web-grounded chat/search provider，不视为 file object lifecycle provider。";
+                case UPLOAD_CREATE ->
+                        "Perplexity 当前不开放与 OpenAI /v1/uploads 等价的稳定对象生命周期。";
                 default -> null;
             };
             case JINA -> switch (feature) {

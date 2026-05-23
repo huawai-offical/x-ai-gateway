@@ -124,7 +124,7 @@ class GatewayRouteSelectionGovernanceTests {
                 "gpt-4o", "gpt-4o", "gpt-4o", false,
                 List.of(new CatalogCandidateView(101L, "openai", ProviderType.OPENAI_DIRECT, "https://api.openai.com", "gpt-4o", "gpt-4o", List.of("openai"), true, false, false, false, false, false, ReasoningTransport.OPENAI_CHAT))
         )));
-        when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.any()))
+        when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.anyString(), Mockito.any()))
                 .thenReturn(new GatewayRequestSemantics(
                         TranslationResourceType.CHAT,
                         TranslationOperation.CHAT_COMPLETION,
@@ -208,7 +208,7 @@ class GatewayRouteSelectionGovernanceTests {
                 "gpt-4o", "gpt-4o", "gpt-4o", false,
                 List.of(new CatalogCandidateView(101L, "openai", ProviderType.OPENAI_DIRECT, 1L, null, null, null, null, null, "https://api.openai.com", "gpt-4o", "gpt-4o", List.of("openai"), true, true, true, true, false, false, false, false, ReasoningTransport.OPENAI_CHAT, InteropCapabilityLevel.NATIVE))
         )));
-        when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.any()))
+        when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.anyString(), Mockito.any()))
                 .thenReturn(new GatewayRequestSemantics(
                         TranslationResourceType.CHAT,
                         TranslationOperation.CHAT_COMPLETION,
@@ -252,3 +252,4 @@ class GatewayRouteSelectionGovernanceTests {
         )));
     }
 }
+

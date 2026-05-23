@@ -17,6 +17,8 @@ import com.prodigalgal.xaigateway.gateway.core.catalog.CredentialModelDiscoveryS
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature;
+import com.prodigalgal.xaigateway.gateway.core.interop.ResourceSurfaceDefinition;
+import com.prodigalgal.xaigateway.gateway.core.interop.ResourceSurfaceRegistry;
 import com.prodigalgal.xaigateway.gateway.core.interop.SiteCapabilityTruthService;
 import com.prodigalgal.xaigateway.gateway.core.interop.SupportStatus;
 import com.prodigalgal.xaigateway.gateway.core.interop.SurfaceCompatibilityReport;
@@ -505,151 +507,54 @@ public class ProviderSiteAdminService {
     private Map<String, CapabilityResolutionView> buildFeatureViews(
             UpstreamSiteProfileEntity entity,
             SiteCapabilitySnapshotEntity snapshot) {
-        return Map.ofEntries(
-                Map.entry(InteropFeature.CHAT_TEXT.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.CHAT_TEXT))),
-                Map.entry(InteropFeature.TOOLS.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.TOOLS))),
-                Map.entry(InteropFeature.IMAGE_INPUT.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.IMAGE_INPUT))),
-                Map.entry(InteropFeature.FILE_INPUT.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.FILE_INPUT))),
-                Map.entry(InteropFeature.RESPONSE_OBJECT.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.RESPONSE_OBJECT))),
-                Map.entry(InteropFeature.EMBEDDINGS.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.EMBEDDINGS))),
-                Map.entry(InteropFeature.REASONING.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.REASONING))),
-                Map.entry(InteropFeature.AUDIO_TRANSCRIPTION.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.AUDIO_TRANSCRIPTION))),
-                Map.entry(InteropFeature.AUDIO_SPEECH.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.AUDIO_SPEECH))),
-                Map.entry(InteropFeature.IMAGE_GENERATION.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.IMAGE_GENERATION))),
-                Map.entry(InteropFeature.MODERATION.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.MODERATION))),
-                Map.entry(InteropFeature.FILE_OBJECT.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.FILE_OBJECT))),
-                Map.entry(InteropFeature.UPLOAD_CREATE.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.UPLOAD_CREATE))),
-                Map.entry(InteropFeature.RERANK.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.RERANK))),
-                Map.entry(InteropFeature.VIDEO_GENERATION.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.VIDEO_GENERATION))),
-                Map.entry(InteropFeature.MUSIC_GENERATION.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.MUSIC_GENERATION))),
-                Map.entry(InteropFeature.WEB_SEARCH.wireName(), CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, InteropFeature.WEB_SEARCH)))
-        );
+        java.util.LinkedHashMap<String, CapabilityResolutionView> views = new java.util.LinkedHashMap<>();
+        for (InteropFeature feature : ResourceSurfaceRegistry.capabilityOverviewFeatures()) {
+            views.put(
+                    feature.wireName(),
+                    CapabilityResolutionView.from(siteCapabilityTruthService.resolve(entity, snapshot, feature))
+            );
+        }
+        return java.util.Collections.unmodifiableMap(views);
     }
 
     private Map<String, SurfaceCapabilityView> buildSurfaceViews(
             UpstreamSiteProfileEntity entity,
             SiteCapabilitySnapshotEntity snapshot) {
-        return Map.ofEntries(
-                Map.entry("chat_completion", toSurface(
-                        entity,
-                        snapshot,
-                        "openai",
-                        "/v1/chat/completions",
-                        TranslationResourceType.CHAT,
-                        TranslationOperation.CHAT_COMPLETION,
-                        List.of(InteropFeature.CHAT_TEXT)
-                )),
-                Map.entry("response_create", toSurface(
-                        entity,
-                        snapshot,
-                        "responses",
-                        "/v1/responses",
-                        TranslationResourceType.RESPONSE,
-                        TranslationOperation.RESPONSE_CREATE,
-                        List.of(InteropFeature.RESPONSE_OBJECT)
-                )),
-                Map.entry("embedding_create", toSurface(
-                        entity,
-                        snapshot,
-                        "openai",
-                        "/v1/embeddings",
-                        TranslationResourceType.EMBEDDING,
-                        TranslationOperation.EMBEDDING_CREATE,
-                        List.of(InteropFeature.EMBEDDINGS)
-                )),
-                Map.entry("audio_transcription", toSurface(
-                        entity,
-                        snapshot,
-                        "openai",
-                        "/v1/audio/transcriptions",
-                        TranslationResourceType.AUDIO,
-                        TranslationOperation.AUDIO_TRANSCRIPTION,
-                        List.of(InteropFeature.AUDIO_TRANSCRIPTION)
-                )),
-                Map.entry("image_generation", toSurface(
-                        entity,
-                        snapshot,
-                        "openai",
-                        "/v1/images/generations",
-                        TranslationResourceType.IMAGE,
-                        TranslationOperation.IMAGE_GENERATION,
-                        List.of(InteropFeature.IMAGE_GENERATION)
-                )),
-                Map.entry("moderation_create", toSurface(
-                        entity,
-                        snapshot,
-                        "openai",
-                        "/v1/moderations",
-                        TranslationResourceType.MODERATION,
-                        TranslationOperation.MODERATION_CREATE,
-                        List.of(InteropFeature.MODERATION)
-                )),
-                Map.entry("file_create", toSurface(
-                        entity,
-                        snapshot,
-                        "openai",
-                        "/v1/files",
-                        TranslationResourceType.FILE,
-                        TranslationOperation.FILE_CREATE,
-                        List.of(InteropFeature.FILE_OBJECT)
-                )),
-                Map.entry("upload_create", toSurface(
-                        entity,
-                        snapshot,
-                        "openai",
-                        "/v1/uploads",
-                        TranslationResourceType.UPLOAD,
-                        TranslationOperation.UPLOAD_CREATE,
-                        List.of(InteropFeature.UPLOAD_CREATE, InteropFeature.FILE_OBJECT)
-                )),
-                Map.entry("rerank_create", toSurface(
-                        entity,
-                        snapshot,
-                        "openai",
-                        "/v1/rerank",
-                        TranslationResourceType.RERANK,
-                        TranslationOperation.RERANK_CREATE,
-                        List.of(InteropFeature.RERANK)
-                )),
-                Map.entry("video_generation_create", toSurface(
-                        entity,
-                        snapshot,
-                        "openai",
-                        "/v1/videos/generations",
-                        TranslationResourceType.VIDEO,
-                        TranslationOperation.VIDEO_GENERATION_CREATE,
-                        List.of(InteropFeature.VIDEO_GENERATION, InteropFeature.ASYNC_TASK)
-                )),
-                Map.entry("music_generation_create", toSurface(
-                        entity,
-                        snapshot,
-                        "openai",
-                        "/v1/music/generations",
-                        TranslationResourceType.MUSIC,
-                        TranslationOperation.MUSIC_GENERATION_CREATE,
-                        List.of(InteropFeature.MUSIC_GENERATION, InteropFeature.ASYNC_TASK)
-                )),
-                Map.entry("web_search_create", toSurface(
-                        entity,
-                        snapshot,
-                        "openai",
-                        "/v1/web_search",
-                        TranslationResourceType.WEB_SEARCH,
-                        TranslationOperation.WEB_SEARCH_CREATE,
-                        List.of(InteropFeature.WEB_SEARCH)
-                ))
-        );
+        java.util.LinkedHashMap<String, SurfaceCapabilityView> views = new java.util.LinkedHashMap<>();
+        for (ResourceSurfaceDefinition definition : ResourceSurfaceRegistry.providerSurfaces()) {
+            views.put(definition.key(), toSurface(entity, snapshot, definition));
+        }
+        return java.util.Collections.unmodifiableMap(views);
     }
 
     private Map<String, SurfaceCapabilityView> buildModelSurfaces(SiteModelCapabilityEntity item) {
         InteropCapabilityLevel chatLevel = item.isSupportsChat() ? item.getCapabilityLevel() : InteropCapabilityLevel.UNSUPPORTED;
         InteropCapabilityLevel responseLevel = item.getSupportedProtocols().contains("responses") ? item.getCapabilityLevel() : InteropCapabilityLevel.UNSUPPORTED;
         InteropCapabilityLevel embeddingsLevel = item.isSupportsEmbeddings() ? item.getCapabilityLevel() : InteropCapabilityLevel.UNSUPPORTED;
-        return Map.of(
-                "chat_completion", modelSurface(item.getSiteProfile() == null ? null : item.getSiteProfile().getSiteKind(), "openai", "/v1/chat/completions", TranslationResourceType.CHAT, TranslationOperation.CHAT_COMPLETION, InteropFeature.CHAT_TEXT, chatLevel),
-                "response_create", modelSurface(item.getSiteProfile() == null ? null : item.getSiteProfile().getSiteKind(), "responses", "/v1/responses", TranslationResourceType.RESPONSE, TranslationOperation.RESPONSE_CREATE, InteropFeature.RESPONSE_OBJECT, responseLevel),
-                "embedding_create", modelSurface(item.getSiteProfile() == null ? null : item.getSiteProfile().getSiteKind(), "openai", "/v1/embeddings", TranslationResourceType.EMBEDDING, TranslationOperation.EMBEDDING_CREATE, InteropFeature.EMBEDDINGS, embeddingsLevel)
-        );
+        java.util.LinkedHashMap<String, SurfaceCapabilityView> views = new java.util.LinkedHashMap<>();
+        putModelSurface(views, item, TranslationOperation.CHAT_COMPLETION, InteropFeature.CHAT_TEXT, chatLevel);
+        putModelSurface(views, item, TranslationOperation.RESPONSE_CREATE, InteropFeature.RESPONSE_OBJECT, responseLevel);
+        putModelSurface(views, item, TranslationOperation.EMBEDDING_CREATE, InteropFeature.EMBEDDINGS, embeddingsLevel);
+        return java.util.Collections.unmodifiableMap(views);
+    }
+
+    private void putModelSurface(
+            Map<String, SurfaceCapabilityView> views,
+            SiteModelCapabilityEntity item,
+            TranslationOperation operation,
+            InteropFeature feature,
+            InteropCapabilityLevel level) {
+        ResourceSurfaceDefinition definition = ResourceSurfaceRegistry.findByOperation(operation)
+                .orElseThrow(() -> new IllegalStateException("资源入口 registry 缺少模型级入口：" + operation.wireName()));
+        views.put(definition.key(), modelSurface(
+                item.getSiteProfile() == null ? null : item.getSiteProfile().getSiteKind(),
+                definition.protocol(),
+                definition.normalizedPath(),
+                definition.resourceType(),
+                definition.operation(),
+                feature,
+                level
+        ));
     }
 
     private SurfaceCapabilityView toSurface(
@@ -659,8 +564,16 @@ public class ProviderSiteAdminService {
             String requestPath,
             TranslationResourceType resourceType,
             TranslationOperation operation,
-            List<InteropFeature> requiredFeatures) {
-        GatewayRequestSemantics semantics = new GatewayRequestSemantics(resourceType, operation, requiredFeatures, true);
+            List<InteropFeature> requiredFeatures,
+            com.prodigalgal.xaigateway.gateway.core.interop.RouteSelectionMode routeSelectionMode) {
+        GatewayRequestSemantics semantics = new GatewayRequestSemantics(
+                resourceType,
+                operation,
+                ResourceSurfaceRegistry.defaultSurface(resourceType, operation),
+                requestPath,
+                requiredFeatures,
+                routeSelectionMode
+        );
         ExecutionBackendDecision backendDecision = executionBackendPolicyService.forSiteSurface(entity, snapshot, resourceType, operation);
         SurfaceCompatibilityReport surfaceReport = siteCapabilityTruthService.evaluateSurface(
                 entity,
@@ -700,6 +613,7 @@ public class ProviderSiteAdminService {
                 surfaceReport.executionCapabilityLevel(),
                 renderLevel,
                 overallCapabilityLevel,
+                semantics.routeSelectionMode(),
                 surfaceReport.blockedReasons(),
                 surfaceReport.lossReasons(),
                 requiredFeatures.stream().map(InteropFeature::wireName).toList(),
@@ -710,6 +624,22 @@ public class ProviderSiteAdminService {
                                 (left, right) -> left,
                                 java.util.LinkedHashMap::new
                         ))
+        );
+    }
+
+    private SurfaceCapabilityView toSurface(
+            UpstreamSiteProfileEntity entity,
+            SiteCapabilitySnapshotEntity snapshot,
+            ResourceSurfaceDefinition definition) {
+        return toSurface(
+                entity,
+                snapshot,
+                definition.protocol(),
+                definition.normalizedPath(),
+                definition.resourceType(),
+                definition.operation(),
+                definition.requiredFeatures(),
+                definition.routeSelectionMode()
         );
     }
 
@@ -769,6 +699,7 @@ public class ProviderSiteAdminService {
                 executionLevel,
                 renderLevel,
                 CanonicalRenderCapabilitySupport.minimum(executionLevel, renderLevel),
+                ResourceSurfaceRegistry.defaultRouteSelectionMode(resourceType, operation),
                 List.of(feature.wireName()),
                 Map.of(feature.wireName(), new CapabilityResolutionView(null, null, executionLevel.name().toLowerCase(), List.of(), List.of()))
         );

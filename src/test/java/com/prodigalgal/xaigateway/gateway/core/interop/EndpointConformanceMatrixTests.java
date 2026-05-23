@@ -429,7 +429,7 @@ class EndpointConformanceMatrixTests {
                 UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC,
                 List.of("openai", "responses"),
                 true, true, true, true, true,
-                true, true, true, true, true, false, false
+                true, true, true, true, true, true, true
         ));
         scenarios.put("gemini-direct", new ScenarioDefinition(
                 ProviderType.GEMINI_DIRECT,
@@ -475,13 +475,6 @@ class EndpointConformanceMatrixTests {
                         List.of("/v1/files", "/v1/files/{fileId}", "/v1/files/{fileId}/content")
                 ),
                 new AcceptedExceptionRecord(
-                        "openai-compatible-object-lifecycle-blocked",
-                        "provider_family",
-                        "OPENAI_COMPATIBLE family 不扩成 object lifecycle 通用替代实现。",
-                        "OpenAI-compatible 站点当前只冻结为 embeddings/audio/images/moderations 的 OpenAI-style 兼容面；object lifecycle 仍作为 accepted exception，不在当前实现面内。",
-                        List.of("/v1/files", "/v1/uploads")
-                ),
-                new AcceptedExceptionRecord(
                         "notion-mcp-auth-required",
                         "workflow",
                         "Notion MCP 当前 `Auth required`，最终回写依赖认证恢复。",
@@ -515,11 +508,25 @@ class EndpointConformanceMatrixTests {
         definitions.add(provider("openai", "POST", "/v1/uploads/{uploadId}/cancel", "/v1/uploads/upload_1/cancel", "upload_cancel", ProviderFamily.OPENAI, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiUploadsControllerTests.java", null, null, "openai-direct"));
 
 
-        definitions.add(provider("openai", "POST", "/v1/files", "/v1/files", "file_create", ProviderFamily.OPENAI, ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/gateway/core/interop/SiteCapabilityTruthServiceTests.java", "openai-compatible-object-lifecycle-blocked", null, "openai-compatible"));
-        definitions.add(provider("openai", "POST", "/v1/uploads", "/v1/uploads", "upload_create", ProviderFamily.OPENAI, ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/gateway/core/interop/SiteCapabilityTruthServiceTests.java", "openai-compatible-object-lifecycle-blocked", null, "openai-compatible"));
+        definitions.add(provider("openai", "POST", "/v1/audio/translations", "/v1/audio/translations", "audio_translation", ProviderFamily.OPENAI, ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC, "whisper-1", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiAudioControllerTests.java", null, null, "openai-compatible"));
+        definitions.add(provider("openai", "POST", "/v1/images/edits", "/v1/images/edits", "image_edit", ProviderFamily.OPENAI, ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC, "gpt-image-1", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiImagesControllerTests.java", null, null, "openai-compatible"));
+        definitions.add(provider("openai", "POST", "/v1/images/variations", "/v1/images/variations", "image_variation", ProviderFamily.OPENAI, ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC, "dall-e-2", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/openai/OpenAiImagesControllerTests.java", null, null, "openai-compatible"));
+
+        definitions.add(provider("openai", "POST", "/v1/files", "/v1/files", "file_create", ProviderFamily.OPENAI, ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/gateway/core/interop/SiteCapabilityTruthServiceTests.java", null, null, "openai-compatible"));
+        definitions.add(provider("openai", "GET", "/v1/files", "/v1/files", "file_list", ProviderFamily.OPENAI, ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/gateway/core/interop/SiteCapabilityTruthServiceTests.java", null, null, "openai-compatible"));
+        definitions.add(provider("openai", "GET", "/v1/files/{fileId}", "/v1/files/file_123", "file_get", ProviderFamily.OPENAI, ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/gateway/core/interop/SiteCapabilityTruthServiceTests.java", null, null, "openai-compatible"));
+        definitions.add(provider("openai", "GET", "/v1/files/{fileId}/content", "/v1/files/file_123/content", "file_content_get", ProviderFamily.OPENAI, ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC, "resource-orchestration", "binary", "src/test/java/com/prodigalgal/xaigateway/gateway/core/interop/SiteCapabilityTruthServiceTests.java", null, null, "openai-compatible"));
+        definitions.add(provider("openai", "DELETE", "/v1/files/{fileId}", "/v1/files/file_123", "file_delete", ProviderFamily.OPENAI, ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/gateway/core/interop/SiteCapabilityTruthServiceTests.java", null, null, "openai-compatible"));
+
+        definitions.add(provider("openai", "POST", "/v1/uploads", "/v1/uploads", "upload_create", ProviderFamily.OPENAI, ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/gateway/core/interop/SiteCapabilityTruthServiceTests.java", null, null, "openai-compatible"));
+        definitions.add(provider("openai", "GET", "/v1/uploads/{uploadId}", "/v1/uploads/upload_1", "upload_get", ProviderFamily.OPENAI, ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/gateway/core/interop/SiteCapabilityTruthServiceTests.java", null, null, "openai-compatible"));
+        definitions.add(provider("openai", "POST", "/v1/uploads/{uploadId}/parts", "/v1/uploads/upload_1/parts", "upload_part_add", ProviderFamily.OPENAI, ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/gateway/core/interop/SiteCapabilityTruthServiceTests.java", null, null, "openai-compatible"));
+        definitions.add(provider("openai", "POST", "/v1/uploads/{uploadId}/complete", "/v1/uploads/upload_1/complete", "upload_complete", ProviderFamily.OPENAI, ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/gateway/core/interop/SiteCapabilityTruthServiceTests.java", null, null, "openai-compatible"));
+        definitions.add(provider("openai", "POST", "/v1/uploads/{uploadId}/cancel", "/v1/uploads/upload_1/cancel", "upload_cancel", ProviderFamily.OPENAI, ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC, "resource-orchestration", "json", "src/test/java/com/prodigalgal/xaigateway/gateway/core/interop/SiteCapabilityTruthServiceTests.java", null, null, "openai-compatible"));
 
         definitions.add(provider("google_native", "POST", "/v1beta/models/{model}:generateContent", "/v1beta/models/gemini-2.5-pro:generateContent", "chat_completion", ProviderFamily.GEMINI, ProviderType.GEMINI_DIRECT, UpstreamSiteKind.GEMINI_DIRECT, "gemini-2.5-pro", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/google/GeminiGenerateContentControllerTests.java", null, null, "gemini-direct"));
         definitions.add(provider("google_native", "POST", "/v1beta/models/{model}:generateContent", "/v1beta/models/gemini-2.5-image:generateContent", "image_generation", ProviderFamily.GEMINI, ProviderType.GEMINI_DIRECT, UpstreamSiteKind.GEMINI_DIRECT, "gemini-2.5-image", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/google/GeminiGenerateContentControllerTests.java", null, null, "gemini-direct"));
+        definitions.add(provider("openai", "POST", "/v1/images/edits", "/v1/images/edits", "image_edit", ProviderFamily.GEMINI, ProviderType.GEMINI_DIRECT, UpstreamSiteKind.GEMINI_DIRECT, "imagen-3.0-capability-001", "json", "src/test/java/com/prodigalgal/xaigateway/gateway/core/execution/GeminiImagesGatewayResourceExecutorTests.java", null, null, "gemini-direct"));
         definitions.add(provider("google_native", "POST", "/v1beta/models/{model}:generateContent", "/v1beta/models/gemini-2.5-flash-preview-tts:generateContent", "audio_speech", ProviderFamily.GEMINI, ProviderType.GEMINI_DIRECT, UpstreamSiteKind.GEMINI_DIRECT, "gemini-2.5-flash-preview-tts", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/google/GeminiGenerateContentControllerTests.java", null, null, "gemini-direct"));
         definitions.add(provider("google_native", "POST", "/v1beta/models/{model}:embedContent", "/v1beta/models/text-embedding-004:embedContent", "embedding_create", ProviderFamily.GEMINI, ProviderType.GEMINI_DIRECT, UpstreamSiteKind.GEMINI_DIRECT, "text-embedding-004", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/google/GeminiEmbeddingsControllerTests.java", null, null, "gemini-direct"));
         definitions.add(provider("google_native", "POST", "/v1beta/models/{model}:batchEmbedContents", "/v1beta/models/text-embedding-004:batchEmbedContents", "embedding_create", ProviderFamily.GEMINI, ProviderType.GEMINI_DIRECT, UpstreamSiteKind.GEMINI_DIRECT, "text-embedding-004", "json", "src/test/java/com/prodigalgal/xaigateway/protocol/ingress/google/GeminiEmbeddingsControllerTests.java", null, null, "gemini-direct"));

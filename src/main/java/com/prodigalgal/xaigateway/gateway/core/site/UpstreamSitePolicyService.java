@@ -116,8 +116,26 @@ public class UpstreamSitePolicyService {
                     "provider-native",
                     null
             );
-            case DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE, MINIMAX, GROK, TOGETHER, FIREWORKS, OPENROUTER,
+            case DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE, MINIMAX, TOGETHER, FIREWORKS, OPENROUTER,
                     OPENAI_COMPATIBLE_GENERIC -> new SitePolicy(
+                    ProviderFamily.OPENAI,
+                    AuthStrategy.BEARER,
+                    PathStrategy.OPENAI_V1,
+                    ModelAddressingStrategy.MODEL_NAME,
+                    ErrorSchemaStrategy.OPENAI_ERROR,
+                    List.of("openai", "responses"),
+                    true,
+                    true,
+                    false,
+                    false,
+                    false,
+                    true,
+                    true,
+                    "sse",
+                    "provider-specific-fallback",
+                    null
+            );
+            case GROK -> new SitePolicy(
                     ProviderFamily.OPENAI,
                     AuthStrategy.BEARER,
                     PathStrategy.OPENAI_V1,
@@ -183,8 +201,8 @@ public class UpstreamSitePolicyService {
                     false,
                     false,
                     false,
-                    false,
-                    false,
+                    true,
+                    true,
                     "sse",
                     "path-adapter-required",
                     null
@@ -335,7 +353,13 @@ public class UpstreamSitePolicyService {
             case AUDIO_TRANSCRIPTION, AUDIO_SPEECH -> policy.supportsAudio()
                     ? InteropCapabilityLevel.NATIVE
                     : InteropCapabilityLevel.UNSUPPORTED;
+            case AUDIO_TRANSLATION -> policy.supportsAudio() && supportsOpenAiStyleResource(siteKind)
+                    ? InteropCapabilityLevel.NATIVE
+                    : InteropCapabilityLevel.UNSUPPORTED;
             case IMAGE_GENERATION -> policy.supportsImages()
+                    ? InteropCapabilityLevel.NATIVE
+                    : InteropCapabilityLevel.UNSUPPORTED;
+            case IMAGE_EDIT, IMAGE_VARIATION -> policy.supportsImages() && supportsOpenAiStyleResource(siteKind)
                     ? InteropCapabilityLevel.NATIVE
                     : InteropCapabilityLevel.UNSUPPORTED;
             case MODERATION -> policy.supportsModeration()
@@ -351,6 +375,14 @@ public class UpstreamSitePolicyService {
             case WEB_SEARCH -> (siteKind == UpstreamSiteKind.OPENAI_DIRECT || siteKind == UpstreamSiteKind.PERPLEXITY)
                     ? InteropCapabilityLevel.NATIVE
                     : InteropCapabilityLevel.UNSUPPORTED;
+        };
+    }
+
+    private boolean supportsOpenAiStyleResource(UpstreamSiteKind siteKind) {
+        return switch (siteKind) {
+            case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE,
+                    MINIMAX, GROK, MISTRAL, COHERE, JINA, TOGETHER, FIREWORKS, OPENROUTER -> true;
+            default -> false;
         };
     }
 

@@ -908,6 +908,55 @@
         }
       }
     },
+    "/v1/audio/translations" : {
+      "post" : {
+        "summary" : "Create audio translation for multimodal input",
+        "operationId" : "post_v1_audio_translations",
+        "tags" : [ "gateway" ],
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        },
+        "description" : "Translates an uploaded audio file through OpenAI-style resource routing when the selected provider exposes an equivalent audio translation surface.",
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "type" : "object",
+                "required" : [ "file", "model" ],
+                "properties" : {
+                  "file" : {
+                    "type" : "string",
+                    "format" : "binary",
+                    "description" : "Audio file to translate."
+                  },
+                  "model" : {
+                    "type" : "string",
+                    "description" : "Translation model name or gateway model alias."
+                  },
+                  "prompt" : {
+                    "type" : "string",
+                    "description" : "Optional translation prompt."
+                  },
+                  "response_format" : {
+                    "type" : "string",
+                    "description" : "Optional response format when supported by the routed provider."
+                  },
+                  "temperature" : {
+                    "type" : "string",
+                    "description" : "Optional temperature, accepted as multipart text."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/audio/speech" : {
       "post" : {
         "summary" : "Create speech audio for multimodal output",
@@ -1000,6 +1049,141 @@
                   "response_format" : {
                     "type" : "string",
                     "description" : "Optional response format such as url or b64_json."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/images/edits" : {
+      "post" : {
+        "summary" : "Create image edit for multimodal output",
+        "operationId" : "post_v1_images_edits",
+        "tags" : [ "gateway" ],
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        },
+        "description" : "Creates image edits through OpenAI-style resource routing when the selected provider exposes an equivalent image edit surface.",
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "type" : "object",
+                "required" : [ "image", "prompt" ],
+                "properties" : {
+                  "image" : {
+                    "type" : "string",
+                    "format" : "binary",
+                    "description" : "Input image to edit."
+                  },
+                  "mask" : {
+                    "type" : "string",
+                    "format" : "binary",
+                    "description" : "Optional transparent mask image."
+                  },
+                  "prompt" : {
+                    "type" : "string",
+                    "description" : "Image edit prompt."
+                  },
+                  "model" : {
+                    "type" : "string",
+                    "description" : "Image model name or gateway model alias."
+                  },
+                  "background" : {
+                    "type" : "string",
+                    "description" : "Optional background hint when supported by the routed provider."
+                  },
+                  "input_fidelity" : {
+                    "type" : "string",
+                    "description" : "Optional input fidelity hint when supported by the routed provider."
+                  },
+                  "n" : {
+                    "type" : "integer",
+                    "description" : "Optional number of images."
+                  },
+                  "output_compression" : {
+                    "type" : "integer",
+                    "description" : "Optional output compression hint when supported."
+                  },
+                  "output_format" : {
+                    "type" : "string",
+                    "description" : "Optional output image format."
+                  },
+                  "quality" : {
+                    "type" : "string",
+                    "description" : "Optional quality hint."
+                  },
+                  "response_format" : {
+                    "type" : "string",
+                    "description" : "Optional response format such as url or b64_json."
+                  },
+                  "size" : {
+                    "type" : "string",
+                    "description" : "Optional image size."
+                  },
+                  "user" : {
+                    "type" : "string",
+                    "description" : "Optional end-user identifier for abuse monitoring."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/images/variations" : {
+      "post" : {
+        "summary" : "Create image variation for multimodal output",
+        "operationId" : "post_v1_images_variations",
+        "tags" : [ "gateway" ],
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        },
+        "description" : "Creates image variations through OpenAI-style resource routing when the selected provider exposes an equivalent image variation surface.",
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "type" : "object",
+                "required" : [ "image" ],
+                "properties" : {
+                  "image" : {
+                    "type" : "string",
+                    "format" : "binary",
+                    "description" : "Input image to vary."
+                  },
+                  "model" : {
+                    "type" : "string",
+                    "description" : "Image variation model name or gateway model alias."
+                  },
+                  "n" : {
+                    "type" : "integer",
+                    "description" : "Optional number of images."
+                  },
+                  "response_format" : {
+                    "type" : "string",
+                    "description" : "Optional response format such as url or b64_json."
+                  },
+                  "size" : {
+                    "type" : "string",
+                    "description" : "Optional image size."
+                  },
+                  "user" : {
+                    "type" : "string",
+                    "description" : "Optional end-user identifier for abuse monitoring."
                   }
                 }
               }

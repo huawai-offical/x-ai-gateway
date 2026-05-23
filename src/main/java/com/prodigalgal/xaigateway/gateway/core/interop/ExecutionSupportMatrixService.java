@@ -51,8 +51,20 @@ public class ExecutionSupportMatrixService {
                     supportsGoogleGenAiAudio(siteKind) || supportsOpenAiStyleSite(siteKind)
                             ? InteropCapabilityLevel.NATIVE
                             : InteropCapabilityLevel.UNSUPPORTED;
+            case AUDIO_TRANSLATION ->
+                    supportsOpenAiStyleSite(siteKind)
+                            ? InteropCapabilityLevel.NATIVE
+                            : InteropCapabilityLevel.UNSUPPORTED;
             case IMAGE_GENERATION ->
                     supportsGoogleGenAiImages(siteKind) || supportsOpenAiStyleSite(siteKind)
+                            ? InteropCapabilityLevel.NATIVE
+                            : InteropCapabilityLevel.UNSUPPORTED;
+            case IMAGE_EDIT ->
+                    supportsGoogleGenAiImages(siteKind) || supportsOpenAiStyleSite(siteKind)
+                            ? InteropCapabilityLevel.NATIVE
+                            : InteropCapabilityLevel.UNSUPPORTED;
+            case IMAGE_VARIATION ->
+                    supportsOpenAiStyleSite(siteKind)
                             ? InteropCapabilityLevel.NATIVE
                             : InteropCapabilityLevel.UNSUPPORTED;
             case MODERATION ->
@@ -60,12 +72,15 @@ public class ExecutionSupportMatrixService {
                             ? InteropCapabilityLevel.NATIVE
                             : InteropCapabilityLevel.UNSUPPORTED;
             case FILE_OBJECT -> (siteKind == UpstreamSiteKind.OPENAI_DIRECT
+                    || supportsOpenAiStyleFileLifecycleSite(siteKind)
                     || siteKind == UpstreamSiteKind.ANTHROPIC_DIRECT
                     || supportsGoogleGenAiSite(siteKind))
                     ? InteropCapabilityLevel.NATIVE
                     : InteropCapabilityLevel.UNSUPPORTED;
             case UPLOAD_CREATE ->
-                    siteKind == UpstreamSiteKind.OPENAI_DIRECT ? InteropCapabilityLevel.NATIVE : InteropCapabilityLevel.UNSUPPORTED;
+                    (siteKind == UpstreamSiteKind.OPENAI_DIRECT || supportsOpenAiStyleFileLifecycleSite(siteKind))
+                            ? InteropCapabilityLevel.NATIVE
+                            : InteropCapabilityLevel.UNSUPPORTED;
             case RERANK ->
                     (siteKind == UpstreamSiteKind.COHERE || siteKind == UpstreamSiteKind.JINA)
                             ? InteropCapabilityLevel.NATIVE
@@ -98,6 +113,14 @@ public class ExecutionSupportMatrixService {
         return switch (siteKind) {
             case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE,
                     MINIMAX, GROK, MISTRAL, COHERE, JINA, TOGETHER, FIREWORKS, OPENROUTER -> true;
+            default -> false;
+        };
+    }
+
+    private boolean supportsOpenAiStyleFileLifecycleSite(UpstreamSiteKind siteKind) {
+        return switch (siteKind) {
+            case OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE, MINIMAX, MISTRAL,
+                    TOGETHER, FIREWORKS, OPENROUTER -> true;
             default -> false;
         };
     }

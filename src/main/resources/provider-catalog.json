@@ -1,4 +1,4 @@
-{
+﻿{
   "catalogVersion": "2026.05.06-provider-ecosystem",
   "catalogSource": "classpath:provider-catalog.json",
   "presets": [
@@ -119,9 +119,7 @@
         "provider-specific"
       ],
       "pricingMetadata": "operator-configured-pricing",
-      "unsupportedFeatures": [
-        "file_object: current gateway does not generalize OpenAI-compatible object lifecycle."
-      ]
+      "unsupportedFeatures": []
     },
     {
       "code": "xiaomi_mimo",
@@ -213,8 +211,7 @@
       ],
       "unsupportedFeatures": [
         "responses_native: MiMo preset receives Codex/OpenAI Responses ingress through Chat Completions emulation, not upstream native Responses.",
-        "reasoning_content_history_missing: thinking mode plus historical assistant tool_calls requires reasoning_content replay; requests missing it are rejected before upstream dispatch.",
-        "file_object: current gateway does not generalize OpenAI-compatible object lifecycle."
+        "reasoning_content_history_missing: thinking mode plus historical assistant tool_calls requires reasoning_content replay; requests missing it are rejected before upstream dispatch."
       ]
     },
     {
@@ -268,9 +265,7 @@
           "weight": 100
         }
       ],
-      "unsupportedFeatures": [
-        "file_object: current gateway does not generalize OpenAI-compatible object lifecycle."
-      ]
+      "unsupportedFeatures": []
     },
     {
       "code": "qwen",
@@ -302,9 +297,7 @@
         "qwen-vl"
       ],
       "pricingMetadata": "provider-console-pricing",
-      "unsupportedFeatures": [
-        "file_object: current gateway does not generalize OpenAI-compatible object lifecycle."
-      ]
+      "unsupportedFeatures": []
     },
     {
       "code": "moonshot",
@@ -333,9 +326,7 @@
         "moonshot-v1-128k"
       ],
       "pricingMetadata": "provider-console-pricing",
-      "unsupportedFeatures": [
-        "file_object: current gateway does not generalize OpenAI-compatible object lifecycle."
-      ]
+      "unsupportedFeatures": []
     },
     {
       "code": "siliconflow",
@@ -365,9 +356,7 @@
         "doubao"
       ],
       "pricingMetadata": "provider-console-pricing",
-      "unsupportedFeatures": [
-        "file_object: current gateway does not generalize OpenAI-compatible object lifecycle."
-      ]
+      "unsupportedFeatures": []
     },
     {
       "code": "volcengine",
@@ -396,9 +385,7 @@
         "seed"
       ],
       "pricingMetadata": "provider-console-pricing",
-      "unsupportedFeatures": [
-        "file_object: current gateway does not generalize OpenAI-compatible object lifecycle."
-      ]
+      "unsupportedFeatures": []
     },
     {
       "code": "minimax",
@@ -426,9 +413,7 @@
         "minimax-m1"
       ],
       "pricingMetadata": "provider-console-pricing",
-      "unsupportedFeatures": [
-        "file_object: current gateway does not generalize OpenAI-compatible object lifecycle."
-      ]
+      "unsupportedFeatures": []
     },
     {
       "code": "dify",
@@ -649,9 +634,7 @@
         "deepseek"
       ],
       "pricingMetadata": "provider-console-pricing",
-      "unsupportedFeatures": [
-        "file_object: current gateway does not generalize OpenAI-compatible object lifecycle."
-      ]
+      "unsupportedFeatures": []
     },
     {
       "code": "fireworks",
@@ -680,9 +663,7 @@
         "embedding"
       ],
       "pricingMetadata": "provider-console-pricing",
-      "unsupportedFeatures": [
-        "file_object: current gateway does not generalize OpenAI-compatible object lifecycle."
-      ]
+      "unsupportedFeatures": []
     },
     {
       "code": "mistral",
@@ -711,9 +692,7 @@
         "codestral"
       ],
       "pricingMetadata": "provider-console-pricing",
-      "unsupportedFeatures": [
-        "file_object: current gateway does not generalize OpenAI-compatible object lifecycle."
-      ]
+      "unsupportedFeatures": []
     },
     {
       "code": "anthropic",
@@ -814,3 +793,6 @@
     }
   ]
 }
+
+
+

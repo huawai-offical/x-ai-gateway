@@ -710,7 +710,9 @@ public class GatewayResourceExecutionService {
                 requestedModel,
                 requestBody,
                 GatewayClientFamily.GENERIC_OPENAI,
-                true
+                true,
+                null,
+                request.httpMethod()
         ));
     }
 

@@ -269,12 +269,21 @@ public class PublicDocsBundleService {
         ObjectNode audioTranscriptions = addPath(paths, "post", "/v1/audio/transcriptions", "Create audio transcription for multimodal input", true);
         audioTranscriptions.put("description", "Transcribes an uploaded audio file through provider-governed routing as part of the multimodal conversation support surface.");
         addAudioTranscriptionRequestBody(audioTranscriptions);
+        ObjectNode audioTranslations = addPath(paths, "post", "/v1/audio/translations", "Create audio translation for multimodal input", true);
+        audioTranslations.put("description", "Translates an uploaded audio file through OpenAI-style resource routing when the selected provider exposes an equivalent audio translation surface.");
+        addAudioTranslationRequestBody(audioTranslations);
         ObjectNode audioSpeech = addPath(paths, "post", "/v1/audio/speech", "Create speech audio for multimodal output", true);
         audioSpeech.put("description", "Generates speech audio through provider-governed routing for multimodal response output.");
         addAudioSpeechRequestBody(audioSpeech);
         ObjectNode imageGeneration = addPath(paths, "post", "/v1/images/generations", "Create image generation for multimodal output", true);
         imageGeneration.put("description", "Creates image generations through provider-governed routing for the multimodal output surface.");
         addImageGenerationRequestBody(imageGeneration);
+        ObjectNode imageEdit = addPath(paths, "post", "/v1/images/edits", "Create image edit for multimodal output", true);
+        imageEdit.put("description", "Creates image edits through OpenAI-style resource routing when the selected provider exposes an equivalent image edit surface.");
+        addImageEditRequestBody(imageEdit);
+        ObjectNode imageVariation = addPath(paths, "post", "/v1/images/variations", "Create image variation for multimodal output", true);
+        imageVariation.put("description", "Creates image variations through OpenAI-style resource routing when the selected provider exposes an equivalent image variation surface.");
+        addImageVariationRequestBody(imageVariation);
         ObjectNode moderationCreate = addPath(paths, "post", "/v1/moderations", "Create moderation classification", true);
         moderationCreate.put("description", "Runs moderation classification for conversation safety and governance support.");
         addModerationRequestBody(moderationCreate);
@@ -730,6 +739,21 @@ public class PublicDocsBundleService {
         addProperty(properties, "stream", "string", "Optional streaming flag accepted as multipart text; provider support is route-dependent.");
     }
 
+    private void addAudioTranslationRequestBody(ObjectNode operation) {
+        ObjectNode schema = operation.putObject("requestBody")
+                .putObject("content")
+                .putObject("multipart/form-data")
+                .putObject("schema");
+        schema.put("type", "object");
+        schema.putArray("required").add("file").add("model");
+        ObjectNode properties = schema.putObject("properties");
+        addBinaryProperty(properties, "file", "Audio file to translate.");
+        addProperty(properties, "model", "string", "Translation model name or gateway model alias.");
+        addProperty(properties, "prompt", "string", "Optional translation prompt.");
+        addProperty(properties, "response_format", "string", "Optional response format when supported by the routed provider.");
+        addProperty(properties, "temperature", "string", "Optional temperature, accepted as multipart text.");
+    }
+
     private void addAudioSpeechRequestBody(ObjectNode operation) {
         ObjectNode schema = operation.putObject("requestBody")
                 .putObject("content")
@@ -759,6 +783,45 @@ public class PublicDocsBundleService {
         addProperty(properties, "quality", "string", "Optional quality hint supported by the routed provider.");
         addProperty(properties, "n", "integer", "Optional number of images.");
         addProperty(properties, "response_format", "string", "Optional response format such as url or b64_json.");
+    }
+
+    private void addImageEditRequestBody(ObjectNode operation) {
+        ObjectNode schema = operation.putObject("requestBody")
+                .putObject("content")
+                .putObject("multipart/form-data")
+                .putObject("schema");
+        schema.put("type", "object");
+        schema.putArray("required").add("image").add("prompt");
+        ObjectNode properties = schema.putObject("properties");
+        addBinaryProperty(properties, "image", "Input image to edit.");
+        addBinaryProperty(properties, "mask", "Optional transparent mask image.");
+        addProperty(properties, "prompt", "string", "Image edit prompt.");
+        addProperty(properties, "model", "string", "Image model name or gateway model alias.");
+        addProperty(properties, "background", "string", "Optional background hint when supported by the routed provider.");
+        addProperty(properties, "input_fidelity", "string", "Optional input fidelity hint when supported by the routed provider.");
+        addProperty(properties, "n", "integer", "Optional number of images.");
+        addProperty(properties, "output_compression", "integer", "Optional output compression hint when supported.");
+        addProperty(properties, "output_format", "string", "Optional output image format.");
+        addProperty(properties, "quality", "string", "Optional quality hint.");
+        addProperty(properties, "response_format", "string", "Optional response format such as url or b64_json.");
+        addProperty(properties, "size", "string", "Optional image size.");
+        addProperty(properties, "user", "string", "Optional end-user identifier for abuse monitoring.");
+    }
+
+    private void addImageVariationRequestBody(ObjectNode operation) {
+        ObjectNode schema = operation.putObject("requestBody")
+                .putObject("content")
+                .putObject("multipart/form-data")
+                .putObject("schema");
+        schema.put("type", "object");
+        schema.putArray("required").add("image");
+        ObjectNode properties = schema.putObject("properties");
+        addBinaryProperty(properties, "image", "Input image to vary.");
+        addProperty(properties, "model", "string", "Image variation model name or gateway model alias.");
+        addProperty(properties, "n", "integer", "Optional number of images.");
+        addProperty(properties, "response_format", "string", "Optional response format such as url or b64_json.");
+        addProperty(properties, "size", "string", "Optional image size.");
+        addProperty(properties, "user", "string", "Optional end-user identifier for abuse monitoring.");
     }
 
     private void addModerationRequestBody(ObjectNode operation) {

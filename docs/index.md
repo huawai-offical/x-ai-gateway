@@ -116,6 +116,10 @@ x-ai-gateway 不以 OpenAI、Anthropic、Gemini、Vertex、Codex 等官方 API �
 - [REQ-20260523-001 厂商管理与预设导入口径一致性](requirements/REQ-20260523-001-provider-site-preset-display-consistency.md)
 - [REQ-20260523-002 厂商管理界面与编辑界面收敛](requirements/REQ-20260523-002-provider-site-ui-simplification.md)
 - [REQ-20260523-003 厂商目录框线层级拆解](requirements/REQ-20260523-003-provider-catalog-frame-flattening.md)
+- [REQ-20260523-004 厂商 Audio、Files、Images 资源型接口覆盖](requirements/REQ-20260523-004-provider-audio-file-image-resource-coverage.md)
+- [REQ-20260523-005 资源入口事实源去重](requirements/REQ-20260523-005-resource-surface-registry-dedup.md)
+- [REQ-20260523-006 厂商目录标题层级与表格边界再平衡](requirements/REQ-20260523-006-provider-catalog-title-border-rebalance.md)
+- [REQ-20260523-007 前端路由错误页自定义](requirements/REQ-20260523-007-router-error-boundary-customization.md)
 
 ## 决策
 

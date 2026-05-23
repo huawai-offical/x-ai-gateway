@@ -55,7 +55,7 @@ print(response.output_text)
 
 ### OpenAI-compatible Generic
 
-用于 MiMo 等兼容 OpenAI Chat 格式的 provider key，只承诺 chat、streaming、function tools 等功能性对话能力；不要把该模式外推为 OpenAI Direct Files、Uploads、Realtime、Batches 或完整 object lifecycle。
+用于 MiMo 等兼容 OpenAI Chat 格式的 provider key，chat、streaming、function tools 与 file/uploads 分开建模；Files/Uploads 只有在 capability snapshot 明示支持时才通过 gateway orchestration 开放，不把 chat 兼容性外推为 Realtime、Batches 或完整 object lifecycle。
 
 ```javascript
 import OpenAI from "openai";

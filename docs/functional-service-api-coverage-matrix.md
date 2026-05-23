@@ -1,7 +1,7 @@
 # 功能性服务 API Coverage Matrix
 
-状态：Derived Complete (tests deferred)
-日期：2026-05-21
+状态：Derived Complete
+日期：2026-05-23
 关联任务：[TASK-20260514-029-01](../tasks/done/TASK-20260514-029-01-functional-service-api-coverage-matrix-source.md)、[TASK-20260514-029-04](../tasks/done/TASK-20260514-029-04-openapi-coverage-sdk-finalization.md)
 
 ## 事实源
@@ -27,8 +27,8 @@ src/main/resources/functional-service-api-coverage-matrix.json
 
 ## Provider 边界
 
-- OpenAI：保留 Chat、Responses、streaming、function tools、多模态、Files/Uploads、Vector Stores/file_search、本地 Conversations、OpenAI Webhooks、Realtime client secret 基线、models 与治理支撑。
-- OpenAI-compatible：MiMo 等 compatible key 只作为 chat、streaming、function tools 的功能性验证来源，不推导 OpenAI Direct Files、Uploads、Realtime、Batches 等 object lifecycle。
+- OpenAI：保留 Chat、Responses、streaming、function tools、多模态、Audio translations、Images edits/variations、Files/Uploads、Vector Stores/file_search、本地 Conversations、OpenAI Webhooks、Realtime client secret 基线、models 与治理支撑。
+- OpenAI-compatible：MiMo 等 compatible key 可按 OpenAI-style 直连 audio/images 资源入口；file* 与 Uploads 已按独立 file/upload capability snapshot 开放 gateway orchestration，不从 chat 兼容性自动推导；Realtime、Batches 等 object lifecycle 仍需独立任务和真实能力对齐。
 - Anthropic：保留 Claude Messages、streaming、tool_use/thinking；不保留 Anthropic message batches、admin/eval 等 provider-specific 非核心 API。
 - Gemini：保留 generateContent、streamGenerateContent、function calling、embeddings/files 支撑；不保留 batch prediction、tuning、pipeline/job/admin。
 - Vertex：保留与 Gemini 对话和支撑面等价的 generateContent、embeddings/files；project/location 只是寻址和凭证边界，不扩展为 Vertex AI Platform 全量 API。
@@ -44,7 +44,7 @@ src/main/resources/functional-service-api-coverage-matrix.json
 | `src/main/resources/provider-catalog.json` | Done | 已按功能性服务 API 范围收紧 unsupportedFeatures 与 provider 边界。 |
 | `docs/public-api-compatibility.md` | Done | 已明确 OpenAI Direct、OpenAI-compatible Generic、Anthropic/Gemini/Vertex/Codex native 边界。 |
 | `docs/public-sdk-examples.md` | Done | `TASK-20260514-029-04` 已补充 OpenAI Direct native、OpenAI-compatible Generic、自定义 provider adapter 三模式示例。 |
-| `src/test/resources/conformance/endpoint-conformance-matrix.json` | Done | 已按功能性服务 API 范围承接 endpoint conformance，并移除 Audio translations、Images edits/variations 等非支撑端点。 |
+| `src/test/resources/conformance/endpoint-conformance-matrix.json` | Done | 已按功能性服务 API 范围承接 endpoint conformance；Audio translations、Images edits/variations 已重新进入 OpenAI-style 资源入口，OpenAI-compatible file*/Uploads 由 capability snapshot 驱动并在矩阵中独立验证。 |
 | `src/test/resources/conformance/accepted-exceptions.json` | Done | 已将非核心 API 纳入 accepted exceptions 或 out-of-scope 决策。 |
 
-当前用户要求先不执行测试。本轮只做文档/快照派生、JSON 解析和强类型编译；恢复测试后应补 coverage matrix consistency tests，至少校验 out-of-scope 不再被 public docs 或 catalog 宣称为 supported。
+本轮资源型接口继续推进后，OpenAI-compatible 的 file*/Uploads 不再作为 accepted exception；是否可用取决于 capability snapshot 的 `supports_files` / `supports_uploads` 以及 provider catalog 是否明确排除该厂商对象生命周期。

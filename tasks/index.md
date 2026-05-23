@@ -61,6 +61,7 @@
 | P0-UI-UX-11 | [TASK-20260522-003 提示气泡化与超大文件组件化拆分](done/TASK-20260522-003-toast-feedback-and-component-splitting.md) | Done | `InlineError` 改为左上角 toast，调试工作台拆出预设和展示组件 |
 | P0-UI-UX-11a | [TASK-20260522-024 全局操作结果提示收敛](done/TASK-20260522-024-action-feedback-toast-coverage-parent.md) | Done | React Query mutation 成功/失败默认 toast，凭证刷新模型成功提示与失败去重 |
 | P1-UI-UX-12 | [TASK-20260522-004 原生确认弹窗与通知入口统一](backlog/TASK-20260522-004-confirm-dialog-notification-unification.md) | Backlog | 迁移 18 处 `window.confirm` 到统一确认弹窗 |
+| P0-UI-UX-13 | [TASK-20260523-008 前端路由错误页自定义](done/TASK-20260523-008-router-error-boundary-customization.md) | Done | 替换 React Router 默认错误页，覆盖动态模块加载失败、未匹配路由与 route 层异常 |
 | P1-ARCH-02 | [TASK-20260522-005 超大文件分批组件化与服务拆分](backlog/TASK-20260522-005-giant-file-decomposition-roadmap.md) | Backlog | 按 P0/P1 清单继续拆前端巨页和后端超级服务 |
 | P0-ARCH-03 | [TASK-20260522-010 Observability Redis 超时退避与同步兜底](done/TASK-20260522-010-observability-redis-timeout-backoff.md) | Done | Redis 热路径队列超时后退避，并让请求观测写入直接同步兜底 |
 | P2-INFRA-01 | [TASK-20260522-006 .gitignore 通配符化整理](done/TASK-20260522-006-gitignore-wildcard-cleanup.md) | Done | 将逐文件缓存 ignore 清单归并为目录级和通配符规则 |
@@ -88,6 +89,12 @@
 | P0-CODEX-06u | [TASK-20260523-002 厂商管理与预设导入口径一致性](done/TASK-20260523-002-provider-site-preset-display-consistency.md) | Done | 区分默认站点类型与厂商协议入口，并让预设导入返回将导入的 protocol endpoints |
 | P0-CODEX-06v | [TASK-20260523-003 厂商管理界面与编辑界面收敛](done/TASK-20260523-003-provider-site-ui-simplification.md) | Done | 厂商管理改为单一厂商目录，已导入统一进入详情管理，详情页和协议入口编辑按 Tab 分层 |
 | P0-CODEX-06w | [TASK-20260523-004 厂商目录框线层级拆解](done/TASK-20260523-004-provider-catalog-frame-flattening.md) | Done | 厂商目录拆掉卡片嵌套和内层圆角表格框，保留表头底线、行分隔和无边框分页 |
+| P0-CODEX-06x | [TASK-20260523-005 厂商 Audio、Files、Images 资源型接口覆盖](done/TASK-20260523-005-provider-audio-file-image-resource-coverage-parent.md) | Done | 已覆盖 audio、file*、image* 资源型接口，按直连、编排和互转完成能力收口 |
+| P0-CODEX-06x1 | [TASK-20260523-005-01 OpenAI-style Audio 与 Images 资源入口补齐](done/TASK-20260523-005-01-openai-style-audio-image-resource-endpoints.md) | Done | 已补齐 audio translations、image edits、image variations 的 OpenAI-style ingress、语义和能力矩阵 |
+| P1-CODEX-06x2 | [TASK-20260523-005-02 厂商 file* 编排覆盖与能力矩阵对齐](done/TASK-20260523-005-02-provider-file-object-orchestration-coverage.md) | Done | 已对齐 OpenAI、OpenAI-compatible、Anthropic、Gemini/Vertex 的 file* 生命周期、uploads 和展示事实源 |
+| P1-CODEX-06x3 | [TASK-20260523-005-03 厂商原生 Audio 与 Images 互转适配补齐](done/TASK-20260523-005-03-provider-native-media-adapter-parity.md) | Done | Gemini/Vertex image edit 原生互转、OpenAI-compatible passthrough 与 Anthropic/Gemini 不可等价 blocked reason 已收口 |
+| P0-CODEX-06y | [TASK-20260523-006 资源入口事实源去重](done/TASK-20260523-006-resource-surface-registry-dedup.md) | Done | 已收敛入口解析、入口能力矩阵、默认 path/surface/default model，并删除厂商详情独立特性解析重复区块 |
+| P0-CODEX-06z | [TASK-20260523-007 厂商目录标题层级与表格边界再平衡](done/TASK-20260523-007-provider-catalog-title-border-rebalance.md) | Done | 厂商管理页标题收敛为单一目录标题，并恢复厂商目录表格单层轻量边界 |
 | P0-FUNC-01 | [TASK-20260514-020 OpenAI 多模态支撑参数边界收紧](done/TASK-20260514-020-openai-multimodal-supporting-parameters.md) | Done | 已清理 Audio translations 与 Images edits/variations 残留，并固定多模态支撑参数 |
 | P0-FUNC-02 | [TASK-20260514-021 OpenAI Files、Uploads、Models 功能性支撑面](done/TASK-20260514-021-openai-files-uploads-models-functional-support.md) | Done | 已补 Files list 参数与 envelope，并确认 Batches/Fine-tuning 不回到公开支持面 |
 | P0-CODEX-05 | [TASK-20260514-031 OpenAI 真实 Smoke 与认证成本防护](backlog/TASK-20260514-031-openai-real-smoke-certification-harness.md) | Backlog | Critical；承接 Codex/OpenAI-compatible smoke 机制，等待恢复测试或真实 key 执行窗口 |

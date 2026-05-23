@@ -82,7 +82,9 @@ public class ModelPolicyAdminService {
                 request.requestedModel(),
                 request.requestBody(),
                 request.clientFamily() == null ? GatewayClientFamily.GENERIC_OPENAI : GatewayClientFamily.from(request.clientFamily()),
-                false
+                false,
+                null,
+                request.httpMethod()
         ));
         return new ModelPolicyPreviewResponse(
                 result.requestedModel(),

@@ -7,6 +7,7 @@ import com.prodigalgal.xaigateway.gateway.core.interop.CapabilityResolution;
 import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestSemantics;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature;
+import com.prodigalgal.xaigateway.gateway.core.interop.RouteSelectionMode;
 import com.prodigalgal.xaigateway.gateway.core.interop.SiteCapabilityTruthService;
 import com.prodigalgal.xaigateway.gateway.core.interop.SupportStatus;
 import com.prodigalgal.xaigateway.gateway.core.interop.SurfaceCompatibilityReport;
@@ -262,6 +263,14 @@ class ProviderSiteAdminServiceTests {
         assertFalse(response.features().containsKey("batch_create"));
         assertFalse(response.features().containsKey("anthropic_message_batch"));
         assertEquals(SupportStatus.NATIVE, response.surfaces().get("file_create").supportStatus());
+        assertEquals(SupportStatus.NATIVE, response.surfaces().get("file_list").supportStatus());
+        assertEquals(SupportStatus.NATIVE, response.surfaces().get("file_get").supportStatus());
+        assertEquals(SupportStatus.NATIVE, response.surfaces().get("file_content_get").supportStatus());
+        assertEquals(SupportStatus.NATIVE, response.surfaces().get("file_delete").supportStatus());
+        assertEquals(
+                RouteSelectionMode.STORED_LINEAGE,
+                response.surfaces().get("file_content_get").routeSelectionMode()
+        );
         assertFalse(response.surfaces().containsKey("batch_create"));
         assertFalse(response.surfaces().containsKey("anthropic_message_batch_create"));
     }
@@ -333,8 +342,11 @@ class ProviderSiteAdminServiceTests {
                 InteropFeature.EMBEDDINGS,
                 InteropFeature.REASONING,
                 InteropFeature.AUDIO_TRANSCRIPTION,
+                InteropFeature.AUDIO_TRANSLATION,
                 InteropFeature.AUDIO_SPEECH,
                 InteropFeature.IMAGE_GENERATION,
+                InteropFeature.IMAGE_EDIT,
+                InteropFeature.IMAGE_VARIATION,
                 InteropFeature.MODERATION,
                 InteropFeature.FILE_OBJECT,
                 InteropFeature.UPLOAD_CREATE,

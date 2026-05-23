@@ -49,6 +49,7 @@ class SiteCapabilityTruthServiceTests {
         SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
         Mockito.when(repository.findBySiteProfile_Id(3L)).thenReturn(Optional.of(snapshot(true, true, false, false, false, true, false, false, false, false)));
         Mockito.when(repository.findBySiteProfile_Id(4L)).thenReturn(Optional.of(snapshot(true, true, false, false, false, false, false, false, false, false)));
+        Mockito.when(repository.findBySiteProfile_Id(13L)).thenReturn(Optional.of(snapshot(true, true, false, false, false, true, true, false, false, false)));
 
         SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
 
@@ -60,6 +61,35 @@ class SiteCapabilityTruthServiceTests {
                 InteropCapabilityLevel.UNSUPPORTED,
                 service.capabilityLevel(candidate(4L, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT), InteropFeature.FILE_OBJECT)
         );
+        assertEquals(
+                InteropCapabilityLevel.NATIVE,
+                service.capabilityLevel(candidate(13L, ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC), InteropFeature.FILE_OBJECT)
+        );
+        assertEquals(
+                InteropCapabilityLevel.NATIVE,
+                service.capabilityLevel(candidate(13L, ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC), InteropFeature.UPLOAD_CREATE)
+        );
+    }
+
+    @Test
+    void shouldBlockOpenAiCompatibleFileLifecycleWhenSnapshotDoesNotAllowIt() {
+        SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        Mockito.when(repository.findBySiteProfile_Id(19L))
+                .thenReturn(Optional.of(snapshot(true, true, false, false, false, false, false, false, false, false)));
+        SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
+
+        FeatureCompatibilityReport report = service.evaluate(
+                candidate(19L, ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC),
+                new GatewayRequestSemantics(
+                        TranslationResourceType.FILE,
+                        TranslationOperation.FILE_CREATE,
+                        List.of(InteropFeature.FILE_OBJECT),
+                        true
+                )
+        );
+
+        assertEquals(SupportStatus.BLOCKED, report.supportStatus());
+        assertTrue(report.blockedReasons().stream().anyMatch(reason -> reason.contains("supports_files=true")));
     }
 
     @Test
@@ -372,6 +402,49 @@ class SiteCapabilityTruthServiceTests {
     }
 
     @Test
+    void shouldSupportGeminiImageEditButBlockUnimplementedAudioTranslationAndVariationResources() {
+        SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        Mockito.when(repository.findBySiteProfile_Id(18L)).thenReturn(Optional.of(snapshot(false, true, true, true, true, false, false, false, false, false)));
+        SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
+
+        FeatureCompatibilityReport audioTranslation = service.evaluate(
+                geminiCandidate(18L, UpstreamSiteKind.GEMINI_DIRECT),
+                new GatewayRequestSemantics(
+                        TranslationResourceType.AUDIO,
+                        TranslationOperation.AUDIO_TRANSLATION,
+                        List.of(InteropFeature.AUDIO_TRANSLATION),
+                        true
+                )
+        );
+        FeatureCompatibilityReport imageEdit = service.evaluate(
+                geminiCandidate(18L, UpstreamSiteKind.GEMINI_DIRECT),
+                new GatewayRequestSemantics(
+                        TranslationResourceType.IMAGE,
+                        TranslationOperation.IMAGE_EDIT,
+                        List.of(InteropFeature.IMAGE_EDIT),
+                        true
+                )
+        );
+        FeatureCompatibilityReport imageVariation = service.evaluate(
+                geminiCandidate(18L, UpstreamSiteKind.GEMINI_DIRECT),
+                new GatewayRequestSemantics(
+                        TranslationResourceType.IMAGE,
+                        TranslationOperation.IMAGE_VARIATION,
+                        List.of(InteropFeature.IMAGE_VARIATION),
+                        true
+                )
+        );
+
+        assertEquals(SupportStatus.BLOCKED, audioTranslation.supportStatus());
+        assertEquals(ExecutionKind.BLOCKED, audioTranslation.executionKind());
+        assertTrue(audioTranslation.blockedReasons().stream().anyMatch(reason -> reason.contains("/v1/audio/translations")));
+        assertEquals(SupportStatus.NATIVE, imageEdit.supportStatus());
+        assertEquals(ExecutionKind.NATIVE, imageEdit.executionKind());
+        assertEquals(SupportStatus.BLOCKED, imageVariation.supportStatus());
+        assertTrue(imageVariation.blockedReasons().stream().anyMatch(reason -> reason.contains("/v1/images/variations")));
+    }
+
+    @Test
     void shouldExposeNativeWrappedSurfaceForGeminiFileResources() {
         SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
         SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
@@ -601,6 +674,7 @@ class SiteCapabilityTruthServiceTests {
                 providerType,
                 siteProfileId,
                 ProviderFamily.OPENAI,
+                null,
                 siteKind,
                 AuthStrategy.BEARER,
                 PathStrategy.OPENAI_V1,
