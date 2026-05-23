@@ -320,6 +320,67 @@ class ProviderSiteAdminServiceTests {
         assertTrue(response.features().containsKey("web_search"));
     }
 
+    @Test
+    void shouldExposeMimoOpenAiCompatibleResourceSurfacesAfterSnapshotRefresh() {
+        UpstreamSiteProfileRepository profileRepository = Mockito.mock(UpstreamSiteProfileRepository.class);
+        SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        SiteModelCapabilityRepository modelCapabilityRepository = Mockito.mock(SiteModelCapabilityRepository.class);
+        UpstreamCredentialRepository credentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        ProviderSiteRegistryService providerSiteRegistryService = Mockito.mock(ProviderSiteRegistryService.class);
+        CredentialModelDiscoveryService credentialModelDiscoveryService = Mockito.mock(CredentialModelDiscoveryService.class);
+        SiteCapabilityTruthService truthService = new SiteCapabilityTruthService(
+                new UpstreamSitePolicyService(),
+                snapshotRepository
+        );
+
+        ProviderSiteAdminService service = new ProviderSiteAdminService(
+                profileRepository,
+                snapshotRepository,
+                modelCapabilityRepository,
+                credentialRepository,
+                providerSiteRegistryService,
+                credentialModelDiscoveryService,
+                truthService
+        );
+
+        UpstreamSiteProfileEntity site = sampleOpenAiCompatibleSite(9L);
+        site.setProfileCode("preset:xiaomi_mimo");
+        site.setDisplayName("Xiaomi MiMo");
+        SiteCapabilitySnapshotEntity snapshot = sampleSnapshot(site);
+        snapshot.setSupportsResponses(true);
+        snapshot.setSupportsEmbeddings(true);
+        snapshot.setSupportsAudio(true);
+        snapshot.setSupportsImages(true);
+        snapshot.setSupportsModeration(true);
+        snapshot.setSupportsFiles(true);
+        snapshot.setSupportsUploads(true);
+
+        Mockito.when(profileRepository.findById(9L)).thenReturn(Optional.of(site));
+        Mockito.when(snapshotRepository.findBySiteProfile_Id(9L)).thenReturn(Optional.of(snapshot));
+        Mockito.when(modelCapabilityRepository.findAllBySiteProfile_IdOrderByModelKeyAsc(9L)).thenReturn(List.of());
+        Mockito.when(credentialRepository.findAllBySiteProfileIdAndDeletedFalseAndActiveTrueOrderByCreatedAtDesc(9L))
+                .thenReturn(List.of());
+
+        ProviderSiteResponse response = service.get(9L);
+
+        assertEquals("native", response.features().get("audio_transcription").supportStatus());
+        assertEquals("native", response.features().get("audio_translation").supportStatus());
+        assertEquals("native", response.features().get("image_generation").supportStatus());
+        assertEquals("native", response.features().get("image_edit").supportStatus());
+        assertEquals("native", response.features().get("image_variation").supportStatus());
+        assertEquals("native", response.features().get("file_object").supportStatus());
+        assertEquals("native", response.features().get("upload_create").supportStatus());
+
+        assertEquals(SupportStatus.PASSTHROUGH, response.surfaces().get("audio_transcription").supportStatus());
+        assertEquals(InteropCapabilityLevel.NATIVE, response.surfaces().get("audio_transcription").overallCapabilityLevel());
+        assertEquals(SupportStatus.PASSTHROUGH, response.surfaces().get("audio_translation").supportStatus());
+        assertEquals(SupportStatus.PASSTHROUGH, response.surfaces().get("image_generation").supportStatus());
+        assertEquals(SupportStatus.PASSTHROUGH, response.surfaces().get("image_edit").supportStatus());
+        assertEquals(SupportStatus.PASSTHROUGH, response.surfaces().get("image_variation").supportStatus());
+        assertEquals(SupportStatus.ORCHESTRATION, response.surfaces().get("file_create").supportStatus());
+        assertEquals(SupportStatus.ORCHESTRATION, response.surfaces().get("upload_create").supportStatus());
+    }
+
     private void mockAllFeatures(
             SiteCapabilityTruthService truthService,
             UpstreamSiteProfileEntity site,

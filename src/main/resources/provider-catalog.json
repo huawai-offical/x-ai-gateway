@@ -103,6 +103,11 @@
       "capabilityTags": [
         "chat",
         "responses",
+        "audio",
+        "images",
+        "moderation",
+        "files",
+        "uploads",
         "openai_compatible",
         "generic"
       ],
@@ -128,10 +133,15 @@
       "vendorName": "小米 MiMo",
       "siteKind": "OPENAI_COMPATIBLE_GENERIC",
       "defaultBaseUrl": "https://token-plan-sgp.xiaomimimo.com/v1",
-      "description": "小米 MiMo OpenAI-compatible API。Codex/Responses 入口通过 Chat Completions 转译接入；thinking mode 下多轮工具调用历史必须回放 assistant reasoning_content。",
+      "description": "小米 MiMo OpenAI-compatible API。Codex/Responses 入口通过 Chat Completions 转译接入；OpenAI-style audio/images/moderation 由 passthrough 执行，files/uploads 由 gateway orchestration 承接；thinking mode 下多轮工具调用历史必须回放 assistant reasoning_content。",
       "capabilityTags": [
         "chat",
         "responses",
+        "audio",
+        "images",
+        "moderation",
+        "files",
+        "uploads",
         "openai_compatible",
         "reasoning",
         "tools",
@@ -211,6 +221,8 @@
       ],
       "unsupportedFeatures": [
         "responses_native: MiMo preset receives Codex/OpenAI Responses ingress through Chat Completions emulation, not upstream native Responses.",
+        "openai_style_resource_passthrough: MiMo audio/images/moderation use OpenAI-compatible passthrough; upstream 401/404/model unsupported remains surfaced at runtime.",
+        "files_uploads_gateway_orchestration: MiMo files/uploads use gateway-local orchestration and lineage instead of assuming an upstream OpenAI object store.",
         "reasoning_content_history_missing: thinking mode plus historical assistant tool_calls requires reasoning_content replay; requests missing it are rejected before upstream dispatch."
       ]
     },

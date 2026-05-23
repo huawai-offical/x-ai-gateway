@@ -28,7 +28,7 @@ src/main/resources/functional-service-api-coverage-matrix.json
 ## Provider 边界
 
 - OpenAI：保留 Chat、Responses、streaming、function tools、多模态、Audio translations、Images edits/variations、Files/Uploads、Vector Stores/file_search、本地 Conversations、OpenAI Webhooks、Realtime client secret 基线、models 与治理支撑。
-- OpenAI-compatible：MiMo 等 compatible key 可按 OpenAI-style 直连 audio/images 资源入口；file* 与 Uploads 已按独立 file/upload capability snapshot 开放 gateway orchestration，不从 chat 兼容性自动推导；Realtime、Batches 等 object lifecycle 仍需独立任务和真实能力对齐。
+- OpenAI-compatible：MiMo 等 compatible key 可按 OpenAI-style 直连 audio/images/moderation 资源入口；file* 与 Uploads 已按独立 file/upload capability snapshot 开放 gateway orchestration，不从 chat 兼容性自动推导；矩阵里的 NATIVE/ORCHESTRATION 表示 gateway 具备可执行入口，真实上游 401/404/model unsupported 仍由运行时或 smoke 反馈；Realtime、Batches 等 object lifecycle 仍需独立任务和真实能力对齐。
 - Anthropic：保留 Claude Messages、streaming、tool_use/thinking、图片输入理解与 file 支撑；不保留 audio 资源、图片生成/编辑/variation、Anthropic message batches、admin/eval 等 provider-specific 非核心 API。
 - Gemini：保留 generateContent、streamGenerateContent、function calling、embeddings/files 支撑，以及 audio transcription/translation/speech、image generation/edit/variation 功能性资源互转；不保留 batch prediction、tuning、pipeline/job/admin。
 - Vertex：保留与 Gemini 对话和支撑面等价的 generateContent、embeddings/files/audio/image 功能面；project/location 只是寻址和凭证边界，不扩展为 Vertex AI Platform 全量 API。
@@ -47,4 +47,4 @@ src/main/resources/functional-service-api-coverage-matrix.json
 | `src/test/resources/conformance/endpoint-conformance-matrix.json` | Done | 已按功能性服务 API 范围承接 endpoint conformance；Audio translations、Images edits/variations 已重新进入 OpenAI-style 资源入口，OpenAI-compatible file*/Uploads 由 capability snapshot 驱动并在矩阵中独立验证。 |
 | `src/test/resources/conformance/accepted-exceptions.json` | Done | 已将非核心 API 纳入 accepted exceptions 或 out-of-scope 决策。 |
 
-本轮资源型接口继续推进后，OpenAI-compatible 的 file*/Uploads 不再作为 accepted exception；是否可用取决于 capability snapshot 的 `supports_files` / `supports_uploads` 以及 provider catalog 是否明确排除该厂商对象生命周期。
+本轮资源型接口继续推进后，OpenAI-compatible 的 audio/images/moderation 按 OpenAI-style passthrough 暴露；file*/Uploads 不再作为 accepted exception，是否可用取决于 capability snapshot 的 `supports_files` / `supports_uploads` 以及 provider catalog 是否明确排除该厂商对象生命周期。MiMo 预设刷新后应写入最新 snapshot，避免旧 snapshot 把已实现入口误报为 blocked。

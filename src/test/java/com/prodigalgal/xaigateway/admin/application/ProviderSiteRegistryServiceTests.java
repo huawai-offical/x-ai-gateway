@@ -286,6 +286,37 @@ class ProviderSiteRegistryServiceTests {
     }
 
     @Test
+    void shouldRefreshMimoPresetSnapshotWithOpenAiStyleResourceCapabilities() {
+        UpstreamSiteProfileRepository profileRepository = Mockito.mock(UpstreamSiteProfileRepository.class);
+        SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        SiteModelCapabilityRepository modelCapabilityRepository = Mockito.mock(SiteModelCapabilityRepository.class);
+        ProviderSiteRegistryService service = new ProviderSiteRegistryService(
+                profileRepository,
+                snapshotRepository,
+                modelCapabilityRepository,
+                new UpstreamSitePolicyService(),
+                new ProviderCatalogLoader(new ObjectMapper())
+        );
+        UpstreamSiteProfileEntity site = sampleSite(8L);
+        site.setProfileCode("preset:xiaomi_mimo");
+
+        when(profileRepository.findByIdForUpdate(8L)).thenReturn(Optional.of(site));
+        when(snapshotRepository.findBySiteProfile_Id(8L)).thenReturn(Optional.empty());
+        when(snapshotRepository.save(any(SiteCapabilitySnapshotEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.refreshCapabilities(site, List.of());
+
+        ArgumentCaptor<SiteCapabilitySnapshotEntity> snapshotCaptor = ArgumentCaptor.forClass(SiteCapabilitySnapshotEntity.class);
+        verify(snapshotRepository).save(snapshotCaptor.capture());
+        SiteCapabilitySnapshotEntity snapshot = snapshotCaptor.getValue();
+        assertTrue(snapshot.isSupportsAudio());
+        assertTrue(snapshot.isSupportsImages());
+        assertTrue(snapshot.isSupportsModeration());
+        assertTrue(snapshot.isSupportsFiles());
+        assertTrue(snapshot.isSupportsUploads());
+    }
+
+    @Test
     void shouldNotRecreateDisabledPresetModelPolicyOnDefaultImport() {
         UpstreamSiteProfileRepository profileRepository = Mockito.mock(UpstreamSiteProfileRepository.class);
         SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);

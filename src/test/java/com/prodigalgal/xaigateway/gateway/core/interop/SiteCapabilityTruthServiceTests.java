@@ -27,10 +27,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SiteCapabilityTruthServiceTests {
 
     @Test
-    void shouldReturnNativeForOpenAiAudioAndUnsupportedForOpenAiCompatibleAudio() {
+    void shouldReturnNativeForOpenAiAndGenericOpenAiCompatibleAudioWhenSnapshotAllowsIt() {
         SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
         Mockito.when(repository.findBySiteProfile_Id(1L)).thenReturn(Optional.of(snapshot(true, true, true, true, true, true, true, true, true, true)));
-        Mockito.when(repository.findBySiteProfile_Id(2L)).thenReturn(Optional.of(snapshot(true, true, false, false, false, false, false, false, false, false)));
+        Mockito.when(repository.findBySiteProfile_Id(2L)).thenReturn(Optional.of(snapshot(true, true, true, true, true, true, true, false, false, false)));
 
         SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
 
@@ -39,8 +39,12 @@ class SiteCapabilityTruthServiceTests {
                 service.capabilityLevel(candidate(1L, ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT), InteropFeature.AUDIO_TRANSCRIPTION)
         );
         assertEquals(
-                InteropCapabilityLevel.UNSUPPORTED,
+                InteropCapabilityLevel.NATIVE,
                 service.capabilityLevel(candidate(2L, ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC), InteropFeature.AUDIO_TRANSCRIPTION)
+        );
+        assertEquals(
+                InteropCapabilityLevel.NATIVE,
+                service.capabilityLevel(candidate(2L, ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC), InteropFeature.IMAGE_VARIATION)
         );
     }
 

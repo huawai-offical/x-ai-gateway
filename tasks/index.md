@@ -341,6 +341,7 @@
 | [TASK-20260516-008 OpenAI Realtime WebSocket 入口与事件代理基线](done/TASK-20260516-008-openai-realtime-websocket-ingress-event-proxy.md) | Done | Critical | TASK-20260514-030 |
 | [TASK-20260516-009 OpenAI Direct 显式 Billable/Write Smoke Probe](done/TASK-20260516-009-openai-direct-explicit-billable-write-smoke-probes.md) | Done | Critical | TASK-20260514-031 |
 | [TASK-20260516-010 OpenAI Provider Catalog 覆盖边界校准](done/TASK-20260516-010-openai-provider-catalog-coverage-boundary.md) | Done | High | TASK-20260514-015 / 029 |
+| [TASK-20260523-011 MiMo 资源能力矩阵与 OpenAI-compatible 实现对齐](done/TASK-20260523-011-mimo-resource-capability-matrix-alignment.md) | Done | High | REQ-20260523-010 |
 | [TASK-20260516-014 OpenAI Responses Tools Registry 与非 function Tool 显式边界](done/TASK-20260516-014-openai-responses-tool-registry-boundary.md) | Done | High | TASK-20260514-019 / 013 |
 | [TASK-20260516-015 OpenAI Conversations 本地 Lifecycle](done/TASK-20260516-015-openai-conversations-local-lifecycle.md) | Done | High | TASK-20260514-019 |
 | [TASK-20260516-016 OpenAI Webhooks 接收入口与事件落库](done/TASK-20260516-016-openai-webhooks-ingress-event-persistence.md) | Done | High | TASK-20260514-019 |

@@ -122,6 +122,7 @@ x-ai-gateway 不以 OpenAI、Anthropic、Gemini、Vertex、Codex 等官方 API �
 - [REQ-20260523-007 前端路由错误页自定义](requirements/REQ-20260523-007-router-error-boundary-customization.md)
 - [REQ-20260523-008 协议入口兼容画像结构化编辑](requirements/REQ-20260523-008-protocol-endpoint-structured-profile-editor.md)
 - [REQ-20260523-009 功能性媒体 API 厂商互转补齐](requirements/REQ-20260523-009-functional-media-provider-translation-parity.md)
+- [REQ-20260523-010 MiMo 资源能力矩阵与已实现 OpenAI-style 入口对齐](requirements/REQ-20260523-010-mimo-resource-capability-matrix-alignment.md)
 
 ## 决策
 

@@ -116,8 +116,7 @@ public class UpstreamSitePolicyService {
                     "provider-native",
                     null
             );
-            case DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE, MINIMAX, TOGETHER, FIREWORKS, OPENROUTER,
-                    OPENAI_COMPATIBLE_GENERIC -> new SitePolicy(
+            case DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE, MINIMAX, TOGETHER, FIREWORKS, OPENROUTER -> new SitePolicy(
                     ProviderFamily.OPENAI,
                     AuthStrategy.BEARER,
                     PathStrategy.OPENAI_V1,
@@ -129,6 +128,24 @@ public class UpstreamSitePolicyService {
                     false,
                     false,
                     false,
+                    true,
+                    true,
+                    "sse",
+                    "provider-specific-fallback",
+                    null
+            );
+            case OPENAI_COMPATIBLE_GENERIC -> new SitePolicy(
+                    ProviderFamily.OPENAI,
+                    AuthStrategy.BEARER,
+                    PathStrategy.OPENAI_V1,
+                    ModelAddressingStrategy.MODEL_NAME,
+                    ErrorSchemaStrategy.OPENAI_ERROR,
+                    List.of("openai", "responses"),
+                    true,
+                    true,
+                    true,
+                    true,
+                    true,
                     true,
                     true,
                     "sse",
