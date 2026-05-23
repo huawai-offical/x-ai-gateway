@@ -51,6 +51,7 @@ class GeminiImagesGatewayResourceExecutorTests {
 
         assertTrue(executor.supports(request("/v1/images/generations", TranslationOperation.IMAGE_GENERATION), candidate(UpstreamSiteKind.GEMINI_DIRECT)));
         assertTrue(executor.supports(request("/v1/images/edits", TranslationOperation.IMAGE_EDIT), candidate(UpstreamSiteKind.GEMINI_DIRECT)));
+        assertTrue(executor.supports(request("/v1/images/variations", TranslationOperation.IMAGE_VARIATION), candidate(UpstreamSiteKind.GEMINI_DIRECT)));
         assertFalse(executor.supports(request("/v1/moderations", TranslationOperation.MODERATION_CREATE), candidate(UpstreamSiteKind.GEMINI_DIRECT)));
         assertTrue(executor.supports(request("/v1/images/generations", TranslationOperation.IMAGE_GENERATION), candidate(UpstreamSiteKind.VERTEX_AI)));
     }
@@ -88,7 +89,7 @@ class GeminiImagesGatewayResourceExecutorTests {
                 () -> executor.executeJson(context(), payload, "gemini-2.0-flash-preview-image-generation")
         );
 
-        assertEquals("Gemini image generation 当前仅返回 b64_json。", error.getMessage());
+        assertEquals("Gemini images 当前仅返回 b64_json。", error.getMessage());
     }
 
     @Test
@@ -144,6 +145,28 @@ class GeminiImagesGatewayResourceExecutorTests {
         assertEquals(2, executor.lastReferenceImages.size());
         assertArrayEquals(maskBytes, executor.lastReferenceImages.get(1).toReferenceImageAPI().referenceImage().orElseThrow().imageBytes().orElseThrow());
         assertTrue(executor.lastReferenceImages.get(1).toReferenceImageAPI().maskImageConfig().isPresent());
+    }
+
+    @Test
+    void shouldReturnOpenAiCompatibleB64JsonForVariationAndUseDefaultPrompt() {
+        byte[] imageBytes = new byte[] {9, 8, 7};
+        byte[] variationBytes = new byte[] {2, 4, 6};
+        TestGeminiImagesExecutor executor = new TestGeminiImagesExecutor(singleEditImageResponse(variationBytes));
+
+        ResponseEntity<JsonNode> response = executor.executeVariation(
+                context(TranslationOperation.IMAGE_VARIATION, "/v1/images/variations"),
+                "Create a visually distinct variation of the provided image. Preserve the main subject and composition, vary visual details naturally, and return only the generated image.",
+                java.util.Map.of("n", "1"),
+                new GeminiGatewayResourceSupport.ResolvedBinaryFile("input.png", "image/png", imageBytes)
+        );
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(Base64.getEncoder().encodeToString(variationBytes), response.getBody().path("data").get(0).path("b64_json").asText());
+        assertEquals(1, executor.lastEditConfig.numberOfImages().orElseThrow());
+        assertEquals("image/png", executor.lastEditConfig.outputMimeType().orElseThrow());
+        assertEquals(1, executor.lastReferenceImages.size());
+        assertArrayEquals(imageBytes, executor.lastReferenceImages.get(0).toReferenceImageAPI().referenceImage().orElseThrow().imageBytes().orElseThrow());
+        assertTrue(executor.lastPrompt.contains("visually distinct variation"));
     }
 
     @Test

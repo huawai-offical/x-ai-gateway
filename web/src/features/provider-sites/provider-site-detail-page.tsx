@@ -5,7 +5,6 @@ import { ArrowLeftIcon, PencilIcon, PlusIcon, RefreshCwIcon, Trash2Icon } from '
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Textarea } from '@/components/ui/textarea'
 import {
   Dialog,
   DialogContent,
@@ -31,6 +30,12 @@ import {
   type SurfaceCapability,
 } from './types'
 
+type JsonRecord = Record<string, unknown>
+type CompatibilityProfile = 'default' | 'openai_chat_completions' | 'responses_to_chat_completions' | 'anthropic_messages' | 'gemini_generate_content'
+type ReasoningRequestMode = 'none' | 'extra_body_thinking_enabled'
+type AssistantReasoningField = 'none' | 'reasoning_content' | 'reasoning'
+type HistoryReplayPolicy = 'none' | 'required_when_tool_calls'
+
 type ProtocolEndpointDraft = {
   endpointCode: string
   displayName: string
@@ -43,12 +48,40 @@ type ProtocolEndpointDraft = {
   modelAddressingStrategy: string
   errorSchemaStrategy: string
   streamTransport: string
-  conversationProfileJson: string
+  compatibilityProfile: CompatibilityProfile
+  reasoningRequestMode: ReasoningRequestMode
+  assistantReasoningField: AssistantReasoningField
+  historyReplayPolicy: HistoryReplayPolicy
+  preservedConversationProfile: JsonRecord
   active: boolean
 }
 
 type DetailTab = 'overview' | 'endpoints' | 'models' | 'diagnostics'
-type EndpointEditorStep = 'basic' | 'runtime' | 'advanced'
+type EndpointEditorStep = 'basic' | 'runtime' | 'profile'
+
+const COMPATIBILITY_PROFILE_OPTIONS: Array<{ value: CompatibilityProfile; label: string }> = [
+  { value: 'default', label: '默认直连' },
+  { value: 'openai_chat_completions', label: 'OpenAI-compatible Chat Completions' },
+  { value: 'responses_to_chat_completions', label: 'Responses 转 Chat Completions' },
+  { value: 'anthropic_messages', label: 'Anthropic Messages' },
+  { value: 'gemini_generate_content', label: 'Gemini GenerateContent' },
+]
+
+const REASONING_REQUEST_OPTIONS: Array<{ value: ReasoningRequestMode; label: string }> = [
+  { value: 'none', label: '不注入' },
+  { value: 'extra_body_thinking_enabled', label: 'extra_body.thinking = enabled' },
+]
+
+const ASSISTANT_REASONING_FIELD_OPTIONS: Array<{ value: AssistantReasoningField; label: string }> = [
+  { value: 'none', label: '不指定' },
+  { value: 'reasoning_content', label: 'reasoning_content' },
+  { value: 'reasoning', label: 'reasoning' },
+]
+
+const HISTORY_REPLAY_OPTIONS: Array<{ value: HistoryReplayPolicy; label: string }> = [
+  { value: 'none', label: '不限制' },
+  { value: 'required_when_tool_calls', label: '工具调用时要求 reasoning' },
+]
 
 export function ProviderSiteDetailPage() {
   const params = useParams()
@@ -212,7 +245,7 @@ export function ProviderSiteDetailPage() {
               ]}
             />
             <div className="mt-4 rounded-2xl border border-border/60 bg-muted/20 p-4">
-              <div className="mb-2 text-sm font-medium text-foreground">conversation profile</div>
+              <div className="mb-2 text-sm font-medium text-foreground">站点运行时画像</div>
               <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-background p-3 text-xs text-muted-foreground">
                 {JSON.stringify(site.conversationProfile ?? {}, null, 2)}
               </pre>
@@ -297,7 +330,7 @@ export function ProviderSiteDetailPage() {
               .filter((endpoint) => Object.keys(endpoint.conversationProfile ?? {}).length > 0)
               .map((endpoint) => (
                 <div key={endpoint.id} className="rounded-2xl border border-border/60 bg-muted/20 p-4">
-                  <div className="mb-2 text-sm font-medium text-foreground">{endpoint.displayName} conversation profile</div>
+                  <div className="mb-2 text-sm font-medium text-foreground">{endpoint.displayName} 运行时画像</div>
                   <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-background p-3 text-xs text-muted-foreground">
                     {JSON.stringify(endpoint.conversationProfile ?? {}, null, 2)}
                   </pre>
@@ -329,7 +362,7 @@ export function ProviderSiteDetailPage() {
               <TabsList variant="line" className="w-full justify-start overflow-x-auto">
                 <TabsTrigger value="basic">1. 基本信息</TabsTrigger>
                 <TabsTrigger value="runtime">2. 运行时策略</TabsTrigger>
-                <TabsTrigger value="advanced">3. 高级 JSON</TabsTrigger>
+                <TabsTrigger value="profile">3. 兼容画像</TabsTrigger>
               </TabsList>
 
               <TabsContent value="basic" className="pt-3">
@@ -426,15 +459,63 @@ export function ProviderSiteDetailPage() {
                 </div>
               </TabsContent>
 
-              <TabsContent value="advanced" className="pt-3">
-                <label className="flex flex-col gap-2">
-                  <span className="text-sm font-medium text-foreground">Conversation Profile JSON</span>
-                  <Textarea
-                    rows={7}
-                    value={endpointDraft.conversationProfileJson}
-                    onChange={(event) => setEndpointDraft({ ...endpointDraft, conversationProfileJson: event.target.value })}
-                  />
-                </label>
+              <TabsContent value="profile" className="pt-3">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="flex flex-col gap-2">
+                    <span className="text-sm font-medium text-foreground">兼容画像</span>
+                    <select
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      value={endpointDraft.compatibilityProfile}
+                      onChange={(event) => setEndpointDraft({ ...endpointDraft, compatibilityProfile: event.target.value as CompatibilityProfile })}
+                    >
+                      {COMPATIBILITY_PROFILE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-2">
+                    <span className="text-sm font-medium text-foreground">Thinking 注入</span>
+                    <select
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      value={endpointDraft.reasoningRequestMode}
+                      onChange={(event) => setEndpointDraft({ ...endpointDraft, reasoningRequestMode: event.target.value as ReasoningRequestMode })}
+                    >
+                      {REASONING_REQUEST_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-2">
+                    <span className="text-sm font-medium text-foreground">Assistant Reasoning 字段</span>
+                    <select
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      value={endpointDraft.assistantReasoningField}
+                      onChange={(event) => setEndpointDraft({ ...endpointDraft, assistantReasoningField: event.target.value as AssistantReasoningField })}
+                    >
+                      {ASSISTANT_REASONING_FIELD_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-2">
+                    <span className="text-sm font-medium text-foreground">工具历史回放</span>
+                    <select
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      value={endpointDraft.historyReplayPolicy}
+                      onChange={(event) => setEndpointDraft({ ...endpointDraft, historyReplayPolicy: event.target.value as HistoryReplayPolicy })}
+                    >
+                      {HISTORY_REPLAY_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="rounded-2xl border border-border/60 bg-muted/20 p-4 md:col-span-2">
+                    <div className="mb-2 text-sm font-medium text-foreground">运行时画像预览</div>
+                    <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-background p-3 text-xs text-muted-foreground">
+                      {JSON.stringify(buildConversationProfile(endpointDraft), null, 2)}
+                    </pre>
+                  </div>
+                </div>
               </TabsContent>
             </Tabs>
             {endpointError || endpointMutation.error ? (
@@ -637,12 +718,17 @@ function emptyEndpointDraft(): ProtocolEndpointDraft {
     modelAddressingStrategy: '',
     errorSchemaStrategy: '',
     streamTransport: 'sse',
-    conversationProfileJson: '',
+    compatibilityProfile: 'default',
+    reasoningRequestMode: 'none',
+    assistantReasoningField: 'none',
+    historyReplayPolicy: 'none',
+    preservedConversationProfile: {},
     active: true,
   }
 }
 
 function defaultEndpointDraftForSite(site: ProviderSite): ProtocolEndpointDraft {
+  const profileFields = profileToDraftFields(site.conversationProfile ?? {})
   return {
     endpointCode: `${site.profileCode}:custom`,
     displayName: `${site.displayName} 自定义入口`,
@@ -655,14 +741,13 @@ function defaultEndpointDraftForSite(site: ProviderSite): ProtocolEndpointDraft 
     modelAddressingStrategy: site.modelAddressingStrategy,
     errorSchemaStrategy: site.errorSchemaStrategy,
     streamTransport: site.streamTransport ?? 'sse',
-    conversationProfileJson: Object.keys(site.conversationProfile ?? {}).length
-      ? JSON.stringify(site.conversationProfile, null, 2)
-      : '',
+    ...profileFields,
     active: true,
   }
 }
 
 function endpointToDraft(endpoint: ProviderProtocolEndpoint): ProtocolEndpointDraft {
+  const profileFields = profileToDraftFields(endpoint.conversationProfile ?? {})
   return {
     endpointCode: endpoint.endpointCode,
     displayName: endpoint.displayName,
@@ -675,9 +760,7 @@ function endpointToDraft(endpoint: ProviderProtocolEndpoint): ProtocolEndpointDr
     modelAddressingStrategy: endpoint.modelAddressingStrategy,
     errorSchemaStrategy: endpoint.errorSchemaStrategy,
     streamTransport: endpoint.streamTransport ?? 'sse',
-    conversationProfileJson: Object.keys(endpoint.conversationProfile ?? {}).length
-      ? JSON.stringify(endpoint.conversationProfile, null, 2)
-      : '',
+    ...profileFields,
     active: endpoint.active,
   }
 }
@@ -695,7 +778,7 @@ function buildEndpointPayload(draft: ProtocolEndpointDraft) {
     modelAddressingStrategy: draft.modelAddressingStrategy.trim() || null,
     errorSchemaStrategy: draft.errorSchemaStrategy.trim() || null,
     streamTransport: draft.streamTransport.trim() || null,
-    conversationProfile: parseConversationProfile(draft.conversationProfileJson),
+    conversationProfile: buildConversationProfile(draft),
     active: draft.active,
   }
 }
@@ -706,17 +789,6 @@ function requireText(value: string, message: string) {
     throw new Error(message)
   }
   return trimmed
-}
-
-function parseConversationProfile(raw: string) {
-  if (!raw.trim()) {
-    return {}
-  }
-  const value = JSON.parse(raw) as unknown
-  if (value == null || Array.isArray(value) || typeof value !== 'object') {
-    throw new Error('Conversation Profile 必须是 JSON 对象。')
-  }
-  return value as Record<string, unknown>
 }
 
 function providerTypeForSiteKind(siteKind: string) {
@@ -734,4 +806,164 @@ function providerTypeForSiteKind(siteKind: string) {
     default:
       return 'OPENAI_COMPATIBLE'
   }
+}
+
+function profileToDraftFields(profile: JsonRecord) {
+  const compatibilityProfile = inferCompatibilityProfile(profile)
+  const reasoningRequestMode = inferReasoningRequestMode(profile)
+  const assistantReasoningField = inferAssistantReasoningField(profile)
+  const historyReplayPolicy = inferHistoryReplayPolicy(profile)
+  return {
+    compatibilityProfile,
+    reasoningRequestMode,
+    assistantReasoningField,
+    historyReplayPolicy,
+    preservedConversationProfile: stripStructuredConversationProfile(profile, {
+      compatibilityProfile,
+      reasoningRequestMode,
+      assistantReasoningField,
+      historyReplayPolicy,
+    }),
+  }
+}
+
+function buildConversationProfile(draft: ProtocolEndpointDraft): JsonRecord {
+  const profile: JsonRecord = { ...draft.preservedConversationProfile }
+  switch (draft.compatibilityProfile) {
+    case 'openai_chat_completions':
+      profile.upstreamSurface = 'chat_completions'
+      break
+    case 'responses_to_chat_completions':
+      profile.ingressProtocol = 'responses'
+      profile.upstreamSurface = 'chat_completions'
+      profile.responsesCompatibility = { mode: 'emulate_with_chat_completions' }
+      break
+    case 'anthropic_messages':
+      profile.targetProtocol = 'anthropic_messages'
+      profile.reasoningTransport = 'thinking_blocks'
+      break
+    case 'gemini_generate_content':
+      profile.targetProtocol = 'gemini_generate_content'
+      break
+    default:
+      break
+  }
+
+  const reasoning = isJsonRecord(profile.reasoning) ? { ...profile.reasoning } : {}
+  if (draft.reasoningRequestMode === 'extra_body_thinking_enabled') {
+    reasoning.requestField = 'extra_body.thinking'
+    reasoning.requestEnabledValue = { type: 'enabled' }
+  }
+  if (draft.assistantReasoningField !== 'none') {
+    reasoning.assistantReasoningField = draft.assistantReasoningField
+  }
+  if (draft.historyReplayPolicy !== 'none') {
+    reasoning.historyReplayPolicy = draft.historyReplayPolicy
+  }
+  if (Object.keys(reasoning).length) {
+    profile.reasoning = reasoning
+  } else {
+    delete profile.reasoning
+  }
+  return profile
+}
+
+function inferCompatibilityProfile(profile: JsonRecord): CompatibilityProfile {
+  const responsesCompatibility = isJsonRecord(profile.responsesCompatibility) ? profile.responsesCompatibility : {}
+  const responsesMode = stringValue(responsesCompatibility.mode ?? profile.responsesMode)
+  if (responsesMode === 'emulate_with_chat_completions' || profile.ingressProtocol === 'responses') {
+    return 'responses_to_chat_completions'
+  }
+  if (profile.targetProtocol === 'anthropic_messages') {
+    return 'anthropic_messages'
+  }
+  if (profile.targetProtocol === 'gemini_generate_content') {
+    return 'gemini_generate_content'
+  }
+  if (profile.upstreamSurface === 'chat_completions') {
+    return 'openai_chat_completions'
+  }
+  return 'default'
+}
+
+function inferReasoningRequestMode(profile: JsonRecord): ReasoningRequestMode {
+  const reasoning = isJsonRecord(profile.reasoning) ? profile.reasoning : {}
+  const requestEnabledValue = isJsonRecord(reasoning.requestEnabledValue) ? reasoning.requestEnabledValue : {}
+  if (reasoning.requestField === 'extra_body.thinking' && requestEnabledValue.type === 'enabled') {
+    return 'extra_body_thinking_enabled'
+  }
+  return 'none'
+}
+
+function inferAssistantReasoningField(profile: JsonRecord): AssistantReasoningField {
+  const reasoning = isJsonRecord(profile.reasoning) ? profile.reasoning : {}
+  if (reasoning.assistantReasoningField === 'reasoning_content' || reasoning.assistantReasoningField === 'reasoning') {
+    return reasoning.assistantReasoningField
+  }
+  return 'none'
+}
+
+function inferHistoryReplayPolicy(profile: JsonRecord): HistoryReplayPolicy {
+  const reasoning = isJsonRecord(profile.reasoning) ? profile.reasoning : {}
+  return reasoning.historyReplayPolicy === 'required_when_tool_calls' ? 'required_when_tool_calls' : 'none'
+}
+
+function stripStructuredConversationProfile(
+  profile: JsonRecord,
+  structured: {
+    compatibilityProfile: CompatibilityProfile
+    reasoningRequestMode: ReasoningRequestMode
+    assistantReasoningField: AssistantReasoningField
+    historyReplayPolicy: HistoryReplayPolicy
+  },
+): JsonRecord {
+  const preserved: JsonRecord = { ...profile }
+  switch (structured.compatibilityProfile) {
+    case 'responses_to_chat_completions':
+      delete preserved.ingressProtocol
+      delete preserved.upstreamSurface
+      delete preserved.responsesCompatibility
+      delete preserved.responsesMode
+      break
+    case 'openai_chat_completions':
+      delete preserved.upstreamSurface
+      break
+    case 'anthropic_messages':
+      delete preserved.targetProtocol
+      delete preserved.reasoningTransport
+      break
+    case 'gemini_generate_content':
+      delete preserved.targetProtocol
+      break
+    default:
+      break
+  }
+
+  if (isJsonRecord(preserved.reasoning)) {
+    const reasoning = { ...preserved.reasoning }
+    if (structured.reasoningRequestMode !== 'none') {
+      delete reasoning.requestField
+      delete reasoning.requestEnabledValue
+    }
+    if (structured.assistantReasoningField !== 'none') {
+      delete reasoning.assistantReasoningField
+    }
+    if (structured.historyReplayPolicy !== 'none') {
+      delete reasoning.historyReplayPolicy
+    }
+    if (Object.keys(reasoning).length) {
+      preserved.reasoning = reasoning
+    } else {
+      delete preserved.reasoning
+    }
+  }
+  return preserved
+}
+
+function isJsonRecord(value: unknown): value is JsonRecord {
+  return value != null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function stringValue(value: unknown) {
+  return typeof value === 'string' ? value : ''
 }

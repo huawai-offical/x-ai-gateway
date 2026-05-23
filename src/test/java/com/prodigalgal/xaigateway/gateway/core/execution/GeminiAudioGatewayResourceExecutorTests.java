@@ -48,6 +48,7 @@ class GeminiAudioGatewayResourceExecutorTests {
         TestGeminiAudioExecutor executor = new TestGeminiAudioExecutor(responseWithText("hello"));
 
         assertTrue(executor.supports(request(TranslationOperation.AUDIO_TRANSCRIPTION, "/v1/audio/transcriptions"), candidate(UpstreamSiteKind.GEMINI_DIRECT)));
+        assertTrue(executor.supports(request(TranslationOperation.AUDIO_TRANSLATION, "/v1/audio/translations"), candidate(UpstreamSiteKind.GEMINI_DIRECT)));
         assertTrue(executor.supports(request(TranslationOperation.AUDIO_SPEECH, "/v1/audio/speech"), candidate(UpstreamSiteKind.GEMINI_DIRECT)));
         assertTrue(executor.supports(request(TranslationOperation.AUDIO_TRANSCRIPTION, "/v1/audio/transcriptions"), candidate(UpstreamSiteKind.VERTEX_AI)));
         assertFalse(executor.supports(request(TranslationOperation.AUDIO_TRANSCRIPTION, "/v1/audio/unknown"), candidate(UpstreamSiteKind.GEMINI_DIRECT)));
@@ -85,6 +86,24 @@ class GeminiAudioGatewayResourceExecutorTests {
         assertEquals("audio/wav", executor.lastContent.parts().orElseThrow().get(1).inlineData().orElseThrow().mimeType().orElseThrow());
         assertTrue(executor.lastContent.text().contains("spoken language is zh"));
         assertTrue(executor.lastContent.text().contains("Additional instructions: 保留产品名"));
+    }
+
+    @Test
+    void shouldReturnJsonTextForTranslationAndUseTranslateInstruction() {
+        TestGeminiAudioExecutor executor = new TestGeminiAudioExecutor(responseWithText("  translated text  "));
+
+        ResponseEntity<tools.jackson.databind.JsonNode> response = executor.executeTextAudio(
+                context(TranslationOperation.AUDIO_TRANSLATION, "/v1/audio/translations"),
+                TranslationOperation.AUDIO_TRANSLATION,
+                Map.of("temperature", "0.1", "prompt", "keep product names"),
+                new GeminiGatewayResourceSupport.ResolvedBinaryFile("voice.wav", "audio/wav", "audio".getBytes(StandardCharsets.UTF_8))
+        );
+
+        assertEquals("translated text", response.getBody().path("text").asText());
+        assertEquals(0.1f, executor.lastConfig.temperature().orElseThrow());
+        assertTrue(executor.lastContent.text().contains("Translate the provided audio to English"));
+        assertFalse(executor.lastContent.text().contains("spoken language"));
+        assertTrue(executor.lastContent.text().contains("Additional instructions: keep product names"));
     }
 
     @Test

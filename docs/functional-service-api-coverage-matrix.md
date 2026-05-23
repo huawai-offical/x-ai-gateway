@@ -29,9 +29,9 @@ src/main/resources/functional-service-api-coverage-matrix.json
 
 - OpenAI：保留 Chat、Responses、streaming、function tools、多模态、Audio translations、Images edits/variations、Files/Uploads、Vector Stores/file_search、本地 Conversations、OpenAI Webhooks、Realtime client secret 基线、models 与治理支撑。
 - OpenAI-compatible：MiMo 等 compatible key 可按 OpenAI-style 直连 audio/images 资源入口；file* 与 Uploads 已按独立 file/upload capability snapshot 开放 gateway orchestration，不从 chat 兼容性自动推导；Realtime、Batches 等 object lifecycle 仍需独立任务和真实能力对齐。
-- Anthropic：保留 Claude Messages、streaming、tool_use/thinking；不保留 Anthropic message batches、admin/eval 等 provider-specific 非核心 API。
-- Gemini：保留 generateContent、streamGenerateContent、function calling、embeddings/files 支撑；不保留 batch prediction、tuning、pipeline/job/admin。
-- Vertex：保留与 Gemini 对话和支撑面等价的 generateContent、embeddings/files；project/location 只是寻址和凭证边界，不扩展为 Vertex AI Platform 全量 API。
+- Anthropic：保留 Claude Messages、streaming、tool_use/thinking、图片输入理解与 file 支撑；不保留 audio 资源、图片生成/编辑/variation、Anthropic message batches、admin/eval 等 provider-specific 非核心 API。
+- Gemini：保留 generateContent、streamGenerateContent、function calling、embeddings/files 支撑，以及 audio transcription/translation/speech、image generation/edit/variation 功能性资源互转；不保留 batch prediction、tuning、pipeline/job/admin。
+- Vertex：保留与 Gemini 对话和支撑面等价的 generateContent、embeddings/files/audio/image 功能面；project/location 只是寻址和凭证边界，不扩展为 Vertex AI Platform 全量 API。
 - Codex：只保留 ChatGPT 官方账号的 `/backend-api/codex/responses` smoke/proxy 边界，不注册为通用 provider catalog preset，不承诺非 Responses 内部 API。
 
 ## 后续派生

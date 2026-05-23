@@ -33,6 +33,7 @@ import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -177,6 +178,95 @@ class GatewayResourceExecutionServiceTests {
         assertEquals(200, response.getStatusCode().value());
         Mockito.verify(geminiImagesExecutor).executeJson(any(), any(), eq("gemini-2.0-flash-preview-image-generation"));
         Mockito.verify(passthroughExecutor, Mockito.never()).executeJson(any(), any(), any());
+    }
+
+    @Test
+    void shouldPreferGeminiNativeAudioExecutorForGeminiAudioTranslation() {
+        GatewayRouteSelectionService gatewayRouteSelectionService = Mockito.mock(GatewayRouteSelectionService.class);
+        UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        CredentialCryptoService credentialCryptoService = Mockito.mock(CredentialCryptoService.class);
+        DistributedKeyGovernanceService distributedKeyGovernanceService = Mockito.mock(DistributedKeyGovernanceService.class);
+        DistributedKeyQueryService distributedKeyQueryService = Mockito.mock(DistributedKeyQueryService.class);
+        AccountSelectionService accountSelectionService = Mockito.mock(AccountSelectionService.class);
+        GatewayRequestFeatureService gatewayRequestFeatureService = Mockito.mock(GatewayRequestFeatureService.class);
+        TranslationExecutionPlanCompiler translationExecutionPlanCompiler = Mockito.mock(TranslationExecutionPlanCompiler.class);
+        GatewayResourceExecutor geminiAudioExecutor = Mockito.mock(GatewayResourceExecutor.class);
+        GatewayResourceExecutor passthroughExecutor = Mockito.mock(GatewayResourceExecutor.class);
+        GatewayFileService gatewayFileService = Mockito.mock(GatewayFileService.class);
+
+        GatewayResourceExecutionService service = service(
+                gatewayRouteSelectionService,
+                upstreamCredentialRepository,
+                credentialCryptoService,
+                distributedKeyGovernanceService,
+                distributedKeyQueryService,
+                accountSelectionService,
+                gatewayRequestFeatureService,
+                translationExecutionPlanCompiler,
+                List.of(geminiAudioExecutor, passthroughExecutor),
+                Mockito.mock(GatewayObservabilityService.class),
+                Mockito.mock(GatewayRequestLifecycleService.class),
+                gatewayFileService
+        );
+
+        com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest request =
+                new com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest(
+                        "sk-gw-test",
+                        CanonicalIngressProtocol.OPENAI,
+                        "POST",
+                        "/v1/audio/translations",
+                        "/v1/audio/translations",
+                        java.util.Map.of(),
+                        "gemini-2.5-flash",
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType.AUDIO,
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation.AUDIO_TRANSLATION,
+                        new ObjectMapper().createObjectNode(),
+                        java.util.Map.of("model", "gemini-2.5-flash"),
+                        java.util.List.of(),
+                        false,
+                        false
+                );
+        RouteSelectionResult selectionResult = selectionResult(ProviderType.GEMINI_DIRECT, UpstreamSiteKind.GEMINI_DIRECT);
+        UpstreamCredentialEntity credential = credential(selectionResult.selectedCandidate().candidate().credentialId(), ProviderType.GEMINI_DIRECT);
+
+        Mockito.when(gatewayRouteSelectionService.select(any())).thenReturn(selectionResult);
+        Mockito.when(upstreamCredentialRepository.findById(101L)).thenReturn(Optional.of(credential));
+        Mockito.when(credentialCryptoService.decrypt("cipher")).thenReturn("api-key");
+        Mockito.when(distributedKeyQueryService.findActiveByKeyPrefix("sk-gw-test"))
+                .thenReturn(Optional.of(new DistributedKeyView(1L, "test", "sk-gw-test", "masked", List.of(), List.of(), List.of())));
+        Mockito.when(accountSelectionService.resolveActiveAccount(anyLong(), any(), any(), anyInt())).thenReturn(Optional.empty());
+        Mockito.when(gatewayRequestFeatureService.describe(eq("POST"), eq("/v1/audio/translations"), any()))
+                .thenReturn(new GatewayRequestSemantics(
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType.AUDIO,
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation.AUDIO_TRANSLATION,
+                        List.of(com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature.AUDIO_TRANSLATION),
+                        true
+                ));
+        Mockito.when(translationExecutionPlanCompiler.compileSelected(any(), Mockito.any(com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest.class), any(), any()))
+                .thenReturn(compilation(
+                        "/v1/audio/translations",
+                        "gemini-2.5-flash",
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType.AUDIO,
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation.AUDIO_TRANSLATION,
+                        com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend.NATIVE
+                ));
+        Mockito.when(geminiAudioExecutor.backend()).thenReturn(com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend.NATIVE);
+        Mockito.when(passthroughExecutor.backend()).thenReturn(com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend.PASSTHROUGH);
+        Mockito.when(geminiAudioExecutor.supports(Mockito.any(com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest.class), any())).thenReturn(true);
+        Mockito.when(passthroughExecutor.supports(Mockito.any(com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest.class), any())).thenReturn(false);
+        Mockito.when(geminiAudioExecutor.executeMultipart(any(), eq("gemini-2.5-flash"), any(), any()))
+                .thenReturn(reactor.core.publisher.Mono.just(ResponseEntity.ok(new ObjectMapper().createObjectNode().put("text", "translated"))));
+
+        GatewayResourceExecutionResult result = service.executeDetailedMultipartJson(
+                request,
+                1L,
+                "gemini-2.5-flash",
+                Map.of()
+        ).block();
+
+        assertEquals(200, result.statusCode());
+        Mockito.verify(geminiAudioExecutor).executeMultipart(any(), eq("gemini-2.5-flash"), any(), any());
+        Mockito.verify(passthroughExecutor, Mockito.never()).executeMultipart(any(), any(), any(), any());
     }
 
     @Test
@@ -513,6 +603,40 @@ class GatewayResourceExecutionServiceTests {
                         List.of(),
                         true
                 ),
+                new CanonicalRequest("sk-gw-test", CanonicalIngressProtocol.OPENAI, requestPath, model, List.of(), List.of(), null, null, null, null, null)
+        );
+    }
+
+    private CanonicalExecutionPlanCompilation compilation(
+            String requestPath,
+            String model,
+            com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType resourceType,
+            com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation operation,
+            com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend executionBackend) {
+        return new CanonicalExecutionPlanCompilation(
+                new CanonicalExecutionPlan(
+                        true,
+                        CanonicalIngressProtocol.OPENAI,
+                        requestPath,
+                        model,
+                        model,
+                        model,
+                        resourceType,
+                        operation,
+                        com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind.NATIVE,
+                        executionBackend,
+                        List.of(executionBackend),
+                        "test",
+                        com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel.NATIVE,
+                        com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel.NATIVE,
+                        com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel.NATIVE,
+                        List.of(),
+                        java.util.Map.of(),
+                        List.of(),
+                        List.of()
+                ),
+                null,
+                new GatewayRequestSemantics(resourceType, operation, List.of(), true),
                 new CanonicalRequest("sk-gw-test", CanonicalIngressProtocol.OPENAI, requestPath, model, List.of(), List.of(), null, null, null, null, null)
         );
     }

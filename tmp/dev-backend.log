@@ -1,0 +1,791 @@
+> Task :compileJava UP-TO-DATE
+> Task :processResources UP-TO-DATE
+> Task :classes UP-TO-DATE
+> Task :resolveMainClassName
+
+> Task :bootRun
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v4.0.5)
+
+2026-05-23T16:31:34.622+08:00  INFO 15516 --- [x-ai-gateway] [           main] c.p.xaigateway.XAiGatewayApplication     : Starting XAiGatewayApplication using Java 25 with PID 15516 (D:\WorkSpace\Project\ai\x-ai-gateway\build\classes\java\main started by zzp84 in D:\WorkSpace\Project\ai\x-ai-gateway)
+2026-05-23T16:31:34.625+08:00  INFO 15516 --- [x-ai-gateway] [           main] c.p.xaigateway.XAiGatewayApplication     : No active profile set, falling back to 1 default profile: "local"
+2026-05-23T16:31:35.880+08:00  INFO 15516 --- [x-ai-gateway] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-05-23T16:31:35.881+08:00  INFO 15516 --- [x-ai-gateway] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-05-23T16:31:36.147+08:00  INFO 15516 --- [x-ai-gateway] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 258 ms. Found 80 JPA repository interfaces.
+2026-05-23T16:31:36.694+08:00  INFO 15516 --- [x-ai-gateway] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-05-23T16:31:36.846+08:00  INFO 15516 --- [x-ai-gateway] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@71b9b035
+2026-05-23T16:31:36.848+08:00  INFO 15516 --- [x-ai-gateway] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-05-23T16:31:39.927+08:00  INFO 15516 --- [x-ai-gateway] [           main] liquibase.changelog                      : Reading from public.databasechangelog
+2026-05-23T16:31:40.114+08:00  INFO 15516 --- [x-ai-gateway] [           main] liquibase.ui                             : Database is up to date, no changesets to execute
+2026-05-23T16:31:40.116+08:00  INFO 15516 --- [x-ai-gateway] [           main] liquibase.changelog                      : Reading from public.databasechangelog
+2026-05-23T16:31:40.125+08:00  INFO 15516 --- [x-ai-gateway] [           main] liquibase.util                           : UPDATE SUMMARY
+2026-05-23T16:31:40.126+08:00  INFO 15516 --- [x-ai-gateway] [           main] liquibase.util                           : Run:                          0
+2026-05-23T16:31:40.126+08:00  INFO 15516 --- [x-ai-gateway] [           main] liquibase.util                           : Previously run:               6
+2026-05-23T16:31:40.126+08:00  INFO 15516 --- [x-ai-gateway] [           main] liquibase.util                           : Filtered out:                 0
+2026-05-23T16:31:40.126+08:00  INFO 15516 --- [x-ai-gateway] [           main] liquibase.util                           : -------------------------------
+2026-05-23T16:31:40.126+08:00  INFO 15516 --- [x-ai-gateway] [           main] liquibase.util                           : Total change sets:            6
+2026-05-23T16:31:40.126+08:00  INFO 15516 --- [x-ai-gateway] [           main] liquibase.util                           : Update summary generated
+2026-05-23T16:31:40.128+08:00  INFO 15516 --- [x-ai-gateway] [           main] liquibase.command                        : Command execution complete
+2026-05-23T16:31:40.247+08:00  INFO 15516 --- [x-ai-gateway] [           main] org.hibernate.orm.jpa                    : HHH008540: Processing PersistenceUnitInfo [name: default]
+2026-05-23T16:31:40.323+08:00  INFO 15516 --- [x-ai-gateway] [           main] org.hibernate.orm.core                   : HHH000001: Hibernate ORM core version 7.2.7.Final
+2026-05-23T16:31:40.764+08:00  INFO 15516 --- [x-ai-gateway] [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-05-23T16:31:40.844+08:00  INFO 15516 --- [x-ai-gateway] [           main] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
+	Database JDBC URL [jdbc:postgresql://192.168.154.143:5432/x_ai_gateway?connectionTimeZone=UTC]
+	Database driver: PostgreSQL JDBC Driver
+	Database dialect: PostgreSQLDialect
+	Database version: 18.0
+	Default catalog/schema: x_ai_gateway/public
+	Autocommit mode: undefined/unknown
+	Isolation level: READ_COMMITTED [default READ_COMMITTED]
+	JDBC fetch size: none
+	Pool: DataSourceConnectionProvider
+	Minimum pool size: undefined/unknown
+	Maximum pool size: undefined/unknown
+2026-05-23T16:31:42.516+08:00  INFO 15516 --- [x-ai-gateway] [           main] org.hibernate.orm.core                   : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-05-23T16:31:42.590+08:00  INFO 15516 --- [x-ai-gateway] [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-05-23T16:31:42.658+08:00  INFO 15516 --- [x-ai-gateway] [           main] o.s.d.j.r.query.QueryEnhancerFactories   : Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-05-23T16:31:46.624+08:00  INFO 15516 --- [x-ai-gateway] [           main] ctiveUserDetailsServiceAutoConfiguration : 
+
+Using generated security password: 315f854d-16a8-4d12-85bb-df0cc9fc1391
+
+2026-05-23T16:31:47.456+08:00  INFO 15516 --- [x-ai-gateway] [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 5 endpoints beneath base path '/actuator'
+2026-05-23T16:31:49.208+08:00  INFO 15516 --- [x-ai-gateway] [           main] o.s.boot.reactor.netty.NettyWebServer    : Netty started on port 8080 (http)
+2026-05-23T16:31:49.222+08:00  INFO 15516 --- [x-ai-gateway] [           main] c.p.xaigateway.XAiGatewayApplication     : Started XAiGatewayApplication in 14.98 seconds (process running for 15.333)
+2026-05-23T16:31:49.909+08:00  INFO 15516 --- [x-ai-gateway] [           main] .p.x.a.a.DefaultResourceBootstrapService : 默认资源引导完成：default 账号分组 id=1，TLS 指纹默认画像已校验，默认厂商 API 入口=6 个，回填协议入口凭证=0 个。
+2026-05-23T17:19:49.262+08:00  WARN 15516 --- [x-ai-gateway] [xag-scheduler-2] ewayObservabilityAsyncPersistenceService : 从 Redis 读取 observability 热路径队列失败，等待下一轮重试。
+
+org.springframework.dao.QueryTimeoutException: Redis command timed out
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:84) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:44) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.PassThroughExceptionTranslationStrategy.translate(PassThroughExceptionTranslationStrategy.java:39) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.FallbackExceptionTranslationStrategy.translate(FallbackExceptionTranslationStrategy.java:38) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.convertLettuceAccessException(LettuceConnection.java:313) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1015) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.lambda$doInvoke$2(LettuceConnection.java:450) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker$Synchronizer.invoke(LettuceInvoker.java:658) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker.just(LettuceInvoker.java:106) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceListCommands.lPop(LettuceListCommands.java:202) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.DefaultedRedisConnection.lPop(DefaultedRedisConnection.java:806) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.lambda$leftPop$0(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:414) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:381) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.AbstractOperations.execute(AbstractOperations.java:166) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.leftPop(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushBatch(GatewayObservabilityAsyncPersistenceService.java:162) ~[main/:na]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushScheduledBatch(GatewayObservabilityAsyncPersistenceService.java:146) ~[main/:na]
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565) ~[na:na]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.runInternal(ScheduledMethodRunnable.java:128) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.lambda$run$1(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at io.micrometer.observation.Observation.observe(Observation.java:569) ~[micrometer-observation-1.16.4.jar:1.16.4]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.run(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.config.Task$OutcomeTrackingRunnable.run(Task.java:88) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.DelegatingErrorHandlingRunnable.run(DelegatingErrorHandlingRunnable.java:54) ~[spring-context-7.0.6.jar:7.0.6]
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:545) ~[na:na]
+	at java.base/java.util.concurrent.FutureTask.runAndReset(FutureTask.java:369) ~[na:na]
+	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:310) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614) ~[na:na]
+	at java.base/java.lang.Thread.run(Thread.java:1474) ~[na:na]
+Caused by: io.lettuce.core.RedisCommandTimeoutException: Command timed out after 5 second(s)
+	at io.lettuce.core.internal.ExceptionFactory.createTimeoutException(ExceptionFactory.java:63) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.internal.Futures.awaitOrCancel(Futures.java:233) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.LettuceFutures.awaitOrCancel(LettuceFutures.java:59) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1013) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	... 26 common frames omitted
+
+2026-05-23T17:19:49.951+08:00  WARN 15516 --- [x-ai-gateway] [xag-scheduler-1] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@29389a7d (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
+2026-05-23T17:25:03.683+08:00  WARN 15516 --- [x-ai-gateway] [xag-scheduler-2] ewayObservabilityAsyncPersistenceService : 从 Redis 读取 observability 热路径队列失败，等待下一轮重试。
+
+org.springframework.dao.QueryTimeoutException: Redis command timed out
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:84) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:44) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.PassThroughExceptionTranslationStrategy.translate(PassThroughExceptionTranslationStrategy.java:39) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.FallbackExceptionTranslationStrategy.translate(FallbackExceptionTranslationStrategy.java:38) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.convertLettuceAccessException(LettuceConnection.java:313) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1015) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.lambda$doInvoke$2(LettuceConnection.java:450) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker$Synchronizer.invoke(LettuceInvoker.java:658) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker.just(LettuceInvoker.java:106) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceListCommands.lPop(LettuceListCommands.java:202) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.DefaultedRedisConnection.lPop(DefaultedRedisConnection.java:806) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.lambda$leftPop$0(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:414) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:381) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.AbstractOperations.execute(AbstractOperations.java:166) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.leftPop(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushBatch(GatewayObservabilityAsyncPersistenceService.java:162) ~[main/:na]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushScheduledBatch(GatewayObservabilityAsyncPersistenceService.java:146) ~[main/:na]
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565) ~[na:na]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.runInternal(ScheduledMethodRunnable.java:128) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.lambda$run$1(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at io.micrometer.observation.Observation.observe(Observation.java:569) ~[micrometer-observation-1.16.4.jar:1.16.4]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.run(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.config.Task$OutcomeTrackingRunnable.run(Task.java:88) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.DelegatingErrorHandlingRunnable.run(DelegatingErrorHandlingRunnable.java:54) ~[spring-context-7.0.6.jar:7.0.6]
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:545) ~[na:na]
+	at java.base/java.util.concurrent.FutureTask.runAndReset(FutureTask.java:369) ~[na:na]
+	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:310) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614) ~[na:na]
+	at java.base/java.lang.Thread.run(Thread.java:1474) ~[na:na]
+Caused by: io.lettuce.core.RedisCommandTimeoutException: Command timed out after 5 second(s)
+	at io.lettuce.core.internal.ExceptionFactory.createTimeoutException(ExceptionFactory.java:63) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.internal.Futures.awaitOrCancel(Futures.java:233) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.LettuceFutures.awaitOrCancel(LettuceFutures.java:59) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1013) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	... 26 common frames omitted
+
+2026-05-23T17:29:10.063+08:00  WARN 15516 --- [x-ai-gateway] [xag-scheduler-1] ewayObservabilityAsyncPersistenceService : 从 Redis 读取 observability 热路径队列失败，等待下一轮重试。
+
+org.springframework.dao.QueryTimeoutException: Redis command timed out
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:84) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:44) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.PassThroughExceptionTranslationStrategy.translate(PassThroughExceptionTranslationStrategy.java:39) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.FallbackExceptionTranslationStrategy.translate(FallbackExceptionTranslationStrategy.java:38) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.convertLettuceAccessException(LettuceConnection.java:313) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1015) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.lambda$doInvoke$2(LettuceConnection.java:450) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker$Synchronizer.invoke(LettuceInvoker.java:658) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker.just(LettuceInvoker.java:106) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceListCommands.lPop(LettuceListCommands.java:202) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.DefaultedRedisConnection.lPop(DefaultedRedisConnection.java:806) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.lambda$leftPop$0(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:414) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:381) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.AbstractOperations.execute(AbstractOperations.java:166) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.leftPop(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushBatch(GatewayObservabilityAsyncPersistenceService.java:162) ~[main/:na]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushScheduledBatch(GatewayObservabilityAsyncPersistenceService.java:146) ~[main/:na]
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565) ~[na:na]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.runInternal(ScheduledMethodRunnable.java:128) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.lambda$run$1(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at io.micrometer.observation.Observation.observe(Observation.java:569) ~[micrometer-observation-1.16.4.jar:1.16.4]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.run(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.config.Task$OutcomeTrackingRunnable.run(Task.java:88) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.DelegatingErrorHandlingRunnable.run(DelegatingErrorHandlingRunnable.java:54) ~[spring-context-7.0.6.jar:7.0.6]
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:545) ~[na:na]
+	at java.base/java.util.concurrent.FutureTask.runAndReset(FutureTask.java:369) ~[na:na]
+	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:310) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614) ~[na:na]
+	at java.base/java.lang.Thread.run(Thread.java:1474) ~[na:na]
+Caused by: io.lettuce.core.RedisCommandTimeoutException: Command timed out after 5 second(s)
+	at io.lettuce.core.internal.ExceptionFactory.createTimeoutException(ExceptionFactory.java:63) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.internal.Futures.awaitOrCancel(Futures.java:233) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.LettuceFutures.awaitOrCancel(LettuceFutures.java:59) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1013) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	... 26 common frames omitted
+
+2026-05-23T17:29:10.485+08:00  WARN 15516 --- [x-ai-gateway] [xag-scheduler-2] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@54b7a3e6 (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
+2026-05-23T17:30:36.634+08:00  WARN 15516 --- [x-ai-gateway] [xag-scheduler-1] ewayObservabilityAsyncPersistenceService : 从 Redis 读取 observability 热路径队列失败，等待下一轮重试。
+
+org.springframework.dao.QueryTimeoutException: Redis command timed out
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:84) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:44) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.PassThroughExceptionTranslationStrategy.translate(PassThroughExceptionTranslationStrategy.java:39) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.FallbackExceptionTranslationStrategy.translate(FallbackExceptionTranslationStrategy.java:38) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.convertLettuceAccessException(LettuceConnection.java:313) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1015) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.lambda$doInvoke$2(LettuceConnection.java:450) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker$Synchronizer.invoke(LettuceInvoker.java:658) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker.just(LettuceInvoker.java:106) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceListCommands.lPop(LettuceListCommands.java:202) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.DefaultedRedisConnection.lPop(DefaultedRedisConnection.java:806) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.lambda$leftPop$0(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:414) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:381) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.AbstractOperations.execute(AbstractOperations.java:166) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.leftPop(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushBatch(GatewayObservabilityAsyncPersistenceService.java:162) ~[main/:na]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushScheduledBatch(GatewayObservabilityAsyncPersistenceService.java:146) ~[main/:na]
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565) ~[na:na]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.runInternal(ScheduledMethodRunnable.java:128) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.lambda$run$1(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at io.micrometer.observation.Observation.observe(Observation.java:569) ~[micrometer-observation-1.16.4.jar:1.16.4]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.run(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.config.Task$OutcomeTrackingRunnable.run(Task.java:88) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.DelegatingErrorHandlingRunnable.run(DelegatingErrorHandlingRunnable.java:54) ~[spring-context-7.0.6.jar:7.0.6]
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:545) ~[na:na]
+	at java.base/java.util.concurrent.FutureTask.runAndReset(FutureTask.java:369) ~[na:na]
+	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:310) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614) ~[na:na]
+	at java.base/java.lang.Thread.run(Thread.java:1474) ~[na:na]
+Caused by: io.lettuce.core.RedisCommandTimeoutException: Command timed out after 5 second(s)
+	at io.lettuce.core.internal.ExceptionFactory.createTimeoutException(ExceptionFactory.java:63) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.internal.Futures.awaitOrCancel(Futures.java:233) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.LettuceFutures.awaitOrCancel(LettuceFutures.java:59) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1013) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	... 26 common frames omitted
+
+2026-05-23T17:39:20.572+08:00  WARN 15516 --- [x-ai-gateway] [xag-scheduler-2] ewayObservabilityAsyncPersistenceService : 从 Redis 读取 observability 热路径队列失败，等待下一轮重试。
+
+org.springframework.dao.QueryTimeoutException: Redis command timed out
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:84) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:44) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.PassThroughExceptionTranslationStrategy.translate(PassThroughExceptionTranslationStrategy.java:39) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.FallbackExceptionTranslationStrategy.translate(FallbackExceptionTranslationStrategy.java:38) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.convertLettuceAccessException(LettuceConnection.java:313) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1015) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.lambda$doInvoke$2(LettuceConnection.java:450) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker$Synchronizer.invoke(LettuceInvoker.java:658) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker.just(LettuceInvoker.java:106) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceListCommands.lPop(LettuceListCommands.java:202) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.DefaultedRedisConnection.lPop(DefaultedRedisConnection.java:806) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.lambda$leftPop$0(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:414) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:381) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.AbstractOperations.execute(AbstractOperations.java:166) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.leftPop(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushBatch(GatewayObservabilityAsyncPersistenceService.java:162) ~[main/:na]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushScheduledBatch(GatewayObservabilityAsyncPersistenceService.java:146) ~[main/:na]
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565) ~[na:na]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.runInternal(ScheduledMethodRunnable.java:128) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.lambda$run$1(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at io.micrometer.observation.Observation.observe(Observation.java:569) ~[micrometer-observation-1.16.4.jar:1.16.4]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.run(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.config.Task$OutcomeTrackingRunnable.run(Task.java:88) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.DelegatingErrorHandlingRunnable.run(DelegatingErrorHandlingRunnable.java:54) ~[spring-context-7.0.6.jar:7.0.6]
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:545) ~[na:na]
+	at java.base/java.util.concurrent.FutureTask.runAndReset(FutureTask.java:369) ~[na:na]
+	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:310) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614) ~[na:na]
+	at java.base/java.lang.Thread.run(Thread.java:1474) ~[na:na]
+Caused by: io.lettuce.core.RedisCommandTimeoutException: Command timed out after 5 second(s)
+	at io.lettuce.core.internal.ExceptionFactory.createTimeoutException(ExceptionFactory.java:63) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.internal.Futures.awaitOrCancel(Futures.java:233) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.LettuceFutures.awaitOrCancel(LettuceFutures.java:59) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1013) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	... 26 common frames omitted
+
+2026-05-23T17:42:33.881+08:00  WARN 15516 --- [x-ai-gateway] [xag-scheduler-2] ewayObservabilityAsyncPersistenceService : 从 Redis 读取 observability 热路径队列失败，等待下一轮重试。
+
+org.springframework.dao.QueryTimeoutException: Redis command timed out
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:84) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:44) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.PassThroughExceptionTranslationStrategy.translate(PassThroughExceptionTranslationStrategy.java:39) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.FallbackExceptionTranslationStrategy.translate(FallbackExceptionTranslationStrategy.java:38) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.convertLettuceAccessException(LettuceConnection.java:313) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1015) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.lambda$doInvoke$2(LettuceConnection.java:450) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker$Synchronizer.invoke(LettuceInvoker.java:658) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker.just(LettuceInvoker.java:106) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceListCommands.lPop(LettuceListCommands.java:202) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.DefaultedRedisConnection.lPop(DefaultedRedisConnection.java:806) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.lambda$leftPop$0(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:414) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:381) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.AbstractOperations.execute(AbstractOperations.java:166) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.leftPop(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushBatch(GatewayObservabilityAsyncPersistenceService.java:162) ~[main/:na]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushScheduledBatch(GatewayObservabilityAsyncPersistenceService.java:146) ~[main/:na]
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565) ~[na:na]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.runInternal(ScheduledMethodRunnable.java:128) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.lambda$run$1(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at io.micrometer.observation.Observation.observe(Observation.java:569) ~[micrometer-observation-1.16.4.jar:1.16.4]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.run(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.config.Task$OutcomeTrackingRunnable.run(Task.java:88) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.DelegatingErrorHandlingRunnable.run(DelegatingErrorHandlingRunnable.java:54) ~[spring-context-7.0.6.jar:7.0.6]
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:545) ~[na:na]
+	at java.base/java.util.concurrent.FutureTask.runAndReset(FutureTask.java:369) ~[na:na]
+	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:310) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614) ~[na:na]
+	at java.base/java.lang.Thread.run(Thread.java:1474) ~[na:na]
+Caused by: io.lettuce.core.RedisCommandTimeoutException: Command timed out after 5 second(s)
+	at io.lettuce.core.internal.ExceptionFactory.createTimeoutException(ExceptionFactory.java:63) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.internal.Futures.awaitOrCancel(Futures.java:233) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.LettuceFutures.awaitOrCancel(LettuceFutures.java:59) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1013) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	... 26 common frames omitted
+
+2026-05-23T17:42:34.901+08:00  WARN 15516 --- [x-ai-gateway] [l-1:housekeeper] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@33b3c840 (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
+2026-05-23T17:43:52.444+08:00  WARN 15516 --- [x-ai-gateway] [xag-scheduler-1] ewayObservabilityAsyncPersistenceService : 从 Redis 读取 observability 热路径队列失败，等待下一轮重试。
+
+org.springframework.dao.QueryTimeoutException: Redis command timed out
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:84) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:44) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.PassThroughExceptionTranslationStrategy.translate(PassThroughExceptionTranslationStrategy.java:39) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.FallbackExceptionTranslationStrategy.translate(FallbackExceptionTranslationStrategy.java:38) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.convertLettuceAccessException(LettuceConnection.java:313) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1015) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.lambda$doInvoke$2(LettuceConnection.java:450) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker$Synchronizer.invoke(LettuceInvoker.java:658) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker.just(LettuceInvoker.java:106) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceListCommands.lPop(LettuceListCommands.java:202) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.DefaultedRedisConnection.lPop(DefaultedRedisConnection.java:806) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.lambda$leftPop$0(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:414) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:381) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.AbstractOperations.execute(AbstractOperations.java:166) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.leftPop(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushBatch(GatewayObservabilityAsyncPersistenceService.java:162) ~[main/:na]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushScheduledBatch(GatewayObservabilityAsyncPersistenceService.java:146) ~[main/:na]
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565) ~[na:na]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.runInternal(ScheduledMethodRunnable.java:128) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.lambda$run$1(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at io.micrometer.observation.Observation.observe(Observation.java:569) ~[micrometer-observation-1.16.4.jar:1.16.4]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.run(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.config.Task$OutcomeTrackingRunnable.run(Task.java:88) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.DelegatingErrorHandlingRunnable.run(DelegatingErrorHandlingRunnable.java:54) ~[spring-context-7.0.6.jar:7.0.6]
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:545) ~[na:na]
+	at java.base/java.util.concurrent.FutureTask.runAndReset(FutureTask.java:369) ~[na:na]
+	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:310) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614) ~[na:na]
+	at java.base/java.lang.Thread.run(Thread.java:1474) ~[na:na]
+Caused by: io.lettuce.core.RedisCommandTimeoutException: Command timed out after 5 second(s)
+	at io.lettuce.core.internal.ExceptionFactory.createTimeoutException(ExceptionFactory.java:63) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.internal.Futures.awaitOrCancel(Futures.java:233) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.LettuceFutures.awaitOrCancel(LettuceFutures.java:59) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1013) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	... 26 common frames omitted
+
+2026-05-23T17:53:54.776+08:00  WARN 15516 --- [x-ai-gateway] [xag-scheduler-1] ewayObservabilityAsyncPersistenceService : 从 Redis 读取 observability 热路径队列失败，等待下一轮重试。
+
+org.springframework.dao.QueryTimeoutException: Redis command timed out
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:84) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:44) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.PassThroughExceptionTranslationStrategy.translate(PassThroughExceptionTranslationStrategy.java:39) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.FallbackExceptionTranslationStrategy.translate(FallbackExceptionTranslationStrategy.java:38) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.convertLettuceAccessException(LettuceConnection.java:313) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1015) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.lambda$doInvoke$2(LettuceConnection.java:450) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker$Synchronizer.invoke(LettuceInvoker.java:658) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker.just(LettuceInvoker.java:106) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceListCommands.lPop(LettuceListCommands.java:202) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.DefaultedRedisConnection.lPop(DefaultedRedisConnection.java:806) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.lambda$leftPop$0(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:414) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:381) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.AbstractOperations.execute(AbstractOperations.java:166) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.leftPop(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushBatch(GatewayObservabilityAsyncPersistenceService.java:162) ~[main/:na]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushScheduledBatch(GatewayObservabilityAsyncPersistenceService.java:146) ~[main/:na]
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565) ~[na:na]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.runInternal(ScheduledMethodRunnable.java:128) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.lambda$run$1(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at io.micrometer.observation.Observation.observe(Observation.java:569) ~[micrometer-observation-1.16.4.jar:1.16.4]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.run(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.config.Task$OutcomeTrackingRunnable.run(Task.java:88) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.DelegatingErrorHandlingRunnable.run(DelegatingErrorHandlingRunnable.java:54) ~[spring-context-7.0.6.jar:7.0.6]
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:545) ~[na:na]
+	at java.base/java.util.concurrent.FutureTask.runAndReset(FutureTask.java:369) ~[na:na]
+	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:310) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614) ~[na:na]
+	at java.base/java.lang.Thread.run(Thread.java:1474) ~[na:na]
+Caused by: io.lettuce.core.RedisCommandTimeoutException: Command timed out after 5 second(s)
+	at io.lettuce.core.internal.ExceptionFactory.createTimeoutException(ExceptionFactory.java:63) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.internal.Futures.awaitOrCancel(Futures.java:233) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.LettuceFutures.awaitOrCancel(LettuceFutures.java:59) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1013) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	... 26 common frames omitted
+
+2026-05-23T17:53:54.923+08:00  WARN 15516 --- [x-ai-gateway] [xag-scheduler-2] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@6e14f92a (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
+2026-05-23T17:55:23.969+08:00  WARN 15516 --- [x-ai-gateway] [xag-scheduler-2] ewayObservabilityAsyncPersistenceService : 从 Redis 读取 observability 热路径队列失败，等待下一轮重试。
+
+org.springframework.dao.QueryTimeoutException: Redis command timed out
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:84) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:44) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.PassThroughExceptionTranslationStrategy.translate(PassThroughExceptionTranslationStrategy.java:39) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.FallbackExceptionTranslationStrategy.translate(FallbackExceptionTranslationStrategy.java:38) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.convertLettuceAccessException(LettuceConnection.java:313) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1015) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.lambda$doInvoke$2(LettuceConnection.java:450) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker$Synchronizer.invoke(LettuceInvoker.java:658) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker.just(LettuceInvoker.java:106) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceListCommands.lPop(LettuceListCommands.java:202) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.DefaultedRedisConnection.lPop(DefaultedRedisConnection.java:806) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.lambda$leftPop$0(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:414) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:381) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.AbstractOperations.execute(AbstractOperations.java:166) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.leftPop(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushBatch(GatewayObservabilityAsyncPersistenceService.java:162) ~[main/:na]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushScheduledBatch(GatewayObservabilityAsyncPersistenceService.java:146) ~[main/:na]
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565) ~[na:na]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.runInternal(ScheduledMethodRunnable.java:128) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.lambda$run$1(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at io.micrometer.observation.Observation.observe(Observation.java:569) ~[micrometer-observation-1.16.4.jar:1.16.4]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.run(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.config.Task$OutcomeTrackingRunnable.run(Task.java:88) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.DelegatingErrorHandlingRunnable.run(DelegatingErrorHandlingRunnable.java:54) ~[spring-context-7.0.6.jar:7.0.6]
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:545) ~[na:na]
+	at java.base/java.util.concurrent.FutureTask.runAndReset(FutureTask.java:369) ~[na:na]
+	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:310) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614) ~[na:na]
+	at java.base/java.lang.Thread.run(Thread.java:1474) ~[na:na]
+Caused by: io.lettuce.core.RedisCommandTimeoutException: Command timed out after 5 second(s)
+	at io.lettuce.core.internal.ExceptionFactory.createTimeoutException(ExceptionFactory.java:63) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.internal.Futures.awaitOrCancel(Futures.java:233) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.LettuceFutures.awaitOrCancel(LettuceFutures.java:59) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1013) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	... 26 common frames omitted
+
+2026-05-23T18:03:06.098+08:00  WARN 15516 --- [x-ai-gateway] [xag-scheduler-2] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@7ff0f3d7 (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
+2026-05-23T18:05:13.116+08:00  WARN 15516 --- [x-ai-gateway] [xag-scheduler-1] ewayObservabilityAsyncPersistenceService : 从 Redis 读取 observability 热路径队列失败，等待下一轮重试。
+
+org.springframework.dao.QueryTimeoutException: Redis command timed out
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:84) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:44) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.PassThroughExceptionTranslationStrategy.translate(PassThroughExceptionTranslationStrategy.java:39) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.FallbackExceptionTranslationStrategy.translate(FallbackExceptionTranslationStrategy.java:38) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.convertLettuceAccessException(LettuceConnection.java:313) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1015) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.lambda$doInvoke$2(LettuceConnection.java:450) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker$Synchronizer.invoke(LettuceInvoker.java:658) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker.just(LettuceInvoker.java:106) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceListCommands.lPop(LettuceListCommands.java:202) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.DefaultedRedisConnection.lPop(DefaultedRedisConnection.java:806) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.lambda$leftPop$0(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:414) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:381) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.AbstractOperations.execute(AbstractOperations.java:166) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.leftPop(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushBatch(GatewayObservabilityAsyncPersistenceService.java:162) ~[main/:na]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushScheduledBatch(GatewayObservabilityAsyncPersistenceService.java:146) ~[main/:na]
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565) ~[na:na]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.runInternal(ScheduledMethodRunnable.java:128) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.lambda$run$1(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at io.micrometer.observation.Observation.observe(Observation.java:569) ~[micrometer-observation-1.16.4.jar:1.16.4]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.run(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.config.Task$OutcomeTrackingRunnable.run(Task.java:88) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.DelegatingErrorHandlingRunnable.run(DelegatingErrorHandlingRunnable.java:54) ~[spring-context-7.0.6.jar:7.0.6]
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:545) ~[na:na]
+	at java.base/java.util.concurrent.FutureTask.runAndReset(FutureTask.java:369) ~[na:na]
+	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:310) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614) ~[na:na]
+	at java.base/java.lang.Thread.run(Thread.java:1474) ~[na:na]
+Caused by: io.lettuce.core.RedisCommandTimeoutException: Command timed out after 5 second(s)
+	at io.lettuce.core.internal.ExceptionFactory.createTimeoutException(ExceptionFactory.java:63) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.internal.Futures.awaitOrCancel(Futures.java:233) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.LettuceFutures.awaitOrCancel(LettuceFutures.java:59) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1013) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	... 26 common frames omitted
+
+2026-05-23T18:52:31.069+08:00  WARN 15516 --- [x-ai-gateway] [xag-scheduler-2] ewayObservabilityAsyncPersistenceService : 从 Redis 读取 observability 热路径队列失败，等待下一轮重试。
+
+org.springframework.dao.QueryTimeoutException: Redis command timed out
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:84) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:44) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.PassThroughExceptionTranslationStrategy.translate(PassThroughExceptionTranslationStrategy.java:39) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.FallbackExceptionTranslationStrategy.translate(FallbackExceptionTranslationStrategy.java:38) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.convertLettuceAccessException(LettuceConnection.java:313) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1015) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.lambda$doInvoke$2(LettuceConnection.java:450) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker$Synchronizer.invoke(LettuceInvoker.java:658) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker.just(LettuceInvoker.java:106) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceListCommands.lPop(LettuceListCommands.java:202) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.DefaultedRedisConnection.lPop(DefaultedRedisConnection.java:806) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.lambda$leftPop$0(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:414) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:381) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.AbstractOperations.execute(AbstractOperations.java:166) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.leftPop(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushBatch(GatewayObservabilityAsyncPersistenceService.java:162) ~[main/:na]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushScheduledBatch(GatewayObservabilityAsyncPersistenceService.java:146) ~[main/:na]
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565) ~[na:na]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.runInternal(ScheduledMethodRunnable.java:128) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.lambda$run$1(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at io.micrometer.observation.Observation.observe(Observation.java:569) ~[micrometer-observation-1.16.4.jar:1.16.4]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.run(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.config.Task$OutcomeTrackingRunnable.run(Task.java:88) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.DelegatingErrorHandlingRunnable.run(DelegatingErrorHandlingRunnable.java:54) ~[spring-context-7.0.6.jar:7.0.6]
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:545) ~[na:na]
+	at java.base/java.util.concurrent.FutureTask.runAndReset(FutureTask.java:369) ~[na:na]
+	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:310) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614) ~[na:na]
+	at java.base/java.lang.Thread.run(Thread.java:1474) ~[na:na]
+Caused by: io.lettuce.core.RedisCommandTimeoutException: Command timed out after 5 second(s)
+	at io.lettuce.core.internal.ExceptionFactory.createTimeoutException(ExceptionFactory.java:63) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.internal.Futures.awaitOrCancel(Futures.java:233) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.LettuceFutures.awaitOrCancel(LettuceFutures.java:59) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1013) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	... 26 common frames omitted
+
+2026-05-23T18:57:13.075+08:00  WARN 15516 --- [x-ai-gateway] [xag-scheduler-1] ewayObservabilityAsyncPersistenceService : 从 Redis 读取 observability 热路径队列失败，等待下一轮重试。
+
+org.springframework.dao.QueryTimeoutException: Redis command timed out
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:84) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:44) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.PassThroughExceptionTranslationStrategy.translate(PassThroughExceptionTranslationStrategy.java:39) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.FallbackExceptionTranslationStrategy.translate(FallbackExceptionTranslationStrategy.java:38) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.convertLettuceAccessException(LettuceConnection.java:313) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1015) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.lambda$doInvoke$2(LettuceConnection.java:450) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker$Synchronizer.invoke(LettuceInvoker.java:658) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker.just(LettuceInvoker.java:106) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceListCommands.lPop(LettuceListCommands.java:202) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.DefaultedRedisConnection.lPop(DefaultedRedisConnection.java:806) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.lambda$leftPop$0(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:414) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:381) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.AbstractOperations.execute(AbstractOperations.java:166) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.leftPop(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushBatch(GatewayObservabilityAsyncPersistenceService.java:162) ~[main/:na]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushScheduledBatch(GatewayObservabilityAsyncPersistenceService.java:146) ~[main/:na]
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565) ~[na:na]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.runInternal(ScheduledMethodRunnable.java:128) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.lambda$run$1(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at io.micrometer.observation.Observation.observe(Observation.java:569) ~[micrometer-observation-1.16.4.jar:1.16.4]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.run(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.config.Task$OutcomeTrackingRunnable.run(Task.java:88) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.DelegatingErrorHandlingRunnable.run(DelegatingErrorHandlingRunnable.java:54) ~[spring-context-7.0.6.jar:7.0.6]
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:545) ~[na:na]
+	at java.base/java.util.concurrent.FutureTask.runAndReset(FutureTask.java:369) ~[na:na]
+	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:310) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614) ~[na:na]
+	at java.base/java.lang.Thread.run(Thread.java:1474) ~[na:na]
+Caused by: io.lettuce.core.RedisCommandTimeoutException: Command timed out after 5 second(s)
+	at io.lettuce.core.internal.ExceptionFactory.createTimeoutException(ExceptionFactory.java:63) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.internal.Futures.awaitOrCancel(Futures.java:233) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.LettuceFutures.awaitOrCancel(LettuceFutures.java:59) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1013) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	... 26 common frames omitted
+
+2026-05-23T18:57:13.683+08:00  WARN 15516 --- [x-ai-gateway] [l-1:housekeeper] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@7ee85705 (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
+2026-05-23T18:58:50.440+08:00  WARN 15516 --- [x-ai-gateway] [xag-scheduler-2] ewayObservabilityAsyncPersistenceService : 从 Redis 读取 observability 热路径队列失败，等待下一轮重试。
+
+org.springframework.dao.QueryTimeoutException: Redis command timed out
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:84) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:44) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.PassThroughExceptionTranslationStrategy.translate(PassThroughExceptionTranslationStrategy.java:39) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.FallbackExceptionTranslationStrategy.translate(FallbackExceptionTranslationStrategy.java:38) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.convertLettuceAccessException(LettuceConnection.java:313) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1015) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.lambda$doInvoke$2(LettuceConnection.java:450) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker$Synchronizer.invoke(LettuceInvoker.java:658) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker.just(LettuceInvoker.java:106) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceListCommands.lPop(LettuceListCommands.java:202) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.DefaultedRedisConnection.lPop(DefaultedRedisConnection.java:806) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.lambda$leftPop$0(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:414) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:381) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.AbstractOperations.execute(AbstractOperations.java:166) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.leftPop(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushBatch(GatewayObservabilityAsyncPersistenceService.java:162) ~[main/:na]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushScheduledBatch(GatewayObservabilityAsyncPersistenceService.java:146) ~[main/:na]
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565) ~[na:na]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.runInternal(ScheduledMethodRunnable.java:128) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.lambda$run$1(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at io.micrometer.observation.Observation.observe(Observation.java:569) ~[micrometer-observation-1.16.4.jar:1.16.4]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.run(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.config.Task$OutcomeTrackingRunnable.run(Task.java:88) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.DelegatingErrorHandlingRunnable.run(DelegatingErrorHandlingRunnable.java:54) ~[spring-context-7.0.6.jar:7.0.6]
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:545) ~[na:na]
+	at java.base/java.util.concurrent.FutureTask.runAndReset(FutureTask.java:369) ~[na:na]
+	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:310) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614) ~[na:na]
+	at java.base/java.lang.Thread.run(Thread.java:1474) ~[na:na]
+Caused by: io.lettuce.core.RedisCommandTimeoutException: Command timed out after 5 second(s)
+	at io.lettuce.core.internal.ExceptionFactory.createTimeoutException(ExceptionFactory.java:63) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.internal.Futures.awaitOrCancel(Futures.java:233) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.LettuceFutures.awaitOrCancel(LettuceFutures.java:59) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1013) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	... 26 common frames omitted
+
+2026-05-23T18:58:50.471+08:00  WARN 15516 --- [x-ai-gateway] [l-1:housekeeper] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@1be85c19 (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
+2026-05-23T19:02:48.012+08:00  WARN 15516 --- [x-ai-gateway] [xag-scheduler-1] ewayObservabilityAsyncPersistenceService : 从 Redis 读取 observability 热路径队列失败，等待下一轮重试。
+
+org.springframework.dao.QueryTimeoutException: Redis command timed out
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:84) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:44) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.PassThroughExceptionTranslationStrategy.translate(PassThroughExceptionTranslationStrategy.java:39) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.FallbackExceptionTranslationStrategy.translate(FallbackExceptionTranslationStrategy.java:38) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.convertLettuceAccessException(LettuceConnection.java:313) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1015) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.lambda$doInvoke$2(LettuceConnection.java:450) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker$Synchronizer.invoke(LettuceInvoker.java:658) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker.just(LettuceInvoker.java:106) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceListCommands.lPop(LettuceListCommands.java:202) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.DefaultedRedisConnection.lPop(DefaultedRedisConnection.java:806) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.lambda$leftPop$0(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:414) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:381) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.AbstractOperations.execute(AbstractOperations.java:166) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.leftPop(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushBatch(GatewayObservabilityAsyncPersistenceService.java:162) ~[main/:na]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushScheduledBatch(GatewayObservabilityAsyncPersistenceService.java:146) ~[main/:na]
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565) ~[na:na]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.runInternal(ScheduledMethodRunnable.java:128) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.lambda$run$1(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at io.micrometer.observation.Observation.observe(Observation.java:569) ~[micrometer-observation-1.16.4.jar:1.16.4]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.run(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.config.Task$OutcomeTrackingRunnable.run(Task.java:88) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.DelegatingErrorHandlingRunnable.run(DelegatingErrorHandlingRunnable.java:54) ~[spring-context-7.0.6.jar:7.0.6]
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:545) ~[na:na]
+	at java.base/java.util.concurrent.FutureTask.runAndReset(FutureTask.java:369) ~[na:na]
+	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:310) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614) ~[na:na]
+	at java.base/java.lang.Thread.run(Thread.java:1474) ~[na:na]
+Caused by: io.lettuce.core.RedisCommandTimeoutException: Command timed out after 5 second(s)
+	at io.lettuce.core.internal.ExceptionFactory.createTimeoutException(ExceptionFactory.java:63) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.internal.Futures.awaitOrCancel(Futures.java:233) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.LettuceFutures.awaitOrCancel(LettuceFutures.java:59) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1013) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	... 26 common frames omitted
+
+2026-05-23T19:02:48.630+08:00  WARN 15516 --- [x-ai-gateway] [l-1:housekeeper] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@1add7532 (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
+2026-05-23T19:09:08.449+08:00  WARN 15516 --- [x-ai-gateway] [l-1:housekeeper] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@3a3799b (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
+2026-05-23T19:09:08.563+08:00  WARN 15516 --- [x-ai-gateway] [xag-scheduler-1] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@22183ecf (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
+2026-05-23T19:09:09.177+08:00  WARN 15516 --- [x-ai-gateway] [xag-scheduler-2] ewayObservabilityAsyncPersistenceService : 从 Redis 读取 observability 热路径队列失败，等待下一轮重试。
+
+org.springframework.dao.QueryTimeoutException: Redis command timed out
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:84) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:44) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.PassThroughExceptionTranslationStrategy.translate(PassThroughExceptionTranslationStrategy.java:39) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.FallbackExceptionTranslationStrategy.translate(FallbackExceptionTranslationStrategy.java:38) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.convertLettuceAccessException(LettuceConnection.java:313) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1015) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.lambda$doInvoke$2(LettuceConnection.java:450) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker$Synchronizer.invoke(LettuceInvoker.java:658) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker.just(LettuceInvoker.java:106) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceListCommands.lPop(LettuceListCommands.java:202) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.DefaultedRedisConnection.lPop(DefaultedRedisConnection.java:806) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.lambda$leftPop$0(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:414) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:381) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.AbstractOperations.execute(AbstractOperations.java:166) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.leftPop(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushBatch(GatewayObservabilityAsyncPersistenceService.java:162) ~[main/:na]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushScheduledBatch(GatewayObservabilityAsyncPersistenceService.java:146) ~[main/:na]
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565) ~[na:na]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.runInternal(ScheduledMethodRunnable.java:128) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.lambda$run$1(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at io.micrometer.observation.Observation.observe(Observation.java:569) ~[micrometer-observation-1.16.4.jar:1.16.4]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.run(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.config.Task$OutcomeTrackingRunnable.run(Task.java:88) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.DelegatingErrorHandlingRunnable.run(DelegatingErrorHandlingRunnable.java:54) ~[spring-context-7.0.6.jar:7.0.6]
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:545) ~[na:na]
+	at java.base/java.util.concurrent.FutureTask.runAndReset(FutureTask.java:369) ~[na:na]
+	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:310) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614) ~[na:na]
+	at java.base/java.lang.Thread.run(Thread.java:1474) ~[na:na]
+Caused by: io.lettuce.core.RedisCommandTimeoutException: Command timed out after 5 second(s)
+	at io.lettuce.core.internal.ExceptionFactory.createTimeoutException(ExceptionFactory.java:63) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.internal.Futures.awaitOrCancel(Futures.java:233) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.LettuceFutures.awaitOrCancel(LettuceFutures.java:59) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1013) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	... 26 common frames omitted
+
+2026-05-23T19:10:36.755+08:00  WARN 15516 --- [x-ai-gateway] [xag-scheduler-2] ewayObservabilityAsyncPersistenceService : 从 Redis 读取 observability 热路径队列失败，等待下一轮重试。
+
+org.springframework.dao.QueryTimeoutException: Redis command timed out
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:84) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:44) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.PassThroughExceptionTranslationStrategy.translate(PassThroughExceptionTranslationStrategy.java:39) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.FallbackExceptionTranslationStrategy.translate(FallbackExceptionTranslationStrategy.java:38) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.convertLettuceAccessException(LettuceConnection.java:313) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1015) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.lambda$doInvoke$2(LettuceConnection.java:450) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker$Synchronizer.invoke(LettuceInvoker.java:658) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker.just(LettuceInvoker.java:106) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceListCommands.lPop(LettuceListCommands.java:202) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.DefaultedRedisConnection.lPop(DefaultedRedisConnection.java:806) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.lambda$leftPop$0(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:414) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:381) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.AbstractOperations.execute(AbstractOperations.java:166) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.leftPop(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushBatch(GatewayObservabilityAsyncPersistenceService.java:162) ~[main/:na]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushScheduledBatch(GatewayObservabilityAsyncPersistenceService.java:146) ~[main/:na]
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565) ~[na:na]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.runInternal(ScheduledMethodRunnable.java:128) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.lambda$run$1(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at io.micrometer.observation.Observation.observe(Observation.java:569) ~[micrometer-observation-1.16.4.jar:1.16.4]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.run(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.config.Task$OutcomeTrackingRunnable.run(Task.java:88) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.DelegatingErrorHandlingRunnable.run(DelegatingErrorHandlingRunnable.java:54) ~[spring-context-7.0.6.jar:7.0.6]
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:545) ~[na:na]
+	at java.base/java.util.concurrent.FutureTask.runAndReset(FutureTask.java:369) ~[na:na]
+	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:310) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614) ~[na:na]
+	at java.base/java.lang.Thread.run(Thread.java:1474) ~[na:na]
+Caused by: io.lettuce.core.RedisCommandTimeoutException: Command timed out after 5 second(s)
+	at io.lettuce.core.internal.ExceptionFactory.createTimeoutException(ExceptionFactory.java:63) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.internal.Futures.awaitOrCancel(Futures.java:233) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.LettuceFutures.awaitOrCancel(LettuceFutures.java:59) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1013) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	... 26 common frames omitted
+
+2026-05-23T19:11:30.053+08:00  WARN 15516 --- [x-ai-gateway] [xag-scheduler-1] ewayObservabilityAsyncPersistenceService : 从 Redis 读取 observability 热路径队列失败，等待下一轮重试。
+
+org.springframework.dao.QueryTimeoutException: Redis command timed out
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:84) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:44) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.PassThroughExceptionTranslationStrategy.translate(PassThroughExceptionTranslationStrategy.java:39) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.FallbackExceptionTranslationStrategy.translate(FallbackExceptionTranslationStrategy.java:38) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.convertLettuceAccessException(LettuceConnection.java:313) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1015) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.lambda$doInvoke$2(LettuceConnection.java:450) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker$Synchronizer.invoke(LettuceInvoker.java:658) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker.just(LettuceInvoker.java:106) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceListCommands.lPop(LettuceListCommands.java:202) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.DefaultedRedisConnection.lPop(DefaultedRedisConnection.java:806) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.lambda$leftPop$0(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:414) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:381) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.AbstractOperations.execute(AbstractOperations.java:166) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.leftPop(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushBatch(GatewayObservabilityAsyncPersistenceService.java:162) ~[main/:na]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushScheduledBatch(GatewayObservabilityAsyncPersistenceService.java:146) ~[main/:na]
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565) ~[na:na]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.runInternal(ScheduledMethodRunnable.java:128) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.lambda$run$1(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at io.micrometer.observation.Observation.observe(Observation.java:569) ~[micrometer-observation-1.16.4.jar:1.16.4]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.run(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.config.Task$OutcomeTrackingRunnable.run(Task.java:88) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.DelegatingErrorHandlingRunnable.run(DelegatingErrorHandlingRunnable.java:54) ~[spring-context-7.0.6.jar:7.0.6]
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:545) ~[na:na]
+	at java.base/java.util.concurrent.FutureTask.runAndReset(FutureTask.java:369) ~[na:na]
+	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:310) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614) ~[na:na]
+	at java.base/java.lang.Thread.run(Thread.java:1474) ~[na:na]
+Caused by: io.lettuce.core.RedisCommandTimeoutException: Command timed out after 5 second(s)
+	at io.lettuce.core.internal.ExceptionFactory.createTimeoutException(ExceptionFactory.java:63) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.internal.Futures.awaitOrCancel(Futures.java:233) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.LettuceFutures.awaitOrCancel(LettuceFutures.java:59) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1013) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	... 26 common frames omitted
+
+2026-05-23T19:11:32.444+08:00  WARN 15516 --- [x-ai-gateway] [xag-scheduler-2] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@6f041f0a (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
+2026-05-23T19:16:02.887+08:00  WARN 15516 --- [x-ai-gateway] [xag-scheduler-2] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@7982b45 (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
+2026-05-23T19:16:02.911+08:00  WARN 15516 --- [x-ai-gateway] [xag-scheduler-1] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@1670ebf2 (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
+
+> Task :bootRun FAILED
+4 actionable tasks: 2 executed, 2 up-to-date

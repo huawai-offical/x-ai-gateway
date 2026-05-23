@@ -52,7 +52,7 @@ public class ExecutionSupportMatrixService {
                             ? InteropCapabilityLevel.NATIVE
                             : InteropCapabilityLevel.UNSUPPORTED;
             case AUDIO_TRANSLATION ->
-                    supportsOpenAiStyleSite(siteKind)
+                    supportsGoogleGenAiAudio(siteKind) || supportsOpenAiStyleSite(siteKind)
                             ? InteropCapabilityLevel.NATIVE
                             : InteropCapabilityLevel.UNSUPPORTED;
             case IMAGE_GENERATION ->
@@ -64,7 +64,7 @@ public class ExecutionSupportMatrixService {
                             ? InteropCapabilityLevel.NATIVE
                             : InteropCapabilityLevel.UNSUPPORTED;
             case IMAGE_VARIATION ->
-                    supportsOpenAiStyleSite(siteKind)
+                    supportsGoogleGenAiImages(siteKind) || supportsOpenAiStyleSite(siteKind)
                             ? InteropCapabilityLevel.NATIVE
                             : InteropCapabilityLevel.UNSUPPORTED;
             case MODERATION ->

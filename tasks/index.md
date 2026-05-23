@@ -95,6 +95,8 @@
 | P1-CODEX-06x3 | [TASK-20260523-005-03 厂商原生 Audio 与 Images 互转适配补齐](done/TASK-20260523-005-03-provider-native-media-adapter-parity.md) | Done | Gemini/Vertex image edit 原生互转、OpenAI-compatible passthrough 与 Anthropic/Gemini 不可等价 blocked reason 已收口 |
 | P0-CODEX-06y | [TASK-20260523-006 资源入口事实源去重](done/TASK-20260523-006-resource-surface-registry-dedup.md) | Done | 已收敛入口解析、入口能力矩阵、默认 path/surface/default model，并删除厂商详情独立特性解析重复区块 |
 | P0-CODEX-06z | [TASK-20260523-007 厂商目录标题层级与表格边界再平衡](done/TASK-20260523-007-provider-catalog-title-border-rebalance.md) | Done | 厂商管理页标题收敛为单一目录标题，并恢复厂商目录表格单层轻量边界 |
+| P0-CODEX-06aa | [TASK-20260523-009 协议入口兼容画像结构化编辑](done/TASK-20260523-009-protocol-endpoint-structured-profile-editor.md) | Done | 已移除协议入口高级 JSON 编辑，改为结构化兼容画像、thinking/reasoning 控件和只读运行时画像预览 |
+| P0-CODEX-06ab | [TASK-20260523-010 功能性媒体 API 厂商互转补齐](done/TASK-20260523-010-functional-media-provider-translation-parity.md) | Done | Gemini/Vertex audio_translation 与 image_variation 已进入 native executor；Anthropic audio/image 资源边界已拆清 |
 | P0-FUNC-01 | [TASK-20260514-020 OpenAI 多模态支撑参数边界收紧](done/TASK-20260514-020-openai-multimodal-supporting-parameters.md) | Done | 已清理 Audio translations 与 Images edits/variations 残留，并固定多模态支撑参数 |
 | P0-FUNC-02 | [TASK-20260514-021 OpenAI Files、Uploads、Models 功能性支撑面](done/TASK-20260514-021-openai-files-uploads-models-functional-support.md) | Done | 已补 Files list 参数与 envelope，并确认 Batches/Fine-tuning 不回到公开支持面 |
 | P0-CODEX-05 | [TASK-20260514-031 OpenAI 真实 Smoke 与认证成本防护](backlog/TASK-20260514-031-openai-real-smoke-certification-harness.md) | Backlog | Critical；承接 Codex/OpenAI-compatible smoke 机制，等待恢复测试或真实 key 执行窗口 |

@@ -451,7 +451,7 @@ public class SiteCapabilityTruthService {
                             : InteropCapabilityLevel.UNSUPPORTED;
             case AUDIO_TRANSLATION ->
                     hasSnapshotCapability(snapshot, SiteCapabilitySnapshotEntity::isSupportsAudio)
-                            && supportsOpenAiStyleResources(siteKind)
+                            && supportsUpstreamAudio(siteKind)
                             ? InteropCapabilityLevel.NATIVE
                             : InteropCapabilityLevel.UNSUPPORTED;
             case IMAGE_GENERATION ->
@@ -466,7 +466,7 @@ public class SiteCapabilityTruthService {
                             : InteropCapabilityLevel.UNSUPPORTED;
             case IMAGE_VARIATION ->
                     hasSnapshotCapability(snapshot, SiteCapabilitySnapshotEntity::isSupportsImages)
-                            && supportsOpenAiStyleResources(siteKind)
+                            && supportsUpstreamImageEdit(siteKind)
                             ? InteropCapabilityLevel.NATIVE
                             : InteropCapabilityLevel.UNSUPPORTED;
             case MODERATION -> hasSnapshotCapability(snapshot, SiteCapabilitySnapshotEntity::isSupportsModeration)
@@ -620,10 +620,6 @@ public class SiteCapabilityTruthService {
             case GEMINI_DIRECT -> switch (feature) {
                 case UPLOAD_CREATE ->
                         "Gemini Files API 存在，但不等价于 OpenAI /v1/uploads 的 create/parts/complete/cancel contract，因此仅开放 gateway-local orchestration surface。";
-                case AUDIO_TRANSLATION ->
-                        "Gemini 当前没有等价 OpenAI /v1/audio/translations 的稳定资源端点，因此当前不开放。";
-                case IMAGE_VARIATION ->
-                        "Gemini 当前没有等价 OpenAI /v1/images/variations 的稳定资源端点，因此当前不开放。";
                 default -> null;
             };
             case ANTHROPIC_DIRECT -> switch (feature) {
@@ -632,7 +628,7 @@ public class SiteCapabilityTruthService {
                 case AUDIO_TRANSCRIPTION, AUDIO_TRANSLATION, AUDIO_SPEECH ->
                         "Anthropic 当前没有稳定的原生 audio API，因此当前不开放。";
                 case IMAGE_GENERATION, IMAGE_EDIT, IMAGE_VARIATION ->
-                        "Anthropic 当前没有稳定的原生 image API，因此当前不开放。";
+                        "Anthropic 当前支持 Messages 图片输入理解，但没有稳定的图片生成、编辑或 variation 资源 API，因此当前不开放。";
                 case MODERATION ->
                         "Anthropic 当前没有稳定的原生 moderation API，因此当前不开放。";
                 case UPLOAD_CREATE ->

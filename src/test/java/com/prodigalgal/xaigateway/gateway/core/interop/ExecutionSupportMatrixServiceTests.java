@@ -137,7 +137,7 @@ class ExecutionSupportMatrixServiceTests {
     }
 
     @Test
-    void shouldExposeNewAudioImageResourceGapsForOpenAiStyleAndGeminiEditSites() {
+    void shouldExposeAudioImageResourcesForOpenAiStyleAndGeminiMediaSites() {
         GatewayRequestSemantics audioTranslation = new GatewayRequestSemantics(
                 TranslationResourceType.AUDIO,
                 TranslationOperation.AUDIO_TRANSLATION,
@@ -150,6 +150,12 @@ class ExecutionSupportMatrixServiceTests {
                 List.of(InteropFeature.IMAGE_EDIT),
                 true
         );
+        GatewayRequestSemantics imageVariation = new GatewayRequestSemantics(
+                TranslationResourceType.IMAGE,
+                TranslationOperation.IMAGE_VARIATION,
+                List.of(InteropFeature.IMAGE_VARIATION),
+                true
+        );
 
         assertEquals(
                 InteropCapabilityLevel.NATIVE,
@@ -160,12 +166,16 @@ class ExecutionSupportMatrixServiceTests {
                 service.implementedLevel(openAiCandidate(ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC), imageEdit, InteropFeature.IMAGE_EDIT)
         );
         assertEquals(
-                InteropCapabilityLevel.UNSUPPORTED,
+                InteropCapabilityLevel.NATIVE,
                 service.implementedLevel(geminiCandidate(UpstreamSiteKind.GEMINI_DIRECT), audioTranslation, InteropFeature.AUDIO_TRANSLATION)
         );
         assertEquals(
                 InteropCapabilityLevel.NATIVE,
                 service.implementedLevel(geminiCandidate(UpstreamSiteKind.GEMINI_DIRECT), imageEdit, InteropFeature.IMAGE_EDIT)
+        );
+        assertEquals(
+                InteropCapabilityLevel.NATIVE,
+                service.implementedLevel(geminiCandidate(UpstreamSiteKind.GEMINI_DIRECT), imageVariation, InteropFeature.IMAGE_VARIATION)
         );
     }
 

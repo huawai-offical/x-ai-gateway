@@ -36,7 +36,11 @@ const { apiRequestMock } = vi.hoisted(() => ({
             pathStrategy: 'OPENAI_V1',
             modelAddressingStrategy: 'MODEL_NAME',
             errorSchemaStrategy: 'OPENAI_ERROR',
-            conversationProfile: { reasoningContentMode: 'passthrough' },
+            conversationProfile: {
+              upstreamSurface: 'chat_completions',
+              protocolEndpoint: 'openai_compatible',
+              customFlag: 'keep',
+            },
             active: true,
             linkedCredentialCount: 1,
           },
@@ -201,7 +205,8 @@ describe('ProviderSiteDetailPage', () => {
     const dialog = await screen.findByRole('dialog', { name: '新增协议入口' })
     expect(within(dialog).getByRole('tab', { name: '1. 基本信息' })).toBeInTheDocument()
     expect(within(dialog).getByRole('tab', { name: '2. 运行时策略' })).toBeInTheDocument()
-    expect(within(dialog).getByRole('tab', { name: '3. 高级 JSON' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('tab', { name: '3. 兼容画像' })).toBeInTheDocument()
+    expect(within(dialog).queryByLabelText('Conversation Profile JSON')).not.toBeInTheDocument()
 
     fireEvent.change(within(dialog).getByLabelText('入口编码'), { target: { value: 'xiaomi_mimo:custom-anthropic' } })
     fireEvent.change(within(dialog).getByLabelText('显示名称'), { target: { value: 'MiMo Custom Anthropic' } })
@@ -213,10 +218,10 @@ describe('ProviderSiteDetailPage', () => {
     fireEvent.change(await within(dialog).findByLabelText('Provider Type'), { target: { value: 'ANTHROPIC_DIRECT' } })
     fireEvent.change(await within(dialog).findByLabelText('Site Kind'), { target: { value: 'ANTHROPIC_DIRECT' } })
 
-    const advancedTab = within(dialog).getByRole('tab', { name: '3. 高级 JSON' })
-    fireEvent.mouseDown(advancedTab)
-    fireEvent.click(advancedTab)
-    fireEvent.change(await within(dialog).findByLabelText('Conversation Profile JSON'), { target: { value: '{"targetProtocol":"anthropic_messages"}' } })
+    const profileTab = within(dialog).getByRole('tab', { name: '3. 兼容画像' })
+    fireEvent.mouseDown(profileTab)
+    fireEvent.click(profileTab)
+    fireEvent.change(await within(dialog).findByLabelText('兼容画像'), { target: { value: 'anthropic_messages' } })
     fireEvent.click(within(dialog).getByRole('button', { name: '保存入口' }))
 
     await waitFor(() => {
@@ -231,7 +236,59 @@ describe('ProviderSiteDetailPage', () => {
         siteKind: 'ANTHROPIC_DIRECT',
         baseUrl: 'https://token-plan-sgp.xiaomimimo.com/anthropic',
         conversationProfile: {
+          reasoningContentMode: 'passthrough',
           targetProtocol: 'anthropic_messages',
+          reasoningTransport: 'thinking_blocks',
+        },
+      })
+    })
+  })
+
+  it('edits protocol endpoint profile with structured controls and keeps unknown fields', async () => {
+    renderPage()
+
+    expect(await screen.findByText('MiMo OpenAI 入口')).toBeInTheDocument()
+    const endpointsTab = screen.getByRole('tab', { name: '协议入口' })
+    fireEvent.mouseDown(endpointsTab)
+    fireEvent.click(endpointsTab)
+    fireEvent.click((await screen.findAllByRole('button', { name: '编辑' }))[0])
+
+    const dialog = await screen.findByRole('dialog', { name: '编辑协议入口' })
+    const profileTab = within(dialog).getByRole('tab', { name: '3. 兼容画像' })
+    fireEvent.mouseDown(profileTab)
+    fireEvent.click(profileTab)
+
+    expect(await within(dialog).findByText('运行时画像预览')).toBeInTheDocument()
+    expect(within(dialog).queryByLabelText('Conversation Profile JSON')).not.toBeInTheDocument()
+    expect(within(dialog).getByLabelText('兼容画像')).toHaveValue('openai_chat_completions')
+
+    fireEvent.change(within(dialog).getByLabelText('兼容画像'), { target: { value: 'responses_to_chat_completions' } })
+    fireEvent.change(within(dialog).getByLabelText('Thinking 注入'), { target: { value: 'extra_body_thinking_enabled' } })
+    fireEvent.change(within(dialog).getByLabelText('Assistant Reasoning 字段'), { target: { value: 'reasoning_content' } })
+    fireEvent.change(within(dialog).getByLabelText('工具历史回放'), { target: { value: 'required_when_tool_calls' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: '保存入口' }))
+
+    await waitFor(() => {
+      const call = apiRequestMock.mock.calls.find(([url, init]) =>
+        url === '/admin/provider-sites/1/protocol-endpoints/11' && init?.method === 'PUT')
+      expect(call).toBeTruthy()
+      expect(JSON.parse(String(call?.[1]?.body))).toMatchObject({
+        conversationProfile: {
+          protocolEndpoint: 'openai_compatible',
+          customFlag: 'keep',
+          ingressProtocol: 'responses',
+          upstreamSurface: 'chat_completions',
+          responsesCompatibility: {
+            mode: 'emulate_with_chat_completions',
+          },
+          reasoning: {
+            requestField: 'extra_body.thinking',
+            requestEnabledValue: {
+              type: 'enabled',
+            },
+            assistantReasoningField: 'reasoning_content',
+            historyReplayPolicy: 'required_when_tool_calls',
+          },
         },
       })
     })

@@ -31,6 +31,7 @@ public class GeminiAudioGatewayResourceExecutor implements GatewayResourceExecut
 
     private static final Set<String> SUPPORTED_PATHS = Set.of(
             "/v1/audio/transcriptions",
+            "/v1/audio/translations",
             "/v1/audio/speech"
     );
 
@@ -102,8 +103,9 @@ public class GeminiAudioGatewayResourceExecutor implements GatewayResourceExecut
             Map<String, String> formFields,
             Map<String, FilePart> files) {
         TranslationOperation operation = context.request().operation();
-        if (operation != TranslationOperation.AUDIO_TRANSCRIPTION) {
-            return Mono.error(new IllegalArgumentException("当前 Gemini audio executor 仅支持 transcriptions multipart 请求。"));
+        if (operation != TranslationOperation.AUDIO_TRANSCRIPTION
+                && operation != TranslationOperation.AUDIO_TRANSLATION) {
+            return Mono.error(new IllegalArgumentException("当前 Gemini audio executor 仅支持 transcriptions/translations multipart 请求。"));
         }
         validateResponseFormat(formFields == null ? null : formFields.get("response_format"));
         return GeminiGatewayResourceSupport.resolveBinaryFile(context, files, gatewayFileService, "file")
@@ -207,10 +209,14 @@ public class GeminiAudioGatewayResourceExecutor implements GatewayResourceExecut
 
     private String buildAudioInstruction(TranslationOperation operation, Map<String, String> formFields) {
         StringBuilder instruction = new StringBuilder();
-        instruction.append("Transcribe the provided audio and return only the transcription text.");
-        String language = formFields == null ? null : trimToNull(formFields.get("language"));
-        if (language != null) {
-            instruction.append(" The spoken language is ").append(language).append('.');
+        if (operation == TranslationOperation.AUDIO_TRANSLATION) {
+            instruction.append("Translate the provided audio to English and return only the translated text.");
+        } else {
+            instruction.append("Transcribe the provided audio and return only the transcription text.");
+            String language = formFields == null ? null : trimToNull(formFields.get("language"));
+            if (language != null) {
+                instruction.append(" The spoken language is ").append(language).append('.');
+            }
         }
         String prompt = formFields == null ? null : trimToNull(formFields.get("prompt"));
         if (prompt != null) {

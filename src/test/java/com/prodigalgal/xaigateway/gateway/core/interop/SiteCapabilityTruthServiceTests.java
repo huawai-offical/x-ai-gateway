@@ -402,7 +402,7 @@ class SiteCapabilityTruthServiceTests {
     }
 
     @Test
-    void shouldSupportGeminiImageEditButBlockUnimplementedAudioTranslationAndVariationResources() {
+    void shouldSupportGeminiAudioTranslationImageEditAndImageVariationResources() {
         SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
         Mockito.when(repository.findBySiteProfile_Id(18L)).thenReturn(Optional.of(snapshot(false, true, true, true, true, false, false, false, false, false)));
         SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
@@ -435,13 +435,12 @@ class SiteCapabilityTruthServiceTests {
                 )
         );
 
-        assertEquals(SupportStatus.BLOCKED, audioTranslation.supportStatus());
-        assertEquals(ExecutionKind.BLOCKED, audioTranslation.executionKind());
-        assertTrue(audioTranslation.blockedReasons().stream().anyMatch(reason -> reason.contains("/v1/audio/translations")));
+        assertEquals(SupportStatus.NATIVE, audioTranslation.supportStatus());
+        assertEquals(ExecutionKind.NATIVE, audioTranslation.executionKind());
         assertEquals(SupportStatus.NATIVE, imageEdit.supportStatus());
         assertEquals(ExecutionKind.NATIVE, imageEdit.executionKind());
-        assertEquals(SupportStatus.BLOCKED, imageVariation.supportStatus());
-        assertTrue(imageVariation.blockedReasons().stream().anyMatch(reason -> reason.contains("/v1/images/variations")));
+        assertEquals(SupportStatus.NATIVE, imageVariation.supportStatus());
+        assertEquals(ExecutionKind.NATIVE, imageVariation.executionKind());
     }
 
     @Test
@@ -591,6 +590,38 @@ class SiteCapabilityTruthServiceTests {
         );
 
         assertEquals(InteropCapabilityLevel.NATIVE, fileReport.executionCapabilityLevel());
+    }
+
+    @Test
+    void shouldKeepAnthropicAudioAndImageGenerationResourcesBlockedWithPreciseReasons() {
+        SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        Mockito.when(repository.findBySiteProfile_Id(12L)).thenReturn(Optional.of(snapshot(false, false, true, true, false, true, false, true, false, false)));
+        SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
+        CatalogCandidateView candidate = anthropicCandidate(12L);
+
+        FeatureCompatibilityReport audioReport = service.evaluate(
+                candidate,
+                new GatewayRequestSemantics(
+                        TranslationResourceType.AUDIO,
+                        TranslationOperation.AUDIO_TRANSLATION,
+                        List.of(InteropFeature.AUDIO_TRANSLATION),
+                        true
+                )
+        );
+        FeatureCompatibilityReport imageReport = service.evaluate(
+                candidate,
+                new GatewayRequestSemantics(
+                        TranslationResourceType.IMAGE,
+                        TranslationOperation.IMAGE_VARIATION,
+                        List.of(InteropFeature.IMAGE_VARIATION),
+                        true
+                )
+        );
+
+        assertEquals(SupportStatus.BLOCKED, audioReport.supportStatus());
+        assertTrue(audioReport.blockedReasons().stream().anyMatch(reason -> reason.contains("原生 audio API")));
+        assertEquals(SupportStatus.BLOCKED, imageReport.supportStatus());
+        assertTrue(imageReport.blockedReasons().stream().anyMatch(reason -> reason.contains("Messages 图片输入理解")));
     }
 
 

@@ -34,8 +34,8 @@ OpenAI Direct preset 使用 `openai-native` / `native-first` 口径：Chat、Res
 
 Anthropic、Gemini、Vertex 与 Codex 同步按 OpenAI 标准功能区收紧：
 
-- Anthropic 只保留 Messages、tools、thinking 等对话功能区，`message_batches`、provider admin、evals 等官方非核心 API 不纳入兼容面。
-- Gemini 只保留 generateContent、embeddings、files 等可映射支撑面；`batchGenerateContent`、tuning、eval-style 和 provider admin API 不纳入兼容面。
+- Anthropic 只保留 Messages、tools、thinking、Messages 图片输入理解和 file 支撑面；Anthropic audio 资源、图片生成/编辑/variation、`message_batches`、provider admin、evals 等不纳入兼容面。
+- Gemini 只保留 generateContent、embeddings、files、audio transcription/translation/speech、image generation/edit/variation 等可映射功能面；`batchGenerateContent`、tuning、eval-style 和 provider admin API 不纳入兼容面。
 - Vertex 只把 project/location 作为 Google Cloud 寻址和凭证边界，功能上仍限定在 Gemini 标准区；pipeline/job/admin、batch prediction、tuning 不纳入兼容面。
 - Codex 单独限定为 ChatGPT 官方账号的 Responses smoke/反代边界，不作为通用 provider catalog preset，不把非 Responses 的 Codex 内部 API 暴露为产品面。
 

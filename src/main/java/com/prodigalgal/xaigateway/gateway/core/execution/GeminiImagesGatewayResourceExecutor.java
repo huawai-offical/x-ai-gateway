@@ -61,7 +61,8 @@ public class GeminiImagesGatewayResourceExecutor implements GatewayResourceExecu
                 request,
                 candidate,
                 "/v1/images/generations",
-                "/v1/images/edits"
+                "/v1/images/edits",
+                "/v1/images/variations"
         );
     }
 
@@ -94,18 +95,25 @@ public class GeminiImagesGatewayResourceExecutor implements GatewayResourceExecu
             String requestedModel,
             Map<String, String> formFields,
             Map<String, FilePart> files) {
-        if (context.request().operation() != TranslationOperation.IMAGE_EDIT) {
-            return Mono.error(new IllegalArgumentException("Gemini images executor 当前 multipart 仅支持 /v1/images/edits。"));
+        TranslationOperation operation = context.request().operation();
+        if (operation != TranslationOperation.IMAGE_EDIT
+                && operation != TranslationOperation.IMAGE_VARIATION) {
+            return Mono.error(new IllegalArgumentException("Gemini images executor 当前 multipart 仅支持 /v1/images/edits 和 /v1/images/variations。"));
         }
         validateResponseFormat(valueOf(formFields, "response_format"));
-        String prompt = requiredText(formFields, "prompt", "images.edit 请求缺少 prompt。");
+        String prompt = operation == TranslationOperation.IMAGE_EDIT
+                ? requiredText(formFields, "prompt", "images.edit 请求缺少 prompt。")
+                : variationPrompt(formFields);
         return GeminiGatewayResourceSupport.resolveBinaryFile(context, files, gatewayFileService, "image")
                 .flatMap(image -> {
-                    if (hasMultipartOrGatewayFile(context, files, "mask")) {
+                    if (operation == TranslationOperation.IMAGE_EDIT && hasMultipartOrGatewayFile(context, files, "mask")) {
                         return GeminiGatewayResourceSupport.resolveBinaryFile(context, files, gatewayFileService, "mask")
                                 .map(mask -> executeEdit(context, prompt, formFields, image, mask));
                     }
-                    return Mono.just(executeEdit(context, prompt, formFields, image, null));
+                    if (operation == TranslationOperation.IMAGE_EDIT) {
+                        return Mono.just(executeEdit(context, prompt, formFields, image, null));
+                    }
+                    return Mono.just(executeVariation(context, prompt, formFields, image));
                 });
     }
 
@@ -152,6 +160,22 @@ public class GeminiImagesGatewayResourceExecutor implements GatewayResourceExecu
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(toOpenAiResponse(context, response.generatedImages().orElse(List.of()), "Gemini image edit 未返回可用图片。"));
+    }
+
+    ResponseEntity<JsonNode> executeVariation(
+            GatewayResourceExecutionContext context,
+            String prompt,
+            Map<String, String> formFields,
+            GeminiGatewayResourceSupport.ResolvedBinaryFile image) {
+        EditImageResponse response = editImage(
+                context,
+                prompt,
+                referenceImages(image, null),
+                buildEditConfig(formFields, false)
+        );
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(toOpenAiResponse(context, response.generatedImages().orElse(List.of()), "Gemini image variation 未返回可用图片。"));
     }
 
     private ObjectNode toOpenAiResponse(GatewayResourceExecutionContext context, GenerateImagesResponse response) {
@@ -229,7 +253,15 @@ public class GeminiImagesGatewayResourceExecutor implements GatewayResourceExecu
         if (normalized == null || "b64_json".equalsIgnoreCase(normalized)) {
             return;
         }
-        throw new IllegalArgumentException("Gemini image generation 当前仅返回 b64_json。");
+        throw new IllegalArgumentException("Gemini images 当前仅返回 b64_json。");
+    }
+
+    private String variationPrompt(Map<String, String> formFields) {
+        String prompt = trimToNull(valueOf(formFields, "prompt"));
+        if (prompt != null) {
+            return prompt;
+        }
+        return "Create a visually distinct variation of the provided image. Preserve the main subject and composition, vary visual details naturally, and return only the generated image.";
     }
 
     private String resolveOutputMimeType(Map<String, String> formFields) {

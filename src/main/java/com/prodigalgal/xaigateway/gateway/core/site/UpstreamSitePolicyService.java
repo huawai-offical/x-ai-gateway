@@ -353,13 +353,15 @@ public class UpstreamSitePolicyService {
             case AUDIO_TRANSCRIPTION, AUDIO_SPEECH -> policy.supportsAudio()
                     ? InteropCapabilityLevel.NATIVE
                     : InteropCapabilityLevel.UNSUPPORTED;
-            case AUDIO_TRANSLATION -> policy.supportsAudio() && supportsOpenAiStyleResource(siteKind)
+            case AUDIO_TRANSLATION -> policy.supportsAudio()
+                    && (supportsOpenAiStyleResource(siteKind) || supportsGoogleGenAiSite(siteKind))
                     ? InteropCapabilityLevel.NATIVE
                     : InteropCapabilityLevel.UNSUPPORTED;
             case IMAGE_GENERATION -> policy.supportsImages()
                     ? InteropCapabilityLevel.NATIVE
                     : InteropCapabilityLevel.UNSUPPORTED;
-            case IMAGE_EDIT, IMAGE_VARIATION -> policy.supportsImages() && supportsOpenAiStyleResource(siteKind)
+            case IMAGE_EDIT, IMAGE_VARIATION -> policy.supportsImages()
+                    && (supportsOpenAiStyleResource(siteKind) || supportsGoogleGenAiSite(siteKind))
                     ? InteropCapabilityLevel.NATIVE
                     : InteropCapabilityLevel.UNSUPPORTED;
             case MODERATION -> policy.supportsModeration()
@@ -384,6 +386,10 @@ public class UpstreamSitePolicyService {
                     MINIMAX, GROK, MISTRAL, COHERE, JINA, TOGETHER, FIREWORKS, OPENROUTER -> true;
             default -> false;
         };
+    }
+
+    private boolean supportsGoogleGenAiSite(UpstreamSiteKind siteKind) {
+        return siteKind == UpstreamSiteKind.GEMINI_DIRECT || siteKind == UpstreamSiteKind.VERTEX_AI;
     }
 
     public record SitePolicy(
