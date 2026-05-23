@@ -85,6 +85,9 @@
 | P0-CODEX-06r | [TASK-20260522-023 功能性 Provider Smoke 认证策略对齐](done/TASK-20260522-023-functional-provider-smoke-auth-strategy.md) | Done | OpenAI-compatible 功能性 smoke 改为 Bearer 认证，避免 MiMo/DeepSeek 真实验证误报 |
 | P0-CODEX-06s | [TASK-20260522-025 MiMo OpenAI Key 刷新模型 401 排查](done/TASK-20260522-025-mimo-openai-key-refresh-401-diagnosis-parent.md) | Done | 脱敏对比 Key 1/Key 2 绑定、指纹、刷新痕迹与 401 状态写回缺口 |
 | P1-CODEX-06t | [TASK-20260523-001 刷新模型失败健康状态写回](backlog/TASK-20260523-001-refresh-model-failure-health-writeback.md) | Backlog | 刷新模型失败时写回 last_error、记录系统事件并展示凭证异常 |
+| P0-CODEX-06u | [TASK-20260523-002 厂商管理与预设导入口径一致性](done/TASK-20260523-002-provider-site-preset-display-consistency.md) | Done | 区分默认站点类型与厂商协议入口，并让预设导入返回将导入的 protocol endpoints |
+| P0-CODEX-06v | [TASK-20260523-003 厂商管理界面与编辑界面收敛](done/TASK-20260523-003-provider-site-ui-simplification.md) | Done | 厂商管理改为单一厂商目录，已导入统一进入详情管理，详情页和协议入口编辑按 Tab 分层 |
+| P0-CODEX-06w | [TASK-20260523-004 厂商目录框线层级拆解](done/TASK-20260523-004-provider-catalog-frame-flattening.md) | Done | 厂商目录拆掉卡片嵌套和内层圆角表格框，保留表头底线、行分隔和无边框分页 |
 | P0-FUNC-01 | [TASK-20260514-020 OpenAI 多模态支撑参数边界收紧](done/TASK-20260514-020-openai-multimodal-supporting-parameters.md) | Done | 已清理 Audio translations 与 Images edits/variations 残留，并固定多模态支撑参数 |
 | P0-FUNC-02 | [TASK-20260514-021 OpenAI Files、Uploads、Models 功能性支撑面](done/TASK-20260514-021-openai-files-uploads-models-functional-support.md) | Done | 已补 Files list 参数与 envelope，并确认 Batches/Fine-tuning 不回到公开支持面 |
 | P0-CODEX-05 | [TASK-20260514-031 OpenAI 真实 Smoke 与认证成本防护](backlog/TASK-20260514-031-openai-real-smoke-certification-harness.md) | Backlog | Critical；承接 Codex/OpenAI-compatible smoke 机制，等待恢复测试或真实 key 执行窗口 |

@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeftIcon, PencilIcon, PlusIcon, RefreshCwIcon, Trash2Icon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import {
   Dialog,
@@ -46,12 +47,17 @@ type ProtocolEndpointDraft = {
   active: boolean
 }
 
+type DetailTab = 'overview' | 'endpoints' | 'models' | 'diagnostics'
+type EndpointEditorStep = 'basic' | 'runtime' | 'advanced'
+
 export function ProviderSiteDetailPage() {
   const params = useParams()
   const siteId = Number(params.id)
   const queryClient = useQueryClient()
   const [endpointDialogOpen, setEndpointDialogOpen] = useState(false)
+  const [detailTab, setDetailTab] = useState<DetailTab>('overview')
   const [editingEndpoint, setEditingEndpoint] = useState<ProviderProtocolEndpoint | null>(null)
+  const [endpointEditorStep, setEndpointEditorStep] = useState<EndpointEditorStep>('basic')
   const [endpointDraft, setEndpointDraft] = useState<ProtocolEndpointDraft>(emptyEndpointDraft())
   const [endpointError, setEndpointError] = useState<string | null>(null)
 
@@ -89,6 +95,7 @@ export function ProviderSiteDetailPage() {
     onSuccess: () => {
       setEndpointDialogOpen(false)
       setEditingEndpoint(null)
+      setEndpointEditorStep('basic')
       setEndpointError(null)
       invalidateProviderSiteDetail(queryClient, siteId)
     },
@@ -127,6 +134,7 @@ export function ProviderSiteDetailPage() {
 
   const openCreateEndpoint = () => {
     setEditingEndpoint(null)
+    setEndpointEditorStep('basic')
     setEndpointDraft(defaultEndpointDraftForSite(site))
     setEndpointError(null)
     setEndpointDialogOpen(true)
@@ -134,6 +142,7 @@ export function ProviderSiteDetailPage() {
 
   const openEditEndpoint = (endpoint: ProviderProtocolEndpoint) => {
     setEditingEndpoint(endpoint)
+    setEndpointEditorStep('basic')
     setEndpointDraft(endpointToDraft(endpoint))
     setEndpointError(null)
     setEndpointDialogOpen(true)
@@ -183,37 +192,49 @@ export function ProviderSiteDetailPage() {
         />
       </PageSection>
 
-      <PageSection kicker="入口策略" title="调用与兼容画像">
-        <InfoGrid
-          columnsClassName="md:grid-cols-2 xl:grid-cols-4"
-          items={[
-            { key: 'auth', label: '鉴权策略', value: site.authStrategy },
-            { key: 'path', label: '路径策略', value: site.pathStrategy },
-            { key: 'modelAddressing', label: '模型寻址', value: site.modelAddressingStrategy },
-            { key: 'errorSchema', label: '错误结构', value: site.errorSchemaStrategy },
-            { key: 'baseUrl', label: 'Base URL 匹配', value: site.baseUrlPattern ?? '未配置', className: 'xl:col-span-2' },
-            { key: 'requirements', label: '凭证要求', value: summarizeList(site.credentialRequirements, '无', 4) },
-            { key: 'protocols', label: '支持协议', value: summarizeList(site.supportedProtocols, '无', 4) },
-          ]}
-        />
-        <div className="mt-4 rounded-2xl border border-border/60 bg-muted/20 p-4">
-          <div className="mb-2 text-sm font-medium text-foreground">conversation profile</div>
-          <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-background p-3 text-xs text-muted-foreground">
-            {JSON.stringify(site.conversationProfile ?? {}, null, 2)}
-          </pre>
-        </div>
-      </PageSection>
+      <Tabs value={detailTab} onValueChange={(value) => setDetailTab(value as DetailTab)} className="gap-4">
+        <TabsList variant="line" className="w-full justify-start overflow-x-auto">
+          <TabsTrigger value="overview">概览</TabsTrigger>
+          <TabsTrigger value="endpoints">协议入口</TabsTrigger>
+          <TabsTrigger value="models">模型能力</TabsTrigger>
+          <TabsTrigger value="diagnostics">高级诊断</TabsTrigger>
+        </TabsList>
 
-      <PageSection
-        kicker="协议入口"
-        title="厂商协议入口"
-        actions={(
-          <Button type="button" variant="outline" onClick={openCreateEndpoint}>
-            <PlusIcon data-icon="inline-start" />
-            新增入口
-          </Button>
-        )}
-      >
+        <TabsContent value="overview" className="mt-0">
+          <PageSection kicker="概览" title="调用与兼容画像">
+            <InfoGrid
+              columnsClassName="md:grid-cols-2 xl:grid-cols-4"
+              items={[
+                { key: 'auth', label: '鉴权策略', value: site.authStrategy },
+                { key: 'path', label: '路径策略', value: site.pathStrategy },
+                { key: 'modelAddressing', label: '模型寻址', value: site.modelAddressingStrategy },
+                { key: 'errorSchema', label: '错误结构', value: site.errorSchemaStrategy },
+                { key: 'baseUrl', label: 'Base URL 匹配', value: site.baseUrlPattern ?? '未配置', className: 'xl:col-span-2' },
+                { key: 'requirements', label: '凭证要求', value: summarizeList(site.credentialRequirements, '无', 4) },
+                { key: 'protocols', label: '支持协议', value: summarizeList(site.supportedProtocols, '无', 4) },
+                { key: 'endpoints', label: '协议入口', value: `${protocolEndpoints.length} 个`, hint: summarizeList(protocolEndpoints.map((endpoint) => endpoint.protocolSuite), '暂无', 3) },
+              ]}
+            />
+            <div className="mt-4 rounded-2xl border border-border/60 bg-muted/20 p-4">
+              <div className="mb-2 text-sm font-medium text-foreground">conversation profile</div>
+              <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-background p-3 text-xs text-muted-foreground">
+                {JSON.stringify(site.conversationProfile ?? {}, null, 2)}
+              </pre>
+            </div>
+          </PageSection>
+        </TabsContent>
+
+        <TabsContent value="endpoints" className="mt-0">
+          <PageSection
+            kicker="协议入口"
+            title="厂商协议入口"
+            actions={(
+              <Button type="button" variant="outline" onClick={openCreateEndpoint}>
+                <PlusIcon data-icon="inline-start" />
+                新增入口
+              </Button>
+            )}
+          >
         {endpointMutation.error || deleteEndpointMutation.error ? (
           <InlineError error={endpointMutation.error ?? deleteEndpointMutation.error} title="协议入口操作失败" />
         ) : null}
@@ -288,7 +309,8 @@ export function ProviderSiteDetailPage() {
               ))}
           </div>
         ) : null}
-      </PageSection>
+          </PageSection>
+        </TabsContent>
 
       <Dialog
         open={endpointDialogOpen}
@@ -297,6 +319,7 @@ export function ProviderSiteDetailPage() {
           if (!open) {
             setEndpointError(null)
             setEditingEndpoint(null)
+            setEndpointEditorStep('basic')
           }
         }}
       >
@@ -306,100 +329,118 @@ export function ProviderSiteDetailPage() {
             <DialogDescription className="sr-only">配置厂商协议入口。</DialogDescription>
           </DialogHeader>
           <form className="grid gap-4" onSubmit={handleSubmitEndpoint}>
-            <div className="grid gap-4 md:grid-cols-2">
-              <label className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-foreground">入口编码</span>
-                <Input value={endpointDraft.endpointCode} onChange={(event) => setEndpointDraft({ ...endpointDraft, endpointCode: event.target.value })} />
-              </label>
-              <label className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-foreground">显示名称</span>
-                <Input value={endpointDraft.displayName} onChange={(event) => setEndpointDraft({ ...endpointDraft, displayName: event.target.value })} />
-              </label>
-              <label className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-foreground">协议簇</span>
-                <Input value={endpointDraft.protocolSuite} onChange={(event) => setEndpointDraft({ ...endpointDraft, protocolSuite: event.target.value })} />
-              </label>
-              <label className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-foreground">Base URL</span>
-                <Input value={endpointDraft.baseUrl} onChange={(event) => setEndpointDraft({ ...endpointDraft, baseUrl: event.target.value })} />
-              </label>
-              <label className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-foreground">Provider Type</span>
-                <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={endpointDraft.providerType} onChange={(event) => setEndpointDraft({ ...endpointDraft, providerType: event.target.value })}>
-                  {['OPENAI_DIRECT', 'OPENAI_COMPATIBLE', 'ANTHROPIC_DIRECT', 'GEMINI_DIRECT', 'OLLAMA_DIRECT'].map((option) => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-foreground">Site Kind</span>
-                <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={endpointDraft.siteKind} onChange={(event) => setEndpointDraft({ ...endpointDraft, siteKind: event.target.value })}>
-                  {[
-                    'OPENAI_DIRECT',
-                    'OPENAI_COMPATIBLE_GENERIC',
-                    'AZURE_OPENAI',
-                    'DEEPSEEK',
-                    'QWEN',
-                    'MOONSHOT',
-                    'SILICONFLOW',
-                    'VOLCENGINE',
-                    'MINIMAX',
-                    'DIFY',
-                    'GROK',
-                    'MISTRAL',
-                    'COHERE',
-                    'JINA',
-                    'TOGETHER',
-                    'FIREWORKS',
-                    'OPENROUTER',
-                    'PERPLEXITY',
-                    'ANTHROPIC_DIRECT',
-                    'GEMINI_DIRECT',
-                    'OLLAMA_DIRECT',
-                    'VERTEX_AI',
-                  ].map((option) => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-foreground">Auth Strategy</span>
-                <Input value={endpointDraft.authStrategy} onChange={(event) => setEndpointDraft({ ...endpointDraft, authStrategy: event.target.value })} />
-              </label>
-              <label className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-foreground">Path Strategy</span>
-                <Input value={endpointDraft.pathStrategy} onChange={(event) => setEndpointDraft({ ...endpointDraft, pathStrategy: event.target.value })} />
-              </label>
-              <label className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-foreground">Model Addressing</span>
-                <Input value={endpointDraft.modelAddressingStrategy} onChange={(event) => setEndpointDraft({ ...endpointDraft, modelAddressingStrategy: event.target.value })} />
-              </label>
-              <label className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-foreground">Error Schema</span>
-                <Input value={endpointDraft.errorSchemaStrategy} onChange={(event) => setEndpointDraft({ ...endpointDraft, errorSchemaStrategy: event.target.value })} />
-              </label>
-              <label className="flex flex-col gap-2 md:col-span-2">
-                <span className="text-sm font-medium text-foreground">Stream Transport</span>
-                <Input value={endpointDraft.streamTransport} onChange={(event) => setEndpointDraft({ ...endpointDraft, streamTransport: event.target.value })} />
-              </label>
-              <label className="flex items-center gap-3 rounded-2xl border border-border/60 bg-muted/20 px-4 py-3 md:col-span-2">
-                <input
-                  type="checkbox"
-                  className="size-4 rounded border-border"
-                  checked={endpointDraft.active}
-                  onChange={(event) => setEndpointDraft({ ...endpointDraft, active: event.target.checked })}
-                />
-                <span className="text-sm font-medium text-foreground">启用协议入口</span>
-              </label>
-              <label className="flex flex-col gap-2 md:col-span-2">
-                <span className="text-sm font-medium text-foreground">Conversation Profile JSON</span>
-                <Textarea
-                  rows={7}
-                  value={endpointDraft.conversationProfileJson}
-                  onChange={(event) => setEndpointDraft({ ...endpointDraft, conversationProfileJson: event.target.value })}
-                />
-              </label>
-            </div>
+            <Tabs value={endpointEditorStep} onValueChange={(value) => setEndpointEditorStep(value as EndpointEditorStep)}>
+              <TabsList variant="line" className="w-full justify-start overflow-x-auto">
+                <TabsTrigger value="basic">1. 基本信息</TabsTrigger>
+                <TabsTrigger value="runtime">2. 运行时策略</TabsTrigger>
+                <TabsTrigger value="advanced">3. 高级 JSON</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="basic" className="pt-3">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="flex flex-col gap-2">
+                    <span className="text-sm font-medium text-foreground">入口编码</span>
+                    <Input value={endpointDraft.endpointCode} onChange={(event) => setEndpointDraft({ ...endpointDraft, endpointCode: event.target.value })} />
+                  </label>
+                  <label className="flex flex-col gap-2">
+                    <span className="text-sm font-medium text-foreground">显示名称</span>
+                    <Input value={endpointDraft.displayName} onChange={(event) => setEndpointDraft({ ...endpointDraft, displayName: event.target.value })} />
+                  </label>
+                  <label className="flex flex-col gap-2">
+                    <span className="text-sm font-medium text-foreground">协议簇</span>
+                    <Input value={endpointDraft.protocolSuite} onChange={(event) => setEndpointDraft({ ...endpointDraft, protocolSuite: event.target.value })} />
+                  </label>
+                  <label className="flex flex-col gap-2">
+                    <span className="text-sm font-medium text-foreground">Base URL</span>
+                    <Input value={endpointDraft.baseUrl} onChange={(event) => setEndpointDraft({ ...endpointDraft, baseUrl: event.target.value })} />
+                  </label>
+                  <label className="flex items-center gap-3 rounded-2xl border border-border/60 bg-muted/20 px-4 py-3 md:col-span-2">
+                    <input
+                      type="checkbox"
+                      className="size-4 rounded border-border"
+                      checked={endpointDraft.active}
+                      onChange={(event) => setEndpointDraft({ ...endpointDraft, active: event.target.checked })}
+                    />
+                    <span className="text-sm font-medium text-foreground">启用协议入口</span>
+                  </label>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="runtime" className="pt-3">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="flex flex-col gap-2">
+                    <span className="text-sm font-medium text-foreground">Provider Type</span>
+                    <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={endpointDraft.providerType} onChange={(event) => setEndpointDraft({ ...endpointDraft, providerType: event.target.value })}>
+                      {['OPENAI_DIRECT', 'OPENAI_COMPATIBLE', 'ANTHROPIC_DIRECT', 'GEMINI_DIRECT', 'OLLAMA_DIRECT'].map((option) => (
+                        <option key={option} value={option}>{option}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-2">
+                    <span className="text-sm font-medium text-foreground">Site Kind</span>
+                    <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={endpointDraft.siteKind} onChange={(event) => setEndpointDraft({ ...endpointDraft, siteKind: event.target.value })}>
+                      {[
+                        'OPENAI_DIRECT',
+                        'OPENAI_COMPATIBLE_GENERIC',
+                        'AZURE_OPENAI',
+                        'DEEPSEEK',
+                        'QWEN',
+                        'MOONSHOT',
+                        'SILICONFLOW',
+                        'VOLCENGINE',
+                        'MINIMAX',
+                        'DIFY',
+                        'GROK',
+                        'MISTRAL',
+                        'COHERE',
+                        'JINA',
+                        'TOGETHER',
+                        'FIREWORKS',
+                        'OPENROUTER',
+                        'PERPLEXITY',
+                        'ANTHROPIC_DIRECT',
+                        'GEMINI_DIRECT',
+                        'OLLAMA_DIRECT',
+                        'VERTEX_AI',
+                      ].map((option) => (
+                        <option key={option} value={option}>{option}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-2">
+                    <span className="text-sm font-medium text-foreground">Auth Strategy</span>
+                    <Input value={endpointDraft.authStrategy} onChange={(event) => setEndpointDraft({ ...endpointDraft, authStrategy: event.target.value })} />
+                  </label>
+                  <label className="flex flex-col gap-2">
+                    <span className="text-sm font-medium text-foreground">Path Strategy</span>
+                    <Input value={endpointDraft.pathStrategy} onChange={(event) => setEndpointDraft({ ...endpointDraft, pathStrategy: event.target.value })} />
+                  </label>
+                  <label className="flex flex-col gap-2">
+                    <span className="text-sm font-medium text-foreground">Model Addressing</span>
+                    <Input value={endpointDraft.modelAddressingStrategy} onChange={(event) => setEndpointDraft({ ...endpointDraft, modelAddressingStrategy: event.target.value })} />
+                  </label>
+                  <label className="flex flex-col gap-2">
+                    <span className="text-sm font-medium text-foreground">Error Schema</span>
+                    <Input value={endpointDraft.errorSchemaStrategy} onChange={(event) => setEndpointDraft({ ...endpointDraft, errorSchemaStrategy: event.target.value })} />
+                  </label>
+                  <label className="flex flex-col gap-2 md:col-span-2">
+                    <span className="text-sm font-medium text-foreground">Stream Transport</span>
+                    <Input value={endpointDraft.streamTransport} onChange={(event) => setEndpointDraft({ ...endpointDraft, streamTransport: event.target.value })} />
+                  </label>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="advanced" className="pt-3">
+                <label className="flex flex-col gap-2">
+                  <span className="text-sm font-medium text-foreground">Conversation Profile JSON</span>
+                  <Textarea
+                    rows={7}
+                    value={endpointDraft.conversationProfileJson}
+                    onChange={(event) => setEndpointDraft({ ...endpointDraft, conversationProfileJson: event.target.value })}
+                  />
+                </label>
+              </TabsContent>
+            </Tabs>
             {endpointError || endpointMutation.error ? (
               <InlineError error={endpointMutation.error ?? new Error(endpointError ?? '协议入口保存失败。')} title="协议入口保存失败" />
             ) : null}
@@ -415,115 +456,122 @@ export function ProviderSiteDetailPage() {
         </DialogContent>
       </Dialog>
 
-      <PageSection kicker="模型能力" title="模型能力清单">
-        {capabilitiesQuery.isPending ? (
-          <PageSkeleton count={1} />
-        ) : capabilities.length ? (
-          <PaginatedRows items={capabilities} itemLabel="个模型">
-            {({ pageItems }) => (
-              <div className="overflow-hidden rounded-2xl border border-border/60 bg-card/92">
-                <table className="w-full table-fixed text-sm">
-                  <thead className="bg-muted/30">
-                    <tr>
-                      <th className="w-[26%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">模型</th>
-                      <th className="w-[18%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">协议</th>
-                      <th className="w-[22%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">能力</th>
-                      <th className="w-[18%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">执行后端</th>
-                      <th className="w-[16%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">刷新时间</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pageItems.map((model) => (
-                      <tr key={model.id} className="border-b border-border/40 align-top">
-                        <td className="px-4 py-3">
-                          <div className="font-medium text-foreground">{model.modelName}</div>
-                          <div className="text-xs text-muted-foreground">{model.modelKey}</div>
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground">{summarizeList(model.supportedProtocols, '无', 3)}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{summarizeModelTags(model).join(' / ') || '无'}</td>
-                        <td className="px-4 py-3 text-muted-foreground">
-                          <div>{model.preferredBackend ?? '未指定'}</div>
-                          <div className="text-xs">{model.capabilityLevel}</div>
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground">{formatInstant(model.sourceRefreshedAt)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+        <TabsContent value="models" className="mt-0">
+          <PageSection kicker="模型能力" title="模型能力清单">
+            {capabilitiesQuery.isPending ? (
+              <PageSkeleton count={1} />
+            ) : capabilities.length ? (
+              <PaginatedRows items={capabilities} itemLabel="个模型">
+                {({ pageItems }) => (
+                  <div className="overflow-hidden rounded-2xl border border-border/60 bg-card/92">
+                    <table className="w-full table-fixed text-sm">
+                      <thead className="bg-muted/30">
+                        <tr>
+                          <th className="w-[26%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">模型</th>
+                          <th className="w-[18%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">协议</th>
+                          <th className="w-[22%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">能力</th>
+                          <th className="w-[18%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">执行后端</th>
+                          <th className="w-[16%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">刷新时间</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pageItems.map((model) => (
+                          <tr key={model.id} className="border-b border-border/40 align-top">
+                            <td className="px-4 py-3">
+                              <div className="font-medium text-foreground">{model.modelName}</div>
+                              <div className="text-xs text-muted-foreground">{model.modelKey}</div>
+                            </td>
+                            <td className="px-4 py-3 text-muted-foreground">{summarizeList(model.supportedProtocols, '无', 3)}</td>
+                            <td className="px-4 py-3 text-muted-foreground">{summarizeModelTags(model).join(' / ') || '无'}</td>
+                            <td className="px-4 py-3 text-muted-foreground">
+                              <div>{model.preferredBackend ?? '未指定'}</div>
+                              <div className="text-xs">{model.capabilityLevel}</div>
+                            </td>
+                            <td className="px-4 py-3 text-muted-foreground">{formatInstant(model.sourceRefreshedAt)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </PaginatedRows>
+            ) : (
+              <EmptyState title="暂无模型能力记录" />
             )}
-          </PaginatedRows>
-        ) : (
-          <EmptyState title="暂无模型能力记录" />
-        )}
-      </PageSection>
+          </PageSection>
+        </TabsContent>
 
-      <PageSection kicker="Surface" title="入口能力矩阵">
-        {surfaces.length ? (
-          <PaginatedRows items={surfaces} itemLabel="个 surface">
-            {({ pageItems }) => (
-              <div className="overflow-hidden rounded-2xl border border-border/60 bg-card/92">
-                <table className="w-full table-fixed text-sm">
-                  <thead className="bg-muted/30">
-                    <tr>
-                      <th className="w-[22%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">Surface</th>
-                      <th className="w-[18%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">状态</th>
-                      <th className="w-[20%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">路径</th>
-                      <th className="w-[20%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">能力等级</th>
-                      <th className="w-[20%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">阻断原因</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pageItems.map(([key, surface]) => (
-                      <tr key={key} className="border-b border-border/40 align-top">
-                        <td className="px-4 py-3">
-                          <div className="font-medium text-foreground">{key}</div>
-                          <div className="text-xs text-muted-foreground">{surface.resourceType} / {surface.operation}</div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <StatusBadge tone={supportTone(surface.supportStatus)}>{surface.supportStatus ?? 'unknown'}</StatusBadge>
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground">{surface.normalizedPath ?? '无'}</td>
-                        <td className="px-4 py-3 text-muted-foreground">
-                          <div>执行：{surface.executionCapabilityLevel ?? '-'}</div>
-                          <div>渲染：{surface.renderCapabilityLevel ?? '-'}</div>
-                          <div>综合：{surface.overallCapabilityLevel ?? '-'}</div>
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground">{summarizeList(surface.blockerReasons, '无', 2)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </PaginatedRows>
-        ) : (
-          <EmptyState title="暂无 surface 能力记录" />
-        )}
-      </PageSection>
+        <TabsContent value="diagnostics" className="mt-0">
+          <div className="flex flex-col gap-6">
+            <PageSection kicker="Surface" title="入口能力矩阵">
+              {surfaces.length ? (
+                <PaginatedRows items={surfaces} itemLabel="个 surface">
+                  {({ pageItems }) => (
+                    <div className="overflow-hidden rounded-2xl border border-border/60 bg-card/92">
+                      <table className="w-full table-fixed text-sm">
+                        <thead className="bg-muted/30">
+                          <tr>
+                            <th className="w-[22%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">Surface</th>
+                            <th className="w-[18%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">状态</th>
+                            <th className="w-[20%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">路径</th>
+                            <th className="w-[20%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">能力等级</th>
+                            <th className="w-[20%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">阻断原因</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {pageItems.map(([key, surface]) => (
+                            <tr key={key} className="border-b border-border/40 align-top">
+                              <td className="px-4 py-3">
+                                <div className="font-medium text-foreground">{key}</div>
+                                <div className="text-xs text-muted-foreground">{surface.resourceType} / {surface.operation}</div>
+                              </td>
+                              <td className="px-4 py-3">
+                                <StatusBadge tone={supportTone(surface.supportStatus)}>{surface.supportStatus ?? 'unknown'}</StatusBadge>
+                              </td>
+                              <td className="px-4 py-3 text-muted-foreground">{surface.normalizedPath ?? '无'}</td>
+                              <td className="px-4 py-3 text-muted-foreground">
+                                <div>执行：{surface.executionCapabilityLevel ?? '-'}</div>
+                                <div>渲染：{surface.renderCapabilityLevel ?? '-'}</div>
+                                <div>综合：{surface.overallCapabilityLevel ?? '-'}</div>
+                              </td>
+                              <td className="px-4 py-3 text-muted-foreground">{summarizeList(surface.blockerReasons, '无', 2)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </PaginatedRows>
+              ) : (
+                <EmptyState title="暂无 surface 能力记录" />
+              )}
+            </PageSection>
 
-      <PageSection kicker="Feature" title="特性解析">
-        {features.length ? (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {features.map(([key, resolution]) => (
-              <div key={key} className="rounded-2xl border border-border/60 bg-muted/20 p-4">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <div className="font-medium text-foreground">{key}</div>
-                  <StatusBadge tone={supportTone(resolution.supportStatus)}>{resolution.supportStatus ?? resolution.effectiveLevel ?? 'unknown'}</StatusBadge>
+            <PageSection kicker="Feature" title="特性解析">
+              {features.length ? (
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {features.map(([key, resolution]) => (
+                    <div key={key} className="rounded-2xl border border-border/60 bg-muted/20 p-4">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <div className="font-medium text-foreground">{key}</div>
+                        <StatusBadge tone={supportTone(resolution.supportStatus)}>{resolution.supportStatus ?? resolution.effectiveLevel ?? 'unknown'}</StatusBadge>
+                      </div>
+                      <div className="text-xs leading-5 text-muted-foreground">
+                        <div>声明：{resolution.declaredLevel ?? '-'}</div>
+                        <div>实现：{resolution.implementedLevel ?? '-'}</div>
+                        <div>有效：{resolution.effectiveLevel ?? '-'}</div>
+                        <div>阻断：{summarizeList(resolution.blockedReasons, '无', 2)}</div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div className="text-xs leading-5 text-muted-foreground">
-                  <div>声明：{resolution.declaredLevel ?? '-'}</div>
-                  <div>实现：{resolution.implementedLevel ?? '-'}</div>
-                  <div>有效：{resolution.effectiveLevel ?? '-'}</div>
-                  <div>阻断：{summarizeList(resolution.blockedReasons, '无', 2)}</div>
-                </div>
-              </div>
-            ))}
+              ) : (
+                <EmptyState title="暂无特性解析记录" />
+              )}
+            </PageSection>
           </div>
-        ) : (
-          <EmptyState title="暂无特性解析记录" />
-        )}
-      </PageSection>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

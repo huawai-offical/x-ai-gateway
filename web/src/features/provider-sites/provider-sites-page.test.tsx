@@ -42,6 +42,48 @@ const { apiRequestMock } = vi.hoisted(() => ({
           modelFamilies: ['mimo'],
           pricingMetadata: '{}',
           unsupportedFeatures: [],
+          protocolEndpoints: [
+            {
+              id: null,
+              siteProfileId: null,
+              endpointCode: 'xiaomi_mimo:openai-compatible',
+              displayName: 'Xiaomi MiMo OpenAI-compatible',
+              protocolSuite: 'xiaomi_mimo.openai_compatible',
+              providerType: 'OPENAI_COMPATIBLE',
+              siteKind: 'OPENAI_COMPATIBLE_GENERIC',
+              baseUrl: 'https://token-plan-sgp.xiaomimimo.com/v1',
+              authStrategy: 'BEARER',
+              pathStrategy: 'OPENAI_V1',
+              modelAddressingStrategy: 'MODEL_NAME',
+              errorSchemaStrategy: 'OPENAI_ERROR',
+              streamTransport: 'sse',
+              conversationProfile: {},
+              active: true,
+              linkedCredentialCount: 0,
+              createdAt: null,
+              updatedAt: null,
+            },
+            {
+              id: null,
+              siteProfileId: null,
+              endpointCode: 'xiaomi_mimo:anthropic-compatible',
+              displayName: 'Xiaomi MiMo Anthropic-compatible',
+              protocolSuite: 'xiaomi_mimo.anthropic_compatible',
+              providerType: 'ANTHROPIC_DIRECT',
+              siteKind: 'ANTHROPIC_DIRECT',
+              baseUrl: 'https://token-plan-sgp.xiaomimimo.com/anthropic',
+              authStrategy: 'API_KEY_HEADER',
+              pathStrategy: 'ANTHROPIC_V1',
+              modelAddressingStrategy: 'MODEL_NAME',
+              errorSchemaStrategy: 'ANTHROPIC_ERROR',
+              streamTransport: 'sse',
+              conversationProfile: {},
+              active: true,
+              linkedCredentialCount: 0,
+              createdAt: null,
+              updatedAt: null,
+            },
+          ],
           imported: false,
           existingSiteProfileId: null,
         },
@@ -74,15 +116,27 @@ afterEach(() => {
 })
 
 describe('ProviderSitesPage', () => {
-  it('renders vendor center and creates provider site', async () => {
+  it('renders a single vendor catalog and creates custom provider site', async () => {
     renderPage()
 
     expect(await screen.findByText('厂商管理中心')).toBeInTheDocument()
     expect(await screen.findByText('OpenAI 主站')).toBeInTheDocument()
     expect(await screen.findByText('MiMo OpenAI 入口')).toBeInTheDocument()
+    expect(await screen.findByText('厂商与 API 入口')).toBeInTheDocument()
+    expect(screen.getByText('可导入')).toBeInTheDocument()
+    expect(screen.queryByText('厂商聚合')).not.toBeInTheDocument()
+    expect(screen.queryByText('预设导入')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '编辑' })).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: '新增 API 入口' }))
-    const dialog = await screen.findByRole('dialog', { name: '新增 API 入口' })
+    const openAiRow = screen.getByText('OpenAI 主站').closest('tr')
+    expect(openAiRow).not.toBeNull()
+    expect(within(openAiRow!).getByRole('button', { name: '管理' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '新增自定义入口' }))
+    const dialog = await screen.findByRole('dialog', { name: '新增自定义 API 入口' })
+    expect(within(dialog).getByRole('tab', { name: '1. 基本信息' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('tab', { name: '2. 连接方式' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('tab', { name: '3. 高级配置' })).toBeInTheDocument()
     fireEvent.change(within(dialog).getByLabelText('入口编码'), { target: { value: 'site:deepseek_openai' } })
     fireEvent.change(within(dialog).getByLabelText('入口名称'), { target: { value: 'DeepSeek OpenAI 入口' } })
     fireEvent.change(within(dialog).getByLabelText('厂商编码'), { target: { value: 'deepseek' } })
@@ -99,8 +153,16 @@ describe('ProviderSitesPage', () => {
     renderPage()
 
     await screen.findByText('OpenAI 主站')
-    fireEvent.click(await screen.findByRole('button', { name: '导入' }))
-    fireEvent.click(await screen.findByRole('button', { name: '刷新' }))
+    expect(await screen.findByText('xiaomi_mimo.openai_compatible')).toBeInTheDocument()
+    expect(await screen.findByText('xiaomi_mimo.anthropic_compatible')).toBeInTheDocument()
+    expect(screen.getAllByText('ANTHROPIC_DIRECT').length).toBeGreaterThan(0)
+    const mimoRow = screen.getByText('MiMo OpenAI 入口').closest('tr')
+    expect(mimoRow).not.toBeNull()
+    fireEvent.click(within(mimoRow!).getByRole('button', { name: '导入' }))
+
+    const openAiRow = screen.getByText('OpenAI 主站').closest('tr')
+    expect(openAiRow).not.toBeNull()
+    fireEvent.click(within(openAiRow!).getByRole('button', { name: '刷新' }))
 
     await waitFor(() => {
       expect(apiRequestMock).toHaveBeenCalledWith('/admin/provider-sites/presets/mimo-openai/import', expect.objectContaining({ method: 'POST' }))
@@ -163,5 +225,27 @@ function baseSite() {
     refreshedAt: '2026-05-22T00:00:00Z',
     createdAt: '2026-05-22T00:00:00Z',
     updatedAt: '2026-05-22T00:00:00Z',
+    protocolEndpoints: [
+      {
+        id: 11,
+        siteProfileId: 1,
+        endpointCode: 'openai:openai-compatible',
+        displayName: 'OpenAI 默认入口',
+        protocolSuite: 'openai.native',
+        providerType: 'OPENAI_DIRECT',
+        siteKind: 'OPENAI_DIRECT',
+        baseUrl: 'https://api.openai.com',
+        authStrategy: 'BEARER',
+        pathStrategy: 'OPENAI_V1',
+        modelAddressingStrategy: 'MODEL_NAME',
+        errorSchemaStrategy: 'OPENAI_ERROR',
+        streamTransport: 'sse',
+        conversationProfile: {},
+        active: true,
+        linkedCredentialCount: 1,
+        createdAt: '2026-05-22T00:00:00Z',
+        updatedAt: '2026-05-22T00:00:00Z',
+      },
+    ],
   }
 }

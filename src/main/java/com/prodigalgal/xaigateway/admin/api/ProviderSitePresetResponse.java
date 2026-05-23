@@ -39,6 +39,7 @@ public record ProviderSitePresetResponse(
         List<String> unsupportedFeatures,
         Object conversationProfile,
         Object modelPolicies,
+        List<ProviderProtocolEndpointResponse> protocolEndpoints,
         boolean imported,
         Long existingSiteProfileId
 ) {

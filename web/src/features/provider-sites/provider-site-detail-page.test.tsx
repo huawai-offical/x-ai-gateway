@@ -148,51 +148,65 @@ vi.mock('../../lib/api', async (importOriginal) => {
 
 afterEach(() => {
   cleanup()
+  apiRequestMock.mockClear()
 })
 
 describe('ProviderSiteDetailPage', () => {
-  it('renders provider site detail, model capability and surface matrix', async () => {
-    render(
-      <MemoryRouter initialEntries={['/console/provider-sites/1']}>
-        <QueryClientProvider client={new QueryClient()}>
-          <Routes>
-            <Route path="/console/provider-sites/:id" element={<ProviderSiteDetailPage />} />
-          </Routes>
-        </QueryClientProvider>
-      </MemoryRouter>,
-    )
+  it('renders provider site detail with scoped tabs', async () => {
+    renderPage()
 
     expect(await screen.findByText('MiMo OpenAI 入口')).toBeInTheDocument()
     expect(await screen.findByText('小米 MiMo')).toBeInTheDocument()
+    expect(await screen.findByText('调用与兼容画像')).toBeInTheDocument()
+    expect(screen.queryByText('mimo-v2-omni')).not.toBeInTheDocument()
+    expect(screen.queryByText('chat_completion')).not.toBeInTheDocument()
+    expect(screen.queryByText('response_object')).not.toBeInTheDocument()
+
+    const endpointsTab = screen.getByRole('tab', { name: '协议入口' })
+    fireEvent.mouseDown(endpointsTab)
+    fireEvent.click(endpointsTab)
     expect(await screen.findByText('xiaomi_mimo.openai_compatible')).toBeInTheDocument()
     expect(await screen.findByText('xiaomi_mimo.anthropic_compatible')).toBeInTheDocument()
+
+    const modelsTab = screen.getByRole('tab', { name: '模型能力' })
+    fireEvent.mouseDown(modelsTab)
+    fireEvent.click(modelsTab)
     expect((await screen.findAllByText('mimo-v2-omni')).length).toBeGreaterThan(0)
+
+    const diagnosticsTab = screen.getByRole('tab', { name: '高级诊断' })
+    fireEvent.mouseDown(diagnosticsTab)
+    fireEvent.click(diagnosticsTab)
     expect(await screen.findByText('chat_completion')).toBeInTheDocument()
     expect(await screen.findByText('response_object')).toBeInTheDocument()
   })
 
   it('creates provider protocol endpoint from detail page', async () => {
-    render(
-      <MemoryRouter initialEntries={['/console/provider-sites/1']}>
-        <QueryClientProvider client={new QueryClient()}>
-          <Routes>
-            <Route path="/console/provider-sites/:id" element={<ProviderSiteDetailPage />} />
-          </Routes>
-        </QueryClientProvider>
-      </MemoryRouter>,
-    )
+    renderPage()
 
     expect(await screen.findByText('MiMo OpenAI 入口')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: '新增入口' }))
+    const endpointsTab = screen.getByRole('tab', { name: '协议入口' })
+    fireEvent.mouseDown(endpointsTab)
+    fireEvent.click(endpointsTab)
+    fireEvent.click(await screen.findByRole('button', { name: '新增入口' }))
     const dialog = await screen.findByRole('dialog', { name: '新增协议入口' })
+    expect(within(dialog).getByRole('tab', { name: '1. 基本信息' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('tab', { name: '2. 运行时策略' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('tab', { name: '3. 高级 JSON' })).toBeInTheDocument()
 
     fireEvent.change(within(dialog).getByLabelText('入口编码'), { target: { value: 'xiaomi_mimo:custom-anthropic' } })
     fireEvent.change(within(dialog).getByLabelText('显示名称'), { target: { value: 'MiMo Custom Anthropic' } })
     fireEvent.change(within(dialog).getByLabelText('协议簇'), { target: { value: 'xiaomi_mimo.anthropic_compatible' } })
     fireEvent.change(within(dialog).getByLabelText('Base URL'), { target: { value: 'https://token-plan-sgp.xiaomimimo.com/anthropic' } })
-    fireEvent.change(within(dialog).getByLabelText('Provider Type'), { target: { value: 'ANTHROPIC_DIRECT' } })
-    fireEvent.change(within(dialog).getByLabelText('Site Kind'), { target: { value: 'ANTHROPIC_DIRECT' } })
-    fireEvent.change(within(dialog).getByLabelText('Conversation Profile JSON'), { target: { value: '{"targetProtocol":"anthropic_messages"}' } })
+    const runtimeTab = within(dialog).getByRole('tab', { name: '2. 运行时策略' })
+    fireEvent.mouseDown(runtimeTab)
+    fireEvent.click(runtimeTab)
+    fireEvent.change(await within(dialog).findByLabelText('Provider Type'), { target: { value: 'ANTHROPIC_DIRECT' } })
+    fireEvent.change(await within(dialog).findByLabelText('Site Kind'), { target: { value: 'ANTHROPIC_DIRECT' } })
+
+    const advancedTab = within(dialog).getByRole('tab', { name: '3. 高级 JSON' })
+    fireEvent.mouseDown(advancedTab)
+    fireEvent.click(advancedTab)
+    fireEvent.change(await within(dialog).findByLabelText('Conversation Profile JSON'), { target: { value: '{"targetProtocol":"anthropic_messages"}' } })
     fireEvent.click(within(dialog).getByRole('button', { name: '保存入口' }))
 
     await waitFor(() => {
@@ -213,3 +227,15 @@ describe('ProviderSiteDetailPage', () => {
     })
   })
 })
+
+function renderPage() {
+  return render(
+    <MemoryRouter initialEntries={['/console/provider-sites/1']}>
+      <QueryClientProvider client={new QueryClient()}>
+        <Routes>
+          <Route path="/console/provider-sites/:id" element={<ProviderSiteDetailPage />} />
+        </Routes>
+      </QueryClientProvider>
+    </MemoryRouter>,
+  )
+}

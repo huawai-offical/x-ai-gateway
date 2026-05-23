@@ -27,8 +27,8 @@ export type SurfaceCapability = {
 }
 
 export type ProviderProtocolEndpoint = {
-  id: number
-  siteProfileId: number
+  id: number | null
+  siteProfileId: number | null
   endpointCode: string
   displayName: string
   protocolSuite: string
@@ -117,6 +117,7 @@ export type ProviderSitePreset = {
   unsupportedFeatures: string[]
   conversationProfile?: unknown
   modelPolicies?: unknown
+  protocolEndpoints: ProviderProtocolEndpoint[]
   imported: boolean
   existingSiteProfileId?: number | null
 }

@@ -11,6 +11,7 @@ import com.prodigalgal.xaigateway.gateway.core.shared.ErrorSchemaStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ModelAddressingStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.PathStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderFamily;
+import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.shared.SiteProfileSource;
 import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
 import com.prodigalgal.xaigateway.testsupport.PermitAllSecurityTestConfig;
@@ -265,6 +266,26 @@ class ProviderSiteAdminControllerTests {
                 List.of(),
                 Map.of("reasoningContentMode", "passthrough"),
                 Map.of(),
+                List.of(new ProviderProtocolEndpointResponse(
+                        null,
+                        null,
+                        "openai-main:openai-compatible",
+                        "OpenAI 主站 OpenAI Native",
+                        "openai.native",
+                        ProviderType.OPENAI_DIRECT,
+                        UpstreamSiteKind.OPENAI_DIRECT,
+                        "https://api.openai.com",
+                        AuthStrategy.BEARER,
+                        PathStrategy.OPENAI_V1,
+                        ModelAddressingStrategy.MODEL_NAME,
+                        ErrorSchemaStrategy.OPENAI_ERROR,
+                        "sse",
+                        Map.of("protocolEndpoint", "openai_native"),
+                        true,
+                        0,
+                        null,
+                        null
+                )),
                 false,
                 null
         );

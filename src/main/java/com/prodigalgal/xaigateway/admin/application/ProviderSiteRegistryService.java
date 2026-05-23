@@ -1,6 +1,7 @@
 package com.prodigalgal.xaigateway.admin.application;
 
 import com.prodigalgal.xaigateway.admin.api.ProviderSitePresetResponse;
+import com.prodigalgal.xaigateway.admin.api.ProviderProtocolEndpointResponse;
 import com.prodigalgal.xaigateway.gateway.core.catalog.DiscoveredModelDefinition;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
 import com.prodigalgal.xaigateway.gateway.core.model.ModelPolicyScopeType;
@@ -479,8 +480,35 @@ public class ProviderSiteRegistryService {
                 preset.unsupportedFeatures(),
                 preset.conversationProfile(),
                 preset.modelPolicies(),
+                protocolEndpointSeeds(preset).stream()
+                        .map(this::toPresetEndpointResponse)
+                        .toList(),
                 existing.isPresent(),
                 existing.map(UpstreamSiteProfileEntity::getId).orElse(null)
+        );
+    }
+
+    private ProviderProtocolEndpointResponse toPresetEndpointResponse(ProtocolEndpointSeed seed) {
+        UpstreamSitePolicyService.SitePolicy policy = upstreamSitePolicyService.policy(seed.siteKind());
+        return new ProviderProtocolEndpointResponse(
+                null,
+                null,
+                seed.endpointCode(),
+                seed.displayName(),
+                seed.protocolSuite(),
+                seed.providerType(),
+                seed.siteKind(),
+                seed.baseUrl(),
+                policy.authStrategy(),
+                policy.pathStrategy(),
+                policy.modelAddressingStrategy(),
+                policy.errorSchemaStrategy(),
+                policy.streamTransport(),
+                seed.conversationProfile(),
+                true,
+                0,
+                null,
+                null
         );
     }
 

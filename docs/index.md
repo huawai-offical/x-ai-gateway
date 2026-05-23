@@ -113,6 +113,9 @@ x-ai-gateway 不以 OpenAI、Anthropic、Gemini、Vertex、Codex 等官方 API �
 - [REQ-20260522-022 功能性 Provider Smoke 认证策略对齐](requirements/REQ-20260522-022-functional-provider-smoke-auth-strategy.md)
 - [REQ-20260522-023 全局操作结果提示收敛](requirements/REQ-20260522-023-action-feedback-toast-coverage.md)
 - [REQ-20260522-024 MiMo OpenAI Key 刷新模型 401 排查](requirements/REQ-20260522-024-mimo-openai-key-refresh-401-diagnosis.md)
+- [REQ-20260523-001 厂商管理与预设导入口径一致性](requirements/REQ-20260523-001-provider-site-preset-display-consistency.md)
+- [REQ-20260523-002 厂商管理界面与编辑界面收敛](requirements/REQ-20260523-002-provider-site-ui-simplification.md)
+- [REQ-20260523-003 厂商目录框线层级拆解](requirements/REQ-20260523-003-provider-catalog-frame-flattening.md)
 
 ## 决策
 
