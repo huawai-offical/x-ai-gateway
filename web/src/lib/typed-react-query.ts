@@ -1,4 +1,5 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
+import type { ActionFeedbackMeta } from '@/components/app/action-feedback'
 
 type QueryOptions<TData> = {
   queryKey: readonly unknown[]
@@ -10,6 +11,8 @@ type QueryOptions<TData> = {
 type MutationOptions<TData, TVariables> = {
   mutationFn: (variables: TVariables) => Promise<TData>
   onSuccess?: (data: TData) => void
+  onError?: (error: unknown) => void
+  meta?: ActionFeedbackMeta
 }
 
 export type TypedQueryResult<TData> = {

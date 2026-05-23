@@ -111,6 +111,8 @@ x-ai-gateway 不以 OpenAI、Anthropic、Gemini、Vertex、Codex 等官方 API �
 - [REQ-20260522-020 分发 Key 鉴权 active 账号组守卫](requirements/REQ-20260522-020-distributed-key-auth-active-group-guard.md)
 - [REQ-20260522-021 分发 Key 创建时初始账号组绑定](requirements/REQ-20260522-021-distributed-key-create-initial-account-group-binding.md)
 - [REQ-20260522-022 功能性 Provider Smoke 认证策略对齐](requirements/REQ-20260522-022-functional-provider-smoke-auth-strategy.md)
+- [REQ-20260522-023 全局操作结果提示收敛](requirements/REQ-20260522-023-action-feedback-toast-coverage.md)
+- [REQ-20260522-024 MiMo OpenAI Key 刷新模型 401 排查](requirements/REQ-20260522-024-mimo-openai-key-refresh-401-diagnosis.md)
 
 ## 决策
 

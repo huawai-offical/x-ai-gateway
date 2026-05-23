@@ -3,6 +3,7 @@ import '@testing-library/jest-dom/vitest'
 import { cleanup, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/lib/api'
+import { markActionErrorToastShown } from './action-feedback'
 import { InlineError } from './inline-error'
 
 const mockedToast = vi.hoisted(() => ({
@@ -58,5 +59,15 @@ describe('InlineError', () => {
         duration: 4200,
       }),
     )
+  })
+
+  it('does not duplicate errors already shown by global action feedback', () => {
+    const error = new Error('刷新模型失败')
+    markActionErrorToastShown(error)
+
+    const { container } = render(<InlineError error={error} title="凭证操作失败" />)
+
+    expect(container).toBeEmptyDOMElement()
+    expect(mockedToast.error).not.toHaveBeenCalled()
   })
 })

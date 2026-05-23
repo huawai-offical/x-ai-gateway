@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import { ApiError } from '@/lib/api'
+import { hasActionErrorToastShown } from './action-feedback'
 
 type InlineErrorProps = {
   error: unknown
@@ -21,6 +22,10 @@ export function InlineError({
   const detail = useMemo(() => normalizeErrorMessage(error), [error])
 
   useEffect(() => {
+    if (hasActionErrorToastShown(error)) {
+      return
+    }
+
     const description = detail.traceId
       ? `${detail.message}\ntraceId: ${detail.traceId}`
       : detail.message
@@ -38,7 +43,7 @@ export function InlineError({
             }
           : undefined,
     })
-  }, [action, detail.message, detail.traceId, onRetry, retryLabel, title])
+  }, [action, detail.message, detail.traceId, error, onRetry, retryLabel, title])
 
   return null
 }

@@ -59,6 +59,7 @@
 | P0-UI-UX-09 | [TASK-20260522-001 账号分组详情入口统一](done/TASK-20260522-001-account-group-detail-entry-unification.md) | Done | 统一凭证详情与账号分组列表进入的完整账号分组详情页 |
 | P0-UI-UX-10 | [TASK-20260522-002 网络代理拨测功能下线](done/TASK-20260522-002-network-proxy-probe-retirement.md) | Done | 删除网络代理拨测页面、任务、接口和 baseline 表 |
 | P0-UI-UX-11 | [TASK-20260522-003 提示气泡化与超大文件组件化拆分](done/TASK-20260522-003-toast-feedback-and-component-splitting.md) | Done | `InlineError` 改为左上角 toast，调试工作台拆出预设和展示组件 |
+| P0-UI-UX-11a | [TASK-20260522-024 全局操作结果提示收敛](done/TASK-20260522-024-action-feedback-toast-coverage-parent.md) | Done | React Query mutation 成功/失败默认 toast，凭证刷新模型成功提示与失败去重 |
 | P1-UI-UX-12 | [TASK-20260522-004 原生确认弹窗与通知入口统一](backlog/TASK-20260522-004-confirm-dialog-notification-unification.md) | Backlog | 迁移 18 处 `window.confirm` 到统一确认弹窗 |
 | P1-ARCH-02 | [TASK-20260522-005 超大文件分批组件化与服务拆分](backlog/TASK-20260522-005-giant-file-decomposition-roadmap.md) | Backlog | 按 P0/P1 清单继续拆前端巨页和后端超级服务 |
 | P0-ARCH-03 | [TASK-20260522-010 Observability Redis 超时退避与同步兜底](done/TASK-20260522-010-observability-redis-timeout-backoff.md) | Done | Redis 热路径队列超时后退避，并让请求观测写入直接同步兜底 |
@@ -82,6 +83,8 @@
 | P0-CODEX-06p | [TASK-20260522-021 分发 Key 鉴权 active 账号组守卫](done/TASK-20260522-021-distributed-key-auth-active-group-guard.md) | Done | Key 鉴权和 auth cache 命中均要求存在启用账号组绑定 |
 | P0-CODEX-06q | [TASK-20260522-022 分发 Key 创建时初始账号组绑定](done/TASK-20260522-022-distributed-key-create-initial-account-group-binding.md) | Done | 创建访问密钥时原子写入初始账号组绑定，并支持账号组详情显式选择运行时 provider |
 | P0-CODEX-06r | [TASK-20260522-023 功能性 Provider Smoke 认证策略对齐](done/TASK-20260522-023-functional-provider-smoke-auth-strategy.md) | Done | OpenAI-compatible 功能性 smoke 改为 Bearer 认证，避免 MiMo/DeepSeek 真实验证误报 |
+| P0-CODEX-06s | [TASK-20260522-025 MiMo OpenAI Key 刷新模型 401 排查](done/TASK-20260522-025-mimo-openai-key-refresh-401-diagnosis-parent.md) | Done | 脱敏对比 Key 1/Key 2 绑定、指纹、刷新痕迹与 401 状态写回缺口 |
+| P1-CODEX-06t | [TASK-20260523-001 刷新模型失败健康状态写回](backlog/TASK-20260523-001-refresh-model-failure-health-writeback.md) | Backlog | 刷新模型失败时写回 last_error、记录系统事件并展示凭证异常 |
 | P0-FUNC-01 | [TASK-20260514-020 OpenAI 多模态支撑参数边界收紧](done/TASK-20260514-020-openai-multimodal-supporting-parameters.md) | Done | 已清理 Audio translations 与 Images edits/variations 残留，并固定多模态支撑参数 |
 | P0-FUNC-02 | [TASK-20260514-021 OpenAI Files、Uploads、Models 功能性支撑面](done/TASK-20260514-021-openai-files-uploads-models-functional-support.md) | Done | 已补 Files list 参数与 envelope，并确认 Batches/Fine-tuning 不回到公开支持面 |
 | P0-CODEX-05 | [TASK-20260514-031 OpenAI 真实 Smoke 与认证成本防护](backlog/TASK-20260514-031-openai-real-smoke-certification-harness.md) | Backlog | Critical；承接 Codex/OpenAI-compatible smoke 机制，等待恢复测试或真实 key 执行窗口 |

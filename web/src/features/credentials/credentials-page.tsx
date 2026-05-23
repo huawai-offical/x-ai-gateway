@@ -68,6 +68,8 @@ type CodexImportPayload = {
   supportedModels: string[]
 }
 
+type CodexImportRequestBody = Omit<CodexImportPayload, 'sourceLabel'>
+
 type CodexImportFailure = {
   sourceLabel: string
   message: string
@@ -253,10 +255,9 @@ export function CredentialsPage() {
       let success = 0
       for (const payload of payloads) {
         try {
-          const { sourceLabel, ...requestBody } = payload
           await apiRequest('/admin/accounts/import-auth-json', {
             method: 'POST',
-            body: JSON.stringify(requestBody),
+            body: JSON.stringify(toCodexImportRequestBody(payload)),
           })
           success += 1
         } catch (error) {
@@ -334,6 +335,13 @@ export function CredentialsPage() {
       apiRequest<CredentialModelRefreshResponse>(`/admin/credentials/${credentialId}/refresh-models`, {
         method: 'POST',
       }),
+    meta: {
+      actionName: '刷新凭证模型',
+      successMessage: (data) => {
+        const result = data as CredentialModelRefreshResponse
+        return `模型刷新完成：发现 ${result.modelCount} 个模型。`
+      },
+    },
     onSuccess: (data) => {
       setRefreshMessage(`模型刷新完成：发现 ${data.modelCount} 个模型。`)
       invalidateCredentialData(queryClient)
@@ -1552,6 +1560,20 @@ function buildIndexedName(baseName: string, index: number, total: number) {
     return baseName
   }
   return `${baseName}-${String(index + 1).padStart(2, '0')}`
+}
+
+function toCodexImportRequestBody(payload: CodexImportPayload): CodexImportRequestBody {
+  return {
+    groupId: payload.groupId,
+    accountName: payload.accountName,
+    authJsonContent: payload.authJsonContent,
+    authJsonFilePath: payload.authJsonFilePath,
+    active: payload.active,
+    proxyId: payload.proxyId,
+    tlsFingerprintProfileId: payload.tlsFingerprintProfileId,
+    siteProfileId: payload.siteProfileId,
+    supportedModels: payload.supportedModels,
+  }
 }
 
 function requireNumericAccountGroup(groupId: string) {

@@ -51,6 +51,9 @@ export function AuthSettingsPage() {
 
   const updateMutation = useMutation({
     mutationFn: (payload: AdminAuthSettingsUpdatePayload) => updateAdminAuthSettings(payload),
+    meta: {
+      suppressSuccessToast: true,
+    },
     onSuccess: async (updated: AdminAuthSettings) => {
       rememberLastAdminUsername(updated.username)
       toast.success('控制台凭证已更新，正在要求重新登录。')
