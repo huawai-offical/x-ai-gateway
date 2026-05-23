@@ -158,13 +158,14 @@ export function AppShell({ route, children }: AppShellProps) {
     navigate('/login?reason=logged-out', { replace: true })
   }
 
+  const effectiveHeaderHeight = headerHeight || 104
   const shellStyle = useMemo(
     () =>
       ({
-        '--app-shell-header-height': `${headerHeight}px`,
+        '--app-shell-header-height': `${effectiveHeaderHeight}px`,
         background: 'var(--surface-shell)',
       }) as CSSProperties,
-    [headerHeight],
+    [effectiveHeaderHeight],
   )
 
   return (
@@ -176,7 +177,7 @@ export function AppShell({ route, children }: AppShellProps) {
         <aside
           data-testid="app-shell-sidebar"
           className={cn(
-            'hidden h-full shrink-0 border-r border-border/70 bg-sidebar/96 shadow-sm backdrop-blur md:flex md:flex-col',
+            'hidden h-full shrink-0 border-r border-sidebar-border/70 bg-sidebar/90 shadow-[inset_-1px_0_0_rgba(255,255,255,0.04)] backdrop-blur-xl transition-[width] duration-200 ease-out md:flex md:flex-col',
             sidebarCollapsed ? 'md:w-[5.5rem]' : 'md:w-[18rem]',
           )}
         >
@@ -186,7 +187,7 @@ export function AppShell({ route, children }: AppShellProps) {
         <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
           <SheetContent
             side="left"
-            className="h-svh w-[18rem] max-w-[calc(100vw-1rem)] border-r border-border/70 bg-sidebar/96 p-0"
+            className="h-svh w-[18rem] max-w-[calc(100vw-1rem)] border-r border-sidebar-border/70 bg-sidebar/96 p-0 backdrop-blur-xl"
           >
             <SheetHeader className="sr-only">
               <SheetTitle>导航菜单</SheetTitle>
@@ -200,7 +201,7 @@ export function AppShell({ route, children }: AppShellProps) {
           <header
             ref={headerRef}
             data-testid="app-shell-header"
-            className="z-40 shrink-0 border-b border-border/70 bg-background/88 backdrop-blur-xl"
+            className="z-40 shrink-0 border-b border-border/60 bg-background/78 shadow-[0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-2xl supports-[backdrop-filter]:bg-background/72"
           >
             <div className="relative">
               <GlobalActivityBar />
@@ -210,7 +211,7 @@ export function AppShell({ route, children }: AppShellProps) {
                     <Button
                       variant="outline"
                       size="icon-sm"
-                      className="md:hidden"
+                      className="border-border/55 bg-card/65 text-muted-foreground shadow-[0_1px_0_rgba(255,255,255,0.06)] hover:bg-muted/70 hover:text-foreground md:hidden"
                       onClick={() => setMobileSidebarOpen(true)}
                     >
                       <MenuIcon />
@@ -219,7 +220,7 @@ export function AppShell({ route, children }: AppShellProps) {
                     <Button
                       variant="outline"
                       size="icon-sm"
-                      className="hidden md:inline-flex"
+                      className="hidden border-border/55 bg-card/65 text-muted-foreground shadow-[0_1px_0_rgba(255,255,255,0.06)] hover:bg-muted/70 hover:text-foreground md:inline-flex"
                       onClick={() => setSidebarCollapsed((value) => !value)}
                     >
                       {sidebarCollapsed ? <PanelLeftOpenIcon /> : <PanelLeftCloseIcon />}
@@ -261,7 +262,7 @@ export function AppShell({ route, children }: AppShellProps) {
                     <ThemeSwitch className="hidden lg:inline-flex" />
                     <Button
                       variant="outline"
-                      className="hidden min-w-[12rem] justify-start gap-2 text-muted-foreground lg:inline-flex"
+                      className="hidden min-w-[12rem] justify-start gap-2 border-border/55 bg-card/65 text-muted-foreground shadow-[0_1px_0_rgba(255,255,255,0.06)] hover:bg-muted/70 hover:text-foreground lg:inline-flex"
                       onClick={() => setCommandOpen(true)}
                     >
                       <SearchIcon data-icon="inline-start" />
@@ -280,7 +281,7 @@ export function AppShell({ route, children }: AppShellProps) {
                   <ThemeSwitch />
                   <Button
                     variant="outline"
-                    className="justify-start gap-2 text-muted-foreground"
+                    className="justify-start gap-2 border-border/55 bg-card/65 text-muted-foreground shadow-[0_1px_0_rgba(255,255,255,0.06)] hover:bg-muted/70 hover:text-foreground"
                     onClick={() => setCommandOpen(true)}
                   >
                     <SearchIcon data-icon="inline-start" />
@@ -295,7 +296,7 @@ export function AppShell({ route, children }: AppShellProps) {
 
           <main
             data-testid="app-shell-main"
-            className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+            className="scrollbar-subtle min-h-0 flex-1 overflow-y-auto overscroll-contain"
           >
             <div className="mx-auto flex min-h-full w-full max-w-[92rem] flex-col gap-5 px-4 py-5 lg:px-6">
               {children}
@@ -410,7 +411,10 @@ function AccountMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" className="min-w-0 max-w-[15rem] justify-between gap-2">
+        <Button
+          variant="outline"
+          className="min-w-0 max-w-[15rem] justify-between gap-2 border-border/55 bg-card/65 shadow-[0_1px_0_rgba(255,255,255,0.06)] hover:bg-muted/70"
+        >
           <div className="flex min-w-0 items-center gap-2">
             <ShieldCheckIcon data-icon="inline-start" />
             <span className="truncate">{username}</span>
@@ -465,13 +469,18 @@ function SidebarContent({
   )
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className={cn('flex flex-col gap-3 border-b border-border/70 px-3 py-4', collapsed && 'px-2')}>
+    <div className="flex h-full min-h-0 flex-col text-sidebar-foreground">
+      <div
+        className={cn(
+          'flex min-h-[var(--app-shell-header-height)] flex-col justify-center gap-3 border-b border-sidebar-border/70 px-3 py-4',
+          collapsed && 'px-2',
+        )}
+      >
         <div className={cn('flex items-center gap-3', collapsed && 'justify-center')}>
           <img src="/logo.svg" alt="" className="size-10 shrink-0" />
           {!collapsed ? (
             <div className="min-w-0">
-              <div className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+              <div className="text-xs font-medium uppercase tracking-[0.18em] text-sidebar-foreground/62">
                 x-ai-gateway
               </div>
               <div className="truncate text-base font-semibold text-foreground">管理控制台</div>
@@ -480,7 +489,7 @@ function SidebarContent({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 py-4">
+      <div className="scrollbar-subtle min-h-0 flex-1 overflow-y-auto px-2 py-4">
         <nav className="flex flex-col gap-4">
           {navigationGroups.map((group) => {
             const groupActive = activeGroupLabels.has(group.label)
@@ -519,7 +528,7 @@ function SidebarContent({
                         )
                       }
                     >
-                      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-background/85 text-sidebar-foreground/68 shadow-sm ring-1 ring-sidebar-border/70 group-hover:bg-sidebar/80 group-hover:text-sidebar-accent-foreground group-[.active]:bg-sidebar-primary-foreground/18 group-[.active]:text-sidebar-primary-foreground">
+                      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-background/72 text-sidebar-foreground/68 shadow-[0_1px_0_rgba(255,255,255,0.04)] ring-1 ring-sidebar-border/60 group-hover:bg-sidebar/80 group-hover:text-sidebar-accent-foreground group-[.active]:bg-sidebar-primary-foreground/18 group-[.active]:text-sidebar-primary-foreground">
                         <Icon className="size-4" />
                       </div>
                       {!collapsed ? (
@@ -537,7 +546,7 @@ function SidebarContent({
         </nav>
       </div>
 
-      <div className={cn('border-t border-border/70 px-3 py-4', collapsed && 'px-2')}>
+      <div className={cn('border-t border-sidebar-border/70 px-3 py-4', collapsed && 'px-2')}>
         {!collapsed ? (
           <>
             <Separator />

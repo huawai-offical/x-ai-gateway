@@ -1,6 +1,7 @@
 package com.prodigalgal.xaigateway.admin.api;
 
 import com.prodigalgal.xaigateway.admin.application.ProviderSiteAdminService;
+import com.prodigalgal.xaigateway.admin.application.ProviderDomainCatalogService;
 import com.prodigalgal.xaigateway.gateway.core.catalog.SurfaceCapabilityView;
 import com.prodigalgal.xaigateway.gateway.core.interop.CapabilityResolutionView;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
@@ -35,6 +36,9 @@ class ProviderSiteAdminControllerTests {
 
     @MockitoBean
     private ProviderSiteAdminService providerSiteAdminService;
+
+    @MockitoBean
+    private ProviderDomainCatalogService providerDomainCatalogService;
 
     @Test
     void shouldListProviderSites() {
@@ -167,6 +171,23 @@ class ProviderSiteAdminControllerTests {
                 .jsonPath("$.profileCode").isEqualTo("site:openai_direct");
     }
 
+    @Test
+    void shouldExposeProviderDomainCatalog() {
+        Mockito.when(providerDomainCatalogService.catalog()).thenReturn(sampleDomainCatalog());
+
+        webTestClient.get()
+                .uri("/admin/provider-sites/domain-catalog")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.summary.vendorCount").isEqualTo(1)
+                .jsonPath("$.vendors[0].displayName").isEqualTo("Xiaomi MiMo")
+                .jsonPath("$.vendors[0].protocolEndpoints[0].protocolSuite").isEqualTo("xiaomi_mimo.openai_compatible")
+                .jsonPath("$.vendors[0].accountGroups[0].groupKind").isEqualTo("PROTOCOL_ENDPOINT")
+                .jsonPath("$.vendors[0].accountGroups[0].endpointCoverage[0].source").isEqualTo("credential_protocol_endpoint_id")
+                .jsonPath("$.vendors[0].accountGroups[0].distributedKeyBindings[0].keyName").isEqualTo("客户 A Key");
+    }
+
     private ProviderSiteResponse sampleSite() {
         return new ProviderSiteResponse(
                 1L,
@@ -231,6 +252,86 @@ class ProviderSiteAdminControllerTests {
                 "sample",
                 Map.of("reasoningContentMode", "passthrough"),
                 true
+        );
+    }
+
+    private ProviderDomainCatalogResponse sampleDomainCatalog() {
+        return new ProviderDomainCatalogResponse(
+                Instant.parse("2026-05-23T10:00:00Z"),
+                new ProviderDomainCatalogResponse.Summary(1, 1, 1, 1, 1),
+                List.of(new ProviderDomainCatalogResponse.Vendor(
+                        9L,
+                        "preset:xiaomi_mimo",
+                        "Xiaomi MiMo",
+                        "xiaomi_mimo",
+                        "小米 MiMo",
+                        ProviderFamily.OPENAI,
+                        UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC,
+                        true,
+                        "READY",
+                        1,
+                        8,
+                        List.of(new ProviderDomainCatalogResponse.ProtocolEndpoint(
+                                91L,
+                                "xiaomi_mimo:openai",
+                                "MiMo OpenAI-compatible",
+                                "xiaomi_mimo.openai_compatible",
+                                ProviderType.OPENAI_COMPATIBLE,
+                                UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC,
+                                "https://token-plan-sgp.xiaomimimo.com/v1",
+                                true,
+                                1,
+                                List.of(41L)
+                        )),
+                        List.of(new ProviderDomainCatalogResponse.AccountGroup(
+                                41L,
+                                "MiMo OpenAI 生产组",
+                                com.prodigalgal.xaigateway.gateway.core.account.UpstreamAccountProviderType.OPENAI_OAUTH,
+                                "PROTOCOL_ENDPOINT",
+                                "credential_endpoint_coverage",
+                                false,
+                                true,
+                                List.of("mimo-vl"),
+                                List.of("openai"),
+                                List.of("GENERIC_OPENAI"),
+                                1,
+                                List.of(new ProviderDomainCatalogResponse.EndpointCoverage(
+                                        91L,
+                                        "xiaomi_mimo:openai",
+                                        "MiMo OpenAI-compatible",
+                                        "xiaomi_mimo.openai_compatible",
+                                        1,
+                                        "credential_protocol_endpoint_id"
+                                )),
+                                List.of(new ProviderDomainCatalogResponse.Credential(
+                                        501L,
+                                        "Xiaomi MiMo OpenAI Key 1",
+                                        ProviderType.OPENAI_COMPATIBLE,
+                                        9L,
+                                        91L,
+                                        41L,
+                                        true,
+                                        false,
+                                        "READY",
+                                        1,
+                                        null,
+                                        null,
+                                        null,
+                                        null
+                                )),
+                                List.of(new ProviderDomainCatalogResponse.DistributedKeyBinding(
+                                        801L,
+                                        701L,
+                                        "客户 A Key",
+                                        "xagw_live",
+                                        ProviderType.OPENAI_COMPATIBLE,
+                                        10,
+                                        true,
+                                        true
+                                ))
+                        ))
+                )),
+                List.of()
         );
     }
 

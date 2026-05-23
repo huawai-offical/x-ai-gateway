@@ -342,6 +342,12 @@
 | [TASK-20260516-009 OpenAI Direct 显式 Billable/Write Smoke Probe](done/TASK-20260516-009-openai-direct-explicit-billable-write-smoke-probes.md) | Done | Critical | TASK-20260514-031 |
 | [TASK-20260516-010 OpenAI Provider Catalog 覆盖边界校准](done/TASK-20260516-010-openai-provider-catalog-coverage-boundary.md) | Done | High | TASK-20260514-015 / 029 |
 | [TASK-20260523-011 MiMo 资源能力矩阵与 OpenAI-compatible 实现对齐](done/TASK-20260523-011-mimo-resource-capability-matrix-alignment.md) | Done | High | REQ-20260523-010 |
+| [TASK-20260523-012 凭证与厂商领域模型梳理父任务](done/TASK-20260523-012-credential-provider-domain-model-clarification-parent.md) | Done | High | REQ-20260523-011 |
+| [TASK-20260523-013 厂商目录 UI 收敛为 Vendor -> Endpoint -> Group -> Credential](in-progress/TASK-20260523-013-provider-catalog-vendor-endpoint-group-credential-ui.md) | In Progress | High | REP-20260523 |
+| [TASK-20260523-014 厂商领域 API 命名与对象边界收敛](in-progress/TASK-20260523-014-provider-domain-api-naming-boundary.md) | In Progress | High | REP-20260523 |
+| [TASK-20260523-015 能力快照与刷新语义重构](backlog/TASK-20260523-015-capability-snapshot-refresh-semantics-redesign.md) | Backlog | Medium | REP-20260523 |
+| [TASK-20260523-016 账号分组分类、入口覆盖反推与 Distributed Key 授权展示](backlog/TASK-20260523-016-account-group-taxonomy-endpoint-coverage.md) | Backlog | High | REP-20260523 |
+| [TASK-20260523-017 控制台 Apple-level UI/UX 精修](in-progress/TASK-20260523-017-console-apple-level-uiux-polish.md) | In Progress | High | REQ-20260523-012 |
 | [TASK-20260516-014 OpenAI Responses Tools Registry 与非 function Tool 显式边界](done/TASK-20260516-014-openai-responses-tool-registry-boundary.md) | Done | High | TASK-20260514-019 / 013 |
 | [TASK-20260516-015 OpenAI Conversations 本地 Lifecycle](done/TASK-20260516-015-openai-conversations-local-lifecycle.md) | Done | High | TASK-20260514-019 |
 | [TASK-20260516-016 OpenAI Webhooks 接收入口与事件落库](done/TASK-20260516-016-openai-webhooks-ingress-event-persistence.md) | Done | High | TASK-20260514-019 |

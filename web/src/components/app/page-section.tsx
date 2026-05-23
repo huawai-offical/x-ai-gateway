@@ -21,8 +21,8 @@ export function PageSection({
   const hasContent = Children.count(children) > 0
 
   return (
-    <Card className={cn('border-border/60 bg-card/92 shadow-sm', className)}>
-      <CardHeader className="gap-4 border-b border-border/60 pb-4">
+    <Card className={cn('border-border/55 bg-card/88 shadow-[0_1px_2px_rgba(15,23,42,0.06)] backdrop-blur', className)}>
+      <CardHeader className="gap-4 border-b border-border/50 pb-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex flex-col gap-2">
             {kicker ? (

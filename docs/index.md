@@ -123,6 +123,8 @@ x-ai-gateway 不以 OpenAI、Anthropic、Gemini、Vertex、Codex 等官方 API �
 - [REQ-20260523-008 协议入口兼容画像结构化编辑](requirements/REQ-20260523-008-protocol-endpoint-structured-profile-editor.md)
 - [REQ-20260523-009 功能性媒体 API 厂商互转补齐](requirements/REQ-20260523-009-functional-media-provider-translation-parity.md)
 - [REQ-20260523-010 MiMo 资源能力矩阵与已实现 OpenAI-style 入口对齐](requirements/REQ-20260523-010-mimo-resource-capability-matrix-alignment.md)
+- [REQ-20260523-011 凭证与厂商领域模型梳理](requirements/REQ-20260523-011-credential-provider-domain-model-clarification.md)
+- [REQ-20260523-012 控制台 Apple-level UI/UX 精修](requirements/REQ-20260523-012-console-apple-level-uiux-polish.md)
 
 ## 决策
 
@@ -158,6 +160,7 @@ x-ai-gateway 不以 OpenAI、Anthropic、Gemini、Vertex、Codex 等官方 API �
 - [REP-20260519 Codex 最高优先级重排](reports/REP-20260519-codex-priority-replan.md)
 - [REP-20260521 项目进度复核与 Codex/UI/UX 优先级重排](reports/REP-20260521-project-progress-codex-uiux-reprioritization.md)
 - [REP-20260521 功能性服务 API Backlog 收口审计](reports/REP-20260521-functional-scope-backlog-closeout.md)
+- [REP-20260523 凭证与厂商领域模型关系梳理](reports/REP-20260523-credential-provider-domain-model.md)
 
 ## 迁移记录
 

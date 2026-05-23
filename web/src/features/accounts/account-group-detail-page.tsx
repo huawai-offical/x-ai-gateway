@@ -686,7 +686,7 @@ export function AccountGroupDetailPage() {
             <InfoGrid items={groupItems} columnsClassName="md:grid-cols-2 xl:grid-cols-3" />
 
             <div className="grid gap-4 lg:grid-cols-3">
-              <div className="rounded-2xl border border-border/60 bg-muted/10 p-4">
+              <div className="rounded-xl border border-border/45 bg-muted/10 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                 <div className="text-sm font-semibold text-foreground">支持协议</div>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {(group.supportedProtocols?.length ? group.supportedProtocols : ['无']).map((item) => (
@@ -694,7 +694,7 @@ export function AccountGroupDetailPage() {
                   ))}
                 </div>
               </div>
-              <div className="rounded-2xl border border-border/60 bg-muted/10 p-4">
+              <div className="rounded-xl border border-border/45 bg-muted/10 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                 <div className="text-sm font-semibold text-foreground">允许客户端</div>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {(group.allowedClientFamilies?.length ? group.allowedClientFamilies : ['全部']).map((item) => (
@@ -702,7 +702,7 @@ export function AccountGroupDetailPage() {
                   ))}
                 </div>
               </div>
-              <div className="rounded-2xl border border-border/60 bg-muted/10 p-4">
+              <div className="rounded-xl border border-border/45 bg-muted/10 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                 <div className="text-sm font-semibold text-foreground">支持模型</div>
                 <div className="mt-2 text-sm text-muted-foreground">
                   {group.supportedModels?.length ? summarizeItems(group.supportedModels, '无', 6) : '无'}
@@ -716,7 +716,7 @@ export function AccountGroupDetailPage() {
             {toggleGroupMutation.error ? <InlineError error={toggleGroupMutation.error} title="账号分组状态更新失败" /> : null}
             {deleteGroupMutation.error ? <InlineError error={deleteGroupMutation.error} title="账号分组删除失败" /> : null}
 
-            <form className="flex flex-col gap-4 rounded-2xl border border-border/60 bg-muted/20 p-4 md:flex-row md:items-end" onSubmit={handleBind}>
+            <form className="flex flex-col gap-4 rounded-xl border border-border/45 bg-muted/15 p-4 md:flex-row md:items-end" onSubmit={handleBind}>
               <label className="flex min-w-0 flex-1 flex-col gap-2">
                 <span className="text-sm font-medium text-foreground">分布式 Key</span>
                 <select
@@ -755,7 +755,7 @@ export function AccountGroupDetailPage() {
             </form>
 
             {lastImportResult ? (
-              <div role="status" className="rounded-2xl border border-border/60 bg-card/80 p-4">
+              <div role="status" className="rounded-xl border border-border/45 bg-card/80 p-4">
                 <div className="mb-3 flex flex-wrap items-center gap-2">
                   <StatusBadge tone={lastImportResult.routeEligible === false ? 'warning' : 'success'}>
                     {lastImportResult.status}
@@ -825,7 +825,7 @@ export function AccountGroupDetailPage() {
             {runtimeAccounts.length ? (
               <PaginatedRows items={runtimeAccounts}>
                 {({ pageItems }) => (
-                  <div className="overflow-x-auto rounded-2xl border border-border/60 bg-card/92">
+                  <div className="scrollbar-subtle overflow-x-auto rounded-xl border border-border/45 bg-card/82">
                     <table className="min-w-[1080px] w-full table-fixed text-sm">
                   <thead className="bg-muted/30">
                     <tr>
@@ -970,7 +970,7 @@ export function AccountGroupDetailPage() {
         ) : accountsQuery.data?.length ? (
           <PaginatedRows items={accountsQuery.data ?? []}>
             {({ pageItems }) => (
-              <div className="overflow-x-auto rounded-2xl border border-border/60 bg-card/92">
+              <div className="scrollbar-subtle overflow-x-auto rounded-xl border border-border/45 bg-card/82">
                 <table className="min-w-[900px] w-full table-fixed text-sm">
               <thead className="bg-muted/30">
                 <tr>
@@ -1023,7 +1023,7 @@ export function AccountGroupDetailPage() {
         ) : credentialsQuery.data?.length ? (
           <PaginatedRows items={credentialsQuery.data ?? []}>
             {({ pageItems }) => (
-              <div className="overflow-x-auto rounded-2xl border border-border/60 bg-card/92">
+              <div className="scrollbar-subtle overflow-x-auto rounded-xl border border-border/45 bg-card/82">
                 <table className="min-w-[900px] w-full table-fixed text-sm">
               <thead className="bg-muted/30">
                 <tr>
@@ -1264,7 +1264,7 @@ export function AccountGroupDetailPage() {
             {runtimeBatchResult.items.length ? (
               <PaginatedRows items={runtimeBatchResult.items}>
                 {({ pageItems }) => (
-                  <div className="overflow-x-auto rounded-2xl border border-border/60 bg-card/92">
+                  <div className="scrollbar-subtle overflow-x-auto rounded-xl border border-border/45 bg-card/82">
                     <table className="min-w-[1060px] w-full table-fixed text-sm">
                   <thead className="bg-muted/30">
                     <tr>

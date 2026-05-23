@@ -1,6 +1,7 @@
 package com.prodigalgal.xaigateway.admin.api;
 
 import com.prodigalgal.xaigateway.admin.application.ProviderSiteAdminService;
+import com.prodigalgal.xaigateway.admin.application.ProviderDomainCatalogService;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.validation.annotation.Validated;
@@ -19,9 +20,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class ProviderSiteAdminController {
 
     private final ProviderSiteAdminService providerSiteAdminService;
+    private final ProviderDomainCatalogService providerDomainCatalogService;
 
-    public ProviderSiteAdminController(ProviderSiteAdminService providerSiteAdminService) {
+    public ProviderSiteAdminController(
+            ProviderSiteAdminService providerSiteAdminService,
+            ProviderDomainCatalogService providerDomainCatalogService) {
         this.providerSiteAdminService = providerSiteAdminService;
+        this.providerDomainCatalogService = providerDomainCatalogService;
     }
 
     @GetMapping
@@ -49,6 +54,11 @@ public class ProviderSiteAdminController {
     @GetMapping("/capability-matrix")
     public List<CapabilityMatrixRowResponse> capabilityMatrix() {
         return providerSiteAdminService.capabilityMatrix();
+    }
+
+    @GetMapping("/domain-catalog")
+    public ProviderDomainCatalogResponse domainCatalog() {
+        return providerDomainCatalogService.catalog();
     }
 
     @PostMapping("/refresh")

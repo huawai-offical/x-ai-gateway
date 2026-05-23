@@ -86,6 +86,104 @@ export type ProviderSite = {
   updatedAt?: string | null
 }
 
+export type ProviderDomainCatalog = {
+  generatedAt?: string | null
+  summary: ProviderDomainCatalogSummary
+  vendors: ProviderDomainVendor[]
+  unassignedAccountGroups: ProviderDomainAccountGroup[]
+}
+
+export type ProviderDomainCatalogSummary = {
+  vendorCount: number
+  protocolEndpointCount: number
+  accountGroupCount: number
+  credentialCount: number
+  distributedKeyBindingCount: number
+}
+
+export type ProviderDomainVendor = {
+  siteProfileId: number
+  profileCode: string
+  displayName: string
+  vendorCode?: string | null
+  vendorName?: string | null
+  providerFamily: string
+  siteKind: string
+  active: boolean
+  healthState: string
+  linkedCredentialCount: number
+  modelCount: number
+  protocolEndpoints: ProviderDomainProtocolEndpoint[]
+  accountGroups: ProviderDomainAccountGroup[]
+}
+
+export type ProviderDomainProtocolEndpoint = {
+  id: number | null
+  endpointCode: string
+  displayName: string
+  protocolSuite: string
+  providerType: string
+  siteKind: string
+  baseUrl: string
+  active: boolean
+  linkedCredentialCount: number
+  accountGroupIds: number[]
+}
+
+export type ProviderDomainAccountGroup = {
+  id: number
+  groupName: string
+  providerType: string
+  groupKind: string
+  groupKindSource: string
+  defaultGroup: boolean
+  active: boolean
+  supportedModels: string[]
+  supportedProtocols: string[]
+  allowedClientFamilies: string[]
+  apiCredentialCount: number
+  endpointCoverage: ProviderDomainEndpointCoverage[]
+  credentials: ProviderDomainCredential[]
+  distributedKeyBindings: ProviderDomainDistributedKeyBinding[]
+}
+
+export type ProviderDomainEndpointCoverage = {
+  endpointId: number | null
+  endpointCode?: string | null
+  displayName: string
+  protocolSuite?: string | null
+  credentialCount: number
+  source: string
+}
+
+export type ProviderDomainCredential = {
+  id: number
+  credentialName: string
+  providerType: string
+  siteProfileId?: number | null
+  protocolEndpointId?: number | null
+  groupId?: number | null
+  active: boolean
+  cooldown: boolean
+  status: string
+  supportedModelCount: number
+  lastErrorCode?: string | null
+  lastErrorMessage?: string | null
+  cooldownUntil?: string | null
+  lastUsedAt?: string | null
+}
+
+export type ProviderDomainDistributedKeyBinding = {
+  bindingId: number
+  distributedKeyId?: number | null
+  keyName?: string | null
+  keyPrefix?: string | null
+  providerType: string
+  priority: number
+  bindingActive: boolean
+  distributedKeyActive: boolean
+}
+
 export type ProviderSitePreset = {
   code: string
   profileCode: string

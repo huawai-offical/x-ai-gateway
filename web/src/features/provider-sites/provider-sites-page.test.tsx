@@ -89,6 +89,9 @@ const { apiRequestMock } = vi.hoisted(() => ({
         },
       ]
     }
+    if (url === '/admin/provider-sites/domain-catalog' && !init?.method) {
+      return sampleDomainCatalog()
+    }
     if (url === '/admin/provider-sites' && init?.method === 'POST') {
       return sampleSite({ displayName: 'DeepSeek OpenAI 入口', vendorCode: 'deepseek', vendorName: 'DeepSeek' })
     }
@@ -120,6 +123,8 @@ describe('ProviderSitesPage', () => {
     renderPage()
 
     expect(await screen.findByText('OpenAI 主站')).toBeInTheDocument()
+    expect(await screen.findByText('OpenAI 生产组')).toBeInTheDocument()
+    expect(await screen.findByText('1 Key 绑定')).toBeInTheDocument()
     expect(screen.queryByText('厂商管理中心')).not.toBeInTheDocument()
     expect(await screen.findByText('MiMo OpenAI 入口')).toBeInTheDocument()
     expect(await screen.findByRole('heading', { name: '厂商目录' })).toBeInTheDocument()
@@ -186,6 +191,104 @@ function sampleSite(patch: Partial<ReturnType<typeof baseSite>> = {}) {
   return {
     ...baseSite(),
     ...patch,
+  }
+}
+
+function sampleDomainCatalog() {
+  return {
+    generatedAt: '2026-05-23T10:00:00Z',
+    summary: {
+      vendorCount: 1,
+      protocolEndpointCount: 1,
+      accountGroupCount: 1,
+      credentialCount: 1,
+      distributedKeyBindingCount: 1,
+    },
+    vendors: [
+      {
+        siteProfileId: 1,
+        profileCode: 'site:openai_direct',
+        displayName: 'OpenAI 主站',
+        vendorCode: 'openai',
+        vendorName: 'OpenAI',
+        providerFamily: 'OPENAI',
+        siteKind: 'OPENAI_DIRECT',
+        active: true,
+        healthState: 'READY',
+        linkedCredentialCount: 1,
+        modelCount: 2,
+        protocolEndpoints: [
+          {
+            id: 11,
+            endpointCode: 'openai:openai-compatible',
+            displayName: 'OpenAI 默认入口',
+            protocolSuite: 'openai.native',
+            providerType: 'OPENAI_DIRECT',
+            siteKind: 'OPENAI_DIRECT',
+            baseUrl: 'https://api.openai.com',
+            active: true,
+            linkedCredentialCount: 1,
+            accountGroupIds: [1],
+          },
+        ],
+        accountGroups: [
+          {
+            id: 1,
+            groupName: 'OpenAI 生产组',
+            providerType: 'OPENAI_OAUTH',
+            groupKind: 'ENVIRONMENT',
+            groupKindSource: 'name_heuristic',
+            defaultGroup: false,
+            active: true,
+            supportedModels: ['gpt-4o'],
+            supportedProtocols: ['openai'],
+            allowedClientFamilies: ['GENERIC_OPENAI'],
+            apiCredentialCount: 1,
+            endpointCoverage: [
+              {
+                endpointId: 11,
+                endpointCode: 'openai:openai-compatible',
+                displayName: 'OpenAI 默认入口',
+                protocolSuite: 'openai.native',
+                credentialCount: 1,
+                source: 'credential_protocol_endpoint_id',
+              },
+            ],
+            credentials: [
+              {
+                id: 501,
+                credentialName: 'OpenAI Key 1',
+                providerType: 'OPENAI_DIRECT',
+                siteProfileId: 1,
+                protocolEndpointId: 11,
+                groupId: 1,
+                active: true,
+                cooldown: false,
+                status: 'READY',
+                supportedModelCount: 1,
+                lastErrorCode: null,
+                lastErrorMessage: null,
+                cooldownUntil: null,
+                lastUsedAt: null,
+              },
+            ],
+            distributedKeyBindings: [
+              {
+                bindingId: 801,
+                distributedKeyId: 701,
+                keyName: '客户 A Key',
+                keyPrefix: 'xagw_live',
+                providerType: 'OPENAI_DIRECT',
+                priority: 10,
+                bindingActive: true,
+                distributedKeyActive: true,
+              },
+            ],
+          },
+        ],
+      },
+    ],
+    unassignedAccountGroups: [],
   }
 }
 

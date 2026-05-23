@@ -24,6 +24,8 @@ import { apiRequest } from '@/lib/api'
 import { formatInstant } from '@/lib/format'
 import {
   SITE_KIND_OPTIONS,
+  type ProviderDomainCatalog,
+  type ProviderDomainVendor,
   type ProviderProtocolEndpoint,
   type ProviderSite,
   type ProviderSiteDraft,
@@ -57,6 +59,9 @@ type ProviderCatalogRow = {
   supportedProtocols: string[]
   baseUrl: string | null
   endpoints: ProviderProtocolEndpoint[]
+  domainVendor: ProviderDomainVendor | null
+  accountGroupCount: number
+  distributedKeyBindingCount: number
   modelFamilies: string[]
   modelCount: number
   credentialCount: number
@@ -79,6 +84,10 @@ export function ProviderSitesPage() {
     queryKey: ['provider-sites', 'presets'],
     queryFn: () => apiRequest<ProviderSitePreset[]>('/admin/provider-sites/presets'),
   })
+  const domainCatalogQuery = useQuery({
+    queryKey: ['provider-sites', 'domain-catalog'],
+    queryFn: () => apiRequest<ProviderDomainCatalog>('/admin/provider-sites/domain-catalog'),
+  })
 
   const sites = useMemo(
     () => [...((sitesQuery.data ?? []) as ProviderSite[])].sort((left, right) => {
@@ -93,7 +102,8 @@ export function ProviderSitesPage() {
     ),
     [presetsQuery.data],
   )
-  const catalogRows = useMemo(() => buildCatalogRows(sites, presets), [presets, sites])
+  const domainCatalog = domainCatalogQuery.data ?? null
+  const catalogRows = useMemo(() => buildCatalogRows(sites, presets, domainCatalog), [domainCatalog, presets, sites])
   const vendorOptions = useMemo(() => {
     const set = new Set<string>()
     for (const row of catalogRows) {
@@ -105,7 +115,7 @@ export function ProviderSitesPage() {
     const normalizedKeyword = keyword.trim().toLowerCase()
     return catalogRows.filter((row) => {
       const matchesVendor = vendorFilter === 'ALL' || row.vendorCode === vendorFilter
-      const text = [
+    const text = [
         row.profileCode,
         row.displayName,
         row.vendorCode,
@@ -115,6 +125,7 @@ export function ProviderSitesPage() {
         row.baseUrl,
         row.site ? '已导入' : '可导入',
         summarizeEndpointLabels(row.endpoints),
+        summarizeDomainGroups(row.domainVendor),
       ].filter(Boolean).join(' ').toLowerCase()
       return matchesVendor && (!normalizedKeyword || text.includes(normalizedKeyword))
     })
@@ -162,7 +173,7 @@ export function ProviderSitesPage() {
     onSuccess: () => invalidateProviderSiteQueries(queryClient),
   })
 
-  const firstError = sitesQuery.error ?? presetsQuery.error ?? saveMutation.error ?? deleteMutation.error ?? refreshMutation.error ?? importMutation.error
+  const firstError = sitesQuery.error ?? presetsQuery.error ?? domainCatalogQuery.error ?? saveMutation.error ?? deleteMutation.error ?? refreshMutation.error ?? importMutation.error
 
   const openCreate = () => {
     setDraft(emptyDraft)
@@ -202,16 +213,16 @@ export function ProviderSitesPage() {
           </Button>
         </div>
         {firstError ? <InlineError error={firstError} title="厂商管理操作失败" /> : null}
-        {sitesQuery.isPending || presetsQuery.isPending ? (
+        {sitesQuery.isPending || presetsQuery.isPending || domainCatalogQuery.isPending ? (
           <PageSkeleton count={2} />
         ) : (
           <>
             <InfoGrid
               items={[
                 { key: 'catalog', label: '厂商目录', value: catalogRows.length.toLocaleString('zh-CN'), hint: `${sites.length} 个已导入 / ${catalogRows.length - sites.length} 个可导入` },
-                { key: 'sites', label: '已导入入口', value: sites.length.toLocaleString('zh-CN') },
-                { key: 'models', label: '模型记录', value: sites.reduce((sum, site) => sum + site.modelCount, 0).toLocaleString('zh-CN') },
-                { key: 'credentials', label: '绑定凭证', value: sites.reduce((sum, site) => sum + site.linkedCredentialCount, 0).toLocaleString('zh-CN') },
+                { key: 'endpoints', label: '协议入口', value: (domainCatalog?.summary.protocolEndpointCount ?? sites.reduce((sum, site) => sum + site.protocolEndpoints.length, 0)).toLocaleString('zh-CN') },
+                { key: 'groups', label: '账号分组', value: (domainCatalog?.summary.accountGroupCount ?? catalogRows.reduce((sum, row) => sum + row.accountGroupCount, 0)).toLocaleString('zh-CN') },
+                { key: 'credentials', label: '绑定凭证', value: (domainCatalog?.summary.credentialCount ?? sites.reduce((sum, site) => sum + site.linkedCredentialCount, 0)).toLocaleString('zh-CN') },
               ]}
             />
 
@@ -248,7 +259,7 @@ export function ProviderSitesPage() {
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-xl font-semibold tracking-tight text-foreground">厂商目录</h2>
         </div>
-        {sitesQuery.isPending || presetsQuery.isPending ? (
+        {sitesQuery.isPending || presetsQuery.isPending || domainCatalogQuery.isPending ? (
           <PageSkeleton count={1} />
         ) : filteredRows.length ? (
           <PaginatedRows
@@ -257,7 +268,7 @@ export function ProviderSitesPage() {
             paginationClassName="rounded-none border-x-0 border-b-0 bg-transparent px-0"
           >
             {({ pageItems }) => (
-              <div className="overflow-x-auto rounded-xl border border-border/60 bg-card/92">
+              <div className="scrollbar-subtle overflow-x-auto rounded-xl border border-border/45 bg-card/82">
                 <table className="w-full min-w-[1100px] table-fixed text-sm">
                   <thead className="bg-muted/30">
                     <tr>
@@ -265,6 +276,7 @@ export function ProviderSitesPage() {
                       <th className="w-[16%] border-b border-border/60 px-3 py-3 text-left font-medium text-muted-foreground">状态</th>
                       <th className="w-[18%] border-b border-border/60 px-3 py-3 text-left font-medium text-muted-foreground">默认站点类型</th>
                       <th className="w-[22%] border-b border-border/60 px-3 py-3 text-left font-medium text-muted-foreground">协议入口</th>
+                      <th className="w-[10%] border-b border-border/60 px-3 py-3 text-left font-medium text-muted-foreground">分组</th>
                       <th className="w-[10%] border-b border-border/60 px-3 py-3 text-left font-medium text-muted-foreground">规模</th>
                       <th className="w-[12%] border-b border-border/60 px-3 py-3 text-left font-medium text-muted-foreground">操作</th>
                     </tr>
@@ -302,8 +314,12 @@ export function ProviderSitesPage() {
                           <EndpointSummary endpoints={row.endpoints} />
                         </td>
                         <td className="px-3 py-4 text-muted-foreground">
+                          <AccountGroupSummary row={row} />
+                        </td>
+                        <td className="px-3 py-4 text-muted-foreground">
                           <div>{row.modelCount.toLocaleString('zh-CN')} 模型</div>
                           <div className="text-xs">{row.credentialCount.toLocaleString('zh-CN')} 凭证</div>
+                          <div className="text-xs">{row.distributedKeyBindingCount.toLocaleString('zh-CN')} Key 绑定</div>
                         </td>
                         <td className="px-3 py-4">
                           <div className="flex flex-wrap gap-2">
@@ -488,17 +504,42 @@ function EndpointSummary({ endpoints }: { endpoints: ProviderProtocolEndpoint[] 
   )
 }
 
-function buildCatalogRows(sites: ProviderSite[], presets: ProviderSitePreset[]): ProviderCatalogRow[] {
+function AccountGroupSummary({ row }: { row: ProviderCatalogRow }) {
+  const groups = row.domainVendor?.accountGroups ?? []
+  if (!groups.length) {
+    return <span>暂无</span>
+  }
+  return (
+    <div className="flex flex-col gap-1">
+      {groups.slice(0, 2).map((group) => (
+        <div key={group.id} className="min-w-0">
+          <div className="truncate text-foreground" title={group.groupName}>{group.groupName}</div>
+          <div className="text-xs">{groupKindLabel(group.groupKind)} / {group.apiCredentialCount} 凭证</div>
+        </div>
+      ))}
+      {groups.length > 2 ? (
+        <div className="text-xs">+{groups.length - 2} 个分组</div>
+      ) : null}
+    </div>
+  )
+}
+
+function buildCatalogRows(sites: ProviderSite[], presets: ProviderSitePreset[], domainCatalog: ProviderDomainCatalog | null): ProviderCatalogRow[] {
   const sitesById = new Map(sites.map((site) => [site.id, site]))
   const sitesByProfileCode = new Map(sites.map((site) => [site.profileCode, site]))
+  const domainVendorsBySiteId = new Map((domainCatalog?.vendors ?? []).map((vendor) => [vendor.siteProfileId, vendor]))
   const usedSiteIds = new Set<number>()
   const rows: ProviderCatalogRow[] = []
 
   for (const preset of presets) {
     const site = preset.existingSiteProfileId ? sitesById.get(preset.existingSiteProfileId) ?? null : sitesByProfileCode.get(preset.profileCode) ?? null
+    const domainVendor = site ? domainVendorsBySiteId.get(site.id) ?? null : null
     if (site) {
       usedSiteIds.add(site.id)
     }
+    const endpoints = domainVendor ? domainEndpointsToProviderEndpoints(domainVendor) : (site?.protocolEndpoints?.length ? site.protocolEndpoints : (preset.protocolEndpoints ?? []))
+    const accountGroupCount = domainVendor?.accountGroups.length ?? 0
+    const distributedKeyBindingCount = domainVendor?.accountGroups.reduce((sum, group) => sum + group.distributedKeyBindings.length, 0) ?? 0
     rows.push({
       key: `preset:${preset.code}`,
       site,
@@ -511,10 +552,13 @@ function buildCatalogRows(sites: ProviderSite[], presets: ProviderSitePreset[]):
       siteKind: site?.siteKind ?? preset.siteKind,
       supportedProtocols: site?.supportedProtocols ?? preset.supportedProtocols,
       baseUrl: site?.baseUrlPattern ?? preset.defaultBaseUrl ?? null,
-      endpoints: site?.protocolEndpoints?.length ? site.protocolEndpoints : (preset.protocolEndpoints ?? []),
+      endpoints,
+      domainVendor,
+      accountGroupCount,
+      distributedKeyBindingCount,
       modelFamilies: preset.modelFamilies,
-      modelCount: site?.modelCount ?? preset.modelFamilies.length,
-      credentialCount: site?.linkedCredentialCount ?? 0,
+      modelCount: domainVendor?.modelCount ?? site?.modelCount ?? preset.modelFamilies.length,
+      credentialCount: domainVendor?.linkedCredentialCount ?? site?.linkedCredentialCount ?? 0,
     })
   }
 
@@ -522,6 +566,8 @@ function buildCatalogRows(sites: ProviderSite[], presets: ProviderSitePreset[]):
     if (usedSiteIds.has(site.id)) {
       continue
     }
+    const domainVendor = domainVendorsBySiteId.get(site.id) ?? null
+    const endpoints = domainVendor ? domainEndpointsToProviderEndpoints(domainVendor) : (site.protocolEndpoints ?? [])
     rows.push({
       key: `site:${site.id}`,
       site,
@@ -534,16 +580,42 @@ function buildCatalogRows(sites: ProviderSite[], presets: ProviderSitePreset[]):
       siteKind: site.siteKind,
       supportedProtocols: site.supportedProtocols,
       baseUrl: site.baseUrlPattern ?? null,
-      endpoints: site.protocolEndpoints ?? [],
+      endpoints,
+      domainVendor,
+      accountGroupCount: domainVendor?.accountGroups.length ?? 0,
+      distributedKeyBindingCount: domainVendor?.accountGroups.reduce((sum, group) => sum + group.distributedKeyBindings.length, 0) ?? 0,
       modelFamilies: [],
-      modelCount: site.modelCount,
-      credentialCount: site.linkedCredentialCount,
+      modelCount: domainVendor?.modelCount ?? site.modelCount,
+      credentialCount: domainVendor?.linkedCredentialCount ?? site.linkedCredentialCount,
     })
   }
 
   return rows.sort((left, right) =>
     left.vendorName.localeCompare(right.vendorName) || left.displayName.localeCompare(right.displayName),
   )
+}
+
+function domainEndpointsToProviderEndpoints(vendor: ProviderDomainVendor): ProviderProtocolEndpoint[] {
+  return vendor.protocolEndpoints.map((endpoint) => ({
+    id: endpoint.id,
+    siteProfileId: vendor.siteProfileId,
+    endpointCode: endpoint.endpointCode,
+    displayName: endpoint.displayName,
+    protocolSuite: endpoint.protocolSuite,
+    providerType: endpoint.providerType,
+    siteKind: endpoint.siteKind,
+    baseUrl: endpoint.baseUrl,
+    authStrategy: '',
+    pathStrategy: '',
+    modelAddressingStrategy: '',
+    errorSchemaStrategy: '',
+    streamTransport: null,
+    conversationProfile: {},
+    active: endpoint.active,
+    linkedCredentialCount: endpoint.linkedCredentialCount,
+    createdAt: null,
+    updatedAt: null,
+  }))
 }
 
 function buildPayload(draft: ProviderSiteDraft) {
@@ -616,8 +688,42 @@ function summarizeEndpointLabels(endpoints: ProviderProtocolEndpoint[]) {
     .join(' ')
 }
 
+function summarizeDomainGroups(vendor: ProviderDomainVendor | null) {
+  if (!vendor) {
+    return ''
+  }
+  return vendor.accountGroups
+    .flatMap((group) => [
+      group.groupName,
+      group.groupKind,
+      ...group.endpointCoverage.map((coverage) => coverage.protocolSuite ?? coverage.displayName),
+      ...group.distributedKeyBindings.map((binding) => binding.keyName ?? binding.keyPrefix ?? ''),
+    ])
+    .filter(Boolean)
+    .join(' ')
+}
+
 function formatEnum(value: string) {
   return value.replaceAll('_', ' ')
+}
+
+function groupKindLabel(value: string) {
+  switch (value) {
+    case 'DEFAULT':
+      return '默认'
+    case 'ENVIRONMENT':
+      return '环境'
+    case 'PROTOCOL_ENDPOINT':
+      return '协议入口'
+    case 'COST_QUOTA':
+      return '成本额度'
+    case 'HEALTH_STANDBY':
+      return '主备'
+    case 'CLIENT_AUTHORIZATION':
+      return '授权'
+    default:
+      return '通用池'
+  }
 }
 
 function healthTone(value?: string | null) {

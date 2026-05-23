@@ -471,8 +471,8 @@ export function AccountGroupsPage() {
         ) : groups.length ? (
           <PaginatedRows items={groups}>
             {({ pageItems }) => (
-              <div className="overflow-hidden rounded-2xl border border-border/60 bg-card/92">
-                <table className="w-full table-fixed text-sm">
+              <div className="scrollbar-subtle overflow-x-auto rounded-xl border border-border/45 bg-card/82">
+                <table className="w-full min-w-[900px] table-fixed text-sm">
                   <thead className="bg-muted/30">
                     <tr>
                       <th className="w-[24%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">账号分组名称</th>

@@ -24,10 +24,10 @@
   --surface-glow-b: rgba(59, 130, 246, 0.12);
   --surface-grid: rgba(15, 23, 42, 0.04);
   --surface-mask: linear-gradient(180deg, rgba(0, 0, 0, 0.28), transparent 78%);
-  --scrollbar-size: 0.82rem;
-  --scrollbar-track: rgba(203, 213, 225, 0.48);
-  --scrollbar-thumb: rgba(100, 116, 139, 0.72);
-  --scrollbar-thumb-hover: rgba(71, 85, 105, 0.88);
+  --scrollbar-size: 0.62rem;
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: rgba(100, 116, 139, 0.46);
+  --scrollbar-thumb-hover: rgba(71, 85, 105, 0.72);
 
   --background: oklch(0.985 0.004 247.858);
   --foreground: oklch(0.246 0.021 258.251);
@@ -192,9 +192,9 @@ samp {
   --surface-glow-b: rgba(59, 130, 246, 0.12);
   --surface-grid: rgba(148, 163, 184, 0.08);
   --surface-mask: linear-gradient(180deg, rgba(0, 0, 0, 0.42), transparent 78%);
-  --scrollbar-track: rgba(30, 41, 59, 0.72);
-  --scrollbar-thumb: rgba(148, 163, 184, 0.72);
-  --scrollbar-thumb-hover: rgba(226, 232, 240, 0.78);
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: rgba(148, 163, 184, 0.38);
+  --scrollbar-thumb-hover: rgba(226, 232, 240, 0.66);
   --background: oklch(0.205 0.015 257.998);
   --foreground: oklch(0.965 0.003 264.542);
   --card: oklch(0.257 0.014 253.1);
@@ -244,4 +244,36 @@ samp {
   ::selection {
     background: color-mix(in oklab, var(--primary) 22%, white);
   }
+}
+
+.scrollbar-subtle {
+  scrollbar-color: transparent transparent;
+}
+
+.scrollbar-subtle:hover,
+.scrollbar-subtle:focus-within {
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+.scrollbar-subtle::-webkit-scrollbar {
+  width: 0.56rem;
+  height: 0.56rem;
+}
+
+.scrollbar-subtle::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-subtle::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  background-color: transparent;
+}
+
+.scrollbar-subtle:hover::-webkit-scrollbar-thumb,
+.scrollbar-subtle:focus-within::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+}
+
+.scrollbar-subtle::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
 }

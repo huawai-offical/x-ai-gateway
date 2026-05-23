@@ -566,7 +566,7 @@ export function CredentialsPage() {
           />
         ) : null}
         {refreshMessage ? (
-          <div className="rounded-2xl border border-border/60 bg-card/80 px-4 py-3 text-sm text-foreground">
+          <div className="rounded-xl border border-border/45 bg-card/75 px-4 py-3 text-sm text-foreground">
             {refreshMessage}
           </div>
         ) : null}
@@ -578,7 +578,7 @@ export function CredentialsPage() {
         ) : credentialRows.length ? (
           <PaginatedRows items={credentialRows}>
             {({ pageItems }) => (
-              <div className="overflow-x-auto rounded-2xl border border-border/60 bg-card/92">
+              <div className="scrollbar-subtle overflow-x-auto rounded-xl border border-border/45 bg-card/82">
                 <table className="w-full min-w-[960px] table-fixed text-sm">
                   <thead className="bg-muted/30">
                     <tr>
