@@ -3,6 +3,7 @@ import '@testing-library/jest-dom/vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { ConfirmProvider } from '@/components/app/confirm-provider'
 import { ModelsPage } from './models-page'
 
 const { apiRequestMock } = vi.hoisted(() => ({
@@ -102,7 +103,9 @@ describe('ModelsPage', () => {
   it('renders model directory and alias table, and opens model detail dialog', async () => {
     render(
       <QueryClientProvider client={new QueryClient()}>
-        <ModelsPage />
+        <ConfirmProvider>
+          <ModelsPage />
+        </ConfirmProvider>
       </QueryClientProvider>,
     )
 

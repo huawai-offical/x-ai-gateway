@@ -14,6 +14,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { EmptyState } from '@/components/app/empty-state'
+import { useConfirm } from '@/components/app/confirm-provider'
 import { InlineError } from '@/components/app/inline-error'
 import { PageSection } from '@/components/app/page-section'
 import { PageSkeleton } from '@/components/app/page-skeleton'
@@ -48,6 +49,7 @@ const PROXY_SCHEME_OPTIONS = [
 
 export function ProxiesPage() {
   const queryClient = useQueryClient()
+  const confirm = useConfirm()
   const [open, setOpen] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [step, setStep] = useState<EditStep>('basic')
@@ -121,8 +123,14 @@ export function ProxiesPage() {
     })
   }
 
-  const handleDelete = (item: ProxyItem) => {
-    if (!window.confirm(`确认删除代理“${item.proxyName}”吗？`)) {
+  const handleDelete = async (item: ProxyItem) => {
+    const confirmed = await confirm({
+      title: '删除代理',
+      description: `确认删除“${item.proxyName}”吗？该操作会立即移除这条代理配置。`,
+      confirmLabel: '删除',
+      destructive: true,
+    })
+    if (!confirmed) {
       return
     }
     deleteMutation.mutate(item.id)
@@ -183,7 +191,7 @@ export function ProxiesPage() {
                             <Button type="button" variant="outline" size="sm" onClick={() => handleOpenEdit(proxy)}>
                               编辑
                             </Button>
-                            <Button type="button" variant="outline" size="sm" onClick={() => handleDelete(proxy)} disabled={deleteMutation.isPending}>
+                            <Button type="button" variant="outline" size="sm" onClick={() => void handleDelete(proxy)} disabled={deleteMutation.isPending}>
                               删除
                             </Button>
                             <Button asChild variant="outline" size="sm">

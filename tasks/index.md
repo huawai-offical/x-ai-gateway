@@ -60,7 +60,7 @@
 | P0-UI-UX-10 | [TASK-20260522-002 网络代理拨测功能下线](done/TASK-20260522-002-network-proxy-probe-retirement.md) | Done | 删除网络代理拨测页面、任务、接口和 baseline 表 |
 | P0-UI-UX-11 | [TASK-20260522-003 提示气泡化与超大文件组件化拆分](done/TASK-20260522-003-toast-feedback-and-component-splitting.md) | Done | `InlineError` 改为左上角 toast，调试工作台拆出预设和展示组件 |
 | P0-UI-UX-11a | [TASK-20260522-024 全局操作结果提示收敛](done/TASK-20260522-024-action-feedback-toast-coverage-parent.md) | Done | React Query mutation 成功/失败默认 toast，凭证刷新模型成功提示与失败去重 |
-| P1-UI-UX-12 | [TASK-20260522-004 原生确认弹窗与通知入口统一](backlog/TASK-20260522-004-confirm-dialog-notification-unification.md) | Backlog | 迁移 18 处 `window.confirm` 到统一确认弹窗 |
+| P1-UI-UX-12 | [TASK-20260522-004 原生确认弹窗与通知入口统一](done/TASK-20260522-004-confirm-dialog-notification-unification.md) | Done | 已迁移业务删除确认到统一确认弹窗，`window.confirm` 清零 |
 | P0-UI-UX-13 | [TASK-20260523-008 前端路由错误页自定义](done/TASK-20260523-008-router-error-boundary-customization.md) | Done | 替换 React Router 默认错误页，覆盖动态模块加载失败、未匹配路由与 route 层异常 |
 | P1-ARCH-02 | [TASK-20260522-005 超大文件分批组件化与服务拆分](backlog/TASK-20260522-005-giant-file-decomposition-roadmap.md) | Backlog | 按 P0/P1 清单继续拆前端巨页和后端超级服务 |
 | P0-ARCH-03 | [TASK-20260522-010 Observability Redis 超时退避与同步兜底](done/TASK-20260522-010-observability-redis-timeout-backoff.md) | Done | Redis 热路径队列超时后退避，并让请求观测写入直接同步兜底 |
@@ -347,7 +347,7 @@
 | [TASK-20260523-014 厂商领域 API 命名与对象边界收敛](in-progress/TASK-20260523-014-provider-domain-api-naming-boundary.md) | In Progress | High | REP-20260523 |
 | [TASK-20260523-015 能力快照与刷新语义重构](backlog/TASK-20260523-015-capability-snapshot-refresh-semantics-redesign.md) | Backlog | Medium | REP-20260523 |
 | [TASK-20260523-016 账号分组分类、入口覆盖反推与 Distributed Key 授权展示](backlog/TASK-20260523-016-account-group-taxonomy-endpoint-coverage.md) | Backlog | High | REP-20260523 |
-| [TASK-20260523-017 控制台 Apple-level UI/UX 精修](in-progress/TASK-20260523-017-console-apple-level-uiux-polish.md) | In Progress | High | REQ-20260523-012 |
+| [TASK-20260523-017 控制台 Apple-level UI/UX 精修](done/TASK-20260523-017-console-apple-level-uiux-polish.md) | Done | High | REQ-20260523-012 |
 | [TASK-20260516-014 OpenAI Responses Tools Registry 与非 function Tool 显式边界](done/TASK-20260516-014-openai-responses-tool-registry-boundary.md) | Done | High | TASK-20260514-019 / 013 |
 | [TASK-20260516-015 OpenAI Conversations 本地 Lifecycle](done/TASK-20260516-015-openai-conversations-local-lifecycle.md) | Done | High | TASK-20260514-019 |
 | [TASK-20260516-016 OpenAI Webhooks 接收入口与事件落库](done/TASK-20260516-016-openai-webhooks-ingress-event-persistence.md) | Done | High | TASK-20260514-019 |

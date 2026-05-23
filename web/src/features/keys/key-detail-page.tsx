@@ -13,6 +13,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { CodePanel } from '@/components/app/code-panel'
 import { EmptyState } from '@/components/app/empty-state'
+import { useConfirm } from '@/components/app/confirm-provider'
 import { InfoGrid } from '@/components/app/info-grid'
 import { InlineError } from '@/components/app/inline-error'
 import { PageSection } from '@/components/app/page-section'
@@ -50,6 +51,7 @@ export function KeyDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const confirm = useConfirm()
   const keysQuery = useQuery({
     queryKey: ['distributed-keys'],
     queryFn: () => apiRequest<DistributedKey[]>('/admin/distributed-keys'),
@@ -252,11 +254,16 @@ export function KeyDetailPage() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => {
-                  if (!window.confirm(`确认删除访问密钥“${activeDraft.keyName}”吗？`)) {
-                    return
+                onClick={async () => {
+                  const confirmed = await confirm({
+                    title: '删除访问密钥',
+                    description: `确认删除“${activeDraft.keyName}”吗？该操作会立即移除这条访问密钥。`,
+                    confirmLabel: '删除',
+                    destructive: true,
+                  })
+                  if (confirmed) {
+                    deleteMutation.mutate()
                   }
-                  deleteMutation.mutate()
                 }}
                 disabled={deleteMutation.isPending}
               >

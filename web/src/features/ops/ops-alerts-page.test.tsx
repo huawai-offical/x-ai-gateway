@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ConfirmProvider } from '@/components/app/confirm-provider'
 import { apiClient } from '../../lib/api'
 import { OpsAlertsPage } from './ops-alerts-page'
 
@@ -103,9 +104,11 @@ afterEach(() => {
 function renderPage() {
   render(
     <QueryClientProvider client={new QueryClient()}>
-      <MemoryRouter>
-        <OpsAlertsPage />
-      </MemoryRouter>
+      <ConfirmProvider>
+        <MemoryRouter>
+          <OpsAlertsPage />
+        </MemoryRouter>
+      </ConfirmProvider>
     </QueryClientProvider>,
   )
 }
@@ -178,10 +181,10 @@ describe('OpsAlertsPage', () => {
   })
 
   it('can delete auto action from the page', async () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
     renderPage()
 
     fireEvent.click(await screen.findByRole('button', { name: '删除动作' }))
+    fireEvent.click(await screen.findByRole('button', { name: '删除' }))
 
     await waitFor(() => {
       expect(mockedApiDelete).toHaveBeenCalledWith(
@@ -189,8 +192,6 @@ describe('OpsAlertsPage', () => {
         expect.objectContaining({ responseType: 'void' }),
       )
     })
-
-    confirmSpy.mockRestore()
   })
 
   it('can create alert silence from the page', async () => {

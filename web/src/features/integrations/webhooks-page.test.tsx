@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { ConfirmProvider } from '@/components/app/confirm-provider'
 import { apiRequest } from '../../lib/api'
 import { WebhooksPage } from './webhooks-page'
 
@@ -35,7 +36,9 @@ describe('WebhooksPage', () => {
   it('renders configured webhooks and can create one', async () => {
     render(
       <QueryClientProvider client={new QueryClient()}>
-        <WebhooksPage />
+        <ConfirmProvider>
+          <WebhooksPage />
+        </ConfirmProvider>
       </QueryClientProvider>,
     )
 
@@ -57,8 +60,9 @@ describe('WebhooksPage', () => {
       expect(JSON.parse(call?.[1]?.body as string).endpointName).toBe('ops-webhook')
     })
 
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
     fireEvent.click(await screen.findByRole('button', { name: '删除' }))
+    const confirmDialog = await screen.findByRole('dialog', { name: '删除回调终端' })
+    fireEvent.click(within(confirmDialog).getByRole('button', { name: '删除' }))
 
     await waitFor(() => {
       expect(mockedApiRequest).toHaveBeenCalledWith(
@@ -66,6 +70,5 @@ describe('WebhooksPage', () => {
         expect.objectContaining({ method: 'DELETE' }),
       )
     })
-    confirmSpy.mockRestore()
   })
 })

@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { EmptyState } from '@/components/app/empty-state'
+import { useConfirm } from '@/components/app/confirm-provider'
 import { InfoGrid } from '@/components/app/info-grid'
 import { InlineError } from '@/components/app/inline-error'
 import { PageSection } from '@/components/app/page-section'
@@ -48,6 +49,7 @@ const USER_STEPS: UserStep[] = ['basic', 'notes', 'submit']
 
 export function UsersPage() {
   const queryClient = useQueryClient()
+  const confirm = useConfirm()
   const [keyword, setKeyword] = useState('')
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>('ALL')
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null)
@@ -129,8 +131,14 @@ export function UsersPage() {
     setEditorOpen(true)
   }
 
-  const handleDelete = (user: GatewayUser) => {
-    if (!window.confirm(`确认删除用户“${user.email}”吗？`)) {
+  const handleDelete = async (user: GatewayUser) => {
+    const confirmed = await confirm({
+      title: '删除用户',
+      description: `确认删除“${user.email}”吗？该操作会立即移除这个用户。`,
+      confirmLabel: '删除',
+      destructive: true,
+    })
+    if (!confirmed) {
       return
     }
     deleteMutation.mutate(user.id)
@@ -226,7 +234,7 @@ export function UsersPage() {
                         <Button type="button" variant="outline" size="sm" onClick={() => handleOpenEdit(user)}>
                           编辑
                         </Button>
-                        <Button type="button" variant="outline" size="sm" onClick={() => handleDelete(user)}>
+                        <Button type="button" variant="outline" size="sm" onClick={() => void handleDelete(user)}>
                           删除
                         </Button>
                       </div>

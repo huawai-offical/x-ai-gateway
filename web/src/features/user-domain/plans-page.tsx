@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { EmptyState } from '@/components/app/empty-state'
+import { useConfirm } from '@/components/app/confirm-provider'
 import { InfoGrid } from '@/components/app/info-grid'
 import { InlineError } from '@/components/app/inline-error'
 import { PageSection } from '@/components/app/page-section'
@@ -57,6 +58,7 @@ const PLAN_STEPS: PlanStep[] = ['basic', 'quota', 'submit']
 
 export function PlansPage() {
   const queryClient = useQueryClient()
+  const confirm = useConfirm()
   const [keyword, setKeyword] = useState('')
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>('ALL')
   const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null)
@@ -143,8 +145,14 @@ export function PlansPage() {
     setEditorOpen(true)
   }
 
-  const handleDelete = (plan: SubscriptionPlan) => {
-    if (!window.confirm(`确认删除套餐“${plan.planName}”吗？`)) {
+  const handleDelete = async (plan: SubscriptionPlan) => {
+    const confirmed = await confirm({
+      title: '删除套餐',
+      description: `确认删除“${plan.planName}”吗？该操作会立即移除这条套餐配置。`,
+      confirmLabel: '删除',
+      destructive: true,
+    })
+    if (!confirmed) {
       return
     }
     deleteMutation.mutate(plan.id)
@@ -247,7 +255,7 @@ export function PlansPage() {
                         <Button type="button" variant="outline" size="sm" onClick={() => handleOpenEdit(plan)}>
                           编辑
                         </Button>
-                        <Button type="button" variant="outline" size="sm" onClick={() => handleDelete(plan)}>
+                        <Button type="button" variant="outline" size="sm" onClick={() => void handleDelete(plan)}>
                           删除
                         </Button>
                       </div>

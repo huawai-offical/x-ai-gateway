@@ -105,15 +105,15 @@ export function ExternalAppsPage() {
         ) : appsQuery.data?.length ? (
           <PaginatedRows items={(appsQuery.data ?? []) as ExternalApp[]}>
             {({ pageItems }) => (
-              <div className="overflow-hidden rounded-2xl border border-border/60 bg-card/92">
-                <table className="w-full table-fixed text-sm">
+              <div className="scrollbar-subtle overflow-x-auto rounded-xl border border-border/45 bg-card/82">
+                <table className="w-full min-w-[980px] table-fixed text-sm">
                   <thead className="bg-muted/30">
                     <tr>
-                      <th className="w-[24%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">应用</th>
-                      <th className="w-[18%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">状态</th>
-                      <th className="w-[24%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">Origin</th>
-                      <th className="w-[18%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">Secret 指纹</th>
-                      <th className="w-[16%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">操作</th>
+                      <th className="w-[24%] border-b border-border/55 px-4 py-3 text-left font-medium text-muted-foreground">应用</th>
+                      <th className="w-[18%] border-b border-border/55 px-4 py-3 text-left font-medium text-muted-foreground">状态</th>
+                      <th className="w-[24%] border-b border-border/55 px-4 py-3 text-left font-medium text-muted-foreground">Origin</th>
+                      <th className="w-[18%] border-b border-border/55 px-4 py-3 text-left font-medium text-muted-foreground">Secret 指纹</th>
+                      <th className="w-[16%] border-b border-border/55 px-4 py-3 text-left font-medium text-muted-foreground">操作</th>
                     </tr>
                   </thead>
                   <tbody>

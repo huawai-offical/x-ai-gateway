@@ -72,5 +72,5 @@
 
 ## 遗留问题
 
-- `window.confirm` 迁移仍由既有 [TASK-20260522-004](../../tasks/backlog/TASK-20260522-004-confirm-dialog-notification-unification.md) 承接，本轮未处理。
+- `window.confirm` 迁移已由既有 [TASK-20260522-004](../../tasks/done/TASK-20260522-004-confirm-dialog-notification-unification.md) 承接并归档。
 - 当前统一策略覆盖 React Query mutation。纯 query 重新加载、导航、筛选、表格分页等非写操作不弹成功 toast，避免普通浏览行为产生噪音。

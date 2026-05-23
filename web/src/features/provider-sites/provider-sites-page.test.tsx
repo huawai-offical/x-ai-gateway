@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { ConfirmProvider } from '@/components/app/confirm-provider'
 import { ProviderSitesPage } from './provider-sites-page'
 
 const { apiRequestMock } = vi.hoisted(() => ({
@@ -181,7 +182,9 @@ function renderPage() {
   return render(
     <MemoryRouter>
       <QueryClientProvider client={new QueryClient()}>
-        <ProviderSitesPage />
+        <ConfirmProvider>
+          <ProviderSitesPage />
+        </ConfirmProvider>
       </QueryClientProvider>
     </MemoryRouter>,
   )

@@ -93,6 +93,13 @@ const PROVIDER_OPTIONS = [
 
 const REF_STATUS_OPTIONS = ['ALL', 'ACTIVE', 'EXPIRED', 'INVALIDATED'] as const
 
+const tableShellClassName = 'scrollbar-subtle overflow-x-auto rounded-xl border border-border/45 bg-card/82'
+const tableHeadCellClassName = 'border-b border-border/55 px-4 py-3 text-left font-medium text-muted-foreground'
+const tableRowClassName = 'border-b border-border/35 align-top last:border-b-0'
+const tableCellClassName = 'px-4 py-3 text-muted-foreground'
+const readableCellClassName = 'min-w-0 break-words text-foreground'
+const mutedReadableCellClassName = 'min-w-0 break-words text-muted-foreground'
+
 export function UpstreamCachePage() {
   const [activeTab, setActiveTab] = useState<CacheTab>('references')
   const [distributedKeyId, setDistributedKeyId] = useState('')
@@ -148,7 +155,7 @@ export function UpstreamCachePage() {
       >
         {pageError ? <InlineError error={pageError} title="缓存观测加载失败" /> : null}
 
-        <div className="grid gap-4 rounded-2xl border border-border/60 bg-card/92 p-4 md:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-4 rounded-xl border border-border/45 bg-muted/12 p-4 md:grid-cols-2 xl:grid-cols-5">
           <label className="flex flex-col gap-2">
             <span className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">访问密钥 ID</span>
             <Input value={distributedKeyId} onChange={(event) => setDistributedKeyId(event.target.value)} placeholder="可选" />
@@ -156,7 +163,7 @@ export function UpstreamCachePage() {
           <label className="flex flex-col gap-2">
             <span className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">提供方类型</span>
             <select
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              className="flex h-8 w-full rounded-lg border border-input bg-background/80 px-2.5 text-sm"
               value={providerType}
               onChange={(event) => setProviderType(event.target.value as (typeof PROVIDER_OPTIONS)[number])}
             >
@@ -168,7 +175,7 @@ export function UpstreamCachePage() {
           <label className="flex flex-col gap-2">
             <span className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">引用状态</span>
             <select
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              className="flex h-8 w-full rounded-lg border border-input bg-background/80 px-2.5 text-sm"
               value={referenceStatus}
               onChange={(event) => setReferenceStatus(event.target.value as (typeof REF_STATUS_OPTIONS)[number])}
             >
@@ -242,30 +249,30 @@ export function UpstreamCachePage() {
             >
               <PaginatedRows items={referencesQuery.data ?? []}>
                 {({ pageItems }) => (
-                  <div className="overflow-hidden rounded-2xl border border-border/60 bg-card/92">
-                    <table className="w-full table-fixed text-sm">
+                  <div className={tableShellClassName}>
+                    <table className="w-full min-w-[980px] table-fixed text-sm">
                       <thead className="bg-muted/30">
                         <tr>
-                          <th className="w-[27%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">外部引用</th>
-                          <th className="w-[12%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">提供方</th>
-                          <th className="w-[10%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">凭证</th>
-                          <th className="w-[11%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">状态</th>
-                          <th className="w-[14%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">过期时间</th>
-                          <th className="w-[14%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">最近使用</th>
-                          <th className="w-[12%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">操作</th>
+                          <th className={`w-[27%] ${tableHeadCellClassName}`}>外部引用</th>
+                          <th className={`w-[12%] ${tableHeadCellClassName}`}>提供方</th>
+                          <th className={`w-[10%] ${tableHeadCellClassName}`}>凭证</th>
+                          <th className={`w-[11%] ${tableHeadCellClassName}`}>状态</th>
+                          <th className={`w-[14%] ${tableHeadCellClassName}`}>过期时间</th>
+                          <th className={`w-[14%] ${tableHeadCellClassName}`}>最近使用</th>
+                          <th className={`w-[12%] ${tableHeadCellClassName}`}>操作</th>
                         </tr>
                       </thead>
                       <tbody>
                         {pageItems.map((row) => (
-                          <tr key={row.id} className="border-b border-border/40 align-top">
-                            <td className="truncate px-4 py-3 text-foreground">{valueOrDash(row.externalCacheRef)}</td>
-                            <td className="truncate px-4 py-3 text-muted-foreground">{valueOrDash(row.providerType)}</td>
-                            <td className="px-4 py-3 text-muted-foreground">{valueOrDash(row.credentialId)}</td>
+                          <tr key={row.id} className={tableRowClassName}>
+                            <td className="px-4 py-3"><div className={readableCellClassName}>{valueOrDash(row.externalCacheRef)}</div></td>
+                            <td className={tableCellClassName}><div className={mutedReadableCellClassName}>{valueOrDash(row.providerType)}</div></td>
+                            <td className={tableCellClassName}>{valueOrDash(row.credentialId)}</td>
                             <td className="px-4 py-3">
                               <StatusBadge tone={toneByStatus(row.effectiveStatus ?? row.status)}>{valueOrDash(row.effectiveStatus ?? row.status)}</StatusBadge>
                             </td>
-                            <td className="truncate px-4 py-3 text-muted-foreground">{formatInstant(row.expireAt)}</td>
-                            <td className="truncate px-4 py-3 text-muted-foreground">{formatInstant(row.lastUsedAt)}</td>
+                            <td className={tableCellClassName}>{formatInstant(row.expireAt)}</td>
+                            <td className={tableCellClassName}>{formatInstant(row.lastUsedAt)}</td>
                             <td className="px-4 py-3">
                               <Button
                                 type="button"
@@ -294,30 +301,30 @@ export function UpstreamCachePage() {
             >
               <PaginatedRows items={cacheHitsQuery.data ?? []}>
                 {({ pageItems }) => (
-                  <div className="overflow-hidden rounded-2xl border border-border/60 bg-card/92">
-                    <table className="w-full table-fixed text-sm">
+                  <div className={tableShellClassName}>
+                    <table className="w-full min-w-[940px] table-fixed text-sm">
                       <thead className="bg-muted/30">
                         <tr>
-                          <th className="w-[20%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">请求 ID</th>
-                          <th className="w-[12%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">缓存类型</th>
-                          <th className="w-[12%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">提供方</th>
-                          <th className="w-[12%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">模型组</th>
-                          <th className="w-[24%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">Token 收益</th>
-                          <th className="w-[10%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">时间</th>
-                          <th className="w-[10%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">操作</th>
+                          <th className={`w-[20%] ${tableHeadCellClassName}`}>请求 ID</th>
+                          <th className={`w-[12%] ${tableHeadCellClassName}`}>缓存类型</th>
+                          <th className={`w-[12%] ${tableHeadCellClassName}`}>提供方</th>
+                          <th className={`w-[12%] ${tableHeadCellClassName}`}>模型组</th>
+                          <th className={`w-[24%] ${tableHeadCellClassName}`}>Token 收益</th>
+                          <th className={`w-[10%] ${tableHeadCellClassName}`}>时间</th>
+                          <th className={`w-[10%] ${tableHeadCellClassName}`}>操作</th>
                         </tr>
                       </thead>
                       <tbody>
                         {pageItems.map((row) => (
-                          <tr key={row.id} className="border-b border-border/40 align-top">
-                            <td className="truncate px-4 py-3 text-foreground">{valueOrDash(row.requestId)}</td>
-                            <td className="truncate px-4 py-3 text-muted-foreground">{valueOrDash(row.cacheKind)}</td>
-                            <td className="truncate px-4 py-3 text-muted-foreground">{valueOrDash(row.providerType)}</td>
-                            <td className="truncate px-4 py-3 text-muted-foreground">{valueOrDash(row.modelGroup)}</td>
-                            <td className="truncate px-4 py-3 text-muted-foreground">
+                          <tr key={row.id} className={tableRowClassName}>
+                            <td className="px-4 py-3"><div className={readableCellClassName}>{valueOrDash(row.requestId)}</div></td>
+                            <td className={tableCellClassName}><div className={mutedReadableCellClassName}>{valueOrDash(row.cacheKind)}</div></td>
+                            <td className={tableCellClassName}><div className={mutedReadableCellClassName}>{valueOrDash(row.providerType)}</div></td>
+                            <td className={tableCellClassName}><div className={mutedReadableCellClassName}>{valueOrDash(row.modelGroup)}</div></td>
+                            <td className={tableCellClassName}>
                               命中 {valueOrDash(row.cacheHitTokens)} / 写入 {valueOrDash(row.cacheWriteTokens)} / 节省 {valueOrDash(row.savedInputTokens)}
                             </td>
-                            <td className="truncate px-4 py-3 text-muted-foreground">{formatInstant(row.createdAt)}</td>
+                            <td className={tableCellClassName}>{formatInstant(row.createdAt)}</td>
                             <td className="px-4 py-3">
                               <Button
                                 type="button"
@@ -351,7 +358,7 @@ export function UpstreamCachePage() {
               items={cacheReferenceDetailItems(detailPayload)}
             />
           ) : null}
-          <pre className="max-h-[70vh] overflow-auto rounded-2xl border border-border/60 bg-muted/30 p-4 text-xs leading-6 text-foreground">
+          <pre className="scrollbar-subtle max-h-[70vh] overflow-auto rounded-xl border border-border/45 bg-muted/16 p-4 text-xs leading-6 text-foreground">
             {JSON.stringify(detailPayload ?? {}, null, 2)}
           </pre>
         </DialogContent>

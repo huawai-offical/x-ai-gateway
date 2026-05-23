@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { ConfirmProvider } from '@/components/app/confirm-provider'
 import { KeysPage } from './keys-page'
 
 const { apiRequestMock } = vi.hoisted(() => ({
@@ -57,9 +58,11 @@ describe('KeysPage', () => {
   it('renders distributed key heading', async () => {
     render(
       <QueryClientProvider client={new QueryClient()}>
-        <MemoryRouter>
-          <KeysPage />
-        </MemoryRouter>
+        <ConfirmProvider>
+          <MemoryRouter>
+            <KeysPage />
+          </MemoryRouter>
+        </ConfirmProvider>
       </QueryClientProvider>,
     )
 
@@ -69,9 +72,11 @@ describe('KeysPage', () => {
   it('creates active key with initial account group binding', async () => {
     render(
       <QueryClientProvider client={new QueryClient()}>
-        <MemoryRouter>
-          <KeysPage />
-        </MemoryRouter>
+        <ConfirmProvider>
+          <MemoryRouter>
+            <KeysPage />
+          </MemoryRouter>
+        </ConfirmProvider>
       </QueryClientProvider>,
     )
 

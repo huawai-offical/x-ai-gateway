@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { EmptyState } from '@/components/app/empty-state'
+import { useConfirm } from '@/components/app/confirm-provider'
 import { InfoGrid } from '@/components/app/info-grid'
 import { InlineError } from '@/components/app/inline-error'
 import { PageSection } from '@/components/app/page-section'
@@ -151,6 +152,7 @@ const ALIAS_PROVIDER_OPTIONS = ['OPENAI_DIRECT', 'OPENAI_COMPATIBLE', 'ANTHROPIC
 
 export function ModelsPage() {
   const queryClient = useQueryClient()
+  const confirm = useConfirm()
   const [searchKeyword, setSearchKeyword] = useState('')
   const [protocolFilter, setProtocolFilter] = useState('ALL')
   const [selectedModelKey, setSelectedModelKey] = useState<string | null>(null)
@@ -302,8 +304,14 @@ export function ModelsPage() {
     setAliasForm(aliasToForm(alias))
   }
 
-  const handleDeleteAlias = (alias: ModelAlias) => {
-    if (!window.confirm(`确认删除模型别名“${alias.aliasName}”吗？`)) {
+  const handleDeleteAlias = async (alias: ModelAlias) => {
+    const confirmed = await confirm({
+      title: '删除模型别名',
+      description: `确认删除“${alias.aliasName}”吗？该操作会立即移除这条模型别名。`,
+      confirmLabel: '删除',
+      destructive: true,
+    })
+    if (!confirmed) {
       return
     }
     aliasDeleteMutation.mutate(alias.id)
@@ -495,7 +503,7 @@ export function ModelsPage() {
                             <Button type="button" variant="outline" size="sm" onClick={() => handleOpenAliasEdit(alias)}>
                               编辑
                             </Button>
-                            <Button type="button" variant="outline" size="sm" onClick={() => handleDeleteAlias(alias)}>
+                            <Button type="button" variant="outline" size="sm" onClick={() => void handleDeleteAlias(alias)}>
                               删除
                             </Button>
                           </div>

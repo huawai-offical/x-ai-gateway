@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { EmptyState } from '@/components/app/empty-state'
+import { useConfirm } from '@/components/app/confirm-provider'
 import { InlineError } from '@/components/app/inline-error'
 import { PageSection } from '@/components/app/page-section'
 import { PageSkeleton } from '@/components/app/page-skeleton'
@@ -33,6 +34,7 @@ const CREATE_STEPS: CreateStep[] = ['basic', 'target']
 
 export function ChannelsPage() {
   const queryClient = useQueryClient()
+  const confirm = useConfirm()
   const [channelName, setChannelName] = useState('')
   const [channelType, setChannelType] = useState('WEBHOOK')
   const [webhookEndpointId, setWebhookEndpointId] = useState('')
@@ -86,8 +88,14 @@ export function ChannelsPage() {
   const canPrev = stepIndex > 0
   const canNext = stepIndex < CREATE_STEPS.length - 1
 
-  const handleDelete = (item: NotificationChannel) => {
-    if (!window.confirm(`确认删除通知通道“${item.channelName}”吗？`)) {
+  const handleDelete = async (item: NotificationChannel) => {
+    const confirmed = await confirm({
+      title: '删除通知通道',
+      description: `确认删除“${item.channelName}”吗？该操作会立即移除这条通知通道。`,
+      confirmLabel: '删除',
+      destructive: true,
+    })
+    if (!confirmed) {
       return
     }
     deleteMutation.mutate(item.id)
@@ -118,8 +126,8 @@ export function ChannelsPage() {
         ) : channelsQuery.data?.length ? (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {channelsQuery.data.map((item: NotificationChannel) => (
-              <Card key={item.id} className="border-border/60 bg-card/92 shadow-sm">
-                <CardHeader className="gap-2 border-b border-border/60">
+              <Card key={item.id} className="border-border/45 bg-card/82 shadow-[0_1px_2px_rgba(15,23,42,0.06)]">
+                <CardHeader className="gap-2 border-b border-border/45">
                   <CardTitle className="text-base">{item.channelName}</CardTitle>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-3 p-5 text-sm text-muted-foreground">
@@ -135,7 +143,7 @@ export function ChannelsPage() {
                       variant="outline"
                       size="sm"
                       disabled={deleteMutation.isPending}
-                      onClick={() => handleDelete(item)}
+                      onClick={() => void handleDelete(item)}
                     >
                       删除
                     </Button>

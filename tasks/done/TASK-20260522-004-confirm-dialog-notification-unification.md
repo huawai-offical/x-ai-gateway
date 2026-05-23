@@ -1,6 +1,6 @@
 # TASK-20260522-004 原生确认弹窗与通知入口统一
 
-状态：Backlog  
+状态：Done  
 优先级：High  
 上游来源：[REQ-20260522-003](../../docs/requirements/REQ-20260522-003-toast-feedback-and-component-splitting.md)
 
@@ -61,10 +61,10 @@
 
 ## 验收标准
 
-- [ ] 项目内不再有业务删除场景直接调用 `window.confirm`。
-- [ ] 确认弹窗支持深色/浅色主题。
-- [ ] 删除成功、失败反馈位置统一。
-- [ ] 定向测试覆盖至少账号分组、凭证、模型、网络代理、治理页面。
+- [x] 项目内不再有业务删除场景直接调用 `window.confirm`。
+- [x] 确认弹窗支持深色/浅色主题。
+- [x] 删除成功、失败反馈位置统一。
+- [x] 定向测试覆盖至少账号分组、凭证、模型、网络代理、治理页面。
 
 ## 测试边界
 
@@ -72,6 +72,14 @@
 - `npm test -- --run` 覆盖迁移页面。
 - 必要时浏览器验证一个删除确认弹窗。
 
-## 当前状态
+## 实现结果
 
-待处理。
+- 2026-05-23：新增 `web/src/components/app/confirm-dialog.tsx` 和 `web/src/components/app/confirm-provider.tsx`。
+- 2026-05-23：`AppProviders` 挂载 `ConfirmProvider`，删除类操作统一通过 `useConfirm` 触发项目内确认弹窗。
+- 2026-05-23：迁移账号分组、凭证、厂商目录、密钥、模型、网络代理、TLS 指纹、集成、维护窗口、用户域、治理和告警运营页面。
+- 2026-05-23：`rg -n "window\\.confirm" web/src -g "*.tsx" -g "*.ts"` 无匹配。
+
+## 验证记录
+
+- `cd web; bun run typecheck`：通过。
+- `cd web; bun run test -- keys-page.test.tsx models-page.test.tsx credentials-page.test.tsx account-group-detail-page.test.tsx provider-sites-page.test.tsx proxies-page.test.tsx tls-profiles-page.test.tsx channels-page.test.tsx runbooks-page.test.tsx subscriptions-page.test.tsx webhooks-page.test.tsx windows-page.test.tsx governance-page.test.tsx ops-alerts-page.test.tsx users-page.test.tsx plans-page.test.tsx`：17 个测试文件、39 个测试通过。

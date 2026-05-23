@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { EmptyState } from '@/components/app/empty-state'
+import { useConfirm } from '@/components/app/confirm-provider'
 import { InfoGrid } from '@/components/app/info-grid'
 import { InlineError } from '@/components/app/inline-error'
 import { PageSkeleton } from '@/components/app/page-skeleton'
@@ -75,6 +76,7 @@ export function ProviderSitesPage() {
   const [editorStep, setEditorStep] = useState<EditorStep>('basic')
   const [draft, setDraft] = useState<ProviderSiteDraft>(emptyDraft)
   const [draftError, setDraftError] = useState<string | null>(null)
+  const confirm = useConfirm()
 
   const sitesQuery = useQuery({
     queryKey: ['provider-sites', 'list'],
@@ -148,7 +150,9 @@ export function ProviderSitesPage() {
         method: 'DELETE',
         responseType: 'void',
       }),
-    onSuccess: () => invalidateProviderSiteQueries(queryClient),
+    onSuccess: () => {
+      invalidateProviderSiteQueries(queryClient)
+    },
   })
   const refreshMutation = useMutation({
     mutationFn: (id?: number) => {
@@ -196,6 +200,18 @@ export function ProviderSitesPage() {
       saveMutation.mutate(buildPayload(draft))
     } catch (error) {
       setDraftError(error instanceof Error ? error.message : 'API 入口保存失败。')
+    }
+  }
+
+  const handleDeleteSite = async (site: ProviderSite) => {
+    const confirmed = await confirm({
+      title: '删除 API 入口',
+      description: `确认删除“${site.displayName}”吗？关联的厂商目录记录会从当前列表移除。`,
+      confirmLabel: '删除',
+      destructive: true,
+    })
+    if (confirmed) {
+      deleteMutation.mutate(site.id)
     }
   }
 
@@ -339,11 +355,7 @@ export function ProviderSitesPage() {
                                   type="button"
                                   variant="destructive"
                                   size="sm"
-                                  onClick={() => {
-                                    if (row.site && window.confirm(`确认删除 API 入口“${row.site.displayName}”吗？`)) {
-                                      deleteMutation.mutate(row.site.id)
-                                    }
-                                  }}
+                                  onClick={() => row.site ? void handleDeleteSite(row.site) : undefined}
                                 >
                                   <Trash2Icon data-icon="inline-start" />
                                   删除
@@ -402,7 +414,7 @@ export function ProviderSitesPage() {
                     <span className="text-sm font-medium text-foreground">厂商名称</span>
                     <Input value={draft.vendorName} onChange={(event) => setDraft({ ...draft, vendorName: event.target.value })} placeholder="例如 Custom Provider" />
                   </label>
-                  <label className="flex items-center gap-3 rounded-2xl border border-border/60 bg-muted/20 px-4 py-3 md:col-span-2">
+                  <label className="flex items-center gap-3 rounded-xl border border-border/45 bg-muted/14 px-4 py-3 md:col-span-2">
                     <input
                       type="checkbox"
                       className="size-4 rounded border-border"

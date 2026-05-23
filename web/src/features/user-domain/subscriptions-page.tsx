@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { EmptyState } from '@/components/app/empty-state'
+import { useConfirm } from '@/components/app/confirm-provider'
 import { InfoGrid } from '@/components/app/info-grid'
 import { InlineError } from '@/components/app/inline-error'
 import { PageSection } from '@/components/app/page-section'
@@ -68,6 +69,7 @@ const SUBSCRIPTION_STATUS_OPTIONS = ['ACTIVE', 'PAUSED', 'EXPIRED', 'CANCELED'] 
 
 export function SubscriptionsPage() {
   const queryClient = useQueryClient()
+  const confirm = useConfirm()
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL')
   const [userFilter, setUserFilter] = useState('ALL')
   const [planFilter, setPlanFilter] = useState('ALL')
@@ -167,8 +169,14 @@ export function SubscriptionsPage() {
     setEditorOpen(true)
   }
 
-  const handleDelete = (item: UserSubscription) => {
-    if (!window.confirm(`确认删除订阅 #${item.id} 吗？`)) {
+  const handleDelete = async (item: UserSubscription) => {
+    const confirmed = await confirm({
+      title: '删除用户订阅',
+      description: `确认删除订阅 #${item.id} 吗？该操作会立即移除这条用户订阅。`,
+      confirmLabel: '删除',
+      destructive: true,
+    })
+    if (!confirmed) {
       return
     }
     deleteMutation.mutate(item.id)
@@ -302,7 +310,7 @@ export function SubscriptionsPage() {
                         <Button type="button" variant="outline" size="sm" onClick={() => handleOpenEdit(item)}>
                           编辑
                         </Button>
-                        <Button type="button" variant="outline" size="sm" onClick={() => handleDelete(item)}>
+                        <Button type="button" variant="outline" size="sm" onClick={() => void handleDelete(item)}>
                           删除
                         </Button>
                       </div>

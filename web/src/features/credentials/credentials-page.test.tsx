@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { ConfirmProvider } from '@/components/app/confirm-provider'
 import { CredentialsPage } from './credentials-page'
 
 const { apiRequestMock } = vi.hoisted(() => ({
@@ -233,9 +234,11 @@ describe('CredentialsPage', () => {
   it('renders static credentials and Codex auth.json accounts in one inventory', async () => {
     render(
       <QueryClientProvider client={new QueryClient()}>
-        <MemoryRouter>
-          <CredentialsPage />
-        </MemoryRouter>
+        <ConfirmProvider>
+          <MemoryRouter>
+            <CredentialsPage />
+          </MemoryRouter>
+        </ConfirmProvider>
       </QueryClientProvider>,
     )
 
@@ -247,9 +250,11 @@ describe('CredentialsPage', () => {
   it('renders secret form and creates credential', async () => {
     render(
       <QueryClientProvider client={new QueryClient()}>
-        <MemoryRouter>
-          <CredentialsPage />
-        </MemoryRouter>
+        <ConfirmProvider>
+          <MemoryRouter>
+            <CredentialsPage />
+          </MemoryRouter>
+        </ConfirmProvider>
       </QueryClientProvider>,
     )
 
@@ -300,9 +305,11 @@ describe('CredentialsPage', () => {
   it('supports batch secret import by newline text', async () => {
     render(
       <QueryClientProvider client={new QueryClient()}>
-        <MemoryRouter>
-          <CredentialsPage />
-        </MemoryRouter>
+        <ConfirmProvider>
+          <MemoryRouter>
+            <CredentialsPage />
+          </MemoryRouter>
+        </ConfirmProvider>
       </QueryClientProvider>,
     )
 
@@ -332,9 +339,11 @@ describe('CredentialsPage', () => {
   it('imports Codex auth.json by file paths from upstream credential dialog', async () => {
     render(
       <QueryClientProvider client={new QueryClient()}>
-        <MemoryRouter>
-          <CredentialsPage />
-        </MemoryRouter>
+        <ConfirmProvider>
+          <MemoryRouter>
+            <CredentialsPage />
+          </MemoryRouter>
+        </ConfirmProvider>
       </QueryClientProvider>,
     )
 

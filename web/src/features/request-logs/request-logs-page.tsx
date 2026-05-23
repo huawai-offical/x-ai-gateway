@@ -147,6 +147,13 @@ const TAB_OPTIONS: Array<{ key: ObservabilityTab; label: string }> = [
   { key: 'upstream-cache-references', label: '上游缓存引用' },
 ]
 
+const tableShellClassName = 'scrollbar-subtle overflow-x-auto rounded-xl border border-border/45 bg-card/82'
+const tableHeadCellClassName = 'border-b border-border/55 px-4 py-3 text-left font-medium text-muted-foreground'
+const tableRowClassName = 'border-b border-border/35 align-top last:border-b-0'
+const tableCellClassName = 'px-4 py-3 text-muted-foreground'
+const readableCellClassName = 'min-w-0 break-words text-foreground'
+const mutedReadableCellClassName = 'min-w-0 break-words text-muted-foreground'
+
 export function RequestLogsPage() {
   const [activeTab, setActiveTab] = useState<ObservabilityTab>('request-logs')
   const [requestId, setRequestId] = useState('')
@@ -239,7 +246,7 @@ export function RequestLogsPage() {
         kicker="可观测性"
         title="请求日志与缓存观测"
       >
-        <div className="grid gap-4 rounded-2xl border border-border/60 bg-card/92 p-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 rounded-xl border border-border/45 bg-muted/12 p-4 md:grid-cols-2 xl:grid-cols-4">
           <label className="flex flex-col gap-2">
             <span className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">请求 ID</span>
             <Input value={requestId} onChange={(event) => setRequestId(event.target.value)} placeholder="可选" />
@@ -259,7 +266,7 @@ export function RequestLogsPage() {
           <label className="flex flex-col gap-2">
             <span className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">提供方类型</span>
             <select
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              className="flex h-8 w-full rounded-lg border border-input bg-background/80 px-2.5 text-sm"
               value={providerType}
               onChange={(event) => setProviderType(event.target.value)}
             >
@@ -281,7 +288,7 @@ export function RequestLogsPage() {
             <label className="flex flex-col gap-2">
               <span className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">状态</span>
               <select
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                className="flex h-8 w-full rounded-lg border border-input bg-background/80 px-2.5 text-sm"
                 value={upstreamStatus}
                 onChange={(event) => setUpstreamStatus(event.target.value)}
               >
@@ -321,35 +328,35 @@ export function RequestLogsPage() {
             >
               <PaginatedRows items={requestLogsQuery.data ?? []}>
                 {({ pageItems }) => (
-                  <div className="overflow-x-auto rounded-2xl border border-border/60 bg-card/92">
+                  <div className={tableShellClassName}>
                     <table aria-label="请求日志表" className="min-w-[1120px] w-full table-fixed text-sm">
                   <thead className="bg-muted/30">
                     <tr>
-                      <th className="w-[18%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">请求 ID</th>
-                      <th className="w-[16%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">模型</th>
-                      <th className="w-[13%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">客户端</th>
-                      <th className="w-[13%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">会话</th>
-                      <th className="w-[10%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">提供方</th>
-                      <th className="w-[12%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">状态</th>
-                      <th className="w-[8%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">耗时</th>
-                      <th className="w-[10%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">操作</th>
+                      <th className={`w-[18%] ${tableHeadCellClassName}`}>请求 ID</th>
+                      <th className={`w-[16%] ${tableHeadCellClassName}`}>模型</th>
+                      <th className={`w-[13%] ${tableHeadCellClassName}`}>客户端</th>
+                      <th className={`w-[13%] ${tableHeadCellClassName}`}>会话</th>
+                      <th className={`w-[10%] ${tableHeadCellClassName}`}>提供方</th>
+                      <th className={`w-[12%] ${tableHeadCellClassName}`}>状态</th>
+                      <th className={`w-[8%] ${tableHeadCellClassName}`}>耗时</th>
+                      <th className={`w-[10%] ${tableHeadCellClassName}`}>操作</th>
                     </tr>
                   </thead>
                   <tbody>
                     {pageItems.map((row) => (
-                      <tr key={row.id} className="border-b border-border/40 align-top">
+                      <tr key={row.id} className={tableRowClassName}>
                         <td className="px-4 py-3">
-                          <div className="truncate text-foreground">{valueOrDash(row.requestId)}</div>
-                          <div className="mt-1 truncate text-xs text-muted-foreground">{formatInstant(row.createdAt)}</div>
+                          <div className="break-all font-medium text-foreground">{valueOrDash(row.requestId)}</div>
+                          <div className="mt-1 text-xs text-muted-foreground">{formatInstant(row.createdAt)}</div>
                         </td>
-                        <td className="truncate px-4 py-3 text-muted-foreground">{valueOrDash(row.publicModel ?? row.requestedModel)}</td>
-                        <td className="truncate px-4 py-3 text-muted-foreground">{valueOrDash(row.clientInstanceName ?? row.clientInstanceId)}</td>
-                        <td className="truncate px-4 py-3 text-muted-foreground">{valueOrDash(row.sessionAffinityKey ?? row.sessionKey)}</td>
-                        <td className="truncate px-4 py-3 text-muted-foreground">{valueOrDash(row.providerType)}</td>
+                        <td className={tableCellClassName}><div className={mutedReadableCellClassName}>{valueOrDash(row.publicModel ?? row.requestedModel)}</div></td>
+                        <td className={tableCellClassName}><div className={mutedReadableCellClassName}>{valueOrDash(row.clientInstanceName ?? row.clientInstanceId)}</div></td>
+                        <td className={tableCellClassName}><div className={mutedReadableCellClassName}>{valueOrDash(row.sessionAffinityKey ?? row.sessionKey)}</div></td>
+                        <td className={tableCellClassName}><div className={mutedReadableCellClassName}>{valueOrDash(row.providerType)}</div></td>
                         <td className="px-4 py-3">
                           <StatusBadge tone={toneByStatus(row.status ?? row.supportStatus)}>{valueOrDash(row.status ?? row.supportStatus)}</StatusBadge>
                         </td>
-                        <td className="px-4 py-3 text-muted-foreground">{formatMs(row.durationMs)}</td>
+                        <td className={tableCellClassName}>{formatMs(row.durationMs)}</td>
                         <td className="px-4 py-3">
                           <Button type="button" variant="outline" size="sm" onClick={() => openDetail('请求日志详情', row, setDetailOpen, setDetailTitle, setDetailPayload)}>
                             详情
@@ -373,30 +380,30 @@ export function RequestLogsPage() {
             >
               <PaginatedRows items={routeDecisionsQuery.data ?? []}>
                 {({ pageItems }) => (
-                  <div className="overflow-x-auto rounded-2xl border border-border/60 bg-card/92">
+                  <div className={tableShellClassName}>
                     <table aria-label="选路决策表" className="min-w-[1040px] w-full table-fixed text-sm">
                   <thead className="bg-muted/30">
                     <tr>
-                      <th className="w-[21%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">请求 ID</th>
-                      <th className="w-[20%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">解析后模型</th>
-                      <th className="w-[13%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">提供方</th>
-                      <th className="w-[12%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">凭证</th>
-                      <th className="w-[12%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">支持状态</th>
-                      <th className="w-[10%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">候选数</th>
-                      <th className="w-[12%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">操作</th>
+                      <th className={`w-[21%] ${tableHeadCellClassName}`}>请求 ID</th>
+                      <th className={`w-[20%] ${tableHeadCellClassName}`}>解析后模型</th>
+                      <th className={`w-[13%] ${tableHeadCellClassName}`}>提供方</th>
+                      <th className={`w-[12%] ${tableHeadCellClassName}`}>凭证</th>
+                      <th className={`w-[12%] ${tableHeadCellClassName}`}>支持状态</th>
+                      <th className={`w-[10%] ${tableHeadCellClassName}`}>候选数</th>
+                      <th className={`w-[12%] ${tableHeadCellClassName}`}>操作</th>
                     </tr>
                   </thead>
                   <tbody>
                     {pageItems.map((row) => (
-                      <tr key={row.id} className="border-b border-border/40 align-top">
-                        <td className="truncate px-4 py-3 text-foreground">{valueOrDash(row.requestId)}</td>
-                        <td className="truncate px-4 py-3 text-muted-foreground">{valueOrDash(row.resolvedModelKey ?? row.publicModel)}</td>
-                        <td className="truncate px-4 py-3 text-muted-foreground">{valueOrDash(row.selectedProviderType)}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{valueOrDash(row.selectedCredentialId)}</td>
+                      <tr key={row.id} className={tableRowClassName}>
+                        <td className="px-4 py-3"><div className={readableCellClassName}>{valueOrDash(row.requestId)}</div></td>
+                        <td className={tableCellClassName}><div className={mutedReadableCellClassName}>{valueOrDash(row.resolvedModelKey ?? row.publicModel)}</div></td>
+                        <td className={tableCellClassName}><div className={mutedReadableCellClassName}>{valueOrDash(row.selectedProviderType)}</div></td>
+                        <td className={tableCellClassName}>{valueOrDash(row.selectedCredentialId)}</td>
                         <td className="px-4 py-3">
                           <StatusBadge tone={toneByStatus(row.supportStatus)}>{valueOrDash(row.supportStatus)}</StatusBadge>
                         </td>
-                        <td className="px-4 py-3 text-muted-foreground">{valueOrDash(row.candidateCount)}</td>
+                        <td className={tableCellClassName}>{valueOrDash(row.candidateCount)}</td>
                         <td className="px-4 py-3">
                           <Button type="button" variant="outline" size="sm" onClick={() => openDetail('选路决策详情', row, setDetailOpen, setDetailTitle, setDetailPayload)}>
                             详情
@@ -420,28 +427,28 @@ export function RequestLogsPage() {
             >
               <PaginatedRows items={cacheHitsQuery.data ?? []}>
                 {({ pageItems }) => (
-                  <div className="overflow-x-auto rounded-2xl border border-border/60 bg-card/92">
+                  <div className={tableShellClassName}>
                     <table aria-label="缓存命中表" className="min-w-[900px] w-full table-fixed text-sm">
                   <thead className="bg-muted/30">
                     <tr>
-                      <th className="w-[22%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">请求 ID</th>
-                      <th className="w-[14%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">缓存类型</th>
-                      <th className="w-[14%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">提供方</th>
-                      <th className="w-[22%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">Token 收益</th>
-                      <th className="w-[14%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">时间</th>
-                      <th className="w-[14%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">操作</th>
+                      <th className={`w-[22%] ${tableHeadCellClassName}`}>请求 ID</th>
+                      <th className={`w-[14%] ${tableHeadCellClassName}`}>缓存类型</th>
+                      <th className={`w-[14%] ${tableHeadCellClassName}`}>提供方</th>
+                      <th className={`w-[22%] ${tableHeadCellClassName}`}>Token 收益</th>
+                      <th className={`w-[14%] ${tableHeadCellClassName}`}>时间</th>
+                      <th className={`w-[14%] ${tableHeadCellClassName}`}>操作</th>
                     </tr>
                   </thead>
                   <tbody>
                     {pageItems.map((row) => (
-                      <tr key={row.id} className="border-b border-border/40 align-top">
-                        <td className="truncate px-4 py-3 text-foreground">{valueOrDash(row.requestId)}</td>
-                        <td className="truncate px-4 py-3 text-muted-foreground">{valueOrDash(row.cacheKind)}</td>
-                        <td className="truncate px-4 py-3 text-muted-foreground">{valueOrDash(row.providerType)}</td>
-                        <td className="truncate px-4 py-3 text-muted-foreground">
+                      <tr key={row.id} className={tableRowClassName}>
+                        <td className="px-4 py-3"><div className={readableCellClassName}>{valueOrDash(row.requestId)}</div></td>
+                        <td className={tableCellClassName}><div className={mutedReadableCellClassName}>{valueOrDash(row.cacheKind)}</div></td>
+                        <td className={tableCellClassName}><div className={mutedReadableCellClassName}>{valueOrDash(row.providerType)}</div></td>
+                        <td className={tableCellClassName}>
                           命中 {valueOrDash(row.cacheHitTokens)} / 写入 {valueOrDash(row.cacheWriteTokens)} / 节省 {valueOrDash(row.savedInputTokens)}
                         </td>
-                        <td className="truncate px-4 py-3 text-muted-foreground">{formatInstant(row.createdAt)}</td>
+                        <td className={tableCellClassName}>{formatInstant(row.createdAt)}</td>
                         <td className="px-4 py-3">
                           <Button type="button" variant="outline" size="sm" onClick={() => openDetail('缓存命中详情', row, setDetailOpen, setDetailTitle, setDetailPayload)}>
                             详情
@@ -465,30 +472,30 @@ export function RequestLogsPage() {
             >
               <PaginatedRows items={upstreamCacheReferencesQuery.data ?? []}>
                 {({ pageItems }) => (
-                  <div className="overflow-x-auto rounded-2xl border border-border/60 bg-card/92">
+                  <div className={tableShellClassName}>
                     <table aria-label="上游缓存引用表" className="min-w-[980px] w-full table-fixed text-sm">
                   <thead className="bg-muted/30">
                     <tr>
-                      <th className="w-[25%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">外部引用</th>
-                      <th className="w-[15%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">提供方</th>
-                      <th className="w-[12%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">凭证</th>
-                      <th className="w-[12%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">状态</th>
-                      <th className="w-[16%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">过期时间</th>
-                      <th className="w-[10%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">最近使用</th>
-                      <th className="w-[10%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">操作</th>
+                      <th className={`w-[25%] ${tableHeadCellClassName}`}>外部引用</th>
+                      <th className={`w-[15%] ${tableHeadCellClassName}`}>提供方</th>
+                      <th className={`w-[12%] ${tableHeadCellClassName}`}>凭证</th>
+                      <th className={`w-[12%] ${tableHeadCellClassName}`}>状态</th>
+                      <th className={`w-[16%] ${tableHeadCellClassName}`}>过期时间</th>
+                      <th className={`w-[10%] ${tableHeadCellClassName}`}>最近使用</th>
+                      <th className={`w-[10%] ${tableHeadCellClassName}`}>操作</th>
                     </tr>
                   </thead>
                   <tbody>
                     {pageItems.map((row) => (
-                      <tr key={row.id} className="border-b border-border/40 align-top">
-                        <td className="truncate px-4 py-3 text-foreground">{valueOrDash(row.externalCacheRef)}</td>
-                        <td className="truncate px-4 py-3 text-muted-foreground">{valueOrDash(row.providerType)}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{valueOrDash(row.credentialId)}</td>
+                      <tr key={row.id} className={tableRowClassName}>
+                        <td className="px-4 py-3"><div className={readableCellClassName}>{valueOrDash(row.externalCacheRef)}</div></td>
+                        <td className={tableCellClassName}><div className={mutedReadableCellClassName}>{valueOrDash(row.providerType)}</div></td>
+                        <td className={tableCellClassName}>{valueOrDash(row.credentialId)}</td>
                         <td className="px-4 py-3">
                           <StatusBadge tone={toneByStatus(row.status)}>{valueOrDash(row.status)}</StatusBadge>
                         </td>
-                        <td className="truncate px-4 py-3 text-muted-foreground">{formatInstant(row.expireAt)}</td>
-                        <td className="truncate px-4 py-3 text-muted-foreground">{formatInstant(row.lastUsedAt)}</td>
+                        <td className={tableCellClassName}>{formatInstant(row.expireAt)}</td>
+                        <td className={tableCellClassName}>{formatInstant(row.lastUsedAt)}</td>
                         <td className="px-4 py-3">
                           <Button type="button" variant="outline" size="sm" onClick={() => openDetail('上游缓存引用详情', row, setDetailOpen, setDetailTitle, setDetailPayload)}>
                             详情
@@ -511,7 +518,7 @@ export function RequestLogsPage() {
           <DialogHeader>
             <DialogTitle>{detailTitle}</DialogTitle>
           </DialogHeader>
-          <pre className="max-h-[70vh] overflow-auto rounded-2xl border border-border/60 bg-muted/30 p-4 text-xs leading-6 text-foreground">
+          <pre className="scrollbar-subtle max-h-[70vh] overflow-auto rounded-xl border border-border/45 bg-muted/16 p-4 text-xs leading-6 text-foreground">
             {JSON.stringify(detailPayload ?? {}, null, 2)}
           </pre>
         </DialogContent>

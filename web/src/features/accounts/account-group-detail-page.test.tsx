@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest'
+import type { ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { ConfirmProvider } from '@/components/app/confirm-provider'
 import { AccountGroupDetailPage } from './account-group-detail-page'
 
 const { apiRequestMock } = vi.hoisted(() => ({
@@ -264,16 +266,24 @@ afterEach(() => {
 })
 
 describe('AccountGroupDetailPage', () => {
-  it('renders group detail heading', async () => {
+  function renderDetailPage(initialEntry = '/account-groups/1', routes: ReactNode = (
+    <Routes>
+      <Route path="/account-groups/:id" element={<AccountGroupDetailPage />} />
+    </Routes>
+  )) {
     render(
       <QueryClientProvider client={new QueryClient()}>
-        <MemoryRouter initialEntries={['/account-groups/1']}>
-          <Routes>
-            <Route path="/account-groups/:id" element={<AccountGroupDetailPage />} />
-          </Routes>
-        </MemoryRouter>
+        <ConfirmProvider>
+          <MemoryRouter initialEntries={[initialEntry]}>
+            {routes}
+          </MemoryRouter>
+        </ConfirmProvider>
       </QueryClientProvider>,
     )
+  }
+
+  it('renders group detail heading', async () => {
+    renderDetailPage()
 
     expect(await screen.findByText('Codex Group')).toBeInTheDocument()
     expect(await screen.findByText('支持协议')).toBeInTheDocument()
@@ -283,15 +293,7 @@ describe('AccountGroupDetailPage', () => {
   })
 
   it('supports editing group on the unified detail page', async () => {
-    render(
-      <QueryClientProvider client={new QueryClient()}>
-        <MemoryRouter initialEntries={['/account-groups/1']}>
-          <Routes>
-            <Route path="/account-groups/:id" element={<AccountGroupDetailPage />} />
-          </Routes>
-        </MemoryRouter>
-      </QueryClientProvider>,
-    )
+    renderDetailPage()
 
     expect(await screen.findByText('Codex Group')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '编辑账号分组' }))
@@ -323,16 +325,12 @@ describe('AccountGroupDetailPage', () => {
   })
 
   it('supports status toggle and delete from the unified detail page', async () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
-    render(
-      <QueryClientProvider client={new QueryClient()}>
-        <MemoryRouter initialEntries={['/account-groups/1']}>
-          <Routes>
-            <Route path="/account-groups/:id" element={<AccountGroupDetailPage />} />
-            <Route path="/console/account-groups" element={<div>账号分组列表页</div>} />
-          </Routes>
-        </MemoryRouter>
-      </QueryClientProvider>,
+    renderDetailPage(
+      '/account-groups/1',
+      <Routes>
+        <Route path="/account-groups/:id" element={<AccountGroupDetailPage />} />
+        <Route path="/console/account-groups" element={<div>账号分组列表页</div>} />
+      </Routes>,
     )
 
     expect(await screen.findByText('Codex Group')).toBeInTheDocument()
@@ -345,6 +343,8 @@ describe('AccountGroupDetailPage', () => {
     })
 
     fireEvent.click(screen.getByRole('button', { name: '删除账号分组' }))
+    expect(await screen.findByRole('dialog', { name: '删除账号分组' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '删除' }))
     await waitFor(() => {
       expect(apiRequestMock).toHaveBeenCalledWith(
         '/admin/account-groups/1',
@@ -352,19 +352,10 @@ describe('AccountGroupDetailPage', () => {
       )
     })
     expect(await screen.findByText('账号分组列表页')).toBeInTheDocument()
-    confirmSpy.mockRestore()
   })
 
   it('imports Codex auth.json through the official account API and shows a sanitized result', async () => {
-    render(
-      <QueryClientProvider client={new QueryClient()}>
-        <MemoryRouter initialEntries={['/account-groups/1']}>
-          <Routes>
-            <Route path="/account-groups/:id" element={<AccountGroupDetailPage />} />
-          </Routes>
-        </MemoryRouter>
-      </QueryClientProvider>,
-    )
+    renderDetailPage()
 
     expect(await screen.findByText('Codex Group')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '导入 auth.json 接入' }))
@@ -394,15 +385,7 @@ describe('AccountGroupDetailPage', () => {
   })
 
   it('keeps non-Codex auth.json imports on the generic endpoint', async () => {
-    render(
-      <QueryClientProvider client={new QueryClient()}>
-        <MemoryRouter initialEntries={['/account-groups/2']}>
-          <Routes>
-            <Route path="/account-groups/:id" element={<AccountGroupDetailPage />} />
-          </Routes>
-        </MemoryRouter>
-      </QueryClientProvider>,
-    )
+    renderDetailPage('/account-groups/2')
 
     expect(await screen.findByText('OpenAI OAuth Group')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '导入 auth.json 接入' }))
@@ -422,15 +405,7 @@ describe('AccountGroupDetailPage', () => {
   })
 
   it('binds account groups with a distributed key picker', async () => {
-    render(
-      <QueryClientProvider client={new QueryClient()}>
-        <MemoryRouter initialEntries={['/account-groups/1']}>
-          <Routes>
-            <Route path="/account-groups/:id" element={<AccountGroupDetailPage />} />
-          </Routes>
-        </MemoryRouter>
-      </QueryClientProvider>,
-    )
+    renderDetailPage()
 
     expect(await screen.findByText('Codex Group')).toBeInTheDocument()
     expect(await screen.findByRole('combobox', { name: '分布式 Key' })).toHaveTextContent('Codex access key')
@@ -449,15 +424,7 @@ describe('AccountGroupDetailPage', () => {
   })
 
   it('exposes Codex runtime recovery actions', async () => {
-    render(
-      <QueryClientProvider client={new QueryClient()}>
-        <MemoryRouter initialEntries={['/account-groups/1']}>
-          <Routes>
-            <Route path="/account-groups/:id" element={<AccountGroupDetailPage />} />
-          </Routes>
-        </MemoryRouter>
-      </QueryClientProvider>,
-    )
+    renderDetailPage()
 
     expect(await screen.findByText('热切换、负载均衡与失败恢复')).toBeInTheDocument()
     expect((await screen.findAllByText('codex-real-test')).length).toBeGreaterThan(0)
@@ -481,15 +448,7 @@ describe('AccountGroupDetailPage', () => {
   })
 
   it('generates a dry-run batch recovery preflight with blocked candidates', async () => {
-    render(
-      <QueryClientProvider client={new QueryClient()}>
-        <MemoryRouter initialEntries={['/account-groups/1']}>
-          <Routes>
-            <Route path="/account-groups/:id" element={<AccountGroupDetailPage />} />
-          </Routes>
-        </MemoryRouter>
-      </QueryClientProvider>,
-    )
+    renderDetailPage()
 
     expect(await screen.findByText('热切换、负载均衡与失败恢复')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /批量恢复预检/ }))

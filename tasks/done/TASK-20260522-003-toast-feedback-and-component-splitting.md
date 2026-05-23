@@ -82,7 +82,7 @@
 - 已新增 `inline-error` 单元测试，覆盖 DistributedKey 类错误和 `traceId` 展示。
 - 已把提示入口、`window.confirm` 遗留点和超大文件清单回写到需求文档。
 - 遗留增强已拆入：
-  - [TASK-20260522-004](../backlog/TASK-20260522-004-confirm-dialog-notification-unification.md)
+  - [TASK-20260522-004](TASK-20260522-004-confirm-dialog-notification-unification.md)
   - [TASK-20260522-005](../backlog/TASK-20260522-005-giant-file-decomposition-roadmap.md)
 
 ## 验证结果

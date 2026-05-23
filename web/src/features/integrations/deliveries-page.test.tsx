@@ -43,12 +43,13 @@ describe('DeliveriesPage', () => {
     )
 
     expect(await screen.findByText('投递记录、重试与重放')).toBeInTheDocument()
-    expect(await screen.findByText(/响应摘要：timeout/)).toBeInTheDocument()
+    expect(await screen.findByText('响应摘要')).toBeInTheDocument()
+    expect(await screen.findByText('timeout')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('combobox', { name: 'test channel' }))
     fireEvent.click(await screen.findByText('ops-webhook'))
     fireEvent.click(screen.getByRole('button', { name: '发送测试投递' }))
-    fireEvent.click(screen.getByRole('button', { name: '重放' }))
+    fireEvent.click(screen.getByRole('button', { name: /重放/ }))
 
     await waitFor(() => {
       expect(mockedApiRequest).toHaveBeenCalledWith('/admin/integrations/test-delivery', expect.objectContaining({ method: 'POST' }))

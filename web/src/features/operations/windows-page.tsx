@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { EmptyState } from '@/components/app/empty-state'
+import { useConfirm } from '@/components/app/confirm-provider'
 import { InlineError } from '@/components/app/inline-error'
 import { PageSection } from '@/components/app/page-section'
 import { PageSkeleton } from '@/components/app/page-skeleton'
@@ -53,9 +54,16 @@ type MaintenanceWindowForm = {
 
 type EditStep = 'basic' | 'scope' | 'submit'
 const EDIT_STEPS: EditStep[] = ['basic', 'scope', 'submit']
+const tableShellClassName = 'scrollbar-subtle overflow-x-auto rounded-xl border border-border/45 bg-card/82'
+const tableHeadCellClassName = 'border-b border-border/55 px-4 py-3 text-left font-medium text-muted-foreground'
+const tableRowClassName = 'border-b border-border/35 align-top last:border-b-0'
+const tableCellClassName = 'px-4 py-3 text-muted-foreground'
+const readableCellClassName = 'min-w-0 break-words text-foreground'
+const mutedReadableCellClassName = 'min-w-0 break-words text-muted-foreground'
 
 export function WindowsPage() {
   const queryClient = useQueryClient()
+  const confirm = useConfirm()
   const [open, setOpen] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [step, setStep] = useState<EditStep>('basic')
@@ -137,8 +145,14 @@ export function WindowsPage() {
     })
   }
 
-  const handleDelete = (item: MaintenanceWindow) => {
-    if (!window.confirm(`确认删除维护窗口“${item.windowName}”吗？`)) {
+  const handleDelete = async (item: MaintenanceWindow) => {
+    const confirmed = await confirm({
+      title: '删除维护窗口',
+      description: `确认删除“${item.windowName}”吗？该操作会立即移除这条维护窗口。`,
+      confirmLabel: '删除',
+      destructive: true,
+    })
+    if (!confirmed) {
       return
     }
     deleteMutation.mutate(item.id)
@@ -171,27 +185,33 @@ export function WindowsPage() {
         ) : windows.length ? (
           <PaginatedRows items={windows}>
             {({ pageItems }) => (
-              <div className="overflow-hidden rounded-2xl border border-border/60 bg-card/92">
-                <table className="w-full table-fixed text-sm">
+              <div className={tableShellClassName}>
+                <table className="w-full min-w-[980px] table-fixed text-sm">
                   <thead className="bg-muted/30">
                     <tr>
-                      <th className="w-[18%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">窗口名称</th>
-                      <th className="w-[12%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">范围</th>
-                      <th className="w-[14%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">范围引用</th>
-                      <th className="w-[14%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">开始</th>
-                      <th className="w-[14%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">结束</th>
-                      <th className="w-[10%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">状态</th>
-                      <th className="w-[18%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">操作</th>
+                      <th className={`w-[18%] ${tableHeadCellClassName}`}>窗口名称</th>
+                      <th className={`w-[12%] ${tableHeadCellClassName}`}>范围</th>
+                      <th className={`w-[14%] ${tableHeadCellClassName}`}>范围引用</th>
+                      <th className={`w-[14%] ${tableHeadCellClassName}`}>开始</th>
+                      <th className={`w-[14%] ${tableHeadCellClassName}`}>结束</th>
+                      <th className={`w-[10%] ${tableHeadCellClassName}`}>状态</th>
+                      <th className={`w-[18%] ${tableHeadCellClassName}`}>操作</th>
                     </tr>
                   </thead>
                   <tbody>
                     {pageItems.map((item) => (
-                      <tr key={item.id} className="border-b border-border/40 align-top">
-                        <td className="truncate px-4 py-3 text-foreground">{item.windowName}</td>
-                        <td className="truncate px-4 py-3 text-muted-foreground">{maintenanceScopeTypeLabel(item.scopeType)}</td>
-                        <td className="truncate px-4 py-3 text-muted-foreground">{item.scopeRef ?? '全部'}</td>
-                        <td className="truncate px-4 py-3 text-muted-foreground">{formatInstant(item.startsAt)}</td>
-                        <td className="truncate px-4 py-3 text-muted-foreground">{formatInstant(item.endsAt)}</td>
+                      <tr key={item.id} className={tableRowClassName}>
+                        <td className="px-4 py-3">
+                          <div className={readableCellClassName}>{item.windowName}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className={mutedReadableCellClassName}>{maintenanceScopeTypeLabel(item.scopeType)}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className={mutedReadableCellClassName}>{item.scopeRef ?? '全部'}</div>
+                        </td>
+                        <td className={tableCellClassName}>{formatInstant(item.startsAt)}</td>
+                        <td className={tableCellClassName}>{formatInstant(item.endsAt)}</td>
                         <td className="px-4 py-3">
                           <StatusBadge tone={item.activeNow ? 'success' : 'warning'}>
                             {item.activeNow ? '当前命中' : '未命中'}
@@ -202,7 +222,7 @@ export function WindowsPage() {
                             <Button type="button" variant="outline" size="sm" onClick={() => handleOpenEdit(item)}>
                               编辑
                             </Button>
-                            <Button type="button" variant="outline" size="sm" onClick={() => handleDelete(item)} disabled={deleteMutation.isPending}>
+                            <Button type="button" variant="outline" size="sm" onClick={() => void handleDelete(item)} disabled={deleteMutation.isPending}>
                               删除
                             </Button>
                           </div>
@@ -275,7 +295,7 @@ export function WindowsPage() {
                     <span className="text-sm font-medium text-foreground">备注（可选）</span>
                     <Input value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} placeholder="例如：只允许升级，不做回滚" />
                   </label>
-                  <label className="flex items-center gap-3 rounded-2xl border border-border/60 bg-muted/20 px-4 py-3">
+                  <label className="flex items-center gap-3 rounded-xl border border-border/45 bg-muted/12 px-4 py-3">
                     <input
                       type="checkbox"
                       className="size-4 rounded border-border"
@@ -287,12 +307,12 @@ export function WindowsPage() {
                 </div>
               </TabsContent>
               <TabsContent value="submit" className="pt-3">
-                <div className="rounded-2xl border border-border/60 bg-muted/20 p-4 text-sm text-foreground">
-                  <div>窗口名称：{form.windowName || '未填写'}</div>
-                  <div className="mt-1">范围：{maintenanceScopeTypeLabel(form.scopeType)} / {form.scopeRef.trim() || '全部'}</div>
-                  <div className="mt-1">开始：{form.startsAt || '未填写'}</div>
-                  <div className="mt-1">结束：{form.endsAt || '未填写'}</div>
-                  <div className="mt-1">状态：{form.enabled ? '启用' : '停用'}</div>
+                <div className="grid gap-1.5 rounded-xl border border-border/45 bg-muted/12 p-4 text-sm text-foreground">
+                  <div className="break-words">窗口名称：{form.windowName || '未填写'}</div>
+                  <div className="break-words">范围：{maintenanceScopeTypeLabel(form.scopeType)} / {form.scopeRef.trim() || '全部'}</div>
+                  <div className="break-words">开始：{form.startsAt || '未填写'}</div>
+                  <div className="break-words">结束：{form.endsAt || '未填写'}</div>
+                  <div>状态：{form.enabled ? '启用' : '停用'}</div>
                 </div>
               </TabsContent>
             </Tabs>

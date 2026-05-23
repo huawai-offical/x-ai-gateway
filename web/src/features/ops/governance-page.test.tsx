@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ConfirmProvider } from '@/components/app/confirm-provider'
 import { apiClient } from '../../lib/api'
 import { GovernancePage } from './governance-page'
 
@@ -160,9 +161,11 @@ afterEach(() => {
 function renderPage() {
   render(
     <QueryClientProvider client={new QueryClient()}>
-      <MemoryRouter>
-        <GovernancePage />
-      </MemoryRouter>
+      <ConfirmProvider>
+        <MemoryRouter>
+          <GovernancePage />
+        </MemoryRouter>
+      </ConfirmProvider>
     </QueryClientProvider>,
   )
 }
@@ -219,10 +222,10 @@ describe('GovernancePage', () => {
   })
 
   it('can delete error rule from governance page', async () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
     renderPage()
 
     fireEvent.click(await screen.findByRole('button', { name: '删除规则 1' }))
+    fireEvent.click(await screen.findByRole('button', { name: '删除' }))
 
     await waitFor(() => {
       expect(mockedApiDelete).toHaveBeenCalledWith(
@@ -230,18 +233,16 @@ describe('GovernancePage', () => {
         expect.objectContaining({ responseType: 'void' }),
       )
     })
-
-    confirmSpy.mockRestore()
   })
 
   it('can delete route guard from governance page', async () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
     renderPage()
 
     const routeGuardsTab = await screen.findByRole('tab', { name: '路由守卫' })
     fireEvent.mouseDown(routeGuardsTab)
     fireEvent.click(routeGuardsTab)
     fireEvent.click(await screen.findByRole('button', { name: '删除守卫 11' }))
+    fireEvent.click(await screen.findByRole('button', { name: '删除' }))
 
     await waitFor(() => {
       expect(mockedApiDelete).toHaveBeenCalledWith(
@@ -249,8 +250,6 @@ describe('GovernancePage', () => {
         expect.objectContaining({ responseType: 'void' }),
       )
     })
-
-    confirmSpy.mockRestore()
   })
 
   it('can inspect and reset routing runtime states', async () => {

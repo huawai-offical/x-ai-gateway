@@ -30,6 +30,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { EmptyState } from '@/components/app/empty-state'
+import { useConfirm } from '@/components/app/confirm-provider'
 import { InlineError } from '@/components/app/inline-error'
 import { MetricCard } from '@/components/app/metric-card'
 import { PageSection } from '@/components/app/page-section'
@@ -68,6 +69,7 @@ const governanceActionOptions = ['NONE', 'QUARANTINE', 'COOLDOWN', 'DRAIN']
 
 export function GovernancePage() {
   const queryClient = useQueryClient()
+  const confirm = useConfirm()
   const [searchParams, setSearchParams] = useSearchParams()
   const activeTab = normalizeTab(searchParams.get('tab'))
   const [errorRuleDraft, setErrorRuleDraft] = useState<ErrorRuleDraft>(createDefaultErrorRuleDraft())
@@ -238,6 +240,30 @@ export function GovernancePage() {
     },
   })
 
+  const handleDeleteErrorRule = async (rule: ErrorRule) => {
+    const confirmed = await confirm({
+      title: '删除错误规则',
+      description: `确认删除错误规则 #${rule.id} 吗？该操作会立即移除这条规则。`,
+      confirmLabel: '删除',
+      destructive: true,
+    })
+    if (confirmed) {
+      deleteErrorRuleMutation.mutate(rule.id)
+    }
+  }
+
+  const handleDeleteRouteGuard = async (policy: RouteGuardPolicy) => {
+    const confirmed = await confirm({
+      title: '删除路由守卫',
+      description: `确认删除“${policy.policyName}”吗？该操作会立即移除这条路由守卫策略。`,
+      confirmLabel: '删除',
+      destructive: true,
+    })
+    if (confirmed) {
+      deleteRouteGuardMutation.mutate(policy.id)
+    }
+  }
+
   const pageError =
     errorRulesQuery.error
     ?? routeGuardsQuery.error
@@ -353,10 +379,7 @@ export function GovernancePage() {
                                 variant="outline"
                                 aria-label={`删除规则 ${rule.id}`}
                                 disabled={deleteErrorRuleMutation.isPending}
-                                onClick={() => {
-                                  if (!window.confirm(`确认删除错误规则 #${rule.id} 吗？`)) return
-                                  deleteErrorRuleMutation.mutate(rule.id)
-                                }}
+                                onClick={() => void handleDeleteErrorRule(rule)}
                               >
                                 <Trash2Icon />
                               </Button>
@@ -536,10 +559,7 @@ export function GovernancePage() {
                                 variant="outline"
                                 aria-label={`删除守卫 ${policy.id}`}
                                 disabled={deleteRouteGuardMutation.isPending}
-                                onClick={() => {
-                                  if (!window.confirm(`确认删除路由守卫“${policy.policyName}”吗？`)) return
-                                  deleteRouteGuardMutation.mutate(policy.id)
-                                }}
+                                onClick={() => void handleDeleteRouteGuard(policy)}
                               >
                                 <Trash2Icon />
                               </Button>

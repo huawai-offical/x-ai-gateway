@@ -133,7 +133,7 @@ function TablePagination<T>({
   return (
     <div
       className={cn(
-        'flex flex-col gap-3 rounded-xl border border-border/60 bg-muted/20 px-3 py-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between',
+        'flex flex-col gap-3 rounded-xl border border-border/45 bg-muted/12 px-3 py-2 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between',
         className,
       )}
     >

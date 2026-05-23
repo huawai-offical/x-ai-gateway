@@ -24,6 +24,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { CodePanel } from '@/components/app/code-panel'
 import { EmptyState } from '@/components/app/empty-state'
+import { useConfirm } from '@/components/app/confirm-provider'
 import { InlineError } from '@/components/app/inline-error'
 import { PageSection } from '@/components/app/page-section'
 import { PageSkeleton } from '@/components/app/page-skeleton'
@@ -198,6 +199,7 @@ const KEY_TEMPLATES = [
 
 export function KeysPage() {
   const queryClient = useQueryClient()
+  const confirm = useConfirm()
   const [activeStep, setActiveStep] = useState<StepId>('basic')
   const [form, setForm] = useState<CreateKeyForm>(createEmptyForm())
   const [formError, setFormError] = useState<string | null>(null)
@@ -325,8 +327,14 @@ export function KeysPage() {
     }
   }
 
-  const handleDelete = (item: DistributedKey) => {
-    if (!window.confirm(`确认删除访问密钥“${item.keyName}”吗？`)) {
+  const handleDelete = async (item: DistributedKey) => {
+    const confirmed = await confirm({
+      title: '删除访问密钥',
+      description: `确认删除“${item.keyName}”吗？该操作会立即移除这条访问密钥。`,
+      confirmLabel: '删除',
+      destructive: true,
+    })
+    if (!confirmed) {
       return
     }
     deleteMutation.mutate(item.id)
@@ -435,7 +443,7 @@ export function KeysPage() {
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => handleDelete(item)}
+                      onClick={() => void handleDelete(item)}
                       disabled={deleteMutation.isPending}
                     >
                       删除

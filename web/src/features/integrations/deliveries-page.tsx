@@ -69,10 +69,10 @@ export function DeliveriesPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="overflow-hidden rounded-3xl border border-border/60 bg-card/80 p-6 shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-border/45 bg-card/82 p-5 shadow-[0_1px_2px_rgba(15,23,42,0.06)]">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
           <div className="space-y-1.5 max-w-xl">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-muted/20 px-3 py-1 text-xs font-semibold text-foreground">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-border/45 bg-muted/14 px-3 py-1 text-xs font-semibold text-foreground">
               <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
               白盒排障控制台
             </span>
@@ -102,7 +102,7 @@ export function DeliveriesPage() {
         kicker="投递记录"
         title="投递记录、重试与重放"
       >
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_18rem_auto] items-end bg-card/40 border border-border/50 rounded-2xl p-5 shadow-sm">
+        <div className="grid items-end gap-4 rounded-xl border border-border/45 bg-muted/12 p-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_18rem_auto]">
           <label className="flex flex-col gap-2">
             <span className="text-sm font-medium text-foreground">事件类型</span>
             <Input value={eventType} onChange={(event) => setEventType(event.target.value)} placeholder="请输入事件类型" />
@@ -170,7 +170,7 @@ export function DeliveriesPage() {
             {deliveriesQuery.data.map((item: OutboundDelivery) => {
               const isReplaying = replayMutation.isPending && replayMutation.variables === item.id;
               return (
-                <Card key={item.id} className="border-border/60 bg-card/60 backdrop-blur shadow-sm hover:shadow-md transition-all duration-300 rounded-2xl overflow-hidden">
+                <Card key={item.id} className="overflow-hidden border-border/45 bg-card/82 shadow-[0_1px_2px_rgba(15,23,42,0.06)] backdrop-blur transition-colors duration-200 hover:border-border/55">
                   <CardHeader className="gap-2 border-b border-border/40 px-5 py-4 bg-muted/20">
                       <div className="flex flex-wrap items-center justify-between gap-3">
                       <div className="flex min-w-0 items-center gap-2">

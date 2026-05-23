@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeftIcon, ExternalLinkIcon } from 'lucide-react'
+import { ArrowLeftIcon, ExternalLinkIcon, TriangleAlertIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { CodePanel } from '@/components/app/code-panel'
 import { EmptyState } from '@/components/app/empty-state'
@@ -125,14 +125,21 @@ export function ExtensionRuntimePage() {
       </PageSection>
 
       {runtimeError ? (
-        <InlineError error={new Error(runtimeError)} title="扩展应用暂不可运行" />
+        <PageSection kicker="运行阻断" title="扩展应用暂不可运行">
+          <InlineError error={new Error(runtimeError)} title="扩展应用暂不可运行" />
+          <EmptyState
+            title={runtimeError}
+            icon={<TriangleAlertIcon className="size-5" />}
+            className="border-border/45 bg-muted/14"
+          />
+        </PageSection>
       ) : signedContext ? (
         <PageSection
           kicker="iframe runtime"
           title="安全挂载"
           contentClassName="space-y-4"
         >
-          <div className="overflow-hidden rounded-2xl border border-border/70 bg-muted/20">
+          <div className="overflow-hidden rounded-xl border border-border/45 bg-muted/12">
             <iframe
               title={`${app.appName} 扩展运行页`}
               src={signedContext.launchUrl}

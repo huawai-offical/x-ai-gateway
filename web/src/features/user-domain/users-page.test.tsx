@@ -3,6 +3,7 @@ import '@testing-library/jest-dom/vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { ConfirmProvider } from '@/components/app/confirm-provider'
 import { UsersPage } from './users-page'
 
 const { apiRequestMock } = vi.hoisted(() => ({
@@ -39,7 +40,9 @@ describe('UsersPage', () => {
   it('renders page and creates user in dialog', async () => {
     render(
       <QueryClientProvider client={new QueryClient()}>
-        <UsersPage />
+        <ConfirmProvider>
+          <UsersPage />
+        </ConfirmProvider>
       </QueryClientProvider>,
     )
 

@@ -12,8 +12,8 @@ export function DataTableShell({
   children,
 }: DataTableShellProps) {
   return (
-    <Card className="border-border/60 bg-card/92 shadow-sm">
-      <CardHeader className="flex flex-col gap-4 border-b border-border/60 lg:flex-row lg:items-start lg:justify-between">
+    <Card className="border-border/55 bg-card/88 shadow-[0_1px_2px_rgba(15,23,42,0.06)] backdrop-blur">
+      <CardHeader className="flex flex-col gap-4 border-b border-border/50 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex flex-col gap-1">
           <CardTitle className="text-lg font-semibold">{title}</CardTitle>
         </div>

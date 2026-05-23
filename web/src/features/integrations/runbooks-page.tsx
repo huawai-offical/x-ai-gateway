@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { EmptyState } from '@/components/app/empty-state'
+import { useConfirm } from '@/components/app/confirm-provider'
 import { InlineError } from '@/components/app/inline-error'
 import { PageSection } from '@/components/app/page-section'
 import { PageSkeleton } from '@/components/app/page-skeleton'
@@ -36,6 +37,7 @@ const EDIT_STEPS: EditStep[] = ['basic', 'match', 'submit']
 
 export function RunbooksPage() {
   const queryClient = useQueryClient()
+  const confirm = useConfirm()
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState<EditStep>('basic')
   const [editingId, setEditingId] = useState<number | null>(null)
@@ -134,8 +136,14 @@ export function RunbooksPage() {
     })
   }
 
-  const handleDelete = (item: RunbookLink) => {
-    if (!window.confirm(`确认删除排障文档“${item.linkName}”吗？`)) {
+  const handleDelete = async (item: RunbookLink) => {
+    const confirmed = await confirm({
+      title: '删除排障文档',
+      description: `确认删除“${item.linkName}”吗？该操作会立即移除这条排障文档链接。`,
+      confirmLabel: '删除',
+      destructive: true,
+    })
+    if (!confirmed) {
       return
     }
     deleteMutation.mutate(item.id)
@@ -161,17 +169,17 @@ export function RunbooksPage() {
         ) : sortedRunbooks.length ? (
           <PaginatedRows items={sortedRunbooks}>
             {({ pageItems }) => (
-              <div className="overflow-hidden rounded-2xl border border-border/60 bg-card/92">
+              <div className="scrollbar-subtle overflow-x-auto rounded-xl border border-border/45 bg-card/82">
                 <table className="w-full table-fixed text-sm">
                   <thead className="bg-muted/30">
                     <tr>
-                      <th className="w-[20%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">名称</th>
-                      <th className="w-[26%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">链接</th>
-                      <th className="w-[12%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">事件</th>
-                      <th className="w-[12%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">实体</th>
-                      <th className="w-[10%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">状态</th>
-                      <th className="w-[10%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">更新时间</th>
-                      <th className="w-[10%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">操作</th>
+                      <th className="w-[20%] border-b border-border/55 px-4 py-3 text-left font-medium text-muted-foreground">名称</th>
+                      <th className="w-[26%] border-b border-border/55 px-4 py-3 text-left font-medium text-muted-foreground">链接</th>
+                      <th className="w-[12%] border-b border-border/55 px-4 py-3 text-left font-medium text-muted-foreground">事件</th>
+                      <th className="w-[12%] border-b border-border/55 px-4 py-3 text-left font-medium text-muted-foreground">实体</th>
+                      <th className="w-[10%] border-b border-border/55 px-4 py-3 text-left font-medium text-muted-foreground">状态</th>
+                      <th className="w-[10%] border-b border-border/55 px-4 py-3 text-left font-medium text-muted-foreground">更新时间</th>
+                      <th className="w-[10%] border-b border-border/55 px-4 py-3 text-left font-medium text-muted-foreground">操作</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -197,7 +205,7 @@ export function RunbooksPage() {
                               type="button"
                               variant="outline"
                               size="sm"
-                              onClick={() => handleDelete(item)}
+                              onClick={() => void handleDelete(item)}
                               disabled={deleteMutation.isPending}
                             >
                               删除
@@ -258,7 +266,7 @@ export function RunbooksPage() {
                     <span className="text-sm font-medium text-foreground">实体类型（可选）</span>
                     <Input value={form.entityType} onChange={(event) => setForm((current) => ({ ...current, entityType: event.target.value }))} placeholder="例如 CREDENTIAL" />
                   </label>
-                  <label className="flex items-center gap-3 rounded-2xl border border-border/60 bg-muted/20 px-4 py-3 md:col-span-2">
+                  <label className="flex items-center gap-3 rounded-xl border border-border/45 bg-muted/14 px-4 py-3 md:col-span-2">
                     <input
                       type="checkbox"
                       className="size-4 rounded border-border"
@@ -271,7 +279,7 @@ export function RunbooksPage() {
               </TabsContent>
 
               <TabsContent value="submit" className="pt-3">
-                <div className="rounded-2xl border border-border/60 bg-muted/20 p-4 text-sm text-foreground">
+                <div className="rounded-xl border border-border/45 bg-muted/14 p-4 text-sm text-foreground">
                   <div>名称：{form.linkName || '未填写'}</div>
                   <div className="mt-1">链接：{form.linkUrl || '未填写'}</div>
                   <div className="mt-1">事件：{form.eventType || '全部'}</div>

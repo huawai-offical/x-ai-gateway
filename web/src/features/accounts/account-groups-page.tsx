@@ -602,7 +602,7 @@ export function AccountGroupsPage() {
                 onChange={(event) => setEditingForm((current) => ({ ...current, description: event.target.value }))}
               />
             </label>
-            <label className="flex items-center gap-3 rounded-2xl border border-border/60 bg-background px-4 py-3">
+            <label className="flex items-center gap-3 rounded-xl border border-border/45 bg-muted/10 px-4 py-3">
               <input
                 type="checkbox"
                 className="size-4 rounded border-border"
@@ -668,7 +668,7 @@ export function AccountGroupsPage() {
               </span>
             </div>
 
-            <div className="max-h-80 overflow-auto rounded-2xl border border-border/60 bg-muted/10 p-3">
+            <div className="scrollbar-subtle max-h-80 overflow-auto rounded-xl border border-border/45 bg-muted/10 p-3">
               <div className="grid gap-2 md:grid-cols-2">
                 {filteredEditingModels.map((model) => (
                   <label key={model} className="flex items-center gap-3 rounded-xl border border-border/60 bg-background px-3 py-2">
@@ -733,7 +733,7 @@ export function AccountGroupsPage() {
               </span>
             </div>
 
-            <div className="max-h-80 overflow-auto rounded-2xl border border-border/60 bg-muted/10 p-3">
+            <div className="scrollbar-subtle max-h-80 overflow-auto rounded-xl border border-border/45 bg-muted/10 p-3">
               <div className="grid gap-2 md:grid-cols-2">
                 {filteredCreateModels.map((model) => (
                   <label key={model} className="flex items-center gap-3 rounded-xl border border-border/60 bg-background px-3 py-2">
@@ -810,7 +810,7 @@ export function AccountGroupsPage() {
                       ))}
                     </select>
                   </label>
-                  <label className="flex items-center gap-3 rounded-2xl border border-border/60 bg-muted/20 px-4 py-3 md:col-span-2">
+                  <label className="flex items-center gap-3 rounded-xl border border-border/45 bg-muted/14 px-4 py-3 md:col-span-2">
                     <input
                       type="checkbox"
                       className="size-4 rounded border-border"
@@ -998,7 +998,7 @@ export function AccountGroupsPage() {
                       <span className="text-sm font-medium text-foreground">站点画像 ID（可选）</span>
                       <Input value={singleImportForm.siteProfileId} onChange={(event) => setSingleImportForm((current) => ({ ...current, siteProfileId: event.target.value }))} />
                     </label>
-                    <label className="flex items-center gap-3 rounded-2xl border border-border/60 bg-muted/20 px-4 py-3 md:col-span-2">
+                    <label className="flex items-center gap-3 rounded-xl border border-border/45 bg-muted/14 px-4 py-3 md:col-span-2">
                       <input
                         type="checkbox"
                         className="size-4 rounded border-border"
@@ -1014,7 +1014,7 @@ export function AccountGroupsPage() {
                   </div>
                 ) : (
                   <div className="grid gap-4">
-                    <div className="rounded-2xl border border-border/60 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+                    <div className="rounded-xl border border-border/45 bg-muted/14 px-4 py-3 text-sm text-muted-foreground">
                       本次预计批量导入 {batchImportForms.length} 个账号。
                     </div>
                     <div className="grid gap-4 md:grid-cols-2">
@@ -1030,7 +1030,7 @@ export function AccountGroupsPage() {
                         <span className="text-sm font-medium text-foreground">统一站点画像 ID（可选）</span>
                         <Input value={batchOverride.siteProfileId} onChange={(event) => setBatchOverride((current) => ({ ...current, siteProfileId: event.target.value }))} />
                       </label>
-                      <label className="flex items-center gap-3 rounded-2xl border border-border/60 bg-muted/20 px-4 py-3 md:col-span-2">
+                      <label className="flex items-center gap-3 rounded-xl border border-border/45 bg-muted/14 px-4 py-3 md:col-span-2">
                         <input
                           type="checkbox"
                           className="size-4 rounded border-border"
@@ -1040,7 +1040,7 @@ export function AccountGroupsPage() {
                         <span className="text-sm font-medium text-foreground">批量导入后统一启用账号</span>
                       </label>
                     </div>
-                    <div className="rounded-2xl border border-border/60 bg-background px-4 py-3 text-sm text-muted-foreground">
+                    <div className="rounded-xl border border-border/45 bg-muted/10 px-4 py-3 text-sm text-muted-foreground">
                       示例账号：{batchImportForms.slice(0, 3).map((item) => item.accountName || '(自动命名)').join('，') || '无'}
                     </div>
                   </div>
@@ -1052,12 +1052,12 @@ export function AccountGroupsPage() {
               <InlineError error={importMutation.error ?? new Error(importError ?? '导入账号失败')} title="导入账号失败" />
             ) : null}
             {importWarning ? (
-              <div className="rounded-2xl border border-border/60 bg-card/80 px-4 py-3 text-sm text-foreground">
+              <div className="rounded-xl border border-border/45 bg-card/75 px-4 py-3 text-sm text-foreground">
                 解析提示：{importWarning}
               </div>
             ) : null}
             {importResult ? (
-              <div className="rounded-2xl border border-border/60 bg-background px-4 py-3 text-sm text-foreground">
+              <div className="rounded-xl border border-border/45 bg-muted/10 px-4 py-3 text-sm text-foreground">
                 导入完成：总计 {importResult.total}，成功 {importResult.success}，失败 {importResult.failed.length}。
                 {importResult.failed.length ? (
                   <div className="mt-2 text-muted-foreground">
@@ -1147,7 +1147,7 @@ function MultiSelectDropdownField({
             </div>
             <div className="grid gap-2 md:grid-cols-2">
               {options.map((option) => (
-                <label key={option} className="flex items-center gap-3 rounded-xl border border-border/60 bg-muted/10 px-3 py-2">
+                <label key={option} className="flex items-center gap-3 rounded-lg border border-border/45 bg-muted/10 px-3 py-2">
                   <input
                     type="checkbox"
                     className="size-4 rounded border-border"

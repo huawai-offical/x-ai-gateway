@@ -471,6 +471,7 @@ function SidebarContent({
   return (
     <div className="flex h-full min-h-0 flex-col text-sidebar-foreground">
       <div
+        data-testid="app-shell-sidebar-brand"
         className={cn(
           'flex min-h-[var(--app-shell-header-height)] flex-col justify-center gap-3 border-b border-sidebar-border/70 px-3 py-4',
           collapsed && 'px-2',

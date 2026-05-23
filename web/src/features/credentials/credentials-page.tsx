@@ -13,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { useConfirm } from '@/components/app/confirm-provider'
 import { EmptyState } from '@/components/app/empty-state'
 import { InlineError } from '@/components/app/inline-error'
 import { PageSection } from '@/components/app/page-section'
@@ -134,6 +135,7 @@ export function CredentialsPage() {
   const [selectedInventoryRow, setSelectedInventoryRow] = useState<UpstreamCredentialInventoryResponse | null>(null)
   const [modelKeyword, setModelKeyword] = useState('')
   const [editingModelKeyword, setEditingModelKeyword] = useState('')
+  const confirm = useConfirm()
 
   const credentialInventoryQuery = useTypedQuery<UpstreamCredentialInventoryResponse[]>({
     queryKey: ['credentials', 'inventory'],
@@ -354,6 +356,7 @@ export function CredentialsPage() {
         method: 'DELETE',
       }),
     onSuccess: () => {
+      setSelectedInventoryRow(null)
       invalidateCredentialData(queryClient)
     },
   })
@@ -474,15 +477,19 @@ export function CredentialsPage() {
     event.target.value = ''
   }
 
-  const handleDeleteInventoryRow = (row: UpstreamCredentialInventoryResponse) => {
+  const handleDeleteInventoryRow = async (row: UpstreamCredentialInventoryResponse) => {
     if (row.sourceType !== 'API_KEY') {
       return
     }
-    if (!window.confirm(`确认删除凭证“${row.displayName}”吗？`)) {
-      return
+    const confirmed = await confirm({
+      title: '删除上游凭证',
+      description: `确认删除“${row.displayName}”吗？该操作会立即移除这条 API Key 凭证。`,
+      confirmLabel: '删除',
+      destructive: true,
+    })
+    if (confirmed) {
+      deleteCredentialMutation.mutate(row.sourceId)
     }
-    deleteCredentialMutation.mutate(row.sourceId)
-    setSelectedInventoryRow(null)
   }
 
   const credentialRows = credentialInventoryQuery.data ?? []
@@ -609,7 +616,7 @@ export function CredentialsPage() {
                         <td className="px-4 py-3">
                           <button
                             type="button"
-                            className="max-w-full truncate text-left font-medium text-primary hover:underline"
+                            className="max-w-full text-left font-medium text-primary [overflow-wrap:anywhere] hover:underline"
                             title={row.groupName ?? '未归组'}
                             onClick={() => setSelectedInventoryRow(row)}
                           >
@@ -1281,7 +1288,7 @@ export function CredentialsPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => handleDeleteInventoryRow(selectedInventoryRow)}
+                      onClick={() => void handleDeleteInventoryRow(selectedInventoryRow)}
                       disabled={deleteCredentialMutation.isPending}
                     >
                       删除

@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { CodePanel } from '@/components/app/code-panel'
+import { useConfirm } from '@/components/app/confirm-provider'
 import { EmptyState } from '@/components/app/empty-state'
 import { InfoGrid } from '@/components/app/info-grid'
 import { InlineError } from '@/components/app/inline-error'
@@ -294,6 +295,7 @@ export function AccountGroupDetailPage() {
   const [runtimeSmokeByAccountId, setRuntimeSmokeByAccountId] = useState<Record<number, OfficialCodexResponsesSmokeResponse>>({})
   const [batchPreflightOpen, setBatchPreflightOpen] = useState(false)
   const [batchRecoveryResult, setBatchRecoveryResult] = useState<RuntimeBatchRecoveryResult | null>(null)
+  const confirm = useConfirm()
   const groupQuery = useTypedQuery<AccountGroup>({
     queryKey: ['account-group', id],
     queryFn: () => apiRequest<AccountGroup>(`/admin/account-groups/${id}`),
@@ -512,11 +514,19 @@ export function AccountGroupDetailPage() {
     }
   }
 
-  const handleDeleteGroup = (group: AccountGroup) => {
-    if (!window.confirm(`确认删除账号分组“${group.groupName}”吗？`)) {
+  const handleDeleteGroup = async () => {
+    if (!group) {
       return
     }
-    deleteGroupMutation.mutate(group.id)
+    const confirmed = await confirm({
+      title: '删除账号分组',
+      description: `确认删除“${group.groupName}”吗？删除后会回到账号分组列表。`,
+      confirmLabel: '删除',
+      destructive: true,
+    })
+    if (confirmed) {
+      deleteGroupMutation.mutate(group.id)
+    }
   }
 
   const handleImportSubmit = (event: FormEvent) => {
@@ -668,7 +678,7 @@ export function AccountGroupDetailPage() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => handleDeleteGroup(group)}
+                onClick={() => void handleDeleteGroup()}
                 disabled={deleteGroupMutation.isPending || group.defaultGroup}
               >
                 删除账号分组
@@ -934,7 +944,7 @@ export function AccountGroupDetailPage() {
                                 )}
                               </div>
                             ) : (
-                              <div className="mt-2 rounded-xl border border-dashed border-border/60 bg-muted/10 px-3 py-2 text-xs text-muted-foreground">
+                              <div className="mt-2 rounded-xl border border-dashed border-border/45 bg-muted/10 px-3 py-2 text-xs text-muted-foreground">
                                 尚未执行预检
                               </div>
                             )}
@@ -1146,7 +1156,7 @@ export function AccountGroupDetailPage() {
                 onChange={(event) => setEditForm((current) => ({ ...current, description: event.target.value }))}
               />
             </label>
-            <label className="flex items-center gap-3 rounded-2xl border border-border/60 bg-muted/20 px-4 py-3">
+            <label className="flex items-center gap-3 rounded-xl border border-border/45 bg-muted/14 px-4 py-3">
               <input
                 type="checkbox"
                 className="size-4 rounded border-border"
@@ -1210,7 +1220,7 @@ export function AccountGroupDetailPage() {
                 可见 {filteredModelOptions.length} 个，已选 {editModels.length} 个
               </span>
             </div>
-            <div className="max-h-80 overflow-auto rounded-2xl border border-border/60 bg-muted/10 p-3">
+            <div className="scrollbar-subtle max-h-80 overflow-auto rounded-xl border border-border/45 bg-muted/10 p-3">
               <div className="grid gap-2 md:grid-cols-2">
                 {filteredModelOptions.map((model) => (
                   <label key={model} className="flex items-center gap-3 rounded-xl border border-border/60 bg-background px-3 py-2">
@@ -1320,7 +1330,7 @@ export function AccountGroupDetailPage() {
               code={JSON.stringify(runtimeBatchResult, null, 2)}
             />
             {runtimeBatchResult.auditEventId ? (
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/60 bg-muted/20 px-4 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/45 bg-muted/14 px-4 py-3">
                 <div>
                   <div className="text-sm font-medium text-foreground">{runtimeBatchResult.auditEventTitle ?? 'Codex Runtime 批量恢复审计事件'}</div>
                   <div className="text-xs text-muted-foreground">事件 ID {runtimeBatchResult.auditEventId}，已按账号分组过滤系统事件。</div>
@@ -1595,7 +1605,7 @@ export function AccountGroupDetailPage() {
                     <span className="text-sm font-medium text-foreground">站点画像 ID（可选）</span>
                     <Input value={importForm.siteProfileId} onChange={(event) => setImportForm((current) => ({ ...current, siteProfileId: event.target.value }))} />
                   </label>
-                  <label className="flex items-center gap-3 rounded-2xl border border-border/60 bg-muted/20 px-4 py-3 md:col-span-2">
+                  <label className="flex items-center gap-3 rounded-xl border border-border/45 bg-muted/14 px-4 py-3 md:col-span-2">
                     <input
                       type="checkbox"
                       className="size-4 rounded border-border"
@@ -1700,7 +1710,7 @@ function MultiSelectDropdownField({
             </div>
             <div className="grid gap-2 md:grid-cols-2">
               {options.map((option) => (
-                <label key={option} className="flex items-center gap-3 rounded-xl border border-border/60 bg-muted/10 px-3 py-2">
+                <label key={option} className="flex items-center gap-3 rounded-lg border border-border/45 bg-muted/10 px-3 py-2">
                   <input
                     type="checkbox"
                     className="size-4 rounded border-border"

@@ -70,7 +70,7 @@
 - `web/src/features/auth/login-page.tsx` 和 `web/src/features/auth/auth-settings-page.tsx` 存在直接 `toast.*` 调用，已受全局左上角 `Toaster` 控制。
 - `web/src/features/auth/login-page.tsx` 仍有 `Alert`，主要用于登录挑战/POW 的持久状态展示，不属于本轮“失败告警气泡化”范围；后续可单独判断是否改为普通状态面板。
 - 未发现 `window.alert` 或裸 `alert(...)`。
-- 发现 18 处 `window.confirm` 原生阻塞确认弹窗，已拆为后续任务 [TASK-20260522-004](../../tasks/backlog/TASK-20260522-004-confirm-dialog-notification-unification.md)。
+- 发现 18 处 `window.confirm` 原生阻塞确认弹窗，已拆为后续任务 [TASK-20260522-004](../../tasks/done/TASK-20260522-004-confirm-dialog-notification-unification.md)。
 
 ## 超大文件清单
 
@@ -103,5 +103,5 @@
 ## 关联任务
 
 - [TASK-20260522-003](../../tasks/done/TASK-20260522-003-toast-feedback-and-component-splitting.md)
-- [TASK-20260522-004](../../tasks/backlog/TASK-20260522-004-confirm-dialog-notification-unification.md)
+- [TASK-20260522-004](../../tasks/done/TASK-20260522-004-confirm-dialog-notification-unification.md)
 - [TASK-20260522-005](../../tasks/backlog/TASK-20260522-005-giant-file-decomposition-roadmap.md)

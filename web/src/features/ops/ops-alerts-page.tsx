@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { EmptyState } from '@/components/app/empty-state'
+import { useConfirm } from '@/components/app/confirm-provider'
 import { InlineError } from '@/components/app/inline-error'
 import { MetricCard } from '@/components/app/metric-card'
 import { PageSection } from '@/components/app/page-section'
@@ -27,6 +28,7 @@ import {
 
 export function OpsAlertsPage() {
   const queryClient = useQueryClient()
+  const confirm = useConfirm()
   const [ruleName, setRuleName] = useState('')
   const [metricKey, setMetricKey] = useState('qps')
   const [thresholdValue, setThresholdValue] = useState('1')
@@ -133,6 +135,18 @@ export function OpsAlertsPage() {
     mutationFn: (id: number) => governanceApi.releaseQuarantine(id, 'manual-release-from-ui'),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ops-quarantines'] }),
   })
+
+  const handleDeleteAutoAction = async (rule: AutoActionRule) => {
+    const confirmed = await confirm({
+      title: '删除自动动作',
+      description: `确认删除“${rule.ruleName}”吗？该操作会立即移除这条自动动作。`,
+      confirmLabel: '删除',
+      destructive: true,
+    })
+    if (confirmed) {
+      deleteAutoActionMutation.mutate(rule.id)
+    }
+  }
 
   const pageError =
     alertRulesQuery.error
@@ -400,10 +414,7 @@ export function OpsAlertsPage() {
                       size="sm"
                       variant="outline"
                       disabled={deleteAutoActionMutation.isPending}
-                      onClick={() => {
-                        if (!window.confirm(`确认删除自动动作“${rule.ruleName}”吗？`)) return
-                        deleteAutoActionMutation.mutate(rule.id)
-                      }}
+                      onClick={() => void handleDeleteAutoAction(rule)}
                     >
                       删除动作
                     </Button>

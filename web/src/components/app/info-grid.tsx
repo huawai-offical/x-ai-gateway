@@ -30,7 +30,7 @@ export function InfoGrid({
         <div
           key={item.key}
           className={cn(
-            'flex min-w-0 flex-col gap-2 rounded-2xl border border-border/60 bg-muted/30 p-5 shadow-sm',
+            'flex min-w-0 flex-col gap-2 rounded-xl border border-border/45 bg-muted/18 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]',
             item.className,
           )}
         >
