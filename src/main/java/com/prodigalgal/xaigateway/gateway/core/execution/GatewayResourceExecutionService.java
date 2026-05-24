@@ -363,8 +363,9 @@ public class GatewayResourceExecutionService {
             RuntimeException lastException = null;
             for (int index = 0; index < maxAttempts; index++) {
                 RouteSelectionResult candidateSelection = selectionForCandidate(selectionResult, selectionResult.candidates().get(index), attempts);
-                GatewayResourceExecutionContext context = prepareContext(candidateSelection, request, payload);
+                GatewayResourceExecutionContext context = null;
                 try {
+                    context = prepareContext(candidateSelection, request, payload);
                     ResponseEntity<JsonNode> response = resolveExecutor(context).executeJson(context, payload, defaultModel);
                     GatewayResourceExecutionResult result = jsonResult(requestId, request, context.executionPlan(), response);
                     if (shouldFallback(response.getStatusCode().value(), response.getBody())) {
@@ -408,6 +409,7 @@ public class GatewayResourceExecutionService {
                     );
                     return result;
                 } catch (RuntimeException exception) {
+                    CanonicalExecutionPlan failedPlan = failedPlan(context, exception);
                     attempts.add(new RouteExecutionAttempt(
                             index + 1,
                             candidateSelection.selectedCandidate().candidate().credentialId(),
@@ -415,22 +417,21 @@ public class GatewayResourceExecutionService {
                             "FAILED_BEFORE_FIRST_BYTE",
                             exception.getMessage()
                     ));
-                    gatewayRouteSelectionService.invalidateSelection(candidateSelection);
-                    gatewayRouteSelectionService.markCredentialCooldown(candidateSelection.selectedCandidate().candidate().credentialId(), exception.getMessage());
+                    recordCandidateFailure(candidateSelection, exception);
                     lastException = exception;
                     if (!shouldFallback(exception) || index == maxAttempts - 1) {
                         RouteSelectionResult failedSelection = candidateSelection.withAttempts(List.copyOf(attempts));
-                        recordStructuredRouteDecision(requestId, failedSelection, request, context.executionPlan());
+                        recordStructuredRouteDecision(requestId, failedSelection, request, failedPlan);
                         gatewayRequestLifecycleService.failRequest(
                                 requestId,
                                 failedSelection,
                                 request,
-                                context.executionPlan(),
+                                failedPlan,
                                 false,
                                 exception,
                                 GatewayUsageView.empty(),
                                 startedAt,
-                                context.credentialMaterial() == null ? null : context.credentialMaterial().accountId(),
+                                context == null || context.credentialMaterial() == null ? null : context.credentialMaterial().accountId(),
                                 null
                         );
                         throw exception;
@@ -527,8 +528,9 @@ public class GatewayResourceExecutionService {
             RuntimeException lastException = null;
             for (int index = 0; index < maxAttempts; index++) {
                 RouteSelectionResult candidateSelection = selectionForCandidate(selectionResult, selectionResult.candidates().get(index), attempts);
-                GatewayResourceExecutionContext context = prepareContext(candidateSelection, request, payload);
+                GatewayResourceExecutionContext context = null;
                 try {
+                    context = prepareContext(candidateSelection, request, payload);
                     ResponseEntity<byte[]> response = resolveExecutor(context).executeBinary(context, payload, defaultModel);
                     GatewayResourceExecutionResult result = binaryResult(requestId, request, context.executionPlan(), response);
                     if (shouldFallback(response.getStatusCode().value(), response.getBody())) {
@@ -572,6 +574,7 @@ public class GatewayResourceExecutionService {
                     );
                     return result;
                 } catch (RuntimeException exception) {
+                    CanonicalExecutionPlan failedPlan = failedPlan(context, exception);
                     attempts.add(new RouteExecutionAttempt(
                             index + 1,
                             candidateSelection.selectedCandidate().candidate().credentialId(),
@@ -579,22 +582,21 @@ public class GatewayResourceExecutionService {
                             "FAILED_BEFORE_FIRST_BYTE",
                             exception.getMessage()
                     ));
-                    gatewayRouteSelectionService.invalidateSelection(candidateSelection);
-                    gatewayRouteSelectionService.markCredentialCooldown(candidateSelection.selectedCandidate().candidate().credentialId(), exception.getMessage());
+                    recordCandidateFailure(candidateSelection, exception);
                     lastException = exception;
                     if (!shouldFallback(exception) || index == maxAttempts - 1) {
                         RouteSelectionResult failedSelection = candidateSelection.withAttempts(List.copyOf(attempts));
-                        recordStructuredRouteDecision(requestId, failedSelection, request, context.executionPlan());
+                        recordStructuredRouteDecision(requestId, failedSelection, request, failedPlan);
                         gatewayRequestLifecycleService.failRequest(
                                 requestId,
                                 failedSelection,
                                 request,
-                                context.executionPlan(),
+                                failedPlan,
                                 false,
                                 exception,
                                 GatewayUsageView.empty(),
                                 startedAt,
-                                context.credentialMaterial() == null ? null : context.credentialMaterial().accountId(),
+                                context == null || context.credentialMaterial() == null ? null : context.credentialMaterial().accountId(),
                                 null
                         );
                         throw exception;
@@ -683,19 +685,19 @@ public class GatewayResourceExecutionService {
         gatewayRequestLifecycleService.startRequest(requestId, selectionResult, request, initialPlan, true, startedAt);
         List<RouteExecutionAttempt> attempts = new java.util.concurrent.CopyOnWriteArrayList<>();
         int maxAttempts = Math.min(selectionResult.candidates().size(), gatewayProperties.getRouting().getMaxFallbackAttempts());
-        return executeMultipartAttempt(
-                requestId,
-                selectionResult,
-                request,
-                requestedModel,
-                routePayload,
-                request.formFields(),
-                files,
-                0,
-                maxAttempts,
-                attempts,
-                startedAt
-        )
+        return Mono.defer(() -> executeMultipartAttempt(
+                        requestId,
+                        selectionResult,
+                        request,
+                        requestedModel,
+                        routePayload,
+                        request.formFields(),
+                        files,
+                        0,
+                        maxAttempts,
+                        attempts,
+                        startedAt
+                ))
                 .doFinally(signalType -> distributedKeyGovernanceService.releaseConcurrency(selectionResult.governanceReservationKey()));
     }
 
@@ -729,7 +731,34 @@ public class GatewayResourceExecutionService {
             List<RouteExecutionAttempt> attempts,
             Instant startedAt) {
         RouteSelectionResult candidateSelection = selectionForCandidate(baseSelection, baseSelection.candidates().get(candidateIndex), attempts);
-        GatewayResourceExecutionContext context = prepareContext(candidateSelection, request, routePayload);
+        GatewayResourceExecutionContext context;
+        try {
+            context = prepareContext(candidateSelection, request, routePayload);
+        } catch (RuntimeException exception) {
+            CanonicalExecutionPlan failedPlan = failedPlan(null, exception);
+            attempts.add(new RouteExecutionAttempt(
+                    candidateIndex + 1,
+                    candidateSelection.selectedCandidate().candidate().credentialId(),
+                    candidateSelection.selectedCandidate().candidate().providerType().name(),
+                    "FAILED_BEFORE_FIRST_BYTE",
+                    exception.getMessage()
+            ));
+            RouteSelectionResult failedSelection = candidateSelection.withAttempts(List.copyOf(attempts));
+            recordStructuredRouteDecision(requestId, failedSelection, request, failedPlan);
+            gatewayRequestLifecycleService.failRequest(
+                    requestId,
+                    failedSelection,
+                    request,
+                    failedPlan,
+                    true,
+                    exception,
+                    GatewayUsageView.empty(),
+                    startedAt,
+                    null,
+                    null
+            );
+            return Mono.error(exception);
+        }
         return resolveExecutor(context).executeMultipart(context, requestedModel, formFields, files)
                 .flatMap(response -> {
                     GatewayResourceExecutionResult result = jsonResult(requestId, request, context.executionPlan(), response);
@@ -794,8 +823,7 @@ public class GatewayResourceExecutionService {
                             "FAILED_BEFORE_FIRST_BYTE",
                             error.getMessage()
                     ));
-                    gatewayRouteSelectionService.invalidateSelection(candidateSelection);
-                    gatewayRouteSelectionService.markCredentialCooldown(candidateSelection.selectedCandidate().candidate().credentialId(), error.getMessage());
+                    recordCandidateFailure(candidateSelection, error);
                     if (shouldFallback(error)
                             && candidateIndex + 1 < maxAttempts
                             && candidateIndex + 1 < baseSelection.candidates().size()) {
@@ -834,8 +862,6 @@ public class GatewayResourceExecutionService {
             RouteSelectionResult selectionResult,
             CanonicalResourceRequest request,
             JsonNode requestBody) {
-        UpstreamCredentialEntity credential = getRequiredCredential(selectionResult.selectedCandidate().candidate().credentialId());
-        ResolvedCredentialMaterial credentialMaterial = credentialMaterialResolver.resolve(selectionResult, credential);
         GatewayRequestSemantics semantics = new GatewayRequestSemantics(
                 request.resourceType(),
                 request.operation(),
@@ -848,13 +874,16 @@ public class GatewayResourceExecutionService {
                 semantics,
                 requestBody
         );
+        CanonicalExecutionPlan executionPlan = ensureExecutable(executionPlanCompilation.canonicalPlan());
+        UpstreamCredentialEntity credential = getRequiredCredential(selectionResult.selectedCandidate().candidate().credentialId());
+        ResolvedCredentialMaterial credentialMaterial = credentialMaterialResolver.resolve(selectionResult, credential);
         return new GatewayResourceExecutionContext(
                 selectionResult.distributedKeyId(),
                 selectionResult,
                 credential,
                 credentialMaterial,
                 request,
-                ensureExecutable(executionPlanCompilation.canonicalPlan())
+                executionPlan
         );
     }
 
@@ -965,9 +994,9 @@ public class GatewayResourceExecutionService {
             return executionPlan;
         }
         if (!executionPlan.blockerReasons().isEmpty()) {
-            throw new IllegalArgumentException(String.join("；", executionPlan.blockerReasons()));
+            throw new BlockedExecutionPlanException(executionPlan, String.join("；", executionPlan.blockerReasons()));
         }
-        throw new IllegalArgumentException("当前请求在 planner 阶段被阻止执行。");
+        throw new BlockedExecutionPlanException(executionPlan, "当前请求在 planner 阶段被阻止执行。");
     }
 
     private CanonicalResourceRequest buildResourceRequest(
@@ -1051,6 +1080,18 @@ public class GatewayResourceExecutionService {
                 : request.normalizedPath();
     }
 
+    private CanonicalExecutionPlan failedPlan(
+            GatewayResourceExecutionContext context,
+            RuntimeException exception) {
+        if (context != null) {
+            return context.executionPlan();
+        }
+        if (exception instanceof BlockedExecutionPlanException blocked) {
+            return blocked.executionPlan();
+        }
+        return null;
+    }
+
     private void recordRouteOutcome(RouteSelectionResult selectionResult, int statusCode) {
         if (statusCode >= 200 && statusCode < 300) {
             gatewayRouteSelectionService.recordSuccessfulSelection(selectionResult);
@@ -1074,6 +1115,9 @@ public class GatewayResourceExecutionService {
     }
 
     private boolean shouldFallback(Throwable throwable) {
+        if (throwable instanceof BlockedExecutionPlanException) {
+            return false;
+        }
         if (throwable instanceof com.prodigalgal.xaigateway.gateway.core.auth.GatewayUnauthorizedException) {
             return false;
         }
@@ -1087,6 +1131,15 @@ public class GatewayResourceExecutionService {
             return responseException.getStatusCode().value() == 429 || responseException.getStatusCode().is5xxServerError();
         }
         return true;
+    }
+
+    private void recordCandidateFailure(RouteSelectionResult candidateSelection, Throwable throwable) {
+        if (throwable instanceof BlockedExecutionPlanException) {
+            return;
+        }
+        String reason = throwable == null ? null : throwable.getMessage();
+        gatewayRouteSelectionService.invalidateSelection(candidateSelection);
+        gatewayRouteSelectionService.markCredentialCooldown(candidateSelection.selectedCandidate().candidate().credentialId(), reason);
     }
 
     private boolean shouldFallback(int statusCode, Object body) {
@@ -1186,5 +1239,18 @@ public class GatewayResourceExecutionService {
                 plan.objectMode(),
                 plan.degradationLevel()
         );
+    }
+
+    private static class BlockedExecutionPlanException extends IllegalArgumentException {
+        private final CanonicalExecutionPlan executionPlan;
+
+        private BlockedExecutionPlanException(CanonicalExecutionPlan executionPlan, String message) {
+            super(message);
+            this.executionPlan = executionPlan;
+        }
+
+        private CanonicalExecutionPlan executionPlan() {
+            return executionPlan;
+        }
     }
 }

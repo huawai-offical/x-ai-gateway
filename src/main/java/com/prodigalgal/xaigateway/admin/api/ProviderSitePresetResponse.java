@@ -37,6 +37,7 @@ public record ProviderSitePresetResponse(
         List<String> modelFamilies,
         String pricingMetadata,
         List<String> unsupportedFeatures,
+        Object nativeAdapterContract,
         Object conversationProfile,
         Object modelPolicies,
         List<ProviderProtocolEndpointResponse> protocolEndpoints,

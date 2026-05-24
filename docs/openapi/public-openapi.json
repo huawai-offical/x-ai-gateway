@@ -3,7 +3,7 @@
   "info" : {
     "title" : "x-ai-gateway Public API",
     "version" : "2026.05.21",
-    "description" : "公开接入面的最小 OpenAPI 事实源，按 OpenAI 标准功能区覆盖 docs、OpenAI-compatible、Claude/Gemini/Vertex 功能性入口、Codex Responses smoke 边界和 Media provider matrix。"
+    "description" : "公开接入面的最小 OpenAPI 事实源，按头部 native provider 和 Lossless Translation Matrix 覆盖 docs、OpenAI-compatible、Claude/Gemini/Vertex 功能性入口、Codex Responses smoke 边界和 Media provider matrix；不可无损翻译的资源属性直接失败。"
   },
   "servers" : [ {
     "url" : "https://gateway.example.com",
@@ -534,7 +534,7 @@
             "description" : "OK"
           }
         },
-        "description" : "Compacts Response input context. OpenAI Direct routes use native upstream compaction when available; route-unavailable cases fall back to the local opaque marker emulation.",
+        "description" : "Compacts Response input context. OpenAI Direct routes use native upstream compaction when available; route-unavailable or non-native cases fail with native_compaction_required instead of returning a local opaque marker.",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -921,7 +921,7 @@
             "description" : "OK"
           }
         },
-        "description" : "Translates an uploaded audio file through OpenAI-style resource routing when the selected provider exposes an equivalent audio translation surface.",
+        "description" : "Translates an uploaded audio file only when the selected provider exposes an equivalent native audio translation surface. Cross-protocol requests that require translation fail with native_audio_translation_required instead of local emulation.",
         "requestBody" : {
           "content" : {
             "multipart/form-data" : {
@@ -1070,7 +1070,7 @@
             "description" : "OK"
           }
         },
-        "description" : "Creates image edits through OpenAI-style resource routing when the selected provider exposes an equivalent image edit surface.",
+        "description" : "Creates image edits only when the selected provider exposes an equivalent native image edit surface. Cross-protocol requests that require translation fail with native_image_edit_required instead of local emulation.",
         "requestBody" : {
           "content" : {
             "multipart/form-data" : {
@@ -1152,7 +1152,7 @@
             "description" : "OK"
           }
         },
-        "description" : "Creates image variations through OpenAI-style resource routing when the selected provider exposes an equivalent image variation surface.",
+        "description" : "Creates image variations only when the selected provider exposes an equivalent native image variation surface. Cross-protocol requests that require translation fail with native_image_variation_required instead of local emulation.",
         "requestBody" : {
           "content" : {
             "multipart/form-data" : {

@@ -125,6 +125,7 @@ x-ai-gateway 不以 OpenAI、Anthropic、Gemini、Vertex、Codex 等官方 API �
 - [REQ-20260523-010 MiMo 资源能力矩阵与已实现 OpenAI-style 入口对齐](requirements/REQ-20260523-010-mimo-resource-capability-matrix-alignment.md)
 - [REQ-20260523-011 凭证与厂商领域模型梳理](requirements/REQ-20260523-011-credential-provider-domain-model-clarification.md)
 - [REQ-20260523-012 控制台 Apple-level UI/UX 精修](requirements/REQ-20260523-012-console-apple-level-uiux-polish.md)
+- [REQ-20260524-001 头部自有模型厂商 Native 与无损翻译网关范围](requirements/REQ-20260524-001-head-provider-native-lossless-gateway-scope.md)
 
 ## 决策
 
@@ -161,6 +162,8 @@ x-ai-gateway 不以 OpenAI、Anthropic、Gemini、Vertex、Codex 等官方 API �
 - [REP-20260521 项目进度复核与 Codex/UI/UX 优先级重排](reports/REP-20260521-project-progress-codex-uiux-reprioritization.md)
 - [REP-20260521 功能性服务 API Backlog 收口审计](reports/REP-20260521-functional-scope-backlog-closeout.md)
 - [REP-20260523 凭证与厂商领域模型关系梳理](reports/REP-20260523-credential-provider-domain-model.md)
+- [REP-20260524-001 Native Adapter 最小契约](reports/REP-20260524-001-native-adapter-minimum-contract.md)
+- [REP-20260524-002 跨协议资源属性无损翻译矩阵](reports/REP-20260524-002-lossless-translation-matrix.md)
 
 ## 迁移记录
 

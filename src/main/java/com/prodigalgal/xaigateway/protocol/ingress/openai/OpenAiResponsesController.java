@@ -14,9 +14,9 @@ import com.prodigalgal.xaigateway.gateway.core.resource.GatewayAsyncResourceServ
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.time.Clock;
 import java.util.HexFormat;
 import java.util.List;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -73,7 +73,7 @@ public class OpenAiResponsesController {
         this.openAiResponsesRequestMapper = openAiResponsesRequestMapper;
         this.objectMapper = objectMapper;
         this.openAiResponsesEncoder = new OpenAiResponsesEncoder(objectMapper);
-        this.openAiResponsesLocalLifecycleService = new OpenAiResponsesLocalLifecycleService(objectMapper, Clock.systemUTC());
+        this.openAiResponsesLocalLifecycleService = new OpenAiResponsesLocalLifecycleService(objectMapper);
         this.openAiResponsesFileSearchBindingService = openAiResponsesFileSearchBindingService;
         this.gatewayOpenAiPassthroughService = gatewayOpenAiPassthroughService;
     }
@@ -271,8 +271,22 @@ public class OpenAiResponsesController {
                     null
             );
         } catch (IllegalArgumentException exception) {
-            return ResponseEntity.ok(openAiResponsesLocalLifecycleService.compact(requestBody));
+            return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED)
+                    .body(openAiError(
+                            "invalid_request_error",
+                            "native_compaction_required",
+                            "/v1/responses/compact requires an OpenAI Direct native route. Gateway-local compaction is not supported because it cannot produce official encrypted compaction state."
+                    ));
         }
+    }
+
+    private JsonNode openAiError(String type, String code, String message) {
+        var root = objectMapper.createObjectNode();
+        root.putObject("error")
+                .put("type", type)
+                .put("code", code)
+                .put("message", message);
+        return root;
     }
 
     @GetMapping("/{responseId}")

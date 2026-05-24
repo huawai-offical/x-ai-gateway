@@ -22,6 +22,7 @@ class PublicOpenApiSnapshotTests {
         assertEquals("3.1.0", root.path("openapi").asText());
         assertFalse(root.path("info").path("title").asText().isBlank());
         assertFalse(root.path("info").path("version").asText().isBlank());
+        assertTrue(root.path("info").path("description").asText().contains("Lossless Translation Matrix"));
         assertTrue(root.path("paths").has("/public/docs/openapi.json"));
         assertTrue(root.path("paths").has("/v1/chat/completions"));
         assertTrue(root.path("paths").has("/v1/chat/completions/{completionId}"));
@@ -53,6 +54,24 @@ class PublicOpenApiSnapshotTests {
         assertTrue(root.path("paths").has("/v1/audio/translations"));
         assertTrue(root.path("paths").has("/v1/images/edits"));
         assertTrue(root.path("paths").has("/v1/images/variations"));
+        assertTrue(root.path("paths")
+                .path("/v1/audio/translations")
+                .path("post")
+                .path("description")
+                .asText()
+                .contains("native_audio_translation_required"));
+        assertTrue(root.path("paths")
+                .path("/v1/images/edits")
+                .path("post")
+                .path("description")
+                .asText()
+                .contains("native_image_edit_required"));
+        assertTrue(root.path("paths")
+                .path("/v1/images/variations")
+                .path("post")
+                .path("description")
+                .asText()
+                .contains("native_image_variation_required"));
         JsonNode chatProperties = root.path("paths")
                 .path("/v1/chat/completions")
                 .path("post")
@@ -106,6 +125,18 @@ class PublicOpenApiSnapshotTests {
                 .path("schema")
                 .path("properties")
                 .has("input"));
+        assertTrue(root.path("paths")
+                .path("/v1/responses/compact")
+                .path("post")
+                .path("description")
+                .asText()
+                .contains("native_compaction_required"));
+        assertFalse(root.path("paths")
+                .path("/v1/responses/compact")
+                .path("post")
+                .path("description")
+                .asText()
+                .contains("opaque marker emulation"));
         assertTrue(root.path("paths")
                 .path("/v1/responses/compact")
                 .path("post")

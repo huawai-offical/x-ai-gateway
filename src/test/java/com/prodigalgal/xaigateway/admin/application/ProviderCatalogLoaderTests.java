@@ -80,9 +80,68 @@ class ProviderCatalogLoaderTests {
             assertTrue(!preset.pricingMetadata().isBlank(), preset.code() + " pricingMetadata");
             assertTrue(!preset.capabilityTags().isEmpty(), preset.code() + " capabilityTags");
             assertTrue(!preset.conformanceChecks().isEmpty(), preset.code() + " conformanceChecks");
+            assertNativeAdapterContract(preset);
             assertTrue(publicPresetCodes.contains(preset.code()), preset.code() + " public docs preset");
             assertTrue(fixtureSiteKinds.contains(preset.siteKind().name()), preset.code() + " conformance fixture");
         }
+    }
+
+    @Test
+    void shouldExposeOnlyHeadOrSelfModelProviderPresetsByDefault() {
+        ProviderCatalogSnapshot snapshot = new ProviderCatalogLoader(new ObjectMapper()).load();
+        Set<String> presetCodes = snapshot.presets().stream()
+                .map(ProviderPresetDefinition::code)
+                .collect(Collectors.toSet());
+
+        assertTrue(presetCodes.containsAll(Set.of(
+                "openai",
+                "azure_openai",
+                "xiaomi_mimo",
+                "deepseek",
+                "qwen",
+                "moonshot",
+                "volcengine",
+                "minimax",
+                "xai",
+                "perplexity",
+                "cohere",
+                "jina",
+                "mistral",
+                "anthropic",
+                "gemini",
+                "vertex"
+        )));
+        assertFalse(presetCodes.contains("openai_compatible_generic"));
+        assertFalse(presetCodes.contains("dify"));
+        assertFalse(presetCodes.contains("openrouter"));
+        assertFalse(presetCodes.contains("siliconflow"));
+        assertFalse(presetCodes.contains("together"));
+        assertFalse(presetCodes.contains("fireworks"));
+    }
+
+    private void assertNativeAdapterContract(ProviderPresetDefinition preset) {
+        var contract = preset.nativeAdapterContract();
+        assertTrue(!contract.isEmpty(), preset.code() + " nativeAdapterContract");
+        assertTrue(textValue(contract.get("adapterKind")) != null, preset.code() + " adapterKind");
+        assertTrue(listValue(contract.get("nativeProtocols")), preset.code() + " nativeProtocols");
+        assertTrue(listValue(contract.get("requiredEndpoints")), preset.code() + " requiredEndpoints");
+        assertTrue(textValue(contract.get("auth")) != null, preset.code() + " auth");
+        assertTrue(textValue(contract.get("stream")) != null, preset.code() + " stream");
+        assertTrue(textValue(contract.get("tools")) != null, preset.code() + " tools");
+        assertTrue(textValue(contract.get("usage")) != null, preset.code() + " usage");
+        assertTrue(textValue(contract.get("errorMapping")) != null, preset.code() + " errorMapping");
+        assertEquals("native_required", textValue(contract.get("smokeClassification")), preset.code() + " smokeClassification");
+    }
+
+    private String textValue(Object value) {
+        if (!(value instanceof String text) || text.isBlank()) {
+            return null;
+        }
+        return text;
+    }
+
+    private boolean listValue(Object value) {
+        return value instanceof java.util.List<?> list && !list.isEmpty();
     }
 
     private Set<String> fixtureSiteKinds(ObjectMapper objectMapper) throws IOException {

@@ -478,6 +478,7 @@ public class ProviderSiteRegistryService {
                 preset.modelFamilies(),
                 preset.pricingMetadata(),
                 preset.unsupportedFeatures(),
+                preset.nativeAdapterContract(),
                 preset.conversationProfile(),
                 preset.modelPolicies(),
                 protocolEndpointSeeds(preset).stream()

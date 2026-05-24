@@ -365,6 +365,7 @@ class ProviderSiteAdminControllerTests {
                 List.of("gpt"),
                 "{}",
                 List.of(),
+                Map.of("adapterKind", "openai_direct", "smokeClassification", "native_required"),
                 Map.of("reasoningContentMode", "passthrough"),
                 Map.of(),
                 List.of(new ProviderProtocolEndpointResponse(

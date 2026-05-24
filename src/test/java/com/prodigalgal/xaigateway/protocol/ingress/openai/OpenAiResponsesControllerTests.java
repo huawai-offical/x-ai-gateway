@@ -1338,9 +1338,16 @@ class OpenAiResponsesControllerTests {
     }
 
     @Test
-    void shouldCompactResponsesWithLocalCompactionShape() {
+    void shouldRejectCompactWhenNativeRouteIsUnavailable() {
         Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayOpenAiPassthroughService.executeOpenAiDirectJson(
+                        Mockito.eq("sk-gw-test"),
+                        Mockito.eq("/v1/responses/compact"),
+                        Mockito.any(tools.jackson.databind.JsonNode.class),
+                        Mockito.<String>nullable(String.class)
+                ))
+                .thenThrow(new IllegalArgumentException("no OpenAI Direct route"));
 
         webTestClient.post()
                 .uri("/v1/responses/compact")
@@ -1358,16 +1365,12 @@ class OpenAiResponsesControllerTests {
                         }
                         """)
                 .exchange()
-                .expectStatus().isOk()
+                .expectStatus().isEqualTo(HttpStatus.NOT_IMPLEMENTED)
                 .expectBody()
-                .jsonPath("$.object").isEqualTo("response.compaction")
-                .jsonPath("$.id").exists()
-                .jsonPath("$.created_at").exists()
-                .jsonPath("$.output[0].role").isEqualTo("user")
-                .jsonPath("$.output[1].type").isEqualTo("compaction")
-                .jsonPath("$.output[1].encrypted_content").exists()
-                .jsonPath("$.usage.input_tokens").isNumber()
-                .jsonPath("$.usage.total_tokens").isNumber();
+                .jsonPath("$.error.type").isEqualTo("invalid_request_error")
+                .jsonPath("$.error.code").isEqualTo("native_compaction_required")
+                .jsonPath("$.error.message").value(message -> org.junit.jupiter.api.Assertions.assertTrue(
+                        message.toString().contains("OpenAI Direct native route")));
     }
 
     @Test

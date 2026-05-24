@@ -64,9 +64,11 @@ public class PublicDocsBundleService {
                 List.of(
                         "路由优先遵守 Distributed Key 的 allowedModels、allowedProviderTypes、clientFamily 与 Route Policy runtime state。",
                         "Retry/Fallback 触发后，trace 中会保留 route decision、provider、credential 与 degradation level。",
+                        "跨协议资源属性只允许 Lossless Translation Matrix 判定为 LOSSLESS 的请求继续执行；NATIVE_REQUIRED 或 UNSUPPORTED 会直接返回错误，例如 native_route_required、unsupported_translation_attribute、native_image_edit_required、native_audio_translation_required 或 native_compaction_required，不通过 header、metadata 或 local fake 伪装成功。",
+                        "默认核心 provider preset 只保留 OpenAI、Azure OpenAI、MiMo、DeepSeek、Qwen、Moonshot、Volcengine、MiniMax、xAI、Perplexity、Cohere、Jina、Mistral、Anthropic、Gemini 和 Vertex；Dify、OpenRouter、Together、Fireworks、SiliconFlow 与 generic OpenAI-compatible 不再进入默认核心兼容承诺。",
                         "OpenAI Direct 可使用 response_format、tools/tool_choice、modalities/audio、web_search_options 等 typed Chat 参数；OpenAI-compatible 站点需以 provider capability matrix 为准。",
                         "Stored Chat list/messages 使用 OpenAI-compatible list envelope，limit 默认 20 且范围为 1 到 100，order 默认 asc；Chat Completion list 使用数据库游标查询下推租户、类型前缀、model、createdAt/id cursor 与排序，metadata 继续做 JSON 精确过滤。",
-                        "Stored Responses 支持本地 retrieve/delete/cancel、input_items list、input_tokens deterministic estimate 与 compact emulation；带 OpenAI Direct upstream lineage 的 stored Response 会对 retrieve/delete/cancel/input_items 走远端 passthrough，未知远端 resp_ id 只有提供 model query 或 X-AI-Gateway-OpenAI-Model header 时才允许 route-hint passthrough。",
+                        "Stored Responses 支持本地 retrieve/delete/cancel、input_items list 与 input_tokens deterministic estimate；/v1/responses/compact 只允许 OpenAI Direct native route，route 不可用或非 native 时返回 native_compaction_required，不提供本地 opaque marker 伪成功。带 OpenAI Direct upstream lineage 的 stored Response 会对 retrieve/delete/cancel/input_items 走远端 passthrough，未知远端 resp_ id 只有提供 model query 或 X-AI-Gateway-OpenAI-Model header 时才允许 route-hint passthrough。",
                         "Stored Responses retrieve 与 input_items 已接收 include query 参数；本地 stored baseline 对 include 采用 no-op acceptance，带 upstream lineage 或显式 route hint 的 OpenAI Direct 对象会把 include 原样转发到上游。",
                         "OpenAI Direct 非流式 Responses create 会优先返回上游原始 Responses JSON，并把 model 重写为 public model；OpenAI Direct stream=true 时透传上游原始 SSE 事件；无 native raw 能力时回退 canonical encoder。",
                         "Responses tools 当前执行 function tools；file_search 可校验本地 vector_store_ids 并把本地 search 结果注入上下文，但不声明 hosted file_search_call lifecycle；web_search_preview、mcp、custom、code_interpreter、computer_use_preview、image_generation、shell/apply_patch 等仍会显式拒绝。",
@@ -86,6 +88,9 @@ public class PublicDocsBundleService {
                 ),
                 List.of(
                         "chat.openai-compatible",
+                        "provider.native-adapter-contract",
+                        "lossless.translation-matrix",
+                        "resource.blocked-plan-hard-fail",
                         "chat.openai-typed-parameters",
                         "chat.openai-stored-lifecycle",
                         "openai.list-pagination-envelope",
@@ -146,9 +151,11 @@ public class PublicDocsBundleService {
                 List.of(
                         "Routing honors Distributed Key model/provider/client-family restrictions and Route Policy runtime state.",
                         "Retry/Fallback decisions are visible in traces with provider, credential and degradation details.",
+                        "Cross-protocol resource attributes execute only when the Lossless Translation Matrix classifies them as LOSSLESS; NATIVE_REQUIRED or UNSUPPORTED returns hard errors such as native_route_required, unsupported_translation_attribute, native_image_edit_required, native_audio_translation_required or native_compaction_required instead of header, metadata or local-fake success.",
+                        "The default core provider presets are OpenAI, Azure OpenAI, MiMo, DeepSeek, Qwen, Moonshot, Volcengine, MiniMax, xAI, Perplexity, Cohere, Jina, Mistral, Anthropic, Gemini and Vertex. Dify, OpenRouter, Together, Fireworks, SiliconFlow and generic OpenAI-compatible presets are outside the default core compatibility promise.",
                         "OpenAI Direct supports typed Chat parameters such as response_format, tools/tool_choice, modalities/audio and web_search_options; OpenAI-compatible sites still depend on the provider capability matrix.",
                         "Stored Chat list/messages use the OpenAI-compatible list envelope; limit defaults to 20 with range 1 to 100, and order defaults to asc. Chat Completion lists push tenant, key prefix, model, createdAt/id cursor and order into database queries while keeping exact JSON metadata filtering.",
-                        "Stored Responses support local retrieve/delete/cancel, input_items lists, input_tokens deterministic estimates and compact emulation; stored Responses with OpenAI Direct upstream lineage use remote passthrough for retrieve/delete/cancel/input_items, and unknown remote resp_ ids require a model query or X-AI-Gateway-OpenAI-Model header for route-hint passthrough.",
+                        "Stored Responses support local retrieve/delete/cancel, input_items lists and input_tokens deterministic estimates; /v1/responses/compact requires an OpenAI Direct native route and returns native_compaction_required when no native route is available. No local opaque-marker compaction success is returned. Stored Responses with OpenAI Direct upstream lineage use remote passthrough for retrieve/delete/cancel/input_items, and unknown remote resp_ ids require a model query or X-AI-Gateway-OpenAI-Model header for route-hint passthrough.",
                         "Stored Responses retrieve and input_items accept the include query parameter; the local stored baseline treats include as no-op acceptance, while OpenAI Direct objects with upstream lineage or explicit route hints forward include to upstream.",
                         "OpenAI Direct non-streaming Responses create prefers the upstream raw Responses JSON and rewrites model to the public model; OpenAI Direct stream=true passes through upstream raw SSE events; canonical encoding remains the fallback when no native raw capability exists.",
                         "Responses tools currently execute function tools; file_search can validate local vector_store_ids and inject local search context, but hosted file_search_call lifecycle is not claimed. web_search_preview, mcp, custom, code_interpreter, computer_use_preview, image_generation, shell and apply_patch remain explicitly rejected.",
@@ -168,6 +175,9 @@ public class PublicDocsBundleService {
                 ),
                 List.of(
                         "chat.openai-compatible",
+                        "provider.native-adapter-contract",
+                        "lossless.translation-matrix",
+                        "resource.blocked-plan-hard-fail",
                         "chat.openai-typed-parameters",
                         "chat.openai-stored-lifecycle",
                         "openai.list-pagination-envelope",
@@ -210,7 +220,7 @@ public class PublicDocsBundleService {
         ObjectNode info = root.putObject("info");
         info.put("title", "x-ai-gateway Public API");
         info.put("version", "2026.05.21");
-        info.put("description", "公开接入面的最小 OpenAPI 事实源，按 OpenAI 标准功能区覆盖 docs、OpenAI-compatible、Claude/Gemini/Vertex 功能性入口、Codex Responses smoke 边界和 Media provider matrix。");
+        info.put("description", "公开接入面的最小 OpenAPI 事实源，按头部 native provider 和 Lossless Translation Matrix 覆盖 docs、OpenAI-compatible、Claude/Gemini/Vertex 功能性入口、Codex Responses smoke 边界和 Media provider matrix；不可无损翻译的资源属性直接失败。");
         root.putArray("servers")
                 .addObject()
                 .put("url", "https://gateway.example.com")
@@ -243,7 +253,7 @@ public class PublicDocsBundleService {
         responsesInputTokens.put("description", "Counts Response input tokens. OpenAI Direct routes use native upstream counting when available; route-unavailable cases fall back to the local deterministic estimate.");
         addResponsesRequestBody(responsesInputTokens);
         ObjectNode responsesCompact = addPath(paths, "post", "/v1/responses/compact", "Compact Response input context", true);
-        responsesCompact.put("description", "Compacts Response input context. OpenAI Direct routes use native upstream compaction when available; route-unavailable cases fall back to the local opaque marker emulation.");
+        responsesCompact.put("description", "Compacts Response input context. OpenAI Direct routes use native upstream compaction when available; route-unavailable or non-native cases fail with native_compaction_required instead of returning a local opaque marker.");
         addResponsesRequestBody(responsesCompact);
         ObjectNode responsesGet = addPath(paths, "get", "/v1/responses/{responseId}", "Retrieve stored Response", true);
         responsesGet.put("description", "Returns local stored Responses from gateway cache; OpenAI Direct stored Responses with upstream lineage are synced from the original upstream Response first. If the local object is missing, model query or X-AI-Gateway-OpenAI-Model can explicitly route an unknown remote resp_ id to OpenAI Direct.");
@@ -270,7 +280,7 @@ public class PublicDocsBundleService {
         audioTranscriptions.put("description", "Transcribes an uploaded audio file through provider-governed routing as part of the multimodal conversation support surface.");
         addAudioTranscriptionRequestBody(audioTranscriptions);
         ObjectNode audioTranslations = addPath(paths, "post", "/v1/audio/translations", "Create audio translation for multimodal input", true);
-        audioTranslations.put("description", "Translates an uploaded audio file through OpenAI-style resource routing when the selected provider exposes an equivalent audio translation surface.");
+        audioTranslations.put("description", "Translates an uploaded audio file only when the selected provider exposes an equivalent native audio translation surface. Cross-protocol requests that require translation fail with native_audio_translation_required instead of local emulation.");
         addAudioTranslationRequestBody(audioTranslations);
         ObjectNode audioSpeech = addPath(paths, "post", "/v1/audio/speech", "Create speech audio for multimodal output", true);
         audioSpeech.put("description", "Generates speech audio through provider-governed routing for multimodal response output.");
@@ -279,10 +289,10 @@ public class PublicDocsBundleService {
         imageGeneration.put("description", "Creates image generations through provider-governed routing for the multimodal output surface.");
         addImageGenerationRequestBody(imageGeneration);
         ObjectNode imageEdit = addPath(paths, "post", "/v1/images/edits", "Create image edit for multimodal output", true);
-        imageEdit.put("description", "Creates image edits through OpenAI-style resource routing when the selected provider exposes an equivalent image edit surface.");
+        imageEdit.put("description", "Creates image edits only when the selected provider exposes an equivalent native image edit surface. Cross-protocol requests that require translation fail with native_image_edit_required instead of local emulation.");
         addImageEditRequestBody(imageEdit);
         ObjectNode imageVariation = addPath(paths, "post", "/v1/images/variations", "Create image variation for multimodal output", true);
-        imageVariation.put("description", "Creates image variations through OpenAI-style resource routing when the selected provider exposes an equivalent image variation surface.");
+        imageVariation.put("description", "Creates image variations only when the selected provider exposes an equivalent native image variation surface. Cross-protocol requests that require translation fail with native_image_variation_required instead of local emulation.");
         addImageVariationRequestBody(imageVariation);
         ObjectNode moderationCreate = addPath(paths, "post", "/v1/moderations", "Create moderation classification", true);
         moderationCreate.put("description", "Runs moderation classification for conversation safety and governance support.");
@@ -431,22 +441,22 @@ public class PublicDocsBundleService {
                         "openai",
                         "/v1",
                         List.of("OpenAI SDK", "Codex", "OpenCode", "OpenClaw", "curl"),
-                        List.of("chat.completions", "chat.typed-parameters", "stored_chat.completions", "responses", "responses.lifecycle", "responses.file_search_local_vector_store_binding", "conversations.local_lineage", "vector_stores.local_lifecycle", "vector_store_files.local_attachment", "vector_store_files.local_ingestion_artifact", "vector_store_files.local_content_read", "vector_stores.local_text_search", "vector_store_file_batches.local_lifecycle", "webhooks.ingress_event_persistence", "embeddings", "files", "models"),
-                        "OpenAI-compatible clients should use /v1 as base path. OpenAI Direct supports typed Chat parameters; third-party compatible sites are governed by provider capability."
+                        List.of("chat.completions", "chat.typed-parameters", "stored_chat.completions", "responses", "responses.lifecycle", "responses.file_search_local_vector_store_binding", "conversations.local_lineage", "vector_stores.local_lifecycle", "vector_store_files.local_attachment", "vector_store_files.local_ingestion_artifact", "vector_store_files.local_content_read", "vector_stores.local_text_search", "vector_store_file_batches.local_lifecycle", "webhooks.ingress_event_persistence", "embeddings", "files", "models", "lossless.translation-matrix"),
+                        "OpenAI-compatible clients should use /v1 as base path. OpenAI Direct supports typed Chat parameters; third-party compatible sites are governed by provider capability and the Lossless Translation Matrix."
                 ),
                 new PublicDocsCompatibilityResponse(
                         "claude",
                         "/v1",
                         List.of("Claude Code", "Anthropic SDK through compatible config"),
                         List.of("messages"),
-                        "Claude native semantics are translated when provider capability allows it."
+                        "Claude native semantics are translated only when the requested attributes are lossless; native-only file, hosted tool or opaque state attributes fail directly."
                 ),
                 new PublicDocsCompatibilityResponse(
                         "gemini",
                         "/v1",
                         List.of("Gemini CLI", "Google GenAI compatible clients"),
                         List.of("generateContent", "files", "cachedContents"),
-                        "Gemini native objects are exposed through gateway resource lineage when needed."
+                        "Gemini native objects are exposed through gateway resource lineage when needed; OpenAI-style image edit, image variation or audio translation requests require equivalent native support or fail."
                 ),
                 new PublicDocsCompatibilityResponse(
                         "ollama",
@@ -489,7 +499,8 @@ public class PublicDocsBundleService {
                 preset.capabilityTags(),
                 preset.modelFamilies(),
                 preset.pricingMetadata(),
-                preset.unsupportedFeatures()
+                preset.unsupportedFeatures(),
+                preset.nativeAdapterContract()
         );
     }
 
@@ -1216,6 +1227,24 @@ public class PublicDocsBundleService {
                         503,
                         zh ? "没有可用 provider、site、credential 或模型候选。" : "No provider, site, credential or model candidate is available.",
                         zh ? "检查 provider site、credential health、模型别名和能力矩阵。" : "Check provider sites, credential health, model aliases and capability matrix."
+                ),
+                new PublicDocsErrorCodeResponse(
+                        "unsupported_translation_attribute",
+                        501,
+                        zh ? "跨协议请求包含 Lossless Translation Matrix 未声明为可无损翻译的属性。" : "The cross-protocol request contains an attribute that the Lossless Translation Matrix does not classify as lossless.",
+                        zh ? "改走目标厂商 native API，或移除不可无损表达的属性。" : "Use the target provider native API or remove attributes that cannot be represented losslessly."
+                ),
+                new PublicDocsErrorCodeResponse(
+                        "native_route_required",
+                        501,
+                        zh ? "请求属性只能由目标厂商 native route 执行，不能通过网关翻译伪造。" : "The requested attribute requires the target provider native route and cannot be fabricated through gateway translation.",
+                        zh ? "绑定具备该 native 能力的 provider site，或使用对应厂商原生入口。" : "Bind a provider site with the required native capability or use the corresponding provider-native endpoint."
+                ),
+                new PublicDocsErrorCodeResponse(
+                        "native_compaction_required",
+                        501,
+                        zh ? "Responses compact 必须走 OpenAI Direct native route；网关不会返回本地 opaque marker 伪成功。" : "Responses compact requires an OpenAI Direct native route; the gateway does not return a local opaque-marker success.",
+                        zh ? "配置 OpenAI Direct route，或不要调用 compact 能力。" : "Configure an OpenAI Direct route or avoid invoking compact."
                 ),
                 new PublicDocsErrorCodeResponse(
                         "insufficient_balance",

@@ -14,7 +14,7 @@ GET /public/docs/openapi.json
 
 - quick start 接入步骤。
 - OpenAI、Claude、Gemini、Ollama、Rerank、Web Search 兼容性矩阵。
-- provider preset 支持矩阵，包括 OpenAI、Azure OpenAI、DeepSeek、Qwen、Moonshot、SiliconFlow、Volcengine、MiniMax、Dify、OpenRouter、xAI、Perplexity、Cohere、Jina、Together、Fireworks、Mistral、Anthropic、Gemini、Vertex AI。
+- provider preset 支持矩阵，包括 OpenAI、Azure OpenAI、MiMo、DeepSeek、Qwen、Moonshot、Volcengine、MiniMax、xAI、Perplexity、Cohere、Jina、Mistral、Anthropic、Gemini、Vertex AI。Dify、OpenRouter、Together、Fireworks、SiliconFlow 与 generic OpenAI-compatible 不再进入默认核心兼容承诺。
 - curl、OpenAI SDK、Claude Code、Gemini CLI 示例。
 - Codex CLI 云端代理接入示例。
 - OpenAPI URL、SDK targets 与 i18n policy。
@@ -29,6 +29,24 @@ GET /public/docs/openapi.json
 - `modelFamilies`
 - `pricingMetadata`
 - `unsupportedFeatures`
+- `nativeAdapterContract`
+
+## Native 与无损翻译边界
+
+公开兼容面按“头部 provider native 能力 + Lossless Translation Matrix”收口。客户端可以继续使用 OpenAI、Anthropic、Gemini 等主流 API 形态接入网关，但网关只有在目标 provider 有 native 能力、且跨协议资源属性可无损表达时才返回成功。
+
+- `LOSSLESS`：允许通过 canonical resource 完整保留语义后继续执行。
+- `NATIVE_REQUIRED`：只能由目标厂商 native route 执行，不能由网关翻译或本地伪造。
+- `UNSUPPORTED`：矩阵未声明可无损翻译或已明确不可等价，直接失败。
+
+公开错误语义包括：
+
+- `native_route_required`：请求属性只能走对应厂商 native route。
+- `unsupported_translation_attribute`：跨协议请求包含不可无损表达的属性。
+- `native_compaction_required`：`POST /v1/responses/compact` 必须走 OpenAI Direct native route。
+- `native_image_edit_required`、`native_image_variation_required`、`native_audio_translation_required`：资源型接口不能跨厂商无损翻译时直接失败。
+
+网关不会通过 header、metadata、opaque marker 或 local fake 把不可对应能力伪装成成功。示例：OpenAI surface 转 Gemini native 的 image edit / image variation / audio translation、OpenAI surface 转 Anthropic 的 file object lifecycle，以及没有 OpenAI Direct native route 的 Responses compact，均必须失败。
 
 OpenAI Direct preset 使用 `openai-native` / `native-first` 口径：Chat、Responses、Conversations local lineage、Webhooks ingress event persistence、Files、Uploads、Models list/get、Vector Stores local lifecycle / file attachment / local chunk ingestion / file content read / local text search / file batch、Responses file_search 本地 Vector Store 绑定、Realtime client secret 与 Realtime WebSocket ingress 已分批闭环，但它不再声明官方 API 全量覆盖。`unsupportedFeatures` 会明确列出 Vector Stores real embedding/vector index ingestion/semantic search/hosted file_search_call lifecycle、非核心官方 API out-of-scope、Realtime full calls/WebRTC/SIP/translation/transcription 等边界。OpenAI `/v1/batches`、`/v1/fine_tuning/jobs*`、`DELETE /v1/models/{model}` 的 fine-tuned owner-role delete 语义不属于当前公开功能性服务 API。
 
@@ -126,7 +144,7 @@ Stored Responses 支持 `GET /v1/responses/{responseId}`、`DELETE /v1/responses
 - retrieve 与 input_items 已接收 OpenAI Responses `include` query 参数；本地 stored baseline 对 `include` 做 no-op acceptance，带 OpenAI Direct upstream lineage 或显式 route hint 的对象会原样转发 `include` 到上游。
 - Responses tools 当前执行 `function` tools；`file_search` 可校验当前 Distributed Key 下的本地 `vector_store_ids`，复用本地 Vector Store Search 结果注入上下文，并移除 hosted tool，避免本地 `vs_...` 透传给上游。`web_search_preview`、`mcp`、`custom`、`computer_use_preview`、`code_interpreter`、`image_generation`、`shell`、`apply_patch` 等其它非 function tools 会返回 OpenAI-style `invalid_request_error`，不会再被静默跳过。详细矩阵见 [openai-responses-tools-compatibility.md](openai-responses-tools-compatibility.md)。
 - `POST /v1/responses/input_tokens` 在 OpenAI Direct native route 可用时优先转发到上游并保留上游 HTTP 状态；route 不可用或不是 OpenAI Direct 时返回本地 deterministic token estimate。只有本地 estimate 用于兼容和预估，不作为 OpenAI 官方 tokenizer 或账单精确依据。
-- `POST /v1/responses/compact` 在 OpenAI Direct native route 可用时优先转发到上游并保留上游 HTTP 状态；route 不可用或不是 OpenAI Direct 时返回本地 emulation，使用 opaque compaction marker 表示本地兼容结果。本地 marker 不等价于 OpenAI 官方 encrypted compaction item，不作为真实模型压缩结果。
+- `POST /v1/responses/compact` 在 OpenAI Direct native route 可用时优先转发到上游并保留上游 HTTP 状态；route 不可用或不是 OpenAI Direct native route 时返回 OpenAI-style `invalid_request_error`，错误码为 `native_compaction_required`。网关不再返回本地 opaque compaction marker，因为本地无法产生 OpenAI 官方 encrypted compaction state。
 - 本地 lifecycle 继续按 Distributed Key 隔离，不能读取、删除或取消其他 key 的 Response。
 
 ## OpenAI Conversations 生命周期
@@ -208,6 +226,9 @@ $env:OPENAI_BASE_URL="https://gateway.example.com/v1"
 - `invalid_api_key`：Distributed Key 无效、过期或未启用。
 - `rate_limit_exceeded`：触发 key 或 route policy 限流。
 - `no_route_available`：没有可用 provider、site、credential 或模型候选。
+- `unsupported_translation_attribute`：跨协议请求包含不可无损表达的资源属性。
+- `native_route_required`：该能力必须走目标 provider native route。
+- `native_compaction_required`：Responses compact 无 OpenAI Direct native route。
 - `insufficient_balance`：用户余额或订阅额度不足。
 
 ## 当前取舍

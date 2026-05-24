@@ -78,17 +78,17 @@ class ProviderSiteRegistryServiceTests {
                 new UpstreamSitePolicyService(),
                 new ProviderCatalogLoader(new ObjectMapper())
         );
-        when(profileRepository.findByProfileCode("preset:openrouter")).thenReturn(Optional.empty());
+        when(profileRepository.findByProfileCode("preset:xai")).thenReturn(Optional.empty());
         when(profileRepository.save(any(UpstreamSiteProfileEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(snapshotRepository.findBySiteProfile_Id(null)).thenReturn(Optional.empty());
         when(snapshotRepository.save(any(SiteCapabilitySnapshotEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        UpstreamSiteProfileEntity result = service.importPreset("openrouter", true, true);
+        UpstreamSiteProfileEntity result = service.importPreset("xai", true, true);
 
-        assertEquals("preset:openrouter", result.getProfileCode());
-        assertEquals(UpstreamSiteKind.OPENROUTER, result.getSiteKind());
+        assertEquals("preset:xai", result.getProfileCode());
+        assertEquals(UpstreamSiteKind.GROK, result.getSiteKind());
         assertEquals(SiteProfileSource.PRESET, result.getProfileSource());
-        assertEquals("https://openrouter.ai/api/v1", result.getBaseUrlPattern());
+        assertEquals("https://api.x.ai/v1", result.getBaseUrlPattern());
 
         ArgumentCaptor<SiteCapabilitySnapshotEntity> snapshotCaptor = ArgumentCaptor.forClass(SiteCapabilitySnapshotEntity.class);
         verify(snapshotRepository).save(snapshotCaptor.capture());

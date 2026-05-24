@@ -348,6 +348,12 @@
 | [TASK-20260523-015 能力快照与刷新语义重构](backlog/TASK-20260523-015-capability-snapshot-refresh-semantics-redesign.md) | Backlog | Medium | REP-20260523 |
 | [TASK-20260523-016 账号分组分类、入口覆盖反推与 Distributed Key 授权展示](backlog/TASK-20260523-016-account-group-taxonomy-endpoint-coverage.md) | Backlog | High | REP-20260523 |
 | [TASK-20260523-017 控制台 Apple-level UI/UX 精修](done/TASK-20260523-017-console-apple-level-uiux-polish.md) | Done | High | REQ-20260523-012 |
+| [TASK-20260524-001 头部自有模型厂商 Native 与无损翻译网关总控父任务](in-progress/TASK-20260524-001-head-provider-native-lossless-gateway-parent.md) | In Progress | Critical | REQ-20260524-001 |
+| [TASK-20260524-001-01 核心厂商目录收敛与非模型 Provider 清理](done/TASK-20260524-001-01-provider-catalog-core-vendor-prune.md) | Done | Critical | TASK-20260524-001 |
+| [TASK-20260524-001-02 支持厂商 Native Adapter 最小契约](in-progress/TASK-20260524-001-02-native-adapter-minimum-contract.md) | In Progress | Critical | TASK-20260524-001 |
+| [TASK-20260524-001-03 跨协议资源属性无损翻译矩阵](in-progress/TASK-20260524-001-03-lossless-translation-matrix.md) | In Progress | Critical | TASK-20260524-001 |
+| [TASK-20260524-001-04 不可对应能力直接失败与假成功清理](in-progress/TASK-20260524-001-04-unsupported-capability-hard-fail.md) | In Progress | Critical | TASK-20260524-001 |
+| [TASK-20260524-001-05 文档、OpenAPI 与 Smoke 范围对齐](in-progress/TASK-20260524-001-05-docs-openapi-smoke-alignment.md) | In Progress | High | TASK-20260524-001 |
 | [TASK-20260516-014 OpenAI Responses Tools Registry 与非 function Tool 显式边界](done/TASK-20260516-014-openai-responses-tool-registry-boundary.md) | Done | High | TASK-20260514-019 / 013 |
 | [TASK-20260516-015 OpenAI Conversations 本地 Lifecycle](done/TASK-20260516-015-openai-conversations-local-lifecycle.md) | Done | High | TASK-20260514-019 |
 | [TASK-20260516-016 OpenAI Webhooks 接收入口与事件落库](done/TASK-20260516-016-openai-webhooks-ingress-event-persistence.md) | Done | High | TASK-20260514-019 |

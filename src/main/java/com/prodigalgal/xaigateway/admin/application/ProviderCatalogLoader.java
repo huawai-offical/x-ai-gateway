@@ -63,7 +63,7 @@ public class ProviderCatalogLoader {
 
     public ProviderCatalogSnapshot loadFromJson(String catalogJson, String sourceOverride) {
         try {
-            JsonNode root = objectMapper.readTree(catalogJson);
+            JsonNode root = objectMapper.readTree(stripBom(catalogJson));
             String version = text(root, "catalogVersion", "2026.05.01-local");
             String source = sourceOverride == null || sourceOverride.isBlank()
                     ? text(root, "catalogSource", "inline")
@@ -87,6 +87,13 @@ public class ProviderCatalogLoader {
         } catch (RuntimeException exception) {
             throw new IllegalArgumentException("provider catalog JSON 无法解析。", exception);
         }
+    }
+
+    private String stripBom(String content) {
+        if (content == null || content.isEmpty()) {
+            return content;
+        }
+        return content.charAt(0) == '\uFEFF' ? content.substring(1) : content;
     }
 
     private Optional<ProviderCatalogSnapshot> loadMarketplaceCache() {
@@ -131,6 +138,7 @@ public class ProviderCatalogLoader {
                 stringList(node.path("modelFamilies")),
                 text(node, "pricingMetadata", ""),
                 stringList(node.path("unsupportedFeatures")),
+                objectMap(node.path("nativeAdapterContract")),
                 objectMap(node.path("conversationProfile")),
                 objectList(node.path("modelPolicies"))
         );
@@ -160,12 +168,19 @@ public class ProviderCatalogLoader {
                         "openai-compatible-chat", "cloud-openai-compatible",
                         List.of("deepseek-chat", "deepseek-reasoner"), "provider-console-pricing",
                         List.of()),
-                preset("openrouter", "OpenRouter", UpstreamSiteKind.OPENROUTER, "https://openrouter.ai/api/v1",
-                        "OpenRouter 聚合站 OpenAI-compatible API，后续可承载多供应商模型路由与成本 metadata。",
-                        List.of("chat", "openai_compatible", "aggregator"),
-                        "aggregator-provider-pricing", "openai_error", version, source, List.of("chat.native", "aggregator.routing"),
-                        "openai-compatible-chat", "aggregator-routing",
-                        List.of("openrouter-auto", "byok-routing"), "aggregator-pass-through-pricing",
+                preset("xiaomi_mimo", "Xiaomi MiMo", UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC, "https://token-plan-sgp.xiaomimimo.com/v1",
+                        "小米 MiMo OpenAI-compatible API。Codex/Responses 入口必须按明确 profile 转译，不作为通用兼容站点兜底。",
+                        List.of("chat", "responses", "openai_compatible", "reasoning", "tools", "mimo"),
+                        "provider-compatible", "openai_error", version, source, List.of("chat.native", "openai-compatible.surface", "responses.emulated"),
+                        "openai-compatible-chat", "responses-to-chat-completions-translation",
+                        List.of("mimo-v2.5", "mimo-v2"), "provider-console-pricing",
+                        List.of("responses_native: MiMo preset receives Responses ingress through Chat Completions translation, not upstream native Responses.")),
+                preset("xai", "xAI Grok", UpstreamSiteKind.GROK, "https://api.x.ai/v1",
+                        "xAI Grok REST API 以 OpenAI-compatible chat/responses 作为主兼容面，专有能力按 xAI adapter 边界单独声明。",
+                        List.of("chat", "responses", "openai_compatible", "reasoning", "vision", "xai"),
+                        "xai-public-pricing", "openai_error", version, source, List.of("chat.native", "openai-compatible.surface", "responses.emulated"),
+                        "openai-compatible-chat", "cloud-openai-compatible",
+                        List.of("grok-4", "grok-3", "grok-2"), "public-list-price-xai",
                         List.of()),
                 preset("anthropic", "Anthropic", UpstreamSiteKind.ANTHROPIC_DIRECT, "https://api.anthropic.com",
                         "Anthropic Messages API，仅按 OpenAI 标准功能区收紧为 chat/tools/thinking 入口，不追求 Anthropic 全量官方 API。",
@@ -182,6 +197,13 @@ public class ProviderCatalogLoader {
                         "gemini-public-pricing", "gemini_error", version, source, List.of("generate-content.native", "files.orchestrated"),
                         "google-native", "translation-layer",
                         List.of("gemini-2.5-pro", "gemini-2.5-flash", "text-embedding"), "public-list-price-gemini",
+                        List.of("non_core_provider_apis: provider-specific async/admin/eval APIs are outside the OpenAI standard functional zone.")),
+                preset("vertex", "Vertex AI", UpstreamSiteKind.VERTEX_AI, "https://{location}-aiplatform.googleapis.com",
+                        "Google Vertex AI Gemini API，仅按 OpenAI 标准功能区收紧为 generateContent、embeddings 与 files 支撑面。",
+                        List.of("chat", "embeddings", "files", "google_native", "vertex"),
+                        "vertex-public-pricing", "gemini_error", version, source, List.of("generate-content.native", "files.orchestrated", "vertex-addressing.native"),
+                        "google-native", "translation-layer",
+                        List.of("gemini-2.5-pro", "gemini-2.5-flash", "text-embedding"), "public-list-price-vertex",
                         List.of("non_core_provider_apis: provider-specific async/admin/eval APIs are outside the OpenAI standard functional zone."))
         ));
     }
@@ -223,6 +245,7 @@ public class ProviderCatalogLoader {
                 modelFamilies,
                 pricingMetadata,
                 unsupportedFeatures,
+                Map.of(),
                 Map.of(),
                 List.of()
         );

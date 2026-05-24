@@ -25,6 +25,7 @@ public record ProviderPresetDefinition(
         List<String> modelFamilies,
         String pricingMetadata,
         List<String> unsupportedFeatures,
+        Map<String, Object> nativeAdapterContract,
         Map<String, Object> conversationProfile,
         List<Map<String, Object>> modelPolicies
 ) {
@@ -43,6 +44,7 @@ public record ProviderPresetDefinition(
         modelFamilies = modelFamilies == null ? List.of() : List.copyOf(modelFamilies);
         pricingMetadata = pricingMetadata == null ? "" : pricingMetadata;
         unsupportedFeatures = unsupportedFeatures == null ? List.of() : List.copyOf(unsupportedFeatures);
+        nativeAdapterContract = nativeAdapterContract == null ? Map.of() : Map.copyOf(nativeAdapterContract);
         conversationProfile = conversationProfile == null ? Map.of() : Map.copyOf(conversationProfile);
         modelPolicies = modelPolicies == null ? List.of() : List.copyOf(modelPolicies);
     }

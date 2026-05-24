@@ -329,6 +329,97 @@ class GatewayResourceExecutionServiceTests {
     }
 
     @Test
+    void shouldRejectBlockedPlanBeforeCredentialAndExecutorUse() {
+        GatewayRouteSelectionService gatewayRouteSelectionService = Mockito.mock(GatewayRouteSelectionService.class);
+        UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        CredentialCryptoService credentialCryptoService = Mockito.mock(CredentialCryptoService.class);
+        DistributedKeyGovernanceService distributedKeyGovernanceService = Mockito.mock(DistributedKeyGovernanceService.class);
+        DistributedKeyQueryService distributedKeyQueryService = Mockito.mock(DistributedKeyQueryService.class);
+        AccountSelectionService accountSelectionService = Mockito.mock(AccountSelectionService.class);
+        GatewayRequestFeatureService gatewayRequestFeatureService = Mockito.mock(GatewayRequestFeatureService.class);
+        TranslationExecutionPlanCompiler translationExecutionPlanCompiler = Mockito.mock(TranslationExecutionPlanCompiler.class);
+        GatewayResourceExecutor geminiImagesExecutor = Mockito.mock(GatewayResourceExecutor.class);
+        GatewayObservabilityService gatewayObservabilityService = Mockito.mock(GatewayObservabilityService.class);
+        GatewayRequestLifecycleService lifecycleService = Mockito.mock(GatewayRequestLifecycleService.class);
+        GatewayResourceExecutionService service = service(
+                gatewayRouteSelectionService,
+                upstreamCredentialRepository,
+                credentialCryptoService,
+                distributedKeyGovernanceService,
+                distributedKeyQueryService,
+                accountSelectionService,
+                gatewayRequestFeatureService,
+                translationExecutionPlanCompiler,
+                List.of(geminiImagesExecutor),
+                gatewayObservabilityService,
+                lifecycleService,
+                Mockito.mock(GatewayFileService.class)
+        );
+
+        RouteSelectionResult selectionResult = selectionResult(ProviderType.GEMINI_DIRECT, UpstreamSiteKind.GEMINI_DIRECT);
+        ObjectNode requestBody = new ObjectMapper().createObjectNode();
+        requestBody.put("model", "imagen-3.0-capability-001");
+        requestBody.put("prompt", "edit this image");
+
+        Mockito.when(gatewayObservabilityService.nextRequestId()).thenReturn("req-blocked-plan");
+        Mockito.when(gatewayRouteSelectionService.select(any())).thenReturn(selectionResult);
+        Mockito.when(gatewayRequestFeatureService.describe(eq("POST"), eq("/v1/images/edits"), any()))
+                .thenReturn(new GatewayRequestSemantics(
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType.IMAGE,
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation.IMAGE_EDIT,
+                        List.of(com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature.IMAGE_EDIT),
+                        true
+                ));
+        Mockito.when(translationExecutionPlanCompiler.compileSelected(any(), Mockito.any(com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest.class), any(), any()))
+                .thenReturn(blockedCompilation(
+                        "/v1/images/edits",
+                        "imagen-3.0-capability-001",
+                        "failure_code=native_image_edit_required"
+                ));
+
+        com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest request =
+                new com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest(
+                        "sk-gw-test",
+                        CanonicalIngressProtocol.OPENAI,
+                        "POST",
+                        "/v1/images/edits",
+                        "/v1/images/edits",
+                        java.util.Map.of(),
+                        "imagen-3.0-capability-001",
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType.IMAGE,
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation.IMAGE_EDIT,
+                        requestBody,
+                        java.util.Map.of(),
+                        java.util.List.of(),
+                        false,
+                        false
+                );
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> service.executeDetailedJson(
+                request,
+                1L,
+                "imagen-3.0-capability-001"
+        ));
+
+        assertEquals("failure_code=native_image_edit_required", exception.getMessage());
+        Mockito.verify(upstreamCredentialRepository, Mockito.never()).findById(anyLong());
+        Mockito.verify(geminiImagesExecutor, Mockito.never()).executeJson(any(), any(), any());
+        Mockito.verify(gatewayRouteSelectionService, Mockito.never()).markCredentialCooldown(anyLong(), any());
+        Mockito.verify(lifecycleService).failRequest(
+                eq("req-blocked-plan"),
+                any(RouteSelectionResult.class),
+                Mockito.any(com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest.class),
+                any(CanonicalExecutionPlan.class),
+                eq(false),
+                eq(exception),
+                any(),
+                any(),
+                eq(null),
+                eq(null)
+        );
+    }
+
+    @Test
     void shouldFallbackToNextResourceCandidateBeforeResponseIsCommitted() {
         GatewayRouteSelectionService gatewayRouteSelectionService = Mockito.mock(GatewayRouteSelectionService.class);
         UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
@@ -637,6 +728,43 @@ class GatewayResourceExecutionServiceTests {
                 ),
                 null,
                 new GatewayRequestSemantics(resourceType, operation, List.of(), true),
+                new CanonicalRequest("sk-gw-test", CanonicalIngressProtocol.OPENAI, requestPath, model, List.of(), List.of(), null, null, null, null, null)
+        );
+    }
+
+    private CanonicalExecutionPlanCompilation blockedCompilation(
+            String requestPath,
+            String model,
+            String blockerReason) {
+        return new CanonicalExecutionPlanCompilation(
+                new CanonicalExecutionPlan(
+                        false,
+                        CanonicalIngressProtocol.OPENAI,
+                        requestPath,
+                        model,
+                        model,
+                        model,
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType.IMAGE,
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation.IMAGE_EDIT,
+                        com.prodigalgal.xaigateway.gateway.core.shared.ExecutionKind.BLOCKED,
+                        com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend.NATIVE,
+                        List.of(com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend.NATIVE),
+                        "blocked",
+                        com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel.NATIVE,
+                        com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel.UNSUPPORTED,
+                        com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel.NATIVE,
+                        List.of(com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature.IMAGE_EDIT),
+                        java.util.Map.of(),
+                        List.of(),
+                        List.of(blockerReason)
+                ),
+                null,
+                new GatewayRequestSemantics(
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType.IMAGE,
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation.IMAGE_EDIT,
+                        List.of(com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature.IMAGE_EDIT),
+                        true
+                ),
                 new CanonicalRequest("sk-gw-test", CanonicalIngressProtocol.OPENAI, requestPath, model, List.of(), List.of(), null, null, null, null, null)
         );
     }

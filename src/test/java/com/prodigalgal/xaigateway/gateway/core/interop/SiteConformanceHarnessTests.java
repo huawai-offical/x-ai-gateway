@@ -227,8 +227,8 @@ class SiteConformanceHarnessTests {
                 candidate,
                 featureService.describe(fixture.requestPath(), requestBody(fixture))
         );
-        assertEquals(fixture.expectedExecutionKind(), executionGate.executionKind().name(), fixture.name());
-        assertEquals(fixture.expectedEffectiveLevel(), executionGate.capabilityLevel().name(), fixture.name());
+        assertEquals(fixture.expectedCapabilityExecutionKind(), executionGate.executionKind().name(), fixture.name());
+        assertEquals(fixture.expectedCapabilityLevel(), executionGate.capabilityLevel().name(), fixture.name());
     }
 
     static Stream<ConformanceFixture> fixtures() throws IOException {
@@ -508,8 +508,18 @@ class SiteConformanceHarnessTests {
             String expectedSupportStatus,
             String expectedRenderCapability,
             String expectedRouteSelectionMode,
+            String expectedCapabilityExecutionKind,
+            String expectedCapabilityLevel,
             String operationHint
     ) {
+        public String expectedCapabilityExecutionKind() {
+            return expectedCapabilityExecutionKind == null ? expectedExecutionKind : expectedCapabilityExecutionKind;
+        }
+
+        public String expectedCapabilityLevel() {
+            return expectedCapabilityLevel == null ? expectedEffectiveLevel : expectedCapabilityLevel;
+        }
+
         @Override
         public String toString() {
             return name;

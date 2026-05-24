@@ -12,6 +12,7 @@ public record PublicDocsProviderPresetResponse(
         List<String> capabilityTags,
         List<String> modelFamilies,
         String pricingMetadata,
-        List<String> unsupportedFeatures
+        List<String> unsupportedFeatures,
+        Object nativeAdapterContract
 ) {
 }

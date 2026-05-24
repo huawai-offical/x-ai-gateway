@@ -21,7 +21,7 @@ class ProviderPricingSnapshotServiceTests {
 
         ProviderPricingSnapshotView gemini = snapshot(snapshots, "gemini");
         ProviderPricingSnapshotView qwen = snapshot(snapshots, "qwen");
-        ProviderPricingSnapshotView openrouter = snapshot(snapshots, "openrouter");
+        ProviderPricingSnapshotView xai = snapshot(snapshots, "xai");
 
         assertEquals("PUBLIC_PRICE_PAGE", gemini.sourceKind());
         assertEquals("APPROVED", gemini.approvalStatus());
@@ -35,9 +35,11 @@ class ProviderPricingSnapshotServiceTests {
         assertEquals("PENDING_REVIEW", qwen.approvalStatus());
         assertFalse(qwen.productionEligible());
 
-        assertEquals("AGGREGATOR_PASS_THROUGH", openrouter.sourceKind());
-        assertEquals("PENDING_REVIEW", openrouter.approvalStatus());
-        assertFalse(openrouter.productionEligible());
+        assertEquals("PUBLIC_PRICE_PAGE", xai.sourceKind());
+        assertEquals("APPROVED", xai.approvalStatus());
+        assertTrue(xai.productionEligible());
+        assertFalse(snapshots.stream().anyMatch(item -> item.providerCode().equals("openrouter")));
+        assertFalse(snapshots.stream().anyMatch(item -> item.providerCode().equals("dify")));
     }
 
     @Test
@@ -57,6 +59,7 @@ class ProviderPricingSnapshotServiceTests {
         assertTrue(eligible.stream().anyMatch(item -> item.providerCode().equals("qwen")
                 && item.approvalStatus().equals("APPROVED")));
         assertFalse(eligible.stream().anyMatch(item -> item.providerCode().equals("openrouter")));
+        assertFalse(eligible.stream().anyMatch(item -> item.providerCode().equals("dify")));
     }
 
     private ProviderPricingSnapshotView snapshot(List<ProviderPricingSnapshotView> snapshots, String providerCode) {

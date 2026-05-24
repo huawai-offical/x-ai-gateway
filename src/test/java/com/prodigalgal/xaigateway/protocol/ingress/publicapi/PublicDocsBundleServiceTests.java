@@ -21,6 +21,12 @@ class PublicDocsBundleServiceTests {
         assertTrue(response.compatibility().stream().anyMatch(item -> "rerank".equals(item.protocol())));
         assertTrue(response.compatibility().stream().anyMatch(item -> "web_search".equals(item.protocol())));
         assertTrue(response.providerPresets().stream().anyMatch(item -> "qwen".equals(item.code())));
+        assertFalse(response.providerPresets().stream().anyMatch(item -> "dify".equals(item.code())));
+        assertFalse(response.providerPresets().stream().anyMatch(item -> "openrouter".equals(item.code())));
+        assertFalse(response.providerPresets().stream().anyMatch(item -> "together".equals(item.code())));
+        assertFalse(response.providerPresets().stream().anyMatch(item -> "fireworks".equals(item.code())));
+        assertFalse(response.providerPresets().stream().anyMatch(item -> "siliconflow".equals(item.code())));
+        assertFalse(response.providerPresets().stream().anyMatch(item -> "openai_compatible_generic".equals(item.code())));
         assertTrue(response.providerPresets().stream().anyMatch(item ->
                 "openai".equals(item.code())
                         && item.unsupportedFeatures().stream().anyMatch(feature -> feature.contains("non_core_official_apis_out_of_scope"))));
@@ -35,6 +41,19 @@ class PublicDocsBundleServiceTests {
                         && item.unsupportedFeatures().stream().anyMatch(feature -> feature.contains("non_core_provider_apis_out_of_scope"))));
         assertTrue(response.providerPresets().stream().anyMatch(item -> "jina".equals(item.code()) && "rerank-native".equals(item.compatibilitySurface())));
         assertTrue(response.providerPresets().stream().anyMatch(item -> "perplexity".equals(item.code()) && item.capabilityTags().contains("web_search")));
+        assertTrue(response.providerPresets().stream().anyMatch(item ->
+                "xai".equals(item.code())
+                        && item.nativeAdapterContract() instanceof java.util.Map<?, ?> contract
+                        && "provider_specific_openai_compatible".equals(contract.get("adapterKind"))
+                        && "native_required".equals(contract.get("smokeClassification"))));
+        assertTrue(response.providerPresets().stream().anyMatch(item ->
+                "anthropic".equals(item.code())
+                        && item.nativeAdapterContract() instanceof java.util.Map<?, ?> contract
+                        && "anthropic_direct".equals(contract.get("adapterKind"))));
+        assertTrue(response.providerPresets().stream().anyMatch(item ->
+                "gemini".equals(item.code())
+                        && item.nativeAdapterContract() instanceof java.util.Map<?, ?> contract
+                        && "gemini_direct".equals(contract.get("adapterKind"))));
         assertTrue(response.cliClients().stream().anyMatch(item -> "CODEX".equals(item.clientFamily())));
         assertTrue(response.cliClients().stream().anyMatch(item -> "CURSOR".equals(item.clientFamily())));
         assertTrue(response.cliClients().stream().allMatch(item ->
@@ -46,8 +65,25 @@ class PublicDocsBundleServiceTests {
         assertTrue(response.examples().stream().anyMatch(item -> "openai-sdk-advanced-chat".equals(item.client())));
         assertTrue(response.examples().stream().anyMatch(item -> "codex-cli".equals(item.client())));
         assertTrue(response.errorCodes().stream().anyMatch(item -> "rate_limit_exceeded".equals(item.code())));
+        assertTrue(response.errorCodes().stream().anyMatch(item ->
+                "unsupported_translation_attribute".equals(item.code())
+                        && item.httpStatus() == 501
+                        && item.description().contains("Lossless Translation Matrix")));
+        assertTrue(response.errorCodes().stream().anyMatch(item ->
+                "native_route_required".equals(item.code())
+                        && item.httpStatus() == 501));
+        assertTrue(response.errorCodes().stream().anyMatch(item ->
+                "native_compaction_required".equals(item.code())
+                        && item.httpStatus() == 501));
         assertTrue(response.routingNotes().stream().anyMatch(item -> item.contains("x-ratelimit")));
+        assertTrue(response.routingNotes().stream().anyMatch(item ->
+                item.contains("Lossless Translation Matrix") && item.contains("NATIVE_REQUIRED")));
+        assertTrue(response.routingNotes().stream().anyMatch(item ->
+                item.contains("Dify") && item.contains("不再进入默认核心兼容承诺")));
         assertTrue(response.conformanceChecks().contains("ollama.chat.native"));
+        assertTrue(response.conformanceChecks().contains("provider.native-adapter-contract"));
+        assertTrue(response.conformanceChecks().contains("lossless.translation-matrix"));
+        assertTrue(response.conformanceChecks().contains("resource.blocked-plan-hard-fail"));
         assertTrue(response.conformanceChecks().contains("chat.openai-typed-parameters"));
         assertTrue(response.conformanceChecks().contains("openai.list-pagination-envelope"));
         assertTrue(response.conformanceChecks().contains("openai.stored-chat-db-cursor-pagination"));
@@ -96,6 +132,8 @@ class PublicDocsBundleServiceTests {
                 "openai".equals(item.protocol()) && item.supportedOperations().contains("vector_store_file_batches.local_lifecycle")));
         assertTrue(response.compatibility().stream().anyMatch(item ->
                 "openai".equals(item.protocol()) && item.supportedOperations().contains("webhooks.ingress_event_persistence")));
+        assertTrue(response.compatibility().stream().anyMatch(item ->
+                "openai".equals(item.protocol()) && item.supportedOperations().contains("lossless.translation-matrix")));
         assertTrue(response.routingNotes().stream().anyMatch(item -> item.contains("官方非核心 API 不纳入公开兼容面")));
         assertTrue(response.routingNotes().stream().anyMatch(item -> item.contains("file_search 可校验本地 vector_store_ids")));
         assertTrue(response.routingNotes().stream().anyMatch(item -> item.contains("OpenAI Conversations")));
@@ -113,7 +151,16 @@ class PublicDocsBundleServiceTests {
         assertEquals("en-US", response.locale());
         assertTrue(response.title().contains("Public Compatibility"));
         assertTrue(response.quickStart().stream().anyMatch(item -> item.contains("Authorization Bearer")));
-        assertTrue(response.providerPresets().stream().anyMatch(item -> "dify".equals(item.code())));
+        assertTrue(response.providerPresets().stream().anyMatch(item -> "xai".equals(item.code())));
+        assertTrue(response.providerPresets().stream().anyMatch(item -> "anthropic".equals(item.code())));
+        assertTrue(response.providerPresets().stream().anyMatch(item -> "gemini".equals(item.code())));
+        assertFalse(response.providerPresets().stream().anyMatch(item -> "dify".equals(item.code())));
+        assertFalse(response.providerPresets().stream().anyMatch(item -> "openrouter".equals(item.code())));
+        assertFalse(response.providerPresets().stream().anyMatch(item -> "together".equals(item.code())));
+        assertFalse(response.providerPresets().stream().anyMatch(item -> "fireworks".equals(item.code())));
+        assertFalse(response.providerPresets().stream().anyMatch(item -> "siliconflow".equals(item.code())));
+        assertTrue(response.routingNotes().stream().anyMatch(item ->
+                item.contains("Lossless Translation Matrix") && item.contains("local-fake success")));
         assertTrue(response.cliClients().stream().anyMatch(item -> "GitHub Copilot-compatible".equals(item.client())));
         assertTrue(response.billingNotes().stream().anyMatch(item -> item.contains("billing rollup")));
         assertTrue(response.i18nPolicy().stream().anyMatch(item -> item.contains("public docs bundle")));
@@ -127,6 +174,7 @@ class PublicDocsBundleServiceTests {
 
         assertEquals("3.1.0", openApi.path("openapi").asText());
         assertEquals("x-ai-gateway Public API", openApi.path("info").path("title").asText());
+        assertTrue(openApi.path("info").path("description").asText().contains("Lossless Translation Matrix"));
         assertTrue(openApi.path("paths").has("/public/docs/compatibility"));
         assertTrue(openApi.path("paths").has("/public/docs/openapi.json"));
         assertTrue(openApi.path("paths").has("/v1/chat/completions"));
@@ -160,6 +208,24 @@ class PublicDocsBundleServiceTests {
         assertTrue(openApi.path("paths").has("/v1/images/variations"));
         assertTrue(openApi.path("paths").has("/v1/web_search"));
         assertTrue(openApi.path("paths").has("/api/v1/media/provider-matrix"));
+        assertTrue(openApi.path("paths")
+                .path("/v1/audio/translations")
+                .path("post")
+                .path("description")
+                .asText()
+                .contains("native_audio_translation_required"));
+        assertTrue(openApi.path("paths")
+                .path("/v1/images/edits")
+                .path("post")
+                .path("description")
+                .asText()
+                .contains("native_image_edit_required"));
+        assertTrue(openApi.path("paths")
+                .path("/v1/images/variations")
+                .path("post")
+                .path("description")
+                .asText()
+                .contains("native_image_variation_required"));
         var chatProperties = openApi.path("paths")
                 .path("/v1/chat/completions")
                 .path("post")
@@ -219,6 +285,18 @@ class PublicDocsBundleServiceTests {
                 .path("description")
                 .asText()
                 .contains("native upstream compaction"));
+        assertTrue(openApi.path("paths")
+                .path("/v1/responses/compact")
+                .path("post")
+                .path("description")
+                .asText()
+                .contains("native_compaction_required"));
+        assertFalse(openApi.path("paths")
+                .path("/v1/responses/compact")
+                .path("post")
+                .path("description")
+                .asText()
+                .contains("opaque marker emulation"));
         assertTrue(openApi.path("paths")
                 .path("/v1/responses/compact")
                 .path("post")
