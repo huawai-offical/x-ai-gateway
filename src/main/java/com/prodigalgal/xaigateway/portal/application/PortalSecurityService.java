@@ -56,6 +56,10 @@ import tools.jackson.databind.ObjectMapper;
 @Transactional
 public class PortalSecurityService {
 
+    public static final String REGISTRATION_CHANNEL_PASSWORD = "PASSWORD";
+    public static final String REGISTRATION_CHANNEL_SOCIAL_OAUTH = "SOCIAL_OAUTH";
+    public static final String REGISTRATION_CHANNEL_INVITE_CODE = "INVITE_CODE";
+
     private static final String PORTAL_USER_ID_SESSION_KEY = "portalUserId";
     private static final Duration CAPTCHA_TTL = Duration.ofMinutes(5);
     private static final Duration EMAIL_VERIFICATION_TTL = Duration.ofMinutes(15);
@@ -64,28 +68,61 @@ public class PortalSecurityService {
     private static final String BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
     private static final String DEFAULT_RP_ID = "x-ai-gateway.local";
     private static final String DEFAULT_ORIGIN = "https://x-ai-gateway.local";
+    private static final Set<String> DEFAULT_REGISTRATION_CHANNELS = Set.of(
+            REGISTRATION_CHANNEL_PASSWORD,
+            REGISTRATION_CHANNEL_INVITE_CODE
+    );
+    private static final Set<String> SUPPORTED_REGISTRATION_CHANNELS = Set.of(
+            REGISTRATION_CHANNEL_PASSWORD,
+            REGISTRATION_CHANNEL_SOCIAL_OAUTH,
+            REGISTRATION_CHANNEL_INVITE_CODE
+    );
 
     private final GatewayUserRepository gatewayUserRepository;
     private final CredentialCryptoService credentialCryptoService;
     private final GatewayUserPasskeyCredentialRepository passkeyCredentialRepository;
     private final AuditLogRepository auditLogRepository;
+    private final InvitationCodeRedemptionService invitationCodeRedemptionService;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final SecureRandom secureRandom = new SecureRandom();
     private final Map<String, Challenge> captchaChallenges = new ConcurrentHashMap<>();
     private final Map<String, Challenge> emailVerifications = new ConcurrentHashMap<>();
     private final Map<String, PasskeyChallenge> passkeyChallenges = new ConcurrentHashMap<>();
-    private volatile RegistrationPolicy registrationPolicy = new RegistrationPolicy(List.of(), false, Set.of(), false, Instant.now());
+    private volatile RegistrationPolicy registrationPolicy = new RegistrationPolicy(
+            List.of(),
+            DEFAULT_REGISTRATION_CHANNELS,
+            false,
+            Set.of(),
+            false,
+            Instant.now()
+    );
 
     @Autowired
     public PortalSecurityService(
             GatewayUserRepository gatewayUserRepository,
             CredentialCryptoService credentialCryptoService,
             GatewayUserPasskeyCredentialRepository passkeyCredentialRepository,
-            AuditLogRepository auditLogRepository) {
+            AuditLogRepository auditLogRepository,
+            InvitationCodeRedemptionService invitationCodeRedemptionService) {
         this.gatewayUserRepository = gatewayUserRepository;
         this.credentialCryptoService = credentialCryptoService;
         this.passkeyCredentialRepository = passkeyCredentialRepository;
         this.auditLogRepository = auditLogRepository;
+        this.invitationCodeRedemptionService = invitationCodeRedemptionService;
+    }
+
+    public PortalSecurityService(
+            GatewayUserRepository gatewayUserRepository,
+            CredentialCryptoService credentialCryptoService,
+            GatewayUserPasskeyCredentialRepository passkeyCredentialRepository,
+            AuditLogRepository auditLogRepository) {
+        this(
+                gatewayUserRepository,
+                credentialCryptoService,
+                passkeyCredentialRepository,
+                auditLogRepository,
+                null
+        );
     }
 
     public PortalSecurityService(
@@ -126,32 +163,55 @@ public class PortalSecurityService {
     }
 
     public PortalRegistrationPolicyResponse updateRegistrationPolicy(PortalRegistrationPolicyRequest request) {
+        RegistrationPolicy current = registrationPolicy;
         List<String> domains = normalizeDomains(request == null ? null : request.allowedEmailDomains());
-        Set<String> inviteCodes = normalizeInviteCodes(request == null ? null : request.inviteCodes());
+        Set<String> channels = request == null || request.allowedRegistrationChannels() == null
+                ? current.allowedRegistrationChannels()
+                : normalizeRegistrationChannels(request.allowedRegistrationChannels());
         registrationPolicy = new RegistrationPolicy(
                 domains,
-                request != null && Boolean.TRUE.equals(request.inviteCodeRequired()),
-                inviteCodes,
-                request != null && Boolean.TRUE.equals(request.emailVerificationRequiredForKeyCreation()),
+                channels,
+                request == null || request.inviteCodeRequired() == null ? current.inviteCodeRequired() : request.inviteCodeRequired(),
+                Set.of(),
+                request == null || request.emailVerificationRequiredForKeyCreation() == null
+                        ? current.emailVerificationRequiredForKeyCreation()
+                        : request.emailVerificationRequiredForKeyCreation(),
                 Instant.now()
         );
-        audit(null, "REGISTRATION_POLICY_UPDATED", "SUCCESS", "{\"domains\":" + domains.size() + ",\"inviteRequired\":" + registrationPolicy.inviteCodeRequired() + "}");
+        audit(null, "REGISTRATION_POLICY_UPDATED", "SUCCESS", "{\"domains\":" + domains.size() + ",\"channels\":" + channels.size() + ",\"inviteRequired\":" + registrationPolicy.inviteCodeRequired() + "}");
         return toPolicyResponse(registrationPolicy);
     }
 
     public void verifyRegistrationPolicy(String email, String inviteCode) {
+        verifyRegistrationPolicy(email, inviteCode, REGISTRATION_CHANNEL_PASSWORD);
+    }
+
+    public void verifyRegistrationPolicy(String email, String inviteCode, String channel) {
         RegistrationPolicy policy = registrationPolicy;
         String normalizedEmail = email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
         if (!policy.allowedEmailDomains().isEmpty() && !domainAllowed(normalizedEmail, policy.allowedEmailDomains())) {
             audit(null, "REGISTRATION_POLICY_REJECTED", "FAILED", "{\"email\":\"" + normalizedEmail + "\",\"reason\":\"domain\"}");
             throw new IllegalArgumentException("当前邮箱域名不允许注册。");
         }
-        if (policy.inviteCodeRequired()) {
-            String normalizedCode = inviteCode == null ? "" : inviteCode.trim().toUpperCase(Locale.ROOT);
-            if (normalizedCode.isBlank() || !policy.inviteCodes().contains(normalizedCode)) {
-                audit(null, "REGISTRATION_POLICY_REJECTED", "FAILED", "{\"email\":\"" + normalizedEmail + "\",\"reason\":\"invite\"}");
-                throw new IllegalArgumentException("注册需要有效邀请码。");
+        String normalizedChannel = normalizeRegistrationChannel(channel);
+        String normalizedCode = inviteCode == null ? "" : inviteCode.trim().toUpperCase(Locale.ROOT);
+        if (REGISTRATION_CHANNEL_SOCIAL_OAUTH.equals(normalizedChannel)) {
+            requireChannel(policy, normalizedEmail, normalizedChannel);
+            if (policy.inviteCodeRequired()) {
+                requireInviteCodePresent(normalizedEmail, normalizedCode);
             }
+            return;
+        }
+
+        if (REGISTRATION_CHANNEL_INVITE_CODE.equals(normalizedChannel)) {
+            requireChannel(policy, normalizedEmail, REGISTRATION_CHANNEL_INVITE_CODE);
+            requireInviteCodePresent(normalizedEmail, normalizedCode);
+            return;
+        }
+
+        requireChannel(policy, normalizedEmail, REGISTRATION_CHANNEL_PASSWORD);
+        if (policy.inviteCodeRequired()) {
+            requireInviteCodePresent(normalizedEmail, normalizedCode);
         }
     }
 
@@ -662,16 +722,42 @@ public class PortalSecurityService {
                 .toList();
     }
 
-    private Set<String> normalizeInviteCodes(List<String> values) {
+    private Set<String> normalizeRegistrationChannels(List<String> values) {
         if (values == null) {
-            return Set.of();
+            return DEFAULT_REGISTRATION_CHANNELS;
         }
-        Set<String> codes = new HashSet<>();
-        values.stream()
-                .filter(value -> value != null && !value.isBlank())
-                .map(value -> value.trim().toUpperCase(Locale.ROOT))
-                .forEach(codes::add);
-        return Set.copyOf(codes);
+        Set<String> channels = new HashSet<>();
+        for (String value : values) {
+            if (value == null || value.isBlank()) {
+                continue;
+            }
+            channels.add(normalizeRegistrationChannel(value));
+        }
+        return Set.copyOf(channels);
+    }
+
+    private String normalizeRegistrationChannel(String value) {
+        String normalized = value == null || value.isBlank()
+                ? REGISTRATION_CHANNEL_PASSWORD
+                : value.trim().toUpperCase(Locale.ROOT).replace('-', '_');
+        if (!SUPPORTED_REGISTRATION_CHANNELS.contains(normalized)) {
+            throw new IllegalArgumentException("不支持的注册渠道：" + normalized);
+        }
+        return normalized;
+    }
+
+    private void requireChannel(RegistrationPolicy policy, String normalizedEmail, String channel) {
+        if (!policy.allowedRegistrationChannels().contains(channel)) {
+            audit(null, "REGISTRATION_POLICY_REJECTED", "FAILED", "{\"email\":\"" + normalizedEmail + "\",\"reason\":\"channel\",\"channel\":\"" + channel + "\"}");
+            throw new IllegalArgumentException("当前注册渠道已关闭。");
+        }
+    }
+
+    private void requireInviteCodePresent(String normalizedEmail, String normalizedCode) {
+        if (normalizedCode.isBlank()) {
+            audit(null, "REGISTRATION_POLICY_REJECTED", "FAILED", "{\"email\":\"" + normalizedEmail + "\",\"reason\":\"invite\"}");
+            throw new IllegalArgumentException("注册需要有效邀请码。");
+        }
     }
 
     private boolean domainAllowed(String email, List<String> allowedDomains) {
@@ -686,8 +772,9 @@ public class PortalSecurityService {
     private PortalRegistrationPolicyResponse toPolicyResponse(RegistrationPolicy policy) {
         return new PortalRegistrationPolicyResponse(
                 policy.allowedEmailDomains(),
+                policy.allowedRegistrationChannels().stream().sorted().toList(),
                 policy.inviteCodeRequired(),
-                !policy.inviteCodes().isEmpty(),
+                invitationCodeRedemptionService != null && invitationCodeRedemptionService.hasConfiguredInvitationCodes(),
                 policy.emailVerificationRequiredForKeyCreation(),
                 policy.updatedAt()
         );
@@ -743,6 +830,7 @@ public class PortalSecurityService {
 
     private record RegistrationPolicy(
             List<String> allowedEmailDomains,
+            Set<String> allowedRegistrationChannels,
             boolean inviteCodeRequired,
             Set<String> inviteCodes,
             boolean emailVerificationRequiredForKeyCreation,

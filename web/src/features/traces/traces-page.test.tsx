@@ -89,6 +89,50 @@ beforeEach(() => {
               updatedAt: '2026-04-20T11:59:00Z',
             },
           ],
+          traceDetails: [
+            {
+              id: 2,
+              requestId: 'req-1',
+              stage: 'UPSTREAM_RESPONSE',
+              direction: 'INBOUND',
+              contentKind: 'JSON',
+              payloadJson: { id: 'chatcmpl-1', object: 'chat.completion' },
+              metadataJson: { providerType: 'OPENAI_DIRECT' },
+              payloadHash: 'hash-response',
+              metadataHash: 'metadata-hash-response',
+              originalLength: 180,
+              storedLength: 180,
+              metadataOriginalLength: 42,
+              metadataStoredLength: 42,
+              truncated: false,
+              metadataTruncated: false,
+              redacted: false,
+              metadataRedacted: false,
+              expiresAt: '2026-04-27T11:59:01Z',
+              createdAt: '2026-04-20T11:59:01Z',
+            },
+            {
+              id: 1,
+              requestId: 'req-1',
+              stage: 'UPSTREAM_REQUEST',
+              direction: 'OUTBOUND',
+              contentKind: 'JSON',
+              payloadJson: { model: 'gpt-4o', messages: [{ role: 'user', content: 'hello' }] },
+              metadataJson: { selectedCredentialId: 101 },
+              payloadHash: 'hash-request',
+              metadataHash: 'metadata-hash-request',
+              originalLength: 210,
+              storedLength: 120,
+              metadataOriginalLength: 5000,
+              metadataStoredLength: 4000,
+              truncated: true,
+              metadataTruncated: true,
+              redacted: true,
+              metadataRedacted: true,
+              expiresAt: '2026-04-27T11:59:00Z',
+              createdAt: '2026-04-20T11:59:00Z',
+            },
+          ],
           asyncResourceSummary: {
             resourceKey: 'file_123',
             resourceType: 'FILE',
@@ -126,6 +170,17 @@ describe('TracesPage', () => {
     expect(await screen.findByText('API 翻译')).toBeInTheDocument()
     expect(await screen.findByText('远端调用')).toBeInTheDocument()
     expect(await screen.findByText('流式返回处理')).toBeInTheDocument()
+    expect(await screen.findByText('上游请求')).toBeInTheDocument()
+    expect(await screen.findByText('上游响应')).toBeInTheDocument()
+    expect(await screen.findByText('出站')).toBeInTheDocument()
+    expect(await screen.findByText('入站')).toBeInTheDocument()
+    expect(await screen.findByText('已脱敏')).toBeInTheDocument()
+    expect(await screen.findByText('已截断')).toBeInTheDocument()
+    expect(await screen.findByText('元数据已脱敏')).toBeInTheDocument()
+    expect(await screen.findByText('元数据已截断')).toBeInTheDocument()
+    expect(await screen.findByText('hash-request')).toBeInTheDocument()
+    expect(await screen.findByText('hash-response')).toBeInTheDocument()
+    expect(await screen.findByText('metadata-hash-request')).toBeInTheDocument()
     expect(await screen.findByRole('link', { name: '打开调试工作台' })).toHaveAttribute(
       'href',
       '/console/workbench?requestId=req-1&requestPath=%2Fv1%2Fchat%2Fcompletions',

@@ -7,7 +7,7 @@
       "displayName": "OpenAI",
       "siteKind": "OPENAI_DIRECT",
       "defaultBaseUrl": "https://api.openai.com",
-      "description": "OpenAI 对话与 tools 功能性服务 API，覆盖 Chat、Responses、Responses file_search 本地绑定、Conversations、Vector Stores 本地 lifecycle、文件 attachment、本地 chunk ingestion、本地文本 search 与 file batch、Webhooks、Embeddings、Audio、Images、Moderation、Files 与 Uploads 支撑面；不再声明官方非核心 API。",
+      "description": "OpenAI 对话与 tools 功能性服务 API，覆盖 Chat、Responses、Conversations、Vector Stores 本地 lifecycle、文件 attachment、本地 chunk ingestion、本地文本 search 与 file batch、Webhooks、Embeddings、Audio、Images、Moderation、Files 与 Uploads 支撑面；Responses hosted file_search 必须走 OpenAI Direct native route，默认不再用本地绑定伪装成功；不再声明官方非核心 API。",
       "capabilityTags": [
         "chat",
         "responses",
@@ -33,7 +33,7 @@
         "openai.responses-remote-lifecycle-passthrough",
         "openai.responses-untracked-remote-lifecycle-route-hints",
         "openai.responses-tool-registry-boundary",
-        "openai.responses-file-search-local-vector-store-binding",
+        "openai.responses-hosted-file-search-native-required",
         "openai.conversations-local-lifecycle",
         "openai.vector-stores-local-lifecycle",
         "openai.vector-store-files-local-attachment",
@@ -77,8 +77,8 @@
         "smokeClassification": "native_required"
       },
       "unsupportedFeatures": [
-        "responses_non_function_tools: Responses function tools are supported; file_search can bind gateway-local vector_store_ids and inject local search context; other hosted/MCP/custom/code_interpreter/computer_use/image_generation/shell/apply_patch tools are explicitly rejected instead of silently skipped.",
-        "vector_stores_child_resources: Vector Stores local lifecycle create/list/retrieve/update/delete, local file attachments, local chunk ingestion artifacts, file content read, local text search, Responses file_search local binding and local file_batches create/retrieve/cancel/list files are available; real embedding/vector index ingestion and semantic search remain TASK-20260514-023.",
+        "responses_non_function_tools: Responses function tools are supported; hosted file_search requires OpenAI Direct native execution and otherwise fails with native_hosted_tool_required; other hosted/MCP/custom/code_interpreter/computer_use/image_generation/shell/apply_patch tools are explicitly rejected instead of silently skipped.",
+        "vector_stores_child_resources: Vector Stores local lifecycle create/list/retrieve/update/delete, local file attachments, local chunk ingestion artifacts, file content read, local text search and local file_batches create/retrieve/cancel/list files are available; real embedding/vector index ingestion, semantic search and hosted file_search_call lifecycle remain TASK-20260514-023.",
         "non_core_official_apis_out_of_scope: official non-core APIs are outside the current conversation/tools product scope per REQ-20260518-005.",
         "codex_non_responses_apis_out_of_scope: OpenAI Codex is designated as a Responses Smoke/Proxy boundary for ChatGPT official accounts. All non-responses Codex internal endpoints, including Fine-tuning, Batches, Evals, and administrative tasks, are strictly unsupported and rejected."
       ]
@@ -133,7 +133,7 @@
       "displayName": "Xiaomi MiMo",
       "vendorCode": "xiaomi_mimo",
       "vendorName": "小米 MiMo",
-      "siteKind": "OPENAI_COMPATIBLE_GENERIC",
+      "siteKind": "XIAOMI_MIMO",
       "defaultBaseUrl": "https://token-plan-sgp.xiaomimimo.com/v1",
       "description": "小米 MiMo OpenAI-compatible API。Codex/Responses 入口通过 Chat Completions 转译接入；OpenAI-style audio/images/moderation 由 passthrough 执行，files/uploads 由 gateway orchestration 承接；thinking mode 下多轮工具调用历史必须回放 assistant reasoning_content。",
       "capabilityTags": [
@@ -155,7 +155,7 @@
       "conformanceChecks": [
         "chat.native",
         "openai-compatible.surface",
-        "responses.emulated",
+        "responses.lossless-translation",
         "reasoning_content.history-replay"
       ],
       "compatibilitySurface": "openai-compatible-chat",
@@ -186,7 +186,7 @@
         "ingressProtocol": "responses",
         "upstreamSurface": "chat_completions",
         "responsesCompatibility": {
-          "mode": "emulate_with_chat_completions"
+          "mode": "lossless_to_chat_completions"
         },
         "reasoning": {
           "requestField": "extra_body.thinking",
@@ -239,7 +239,7 @@
         }
       ],
       "unsupportedFeatures": [
-        "responses_native: MiMo preset receives Codex/OpenAI Responses ingress through Chat Completions emulation, not upstream native Responses.",
+        "responses_native: MiMo preset receives Codex/OpenAI Responses ingress through lossless Chat Completions translation, not upstream native Responses.",
         "openai_style_resource_passthrough: MiMo audio/images/moderation use OpenAI-compatible passthrough; upstream 401/404/model unsupported remains surfaced at runtime.",
         "files_uploads_gateway_orchestration: MiMo files/uploads use gateway-local orchestration and lineage instead of assuming an upstream OpenAI object store.",
         "reasoning_content_history_missing: thinking mode plus historical assistant tool_calls requires reasoning_content replay; requests missing it are rejected before upstream dispatch."
@@ -334,7 +334,7 @@
       "conformanceChecks": [
         "chat.native",
         "openai-compatible.surface",
-        "responses.emulated"
+        "responses.lossless-translation"
       ],
       "compatibilitySurface": "openai-compatible-chat",
       "supportStrategy": "cloud-openai-compatible",
@@ -521,7 +521,7 @@
       "conformanceChecks": [
         "chat.native",
         "openai-compatible.surface",
-        "responses.emulated"
+        "responses.lossless-translation"
       ],
       "compatibilitySurface": "openai-compatible-chat",
       "supportStrategy": "cloud-openai-compatible",
@@ -610,19 +610,17 @@
       "code": "cohere",
       "displayName": "Cohere",
       "siteKind": "COHERE",
-      "defaultBaseUrl": "https://api.cohere.ai/compatibility/v1",
-      "description": "Cohere 既可通过 compatibility API 参与 chat/embeddings，也作为 dedicated rerank provider 接入。",
+      "defaultBaseUrl": "https://api.cohere.ai",
+      "description": "Cohere 在本仓库中冻结为 native embed/rerank provider；compatibility chat 不作为当前核心成功证据。",
       "capabilityTags": [
-        "chat",
         "embeddings",
         "rerank",
-        "openai_compatible"
+        "cohere_native"
       ],
       "costProfile": "cohere-public-pricing",
       "errorMode": "openai_error",
       "deprecated": false,
       "conformanceChecks": [
-        "chat.native",
         "embeddings.native",
         "rerank.native"
       ],
@@ -653,6 +651,7 @@
         "smokeClassification": "native_required"
       },
       "unsupportedFeatures": [
+        "chat: current gateway does not treat Cohere compatibility chat as native executor evidence.",
         "file_object: Cohere compatibility API is not treated as a stable object lifecycle provider."
       ]
     },

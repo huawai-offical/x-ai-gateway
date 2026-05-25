@@ -10,6 +10,7 @@ import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyView;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.credential.CredentialMaterialResolver;
 import com.prodigalgal.xaigateway.gateway.core.credential.ResolvedCredentialMaterial;
+import com.prodigalgal.xaigateway.gateway.core.error.GatewayRuleMatchedException;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileResponse;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileService;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
@@ -74,7 +75,7 @@ class GatewayAsyncResourceServiceTests {
     Path tempDir;
 
     @Test
-    void shouldCreateAndCancelLocalVideoTask() {
+    void shouldRejectLocalVideoTaskWithoutNativeRoute() {
         GatewayAsyncResourceRepository gatewayAsyncResourceRepository = Mockito.mock(GatewayAsyncResourceRepository.class);
         SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
         ObjectMapper objectMapper = new ObjectMapper();
@@ -98,32 +99,19 @@ class GatewayAsyncResourceServiceTests {
         request.put("model", "veo-3");
         request.put("prompt", "demo");
 
-        JsonNode created = service.createVideoTask(1L, request);
+        GatewayRuleMatchedException exception = assertThrows(
+                GatewayRuleMatchedException.class,
+                () -> service.createVideoTask(1L, request)
+        );
 
-        assertTrue(created.path("id").asText().startsWith("video_"));
-        assertEquals("video.generation", created.path("object").asText());
-        assertEquals("queued", created.path("status").asText());
-        ArgumentCaptor<GatewayAsyncResourceEntity> captor = ArgumentCaptor.forClass(GatewayAsyncResourceEntity.class);
-        Mockito.verify(gatewayAsyncResourceRepository).save(captor.capture());
-        GatewayAsyncResourceEntity entity = captor.getValue();
-        assertEquals(GatewayAsyncResourceType.VIDEO, entity.getResourceType());
-        assertTrue(entity.getMetadataJson().contains("gateway_local_async_task"));
-
-        Mockito.when(gatewayAsyncResourceRepository.findByResourceKeyAndResourceTypeAndDeletedFalse(
-                        created.path("id").asText(),
-                        GatewayAsyncResourceType.VIDEO))
-                .thenReturn(Optional.of(entity));
-
-        JsonNode cancelled = service.cancelVideoTask(created.path("id").asText(), 1L);
-
-        assertEquals("cancelled", cancelled.path("status").asText());
-        assertEquals("cancelled", entity.getStatus());
-        assertTrue(entity.getMetadataJson().contains("user_cancelled"));
-        Mockito.verify(gatewayAsyncResourceRepository, Mockito.times(2)).save(any());
+        assertEquals(501, exception.getStatus());
+        assertEquals("native_route_required", exception.getCode());
+        assertTrue(exception.getMessage().contains("provider native route"));
+        Mockito.verify(gatewayAsyncResourceRepository, Mockito.never()).save(any());
     }
 
     @Test
-    void shouldKeepFailedLocalMusicTaskTerminalWhenCancelled() {
+    void shouldRejectLocalMusicTaskWithoutNativeRoute() {
         GatewayAsyncResourceRepository gatewayAsyncResourceRepository = Mockito.mock(GatewayAsyncResourceRepository.class);
         SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
         ObjectMapper objectMapper = new ObjectMapper();
@@ -145,22 +133,15 @@ class GatewayAsyncResourceServiceTests {
         ObjectNode request = objectMapper.createObjectNode();
         request.put("model", "music-demo");
         request.put("prompt", "demo");
-        request.put("status", "failed");
+        GatewayRuleMatchedException exception = assertThrows(
+                GatewayRuleMatchedException.class,
+                () -> service.createMusicTask(1L, request)
+        );
 
-        JsonNode created = service.createMusicTask(1L, request);
-        ArgumentCaptor<GatewayAsyncResourceEntity> captor = ArgumentCaptor.forClass(GatewayAsyncResourceEntity.class);
-        Mockito.verify(gatewayAsyncResourceRepository).save(captor.capture());
-        GatewayAsyncResourceEntity entity = captor.getValue();
-        Mockito.when(gatewayAsyncResourceRepository.findByResourceKeyAndResourceTypeAndDeletedFalse(
-                        created.path("id").asText(),
-                        GatewayAsyncResourceType.MUSIC))
-                .thenReturn(Optional.of(entity));
-
-        JsonNode cancelled = service.cancelMusicTask(created.path("id").asText(), 1L);
-
-        assertEquals("failed", cancelled.path("status").asText());
-        assertEquals("failed", entity.getStatus());
-        Mockito.verify(gatewayAsyncResourceRepository, Mockito.times(1)).save(any());
+        assertEquals(501, exception.getStatus());
+        assertEquals("native_route_required", exception.getCode());
+        assertTrue(exception.getMessage().contains("provider native route"));
+        Mockito.verify(gatewayAsyncResourceRepository, Mockito.never()).save(any());
     }
 
     @Test
@@ -282,16 +263,50 @@ class GatewayAsyncResourceServiceTests {
         assertEquals("gateway.media_provider_matrix", matrix.path("object").asText());
         assertTrue(matrix.path("video").toString().contains("openai_compatible"));
         assertTrue(matrix.path("video").toString().contains("Gemini"));
-        assertTrue(matrix.path("video").toString().contains("provider_specific_adapter"));
+        assertTrue(matrix.path("video").toString().contains("provider_specific_native_profile_required"));
+        assertTrue(matrix.path("video").toString().contains("NATIVE_REQUIRED"));
         assertTrue(matrix.path("music").toString().contains("suno"));
         assertTrue(matrix.path("music").toString().contains("music_generation"));
         assertTrue(matrix.path("music").toString().contains("operator_configured_suno_music_pricing"));
         assertTrue(matrix.path("music").toString().contains("XAG_SMOKE_SUNO"));
+        assertTrue(matrix.path("music").toString().contains("NATIVE_REQUIRED"));
         assertTrue(matrix.path("music").toString().contains("NOT_SUPPORTED"));
     }
 
     @Test
-    void shouldRunGeminiVeoProviderAdapterLifecycle() throws Exception {
+    void shouldRejectGeminiVeoProviderAdapterWithoutProviderEvidence() throws Exception {
+        GatewayAsyncResourceRepository gatewayAsyncResourceRepository = Mockito.mock(GatewayAsyncResourceRepository.class);
+        SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        ObjectMapper objectMapper = new ObjectMapper();
+        GatewayAsyncResourceService service = new GatewayAsyncResourceService(
+                gatewayAsyncResourceRepository,
+                Mockito.mock(DistributedKeyQueryService.class),
+                Mockito.mock(UpstreamCredentialRepository.class),
+                Mockito.mock(UpstreamSiteProfileRepository.class),
+                snapshotRepository,
+                Mockito.mock(GatewayFileRepository.class),
+                Mockito.mock(GatewayFileBindingRepository.class),
+                Mockito.mock(CredentialCryptoService.class),
+                new SiteCapabilityTruthService(new UpstreamSitePolicyService(), snapshotRepository),
+                objectMapper,
+                Clock.fixed(Instant.parse("2026-04-12T04:00:00Z"), ZoneOffset.UTC),
+                WebClient.builder()
+        );
+        GatewayRuleMatchedException exception = assertThrows(
+                GatewayRuleMatchedException.class,
+                () -> service.createVideoTask(1L, objectMapper.readTree("""
+                {"model":"veo-3","prompt":"demo","provider_mode":"adapter","provider_family":"gemini"}
+                """))
+        );
+
+        assertEquals(501, exception.getStatus());
+        assertEquals("native_route_required", exception.getCode());
+        assertTrue(exception.getMessage().contains("provider_task_id"));
+        Mockito.verify(gatewayAsyncResourceRepository, Mockito.never()).save(any());
+    }
+
+    @Test
+    void shouldKeepGeminiVeoProviderAdapterPendingUntilRealProviderArtifactExists() throws Exception {
         GatewayAsyncResourceRepository gatewayAsyncResourceRepository = Mockito.mock(GatewayAsyncResourceRepository.class);
         SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
         ObjectMapper objectMapper = new ObjectMapper();
@@ -317,7 +332,7 @@ class GatewayAsyncResourceServiceTests {
         });
 
         JsonNode created = service.createVideoTask(1L, objectMapper.readTree("""
-                {"model":"veo-3","prompt":"demo","provider_mode":"adapter","provider_family":"gemini"}
+                {"model":"veo-3","prompt":"demo","provider_mode":"adapter","provider_family":"gemini","provider_task_id":"veo-real-1"}
                 """));
         GatewayAsyncResourceEntity entity = savedEntities.get(savedEntities.size() - 1);
         Mockito.when(gatewayAsyncResourceRepository.findByResourceKeyAndResourceTypeAndDeletedFalse(
@@ -326,31 +341,60 @@ class GatewayAsyncResourceServiceTests {
                 .thenReturn(Optional.of(entity));
 
         JsonNode synced = service.getVideoTask(created.path("id").asText(), 1L);
-        JsonNode download = service.downloadVideoTaskArtifact(created.path("id").asText(), 1L);
-
-        JsonNode cancellable = service.createVideoTask(1L, objectMapper.readTree("""
-                {"model":"veo-3","prompt":"demo","provider_mode":"adapter","provider_family":"gemini"}
-                """));
-        GatewayAsyncResourceEntity cancellableEntity = savedEntities.get(savedEntities.size() - 1);
-        Mockito.when(gatewayAsyncResourceRepository.findByResourceKeyAndResourceTypeAndDeletedFalse(
-                        cancellable.path("id").asText(),
-                        GatewayAsyncResourceType.VIDEO))
-                .thenReturn(Optional.of(cancellableEntity));
-        JsonNode cancelled = service.cancelVideoTask(cancellable.path("id").asText(), 1L);
 
         assertEquals("queued", created.path("status").asText());
-        assertEquals("completed", synced.path("status").asText());
-        assertEquals("media.artifact_download", download.path("object").asText());
-        assertTrue(download.path("download_url").asText().contains("/videos/" + created.path("id").asText() + "/download"));
-        assertEquals("cancelled", cancelled.path("status").asText());
+        assertEquals("queued", synced.path("status").asText());
+        GatewayRuleMatchedException downloadException = assertThrows(
+                GatewayRuleMatchedException.class,
+                () -> service.downloadVideoTaskArtifact(created.path("id").asText(), 1L)
+        );
+        assertEquals("native_route_required", downloadException.getCode());
         assertTrue(entity.getMetadataJson().contains("\"object_mode\":\"provider_specific_media_adapter\""));
         assertTrue(entity.getMetadataJson().contains("\"provider_adapter\":\"gemini_veo\""));
-        assertTrue(entity.getMetadataJson().contains("\"downloaded\""));
-        assertTrue(cancellableEntity.getMetadataJson().contains("\"cancel_reason\":\"user_cancelled\""));
+        assertFalse(entity.getMetadataJson().contains("\"downloaded\""));
     }
 
     @Test
-    void shouldRunSunoMusicProviderAdapterLifecycle() throws Exception {
+    void shouldRejectSunoMusicProviderAdapterWithoutProviderEvidence() throws Exception {
+        GatewayAsyncResourceRepository gatewayAsyncResourceRepository = Mockito.mock(GatewayAsyncResourceRepository.class);
+        SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
+        ObjectMapper objectMapper = new ObjectMapper();
+        GatewayAsyncResourceService service = new GatewayAsyncResourceService(
+                gatewayAsyncResourceRepository,
+                Mockito.mock(DistributedKeyQueryService.class),
+                Mockito.mock(UpstreamCredentialRepository.class),
+                Mockito.mock(UpstreamSiteProfileRepository.class),
+                snapshotRepository,
+                Mockito.mock(GatewayFileRepository.class),
+                Mockito.mock(GatewayFileBindingRepository.class),
+                Mockito.mock(CredentialCryptoService.class),
+                new SiteCapabilityTruthService(new UpstreamSitePolicyService(), snapshotRepository),
+                objectMapper,
+                Clock.fixed(Instant.parse("2026-04-12T04:00:00Z"), ZoneOffset.UTC),
+                WebClient.builder()
+        );
+        GatewayRuleMatchedException exception = assertThrows(
+                GatewayRuleMatchedException.class,
+                () -> service.createMusicTask(1L, objectMapper.readTree("""
+                {
+                  "model":"suno_music",
+                  "prompt":"a calm synth theme",
+                  "title":"Smoke Song",
+                  "tags":"ambient,synth",
+                  "provider_mode":"adapter",
+                  "provider_family":"suno"
+                }
+                """))
+        );
+
+        assertEquals(501, exception.getStatus());
+        assertEquals("native_route_required", exception.getCode());
+        assertTrue(exception.getMessage().contains("provider_task_id"));
+        Mockito.verify(gatewayAsyncResourceRepository, Mockito.never()).save(any());
+    }
+
+    @Test
+    void shouldUseOnlyRealSunoProviderArtifactForCompletedDownload() throws Exception {
         GatewayAsyncResourceRepository gatewayAsyncResourceRepository = Mockito.mock(GatewayAsyncResourceRepository.class);
         SiteCapabilitySnapshotRepository snapshotRepository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
         ObjectMapper objectMapper = new ObjectMapper();
@@ -379,10 +423,11 @@ class GatewayAsyncResourceServiceTests {
                 {
                   "model":"suno_music",
                   "prompt":"a calm synth theme",
-                  "title":"Smoke Song",
-                  "tags":"ambient,synth",
                   "provider_mode":"adapter",
-                  "provider_family":"suno"
+                  "provider_family":"suno",
+                  "provider_task_id":"suno-real-1",
+                  "provider_status":"success",
+                  "audio_url":"https://cdn.example/suno-real-1.mp3"
                 }
                 """));
         GatewayAsyncResourceEntity entity = savedEntities.get(savedEntities.size() - 1);
@@ -394,31 +439,20 @@ class GatewayAsyncResourceServiceTests {
         JsonNode synced = service.getMusicTask(created.path("id").asText(), 1L);
         JsonNode download = service.downloadMusicTaskArtifact(created.path("id").asText(), 1L);
 
-        JsonNode cancellable = service.createMusicTask(1L, objectMapper.readTree("""
-                {"model":"suno_music","prompt":"demo","provider_mode":"adapter","provider_family":"suno"}
-                """));
-        GatewayAsyncResourceEntity cancellableEntity = savedEntities.get(savedEntities.size() - 1);
-        Mockito.when(gatewayAsyncResourceRepository.findByResourceKeyAndResourceTypeAndDeletedFalse(
-                        cancellable.path("id").asText(),
-                        GatewayAsyncResourceType.MUSIC))
-                .thenReturn(Optional.of(cancellableEntity));
-        JsonNode cancelled = service.cancelMusicTask(cancellable.path("id").asText(), 1L);
-
-        assertEquals("queued", created.path("status").asText());
-        assertEquals("submitted", created.path("provider_status").asText());
+        assertEquals("completed", created.path("status").asText());
+        assertEquals("success", created.path("provider_status").asText());
         assertEquals("completed", synced.path("status").asText());
         assertEquals("success", synced.path("provider_status").asText());
         assertEquals("media.artifact_download", download.path("object").asText());
         assertEquals("audio/mpeg", download.path("content_type").asText());
-        assertTrue(download.path("download_url").asText().contains("/music/" + created.path("id").asText() + "/download"));
-        assertEquals("cancelled", cancelled.path("status").asText());
+        assertEquals("https://cdn.example/suno-real-1.mp3", download.path("download_url").asText());
         assertTrue(entity.getMetadataJson().contains("\"provider_adapter\":\"suno_music\""));
         assertTrue(entity.getMetadataJson().contains("\"provider_capability\":\"music_generation\""));
         assertTrue(entity.getMetadataJson().contains("\"provider_pricing_source\":\"operator_configured_suno_music_pricing\""));
         assertTrue(entity.getMetadataJson().contains("\"AUTHENTICATION_FAILED\""));
         assertTrue(entity.getMetadataJson().contains("\"PROVIDER_RATE_LIMITED\""));
         assertTrue(entity.getMetadataJson().contains("\"downloaded\""));
-        assertTrue(cancellableEntity.getMetadataJson().contains("\"cancel_reason\":\"user_cancelled\""));
+        assertFalse(download.path("download_url").asText().contains("gateway.local"));
     }
 
     @Test

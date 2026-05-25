@@ -28,10 +28,11 @@ src/main/resources/functional-service-api-coverage-matrix.json
 ## Provider 边界
 
 - OpenAI：保留 Chat、Responses、streaming、function tools、多模态、Audio translations、Images edits/variations、Files/Uploads、Vector Stores/file_search、本地 Conversations、OpenAI Webhooks、Realtime client secret 基线、models 与治理支撑。
-- OpenAI-compatible：MiMo 等 compatible key 可按 OpenAI-style 直连 audio/images/moderation 资源入口；file* 与 Uploads 已按独立 file/upload capability snapshot 开放 gateway orchestration，不从 chat 兼容性自动推导；矩阵里的 NATIVE/ORCHESTRATION 表示 gateway 具备可执行入口，真实上游 401/404/model unsupported 仍由运行时或 smoke 反馈；Realtime、Batches 等 object lifecycle 仍需独立任务和真实能力对齐。
+- Provider-specific OpenAI-compatible native profile：MiMo、DeepSeek、xAI、Qwen、Moonshot、Volcengine、MiniMax、Mistral 等仅在 catalog 声明 `nativeAdapterContract` 后进入默认核心能力矩阵；它们不是 generic fallback，不能把 OpenAI-style chat 兼容性自动外推为 Realtime、Batches、Files/Uploads 或完整 object lifecycle。audio/images/moderation/file/uploads 等资源面必须由 provider-specific native profile、capability snapshot 与 Lossless Translation Matrix 共同约束；不可无损或 native-only 的能力必须硬失败，不返回 warning/metadata/header/local emulation 伪成功。
+- 非默认核心平台：Dify、OpenRouter、Together、Fireworks、SiliconFlow 与通用 generic compatible provider 默认不在核心支持范围；如未来保留，只能作为非核心可选 profile 单独声明，不进入本矩阵默认核心承诺。
 - Anthropic：保留 Claude Messages、streaming、tool_use/thinking、图片输入理解与 file 支撑；不保留 audio 资源、图片生成/编辑/variation、Anthropic message batches、admin/eval 等 provider-specific 非核心 API。
-- Gemini：保留 generateContent、streamGenerateContent、function calling、embeddings/files 支撑，以及 audio transcription/translation/speech、image generation/edit/variation 功能性资源互转；不保留 batch prediction、tuning、pipeline/job/admin。
-- Vertex：保留与 Gemini 对话和支撑面等价的 generateContent、embeddings/files/audio/image 功能面；project/location 只是寻址和凭证边界，不扩展为 Vertex AI Platform 全量 API。
+- Gemini：保留 generateContent、streamGenerateContent、function calling、embeddings/files 等 Google native 支撑面；audio/image 等资源型入口只有在 Gemini native surface 或 Lossless Translation Matrix 明确允许时才执行，OpenAI surface 到 Gemini native 的 image edit、image variation、audio translation 已按 native-required 硬失败处理；不保留 batch prediction、tuning、pipeline/job/admin。
+- Vertex：保留与 Gemini 对话和支撑面等价的 generateContent、embeddings/files 功能面；project/location 只是寻址和凭证边界，不扩展为 Vertex AI Platform 全量 API，audio/image 资源同样受 native surface 与 Lossless Translation Matrix 约束。
 - Codex：只保留 ChatGPT 官方账号的 `/backend-api/codex/responses` smoke/proxy 边界，不注册为通用 provider catalog preset，不承诺非 Responses 内部 API。
 
 ## 后续派生
@@ -42,9 +43,9 @@ src/main/resources/functional-service-api-coverage-matrix.json
 | --- | --- | --- |
 | `docs/openapi/public-openapi.json` | Done | `TASK-20260514-029-04` 已补全 core/supporting/governance 已实现路径，不声明 out_of_scope API。 |
 | `src/main/resources/provider-catalog.json` | Done | 已按功能性服务 API 范围收紧 unsupportedFeatures 与 provider 边界。 |
-| `docs/public-api-compatibility.md` | Done | 已明确 OpenAI Direct、OpenAI-compatible Generic、Anthropic/Gemini/Vertex/Codex native 边界。 |
-| `docs/public-sdk-examples.md` | Done | `TASK-20260514-029-04` 已补充 OpenAI Direct native、OpenAI-compatible Generic、自定义 provider adapter 三模式示例。 |
-| `src/test/resources/conformance/endpoint-conformance-matrix.json` | Done | 已按功能性服务 API 范围承接 endpoint conformance；Audio translations、Images edits/variations 已重新进入 OpenAI-style 资源入口，OpenAI-compatible file*/Uploads 由 capability snapshot 驱动并在矩阵中独立验证。 |
+| `docs/public-api-compatibility.md` | Done | 已明确 OpenAI Direct、provider-specific OpenAI-compatible native profile、Anthropic/Gemini/Vertex/Codex native 边界。 |
+| `docs/public-sdk-examples.md` | Done | `TASK-20260514-029-04` 已补充 OpenAI Direct native、provider-specific OpenAI-compatible native profile、自定义 provider adapter 三模式示例。 |
+| `src/test/resources/conformance/endpoint-conformance-matrix.json` | Done | 已按功能性服务 API 范围承接 endpoint conformance；Audio translations、Images edits/variations 已重新进入 OpenAI-style 资源入口，provider-specific file*/Uploads 由 native profile、capability snapshot 与 Lossless Translation Matrix 共同约束并在矩阵中独立验证。 |
 | `src/test/resources/conformance/accepted-exceptions.json` | Done | 已将非核心 API 纳入 accepted exceptions 或 out-of-scope 决策。 |
 
-本轮资源型接口继续推进后，OpenAI-compatible 的 audio/images/moderation 按 OpenAI-style passthrough 暴露；file*/Uploads 不再作为 accepted exception，是否可用取决于 capability snapshot 的 `supports_files` / `supports_uploads` 以及 provider catalog 是否明确排除该厂商对象生命周期。MiMo 预设刷新后应写入最新 snapshot，避免旧 snapshot 把已实现入口误报为 blocked。
+本轮资源型接口继续推进后，provider-specific OpenAI-compatible native profile 的 audio/images/moderation 只有在 provider catalog、capability snapshot 与 Lossless Translation Matrix 均允许时才暴露；file*/Uploads 不再作为 accepted exception，是否可用取决于 capability snapshot 的 `supports_files` / `supports_uploads` 以及 provider catalog 是否明确支持该厂商对象生命周期。不可无损或 native-only 的跨协议资源属性必须转为硬失败，MiMo 等预设刷新后应写入最新 snapshot，避免旧 snapshot 把已实现入口误报为 blocked，也避免把未验证能力误报为成功。

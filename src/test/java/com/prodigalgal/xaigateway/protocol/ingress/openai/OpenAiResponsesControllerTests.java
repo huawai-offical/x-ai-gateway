@@ -53,7 +53,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Flux;
 
 @WebFluxTest(controllers = OpenAiResponsesController.class)
-@Import({PermitAllSecurityTestConfig.class, OpenAiResponsesRequestMapper.class, OpenAiResponsesFileSearchBindingService.class, GatewayClientFamilyResolver.class})
+@Import({PermitAllSecurityTestConfig.class, OpenAiResponsesRequestMapper.class, GatewayClientFamilyResolver.class})
 class OpenAiResponsesControllerTests {
 
     @Autowired
@@ -316,29 +316,16 @@ class OpenAiResponsesControllerTests {
     }
 
     @Test
-    void shouldBindResponsesFileSearchToLocalVectorStoreContext() {
+    void shouldKeepResponsesFileSearchHostedToolVisibleForNativeRequiredBlocking() {
         Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
-        Mockito.when(gatewayAsyncResourceService.searchVectorStore(
-                Mockito.eq("vs_1"),
-                Mockito.eq(1L),
-                Mockito.argThat(request -> request.path("query").asText().contains("refund policy")
-                        && request.path("max_num_results").asInt() == 2)
-        )).thenReturn(fileSearchPage());
         Mockito.when(gatewayChatExecutionService.executeGatewayResponse(Mockito.<CanonicalRequest>argThat(request ->
                         request != null
                                 && request.tools().isEmpty()
-                                && request.providerExtensions().path("instructions").asText().contains("Local file_search context")
-                                && request.providerExtensions().path("instructions").asText().contains("refund policy allows quarterly credits")
-                                && !request.providerExtensions().toString().contains("\"type\":\"file_search\"")
+                                && request.providerExtensions().toString().contains("\"type\":\"file_search\"")
                 )))
-                .thenReturn(gatewayResponse(
-                        "req-file-search-local-1",
-                        "退款政策允许季度抵扣。",
-                        GatewayUsage.empty(),
-                        List.of(),
-                        null,
-                        GatewayFinishReason.STOP
+                .thenThrow(new IllegalArgumentException(
+                        "跨协议属性 response.hosted_tool.file_search 不能从 responses 无损翻译到 openai；hosted tool lifecycle 不跨厂商翻译。 failure_code=native_hosted_tool_required"
                 ));
 
         webTestClient.post()
@@ -359,9 +346,16 @@ class OpenAiResponsesControllerTests {
                         }
                         """)
                 .exchange()
-                .expectStatus().isOk()
+                .expectStatus().isBadRequest()
                 .expectBody()
-                .jsonPath("$.output_text").isEqualTo("退款政策允许季度抵扣。");
+                .jsonPath("$.error.type").isEqualTo("invalid_request_error")
+                .jsonPath("$.error.code").isEqualTo("invalid_argument")
+                .jsonPath("$.error.message").value(message -> {
+                    org.junit.jupiter.api.Assertions.assertTrue(message.toString().contains("response.hosted_tool.file_search"));
+                    org.junit.jupiter.api.Assertions.assertTrue(message.toString().contains("native_hosted_tool_required"));
+                });
+
+        Mockito.verifyNoInteractions(gatewayAsyncResourceService);
     }
 
     @Test
@@ -1151,11 +1145,18 @@ class OpenAiResponsesControllerTests {
     }
 
     @Test
-    void shouldCountResponseInputTokensWithStableLocalEstimate() throws Exception {
+    void shouldRejectInputTokensWhenNativeRouteIsUnavailable() {
         Mockito.when(distributedKeyAuthenticationService.authenticateBearerToken("Bearer sk-gw-test.secret"))
                 .thenReturn(new AuthenticatedDistributedKey(1L, "sk-gw-test", "test-key"));
+        Mockito.when(gatewayOpenAiPassthroughService.executeOpenAiDirectJson(
+                        Mockito.eq("sk-gw-test"),
+                        Mockito.eq("/v1/responses/input_tokens"),
+                        Mockito.any(tools.jackson.databind.JsonNode.class),
+                        Mockito.<String>nullable(String.class)
+                ))
+                .thenThrow(new IllegalArgumentException("no OpenAI Direct route"));
 
-        JsonNode shortResult = readJson(webTestClient.post()
+        webTestClient.post()
                 .uri("/v1/responses/input_tokens")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -1166,30 +1167,12 @@ class OpenAiResponsesControllerTests {
                         }
                         """)
                 .exchange()
-                .expectStatus().isOk()
-                .expectBody(String.class)
-                .returnResult()
-                .getResponseBody());
-        JsonNode longResult = readJson(webTestClient.post()
-                .uri("/v1/responses/input_tokens")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer sk-gw-test.secret")
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue("""
-                        {
-                          "model":"writer-fast",
-                          "instructions":"You are concise.",
-                          "input":"hello, please write a longer answer with extra context"
-                        }
-                        """)
-                .exchange()
-                .expectStatus().isOk()
-                .expectBody(String.class)
-                .returnResult()
-                .getResponseBody());
-
-        org.junit.jupiter.api.Assertions.assertEquals("response.input_tokens", shortResult.path("object").asText());
-        org.junit.jupiter.api.Assertions.assertTrue(shortResult.path("input_tokens").asInt() > 0);
-        org.junit.jupiter.api.Assertions.assertTrue(longResult.path("input_tokens").asInt() >= shortResult.path("input_tokens").asInt());
+                .expectStatus().isEqualTo(HttpStatus.NOT_IMPLEMENTED)
+                .expectBody()
+                .jsonPath("$.error.type").isEqualTo("invalid_request_error")
+                .jsonPath("$.error.code").isEqualTo("native_input_tokens_required")
+                .jsonPath("$.error.message").value(message -> org.junit.jupiter.api.Assertions.assertTrue(
+                        message.toString().contains("OpenAI Direct native route")));
     }
 
     @Test
@@ -1571,23 +1554,6 @@ class OpenAiResponsesControllerTests {
 
     private JsonNode readJson(String body) throws Exception {
         return objectMapper.readTree(body);
-    }
-
-    private JsonNode fileSearchPage() {
-        var page = objectMapper.createObjectNode();
-        page.put("object", "vector_store.search_results.page");
-        page.putArray("data")
-                .addObject()
-                .put("file_id", "file_finance")
-                .put("filename", "finance.txt")
-                .put("score", 1.0d)
-                .putArray("content")
-                .addObject()
-                .put("type", "text")
-                .put("text", "The refund policy allows quarterly credits.");
-        page.put("has_more", false);
-        page.putNull("next_page");
-        return page;
     }
 
     private JsonNode firstEvent(List<JsonNode> events, String type) {

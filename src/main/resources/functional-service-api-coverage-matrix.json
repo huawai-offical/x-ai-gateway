@@ -22,6 +22,28 @@
     "src/test/resources/conformance/endpoint-conformance-matrix.json",
     "src/test/resources/conformance/accepted-exceptions.json"
   ],
+  "defaultCoreProviderBoundary": {
+    "providerSpecificOpenAiCompatibleProfiles": [
+      "mimo",
+      "deepseek",
+      "xai",
+      "qwen",
+      "moonshot",
+      "volcengine",
+      "minimax",
+      "mistral"
+    ],
+    "requiredContract": "catalog nativeAdapterContract",
+    "excludedFromDefaultCore": [
+      "dify",
+      "openrouter",
+      "together",
+      "fireworks",
+      "siliconflow",
+      "generic"
+    ],
+    "translationBoundary": "跨协议资源属性只按 Lossless Translation Matrix 执行；不可无损、native-only 或未声明属性必须硬失败，不返回伪成功。"
+  },
   "featureFamilies": [
     {
       "id": "conversation.create",
@@ -45,15 +67,25 @@
             "/v1/chat/completions",
             "/v1/responses"
           ],
-          "contract": "OpenAI Direct 或 OpenAI-compatible 对话/Responses 标准区。"
+          "contract": "OpenAI Direct/native 对话/Responses 标准区。"
         },
         {
-          "provider": "openai_compatible",
+          "provider": "provider_specific_openai_compatible_profiles",
           "protocol": "openai",
+          "providerProfiles": [
+            "mimo",
+            "deepseek",
+            "xai",
+            "qwen",
+            "moonshot",
+            "volcengine",
+            "minimax",
+            "mistral"
+          ],
           "paths": [
             "/v1/chat/completions"
           ],
-          "contract": "MiMo 等 OpenAI-compatible key 的 chat/tools 与 file/uploads 分开建模；file/uploads 仅在 capability snapshot 声明后通过 gateway orchestration 开放。"
+          "contract": "MiMo、DeepSeek、xAI、Qwen、Moonshot、Volcengine、MiniMax、Mistral 等必须拥有 catalog nativeAdapterContract；chat/tools 与 file/uploads 按 provider-specific native profile、capability snapshot 和 Lossless Translation Matrix 分开建模；不可无损或 native-only 的能力硬失败，不返回伪成功。"
         },
         {
           "provider": "anthropic",
@@ -114,12 +146,22 @@
           "contract": "stream=true 或 SSE passthrough/canonical stream。"
         },
         {
-          "provider": "openai_compatible",
+          "provider": "provider_specific_openai_compatible_profiles",
           "protocol": "openai",
+          "providerProfiles": [
+            "mimo",
+            "deepseek",
+            "xai",
+            "qwen",
+            "moonshot",
+            "volcengine",
+            "minimax",
+            "mistral"
+          ],
           "paths": [
             "/v1/chat/completions"
           ],
-          "contract": "仅按 compatible chat streaming 验证，不从 streaming 推导 Responses、file/uploads 或其他 object lifecycle。"
+          "contract": "仅按 provider-specific chat streaming native profile 验证；不从 streaming 推导 Responses、file/uploads、Realtime、Batches 或其他 object lifecycle；Lossless Translation Matrix 判定为 native-only/unsupported 时硬失败。"
         },
         {
           "provider": "anthropic",
@@ -162,12 +204,22 @@
           "contract": "Chat tools 与 Responses function tools；非 function hosted tools 显式拒绝或进入 supporting 边界。"
         },
         {
-          "provider": "openai_compatible",
+          "provider": "provider_specific_openai_compatible_profiles",
           "protocol": "openai",
+          "providerProfiles": [
+            "mimo",
+            "deepseek",
+            "xai",
+            "qwen",
+            "moonshot",
+            "volcengine",
+            "minimax",
+            "mistral"
+          ],
           "paths": [
             "/v1/chat/completions"
           ],
-          "contract": "MiMo 等 compatible provider 只验 function tools/tool_choice 主路径。"
+          "contract": "MiMo、DeepSeek、xAI、Qwen、Moonshot、Volcengine、MiniMax、Mistral 等只按各自 nativeAdapterContract 验证 function tools/tool_choice 主路径；不提供 generic fallback。"
         },
         {
           "provider": "anthropic",
@@ -224,14 +276,14 @@
           "paths": [
             "/v1beta/models/{model}:generateContent"
           ],
-          "contract": "多模态内容随 generateContent 进入，不承诺 Gemini 全量媒体 API。"
+          "contract": "多模态内容随 generateContent 进入，不承诺 Gemini 全量媒体 API；OpenAI surface 到 Gemini native 的 image edit、image variation、audio translation 等 native-only 资源按 Lossless Translation Matrix 硬失败。"
         }
       ]
     },
     {
       "id": "rag.file_search",
       "status": "supporting",
-      "description": "Responses file_search、本地 Vector Store、Files/Uploads 与 RAG 支撑面。",
+      "description": "本地 Vector Store、Files/Uploads 与 RAG 支撑面；Responses hosted file_search 为 native-required。",
       "canonicalOperations": [
         "file_create",
         "upload_create",
@@ -254,7 +306,7 @@
             "/v1/vector_stores",
             "/v1/responses"
           ],
-          "contract": "gateway-local lifecycle、local ingestion、local text search 与 Responses file_search 绑定；不承诺 hosted file_search_call 全生命周期。"
+          "contract": "gateway-local lifecycle、local ingestion 与 local text search 仅作为本地 RAG 支撑；Responses hosted file_search 不再绑定本地 Vector Store 并返回官方成功对象，必须走 OpenAI Direct/native hosted lifecycle，否则返回 native_hosted_tool_required。"
         },
         {
           "provider": "gemini",

@@ -186,6 +186,140 @@ class GatewayRouteSelectionServiceTests {
         assertEquals("mimo-v2.5-pro", result.resolvedModelKey());
         assertEquals("gpt-5-codex", result.modelGroup());
         assertTrue(result.candidateEvaluations().get(0).scoreBreakdown().contains("allow_policy=1"));
+        assertEquals("XIAOMI_MIMO", result.selectedCandidate().candidate().runtimeProviderKey());
+    }
+
+    @Test
+    void shouldUseRuntimeProviderKeyForCompatibleProviderAffinity() {
+        DistributedKeyQueryService distributedKeyQueryService = Mockito.mock(DistributedKeyQueryService.class);
+        ModelCatalogQueryService modelCatalogQueryService = Mockito.mock(ModelCatalogQueryService.class);
+        AffinityCacheService affinityCacheService = Mockito.mock(AffinityCacheService.class);
+        DistributedKeyGovernanceService distributedKeyGovernanceService = Mockito.mock(DistributedKeyGovernanceService.class);
+        UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        NetworkProxyRepository networkProxyRepository = Mockito.mock(NetworkProxyRepository.class);
+        AccountSelectionService accountSelectionService = Mockito.mock(AccountSelectionService.class);
+        GatewayRequestFeatureService gatewayRequestFeatureService = Mockito.mock(GatewayRequestFeatureService.class);
+        SiteCapabilityTruthService siteCapabilityTruthService = Mockito.mock(SiteCapabilityTruthService.class);
+        RouteCacheStore routeCacheStore = Mockito.mock(RouteCacheStore.class);
+        HealthStateStore healthStateStore = Mockito.mock(HealthStateStore.class);
+
+        GatewayRouteSelectionService service = new GatewayRouteSelectionService(
+                distributedKeyQueryService,
+                modelCatalogQueryService,
+                new PromptFingerprintService(new ObjectMapper(), new GatewayProperties()),
+                affinityCacheService,
+                distributedKeyGovernanceService,
+                upstreamCredentialRepository,
+                networkProxyRepository,
+                accountSelectionService,
+                gatewayRequestFeatureService,
+                siteCapabilityTruthService,
+                routeCacheStore,
+                healthStateStore
+        );
+        DistributedKeyView keyView = new DistributedKeyView(
+                1L,
+                "test-key",
+                "sk-gw-test",
+                "masked",
+                List.of("xiaomi_mimo.openai_compatible"),
+                List.of(),
+                List.of("XIAOMI_MIMO"),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                List.of(),
+                false,
+                List.of(new DistributedCredentialBindingView(
+                        11L,
+                        101L,
+                        "mimo",
+                        ProviderType.OPENAI_COMPATIBLE,
+                        "https://token-plan-sgp.xiaomimimo.com/v1",
+                        10,
+                        100
+                ))
+        );
+        CatalogCandidateView candidate = new CatalogCandidateView(
+                101L,
+                "mimo",
+                ProviderType.OPENAI_COMPATIBLE,
+                "https://token-plan-sgp.xiaomimimo.com/v1",
+                "mimo-v2.5-pro",
+                "mimo-v2.5-pro",
+                List.of("openai", "responses"),
+                true,
+                true,
+                false,
+                false,
+                true,
+                true,
+                ReasoningTransport.OPENAI_CHAT
+        );
+
+        when(distributedKeyQueryService.findActiveByKeyPrefix("sk-gw-test")).thenReturn(Optional.of(keyView));
+        when(distributedKeyGovernanceService.evaluate(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.anyBoolean()))
+                .thenReturn(new DistributedKeyGovernanceService.GovernanceDecision(List.of(), List.of(), 1L, 1000L, null));
+        when(modelCatalogQueryService.resolveRequestedModel("mimo-v2.5-pro", "openai"))
+                .thenReturn(Optional.of(new ResolvedModelView(
+                        "mimo-v2.5-pro",
+                        "mimo-v2.5-pro",
+                        "mimo-v2.5-pro",
+                        false,
+                        List.of(candidate)
+                )));
+        when(gatewayRequestFeatureService.describe(Mockito.anyString(), Mockito.anyString(), Mockito.any()))
+                .thenReturn(new GatewayRequestSemantics(
+                        TranslationResourceType.CHAT,
+                        TranslationOperation.CHAT_COMPLETION,
+                        List.of(InteropFeature.CHAT_TEXT),
+                        true
+                ));
+        when(siteCapabilityTruthService.resolve(Mockito.any(), Mockito.any()))
+                .thenReturn(nativeChatResolution());
+        when(routeCacheStore.get(Mockito.anyLong(), Mockito.anyString(), Mockito.anyString(), Mockito.anyString(), Mockito.any()))
+                .thenReturn(Optional.empty());
+        when(healthStateStore.getCredentialState(101L)).thenReturn(Optional.empty());
+        when(upstreamCredentialRepository.findById(101L)).thenReturn(Optional.of(new com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity() {{
+            setProviderType(ProviderType.OPENAI_COMPATIBLE);
+            setBaseUrl("https://token-plan-sgp.xiaomimimo.com/v1");
+        }}));
+        when(accountSelectionService.hasHealthyAccountBinding(1L, ProviderType.OPENAI_COMPATIBLE, GatewayClientFamily.GENERIC_OPENAI))
+                .thenReturn(true);
+        when(affinityCacheService.getPrefixAffinity(eq(1L), eq("XIAOMI_MIMO"), eq("mimo-v2.5-pro"), anyString()))
+                .thenReturn("101");
+
+        RouteSelectionResult result = service.select(new RouteSelectionRequest(
+                "sk-gw-test",
+                "openai",
+                "/v1/chat/completions",
+                "mimo-v2.5-pro",
+                Map.of("messages", List.of(Map.of("role", "user", "content", "hello"))),
+                GatewayClientFamily.GENERIC_OPENAI,
+                false
+        ));
+
+        assertEquals(RouteSelectionSource.PREFIX_AFFINITY, result.selectionSource());
+        assertEquals("XIAOMI_MIMO", result.selectedCandidate().candidate().runtimeProviderKey());
+        service.recordSuccessfulSelection(result);
+        Mockito.verify(affinityCacheService).bindPrefixAffinity(
+                eq(1L),
+                eq("XIAOMI_MIMO"),
+                eq("mimo-v2.5-pro"),
+                anyString(),
+                eq(101L)
+        );
+        Mockito.verify(affinityCacheService, Mockito.never()).bindPrefixAffinity(
+                eq(1L),
+                eq("OPENAI_COMPATIBLE"),
+                Mockito.anyString(),
+                Mockito.anyString(),
+                Mockito.anyLong()
+        );
     }
 
     @Test
@@ -817,6 +951,27 @@ class GatewayRouteSelectionServiceTests {
                 eq(1L),
                 isNull(),
                 isNull());
+    }
+
+    private static CapabilityResolutionReport nativeChatResolution() {
+        return new CapabilityResolutionReport(
+                Map.of("chat_text", new CapabilityResolution(
+                        InteropFeature.CHAT_TEXT,
+                        InteropCapabilityLevel.NATIVE,
+                        InteropCapabilityLevel.NATIVE,
+                        InteropCapabilityLevel.NATIVE,
+                        InteropCapabilityLevel.NATIVE,
+                        List.of(),
+                        List.of()
+                )),
+                InteropCapabilityLevel.NATIVE,
+                InteropCapabilityLevel.NATIVE,
+                InteropCapabilityLevel.NATIVE,
+                ExecutionKind.NATIVE,
+                "direct_upstream_execution",
+                List.of(),
+                List.of()
+        );
     }
 }
 

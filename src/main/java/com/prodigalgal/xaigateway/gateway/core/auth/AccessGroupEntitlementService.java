@@ -5,10 +5,12 @@ import com.prodigalgal.xaigateway.infra.persistence.entity.AccessGroupEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyAccessGroupGrantEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.PlanAccessGroupEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UserAccessGroupGrantEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UserSubscriptionEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAccessGroupGrantRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.PlanAccessGroupRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UserAccessGroupGrantRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UserSubscriptionRepository;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -16,6 +18,7 @@ import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,16 +30,28 @@ public class AccessGroupEntitlementService {
     private final DistributedKeyAccessGroupGrantRepository keyGrantRepository;
     private final UserSubscriptionRepository userSubscriptionRepository;
     private final DistributedKeyRepository distributedKeyRepository;
+    private final UserAccessGroupGrantRepository userAccessGroupGrantRepository;
 
     public AccessGroupEntitlementService(
             PlanAccessGroupRepository planAccessGroupRepository,
             DistributedKeyAccessGroupGrantRepository keyGrantRepository,
             UserSubscriptionRepository userSubscriptionRepository,
             DistributedKeyRepository distributedKeyRepository) {
+        this(planAccessGroupRepository, keyGrantRepository, userSubscriptionRepository, distributedKeyRepository, null);
+    }
+
+    @Autowired
+    public AccessGroupEntitlementService(
+            PlanAccessGroupRepository planAccessGroupRepository,
+            DistributedKeyAccessGroupGrantRepository keyGrantRepository,
+            UserSubscriptionRepository userSubscriptionRepository,
+            DistributedKeyRepository distributedKeyRepository,
+            UserAccessGroupGrantRepository userAccessGroupGrantRepository) {
         this.planAccessGroupRepository = planAccessGroupRepository;
         this.keyGrantRepository = keyGrantRepository;
         this.userSubscriptionRepository = userSubscriptionRepository;
         this.distributedKeyRepository = distributedKeyRepository;
+        this.userAccessGroupGrantRepository = userAccessGroupGrantRepository;
     }
 
     public ResolvedAccessPolicy resolveForDistributedKey(DistributedKeyEntity key) {
@@ -78,6 +93,9 @@ public class AccessGroupEntitlementService {
         activeGroupsForUserSubscriptions(userId).stream()
                 .map(AccessGroupEntity::getId)
                 .forEach(ids::add);
+        activeGroupsForUserGrants(userId).stream()
+                .map(AccessGroupEntity::getId)
+                .forEach(ids::add);
         List<Long> keyIds = distributedKeyRepository.findAllByOwnerUser_IdOrderByCreatedAtDesc(userId).stream()
                 .filter(DistributedKeyEntity::isActive)
                 .map(DistributedKeyEntity::getId)
@@ -99,11 +117,31 @@ public class AccessGroupEntitlementService {
                 .map(entity -> entity.getPlan().getId())
                 .toList();
         if (activePlanIds.isEmpty()) {
+            return activeGroupsForUserGrants(userId);
+        }
+        List<AccessGroupEntity> groups = new ArrayList<>(planAccessGroupRepository.findAllByPlan_IdInAndActiveTrueOrderByPriorityAscCreatedAtAsc(activePlanIds).stream()
+                .map(PlanAccessGroupEntity::getAccessGroup)
+                .toList());
+        groups.addAll(activeGroupsForUserGrants(userId));
+        return groups;
+    }
+
+    private List<AccessGroupEntity> activeGroupsForUserGrants(Long userId) {
+        if (userAccessGroupGrantRepository == null) {
             return List.of();
         }
-        return planAccessGroupRepository.findAllByPlan_IdInAndActiveTrueOrderByPriorityAscCreatedAtAsc(activePlanIds).stream()
-                .map(PlanAccessGroupEntity::getAccessGroup)
+        Instant now = Instant.now();
+        return userAccessGroupGrantRepository.findAllByUser_IdAndStatusOrderByCreatedAtDesc(userId, "ACTIVE").stream()
+                .filter(entity -> isActiveUserGrant(entity, now))
+                .map(UserAccessGroupGrantEntity::getAccessGroup)
                 .toList();
+    }
+
+    private boolean isActiveUserGrant(UserAccessGroupGrantEntity entity, Instant now) {
+        return entity.getAccessGroup() != null
+                && entity.getAccessGroup().isActive()
+                && (entity.getStartsAt() == null || !entity.getStartsAt().isAfter(now))
+                && (entity.getExpiresAt() == null || entity.getExpiresAt().isAfter(now));
     }
 
     private boolean isActiveSubscription(UserSubscriptionEntity entity, Instant now) {

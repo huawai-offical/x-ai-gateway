@@ -111,6 +111,42 @@ class CredentialAdminControllerTests {
     }
 
     @Test
+    void shouldTestSavedCredentialConnectivity() {
+        Instant now = Instant.now();
+        Mockito.when(credentialAdminService.testSavedCredentialConnectivity(11L))
+                .thenReturn(new CredentialConnectivityResponse(
+                        11L,
+                        ProviderType.GEMINI_DIRECT,
+                        "https://generativelanguage.googleapis.com",
+                        true,
+                        "AVAILABLE",
+                        123L,
+                        1,
+                        List.of("gemini-2.5-flash"),
+                        "gemini-2.5-flash",
+                        "req-gemini",
+                        "OK",
+                        null,
+                        now,
+                        "联通性测试成功，凭证可用。"
+                ));
+
+        webTestClient.post()
+                .uri("/admin/credentials/11/connectivity-test")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.credentialId").isEqualTo(11)
+                .jsonPath("$.status").isEqualTo("AVAILABLE")
+                .jsonPath("$.reachable").isEqualTo(true)
+                .jsonPath("$.model").isEqualTo("gemini-2.5-flash")
+                .jsonPath("$.upstreamRequestId").isEqualTo("req-gemini")
+                .jsonPath("$.responseSummary").isEqualTo("OK");
+
+        Mockito.verify(credentialAdminService).testSavedCredentialConnectivity(11L);
+    }
+
+    @Test
     void shouldCreateCredentialForMultipleProtocolEndpoints() {
         Mockito.when(credentialAdminService.createForProtocolEndpoints(Mockito.any()))
                 .thenReturn(List.of(
@@ -349,6 +385,13 @@ class CredentialAdminControllerTests {
                 null,
                 null,
                 now,
+                "AVAILABLE",
+                now,
+                123L,
+                null,
+                "OK",
+                "req-connectivity",
+                "gpt-4o",
                 0L,
                 0L,
                 0L,
@@ -409,6 +452,13 @@ class CredentialAdminControllerTests {
                 null,
                 null,
                 now,
+                sourceType.equals("API_KEY") ? "AVAILABLE" : null,
+                sourceType.equals("API_KEY") ? now : null,
+                sourceType.equals("API_KEY") ? 123L : null,
+                null,
+                sourceType.equals("API_KEY") ? "OK" : null,
+                sourceType.equals("API_KEY") ? "req-connectivity" : null,
+                sourceType.equals("API_KEY") ? "gpt-4o" : null,
                 sourceType.equals("API_KEY") ? null : now,
                 sourceType.equals("API_KEY") ? null : now,
                 null,

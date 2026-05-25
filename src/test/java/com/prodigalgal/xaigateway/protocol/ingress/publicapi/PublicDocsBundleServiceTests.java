@@ -75,6 +75,12 @@ class PublicDocsBundleServiceTests {
         assertTrue(response.errorCodes().stream().anyMatch(item ->
                 "native_compaction_required".equals(item.code())
                         && item.httpStatus() == 501));
+        assertTrue(response.errorCodes().stream().anyMatch(item ->
+                "native_input_tokens_required".equals(item.code())
+                        && item.httpStatus() == 501));
+        assertTrue(response.errorCodes().stream().anyMatch(item ->
+                "native_hosted_tool_required".equals(item.code())
+                        && item.httpStatus() == 501));
         assertTrue(response.routingNotes().stream().anyMatch(item -> item.contains("x-ratelimit")));
         assertTrue(response.routingNotes().stream().anyMatch(item ->
                 item.contains("Lossless Translation Matrix") && item.contains("NATIVE_REQUIRED")));
@@ -91,7 +97,7 @@ class PublicDocsBundleServiceTests {
         assertTrue(response.conformanceChecks().contains("openai.responses-local-lifecycle"));
         assertTrue(response.conformanceChecks().contains("openai.streaming-event-usage-sequence"));
         assertTrue(response.conformanceChecks().contains("openai.responses-stream-obfuscation"));
-        assertTrue(response.conformanceChecks().contains("openai.responses-input-tokens-compact"));
+        assertTrue(response.conformanceChecks().contains("openai.responses-input-tokens-native-required"));
         assertTrue(response.conformanceChecks().contains("openai.responses-input-tokens-native-passthrough"));
         assertTrue(response.conformanceChecks().contains("openai.responses-compact-native-passthrough"));
         assertTrue(response.conformanceChecks().contains("openai.responses-native-json-passthrough"));
@@ -105,7 +111,7 @@ class PublicDocsBundleServiceTests {
         assertTrue(response.conformanceChecks().contains("openai.vector-store-files-local-ingestion-artifact"));
         assertTrue(response.conformanceChecks().contains("openai.vector-store-file-content-local-read"));
         assertTrue(response.conformanceChecks().contains("openai.vector-store-search-local-text"));
-        assertTrue(response.conformanceChecks().contains("openai.responses-file-search-local-vector-store-binding"));
+        assertTrue(response.conformanceChecks().contains("openai.responses-hosted-file-search-native-required"));
         assertTrue(response.conformanceChecks().contains("openai.vector-store-file-batches-local-lifecycle"));
         assertFalse(response.conformanceChecks().contains("openai.batches-list-local-catalog"));
         assertFalse(response.conformanceChecks().contains("openai.models-delete-local-registry"));
@@ -127,7 +133,7 @@ class PublicDocsBundleServiceTests {
         assertTrue(response.compatibility().stream().anyMatch(item ->
                 "openai".equals(item.protocol()) && item.supportedOperations().contains("vector_stores.local_text_search")));
         assertTrue(response.compatibility().stream().anyMatch(item ->
-                "openai".equals(item.protocol()) && item.supportedOperations().contains("responses.file_search_local_vector_store_binding")));
+                "openai".equals(item.protocol()) && item.supportedOperations().contains("responses.hosted_file_search_native_required")));
         assertTrue(response.compatibility().stream().anyMatch(item ->
                 "openai".equals(item.protocol()) && item.supportedOperations().contains("vector_store_file_batches.local_lifecycle")));
         assertTrue(response.compatibility().stream().anyMatch(item ->
@@ -135,9 +141,11 @@ class PublicDocsBundleServiceTests {
         assertTrue(response.compatibility().stream().anyMatch(item ->
                 "openai".equals(item.protocol()) && item.supportedOperations().contains("lossless.translation-matrix")));
         assertTrue(response.routingNotes().stream().anyMatch(item -> item.contains("官方非核心 API 不纳入公开兼容面")));
-        assertTrue(response.routingNotes().stream().anyMatch(item -> item.contains("file_search 可校验本地 vector_store_ids")));
+        assertTrue(response.routingNotes().stream().anyMatch(item -> item.contains("native_hosted_tool_required")));
         assertTrue(response.routingNotes().stream().anyMatch(item -> item.contains("OpenAI Conversations")));
         assertTrue(response.routingNotes().stream().anyMatch(item -> item.contains("OpenAI Vector Stores")));
+        assertTrue(response.routingNotes().stream().anyMatch(item ->
+                item.contains("/v1/realtime") && item.contains("历史归档")));
         assertTrue(response.routingNotes().stream().anyMatch(item -> item.contains("/v1/webhooks/openai")));
         assertTrue(response.routingNotes().stream().anyMatch(item -> item.contains("Codex 单独限定为 Responses smoke")));
     }
@@ -161,6 +169,8 @@ class PublicDocsBundleServiceTests {
         assertFalse(response.providerPresets().stream().anyMatch(item -> "siliconflow".equals(item.code())));
         assertTrue(response.routingNotes().stream().anyMatch(item ->
                 item.contains("Lossless Translation Matrix") && item.contains("local-fake success")));
+        assertTrue(response.routingNotes().stream().anyMatch(item ->
+                item.contains("/v1/realtime") && item.contains("historical archived")));
         assertTrue(response.cliClients().stream().anyMatch(item -> "GitHub Copilot-compatible".equals(item.client())));
         assertTrue(response.billingNotes().stream().anyMatch(item -> item.contains("billing rollup")));
         assertTrue(response.i18nPolicy().stream().anyMatch(item -> item.contains("public docs bundle")));
@@ -208,6 +218,31 @@ class PublicDocsBundleServiceTests {
         assertTrue(openApi.path("paths").has("/v1/images/variations"));
         assertTrue(openApi.path("paths").has("/v1/web_search"));
         assertTrue(openApi.path("paths").has("/api/v1/media/provider-matrix"));
+        assertFalse(openApi.path("paths").has("/v1/realtime"));
+        assertTrue(openApi.path("paths")
+                .path("/api/v1/videos/generations")
+                .path("post")
+                .path("description")
+                .asText()
+                .contains("native_route_required"));
+        assertTrue(openApi.path("paths")
+                .path("/api/v1/videos/{videoId}/download")
+                .path("get")
+                .path("description")
+                .asText()
+                .contains("real provider artifact URL"));
+        assertTrue(openApi.path("paths")
+                .path("/api/v1/music/generations")
+                .path("post")
+                .path("description")
+                .asText()
+                .contains("native_route_required"));
+        assertTrue(openApi.path("paths")
+                .path("/api/v1/music/{musicId}/download")
+                .path("get")
+                .path("description")
+                .asText()
+                .contains("real provider artifact URL"));
         assertTrue(openApi.path("paths")
                 .path("/v1/audio/translations")
                 .path("post")
@@ -267,9 +302,21 @@ class PublicDocsBundleServiceTests {
         assertTrue(responsesProperties.has("stream_options"));
         assertTrue(responsesProperties.path("stream_options").path("description").asText().contains("include_obfuscation"));
         assertTrue(responsesProperties.has("tools"));
-        assertTrue(responsesProperties.path("tools").path("description").asText().contains("file_search"));
+        assertTrue(responsesProperties.path("tools").path("description").asText().contains("native_hosted_tool_required"));
         assertTrue(responsesProperties.has("tool_choice"));
         assertTrue(responsesProperties.path("tool_choice").path("description").asText().contains("Non-function"));
+        assertTrue(openApi.path("paths")
+                .path("/v1/responses/input_tokens")
+                .path("post")
+                .path("description")
+                .asText()
+                .contains("native_input_tokens_required"));
+        assertTrue(openApi.path("paths")
+                .path("/v1/responses/input_tokens")
+                .path("post")
+                .path("description")
+                .asText()
+                .contains("instead of returning a local deterministic estimate"));
         assertTrue(openApi.path("paths")
                 .path("/v1/responses/input_tokens")
                 .path("post")
@@ -296,7 +343,7 @@ class PublicDocsBundleServiceTests {
                 .path("post")
                 .path("description")
                 .asText()
-                .contains("opaque marker emulation"));
+                .contains("opaque-marker success"));
         assertTrue(openApi.path("paths")
                 .path("/v1/responses/compact")
                 .path("post")

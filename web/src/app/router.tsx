@@ -62,14 +62,13 @@ const consoleChildren = [
   { path: 'access-groups', lazy: lazyPage(() => import('../features/user-domain/access-groups-page'), 'AccessGroupsPage') },
   { path: 'subscriptions', lazy: lazyPage(() => import('../features/user-domain/subscriptions-page'), 'SubscriptionsPage') },
   { path: 'announcements', lazy: lazyPage(() => import('../features/user-domain/announcements-page'), 'AnnouncementsPage') },
+  { path: 'invitation-codes', lazy: lazyPage(() => import('../features/user-domain/invitation-codes-page'), 'InvitationCodesPage') },
   { path: 'promo-codes', lazy: lazyPage(() => import('../features/user-domain/promo-codes-page'), 'PromoCodesPage') },
   { path: 'models', lazy: lazyPage(() => import('../features/models/models-page'), 'ModelsPage') },
   { path: 'resources', lazy: lazyPage(() => import('../features/resources/resources-page'), 'ResourcesPage') },
   { path: 'upstream-cache', lazy: lazyPage(() => import('../features/upstream-cache/upstream-cache-page'), 'UpstreamCachePage') },
   { path: 'account-groups/:id', lazy: lazyPage(() => import('../features/accounts/account-group-detail-page'), 'AccountGroupDetailPage') },
   { path: 'accounts/connect/codex', lazy: lazyPage(() => import('../features/accounts/codex-onboarding-page'), 'CodexOnboardingPage') },
-  { path: 'accounts/connect/:provider', lazy: lazyPage(() => import('../features/accounts/oauth-connect-page'), 'OauthConnectPage') },
-  { path: 'accounts/callback/:provider', lazy: lazyPage(() => import('../features/accounts/oauth-callback-page'), 'OauthCallbackPage') },
   { path: 'accounts/:id', element: <Navigate to="/console/account-groups" replace /> },
   { path: 'network/proxies', lazy: lazyPage(() => import('../features/network/proxies-page'), 'ProxiesPage') },
   { path: 'network/proxies/:id', lazy: lazyPage(() => import('../features/network/proxy-detail-page'), 'ProxyDetailPage') },
@@ -147,6 +146,10 @@ const appRoutesBase = [
   {
     path: '/portal/redeem',
     lazy: lazyPage(() => import('../features/portal/portal-redeem-page'), 'PortalRedeemPage'),
+  },
+  {
+    path: '/portal/invitations',
+    lazy: lazyPage(() => import('../features/portal/portal-invitations-page'), 'PortalInvitationsPage'),
   },
   {
     path: '/portal/usage',

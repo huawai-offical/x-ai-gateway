@@ -1,13 +1,19 @@
 import { type FormEvent, useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { InlineError } from '@/components/app/inline-error'
-import { loginPortal, registerPortal } from './api'
-import type { PortalSession } from './types'
+import {
+  getPortalRegistrationPolicy,
+  listPortalOAuthProviders,
+  loginPortal,
+  registerPortal,
+  startPortalOAuth,
+} from './api'
+import type { PortalSession, PortalSocialOAuthProvider, PortalSocialOAuthStartResponse } from './types'
 
 type Mode = 'login' | 'register'
 
@@ -18,7 +24,23 @@ export function PortalLoginPage({ initialMode = 'login' }: { initialMode?: Mode 
   const [email, setEmail] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [password, setPassword] = useState('')
+  const [inviteCode, setInviteCode] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
+  const registrationPolicyQuery = useQuery({
+    queryKey: ['portal', 'registration-policy'],
+    queryFn: getPortalRegistrationPolicy,
+  })
+  const oauthProvidersQuery = useQuery({
+    queryKey: ['portal', 'oauth-providers'],
+    queryFn: listPortalOAuthProviders,
+  })
+  const registrationChannels = registrationPolicyQuery.data?.allowedRegistrationChannels ?? ['PASSWORD', 'INVITE_CODE']
+  const passwordRegistrationEnabled = registrationChannels.includes('PASSWORD') || registrationChannels.includes('INVITE_CODE')
+  const socialRegistrationEnabled = registrationChannels.includes('SOCIAL_OAUTH')
+  const canRegister = passwordRegistrationEnabled || socialRegistrationEnabled
+  const showInviteCode = mode === 'register'
+    && (registrationPolicyQuery.data?.inviteCodeRequired || registrationChannels.includes('INVITE_CODE'))
+  const oauthProviders = (oauthProvidersQuery.data ?? []) as PortalSocialOAuthProvider[]
 
   const mutation = useMutation({
     mutationFn: () => {
@@ -26,15 +48,25 @@ export function PortalLoginPage({ initialMode = 'login' }: { initialMode?: Mode 
       if (!normalizedEmail) {
         throw new Error('邮箱不能为空。')
       }
-      if (password.length < 8) {
-        throw new Error('密码至少需要 8 个字符。')
-      }
       if (mode === 'register') {
+        if (!canRegister) {
+          throw new Error('当前未开放用户注册渠道。')
+        }
+        if (!passwordRegistrationEnabled) {
+          throw new Error('当前未开放邮箱密码注册渠道。')
+        }
+        if (password.length < 8) {
+          throw new Error('密码至少需要 8 个字符。')
+        }
         return registerPortal({
           email: normalizedEmail,
           displayName: displayName.trim() || null,
           password,
+          inviteCode: inviteCode.trim() || null,
         })
+      }
+      if (password.length < 8) {
+        throw new Error('密码至少需要 8 个字符。')
       }
       return loginPortal({ email: normalizedEmail, password })
     },
@@ -43,6 +75,24 @@ export function PortalLoginPage({ initialMode = 'login' }: { initialMode?: Mode 
       if (session.authenticated) {
         navigate('/portal', { replace: true })
       }
+    },
+  })
+  const oauthStartMutation = useMutation({
+    mutationFn: (provider: PortalSocialOAuthProvider) => {
+      if (mode === 'register' && !socialRegistrationEnabled) {
+        throw new Error('当前未开放社交 OAuth 注册渠道。')
+      }
+      if (mode === 'register' && registrationPolicyQuery.data?.inviteCodeRequired && !inviteCode.trim()) {
+        throw new Error('注册需要有效邀请码。')
+      }
+      return startPortalOAuth(
+        provider.provider,
+        mode === 'register' ? '/portal/register' : '/portal/login',
+        mode === 'register' ? inviteCode : null,
+      )
+    },
+    onSuccess: (response: PortalSocialOAuthStartResponse) => {
+      window.location.assign(response.authorizationUrl)
     },
   })
 
@@ -82,7 +132,7 @@ export function PortalLoginPage({ initialMode = 'login' }: { initialMode?: Mode 
               <Tabs value={mode} onValueChange={(value) => setMode(value as Mode)}>
                 <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="login">登录</TabsTrigger>
-                  <TabsTrigger value="register">注册</TabsTrigger>
+                  <TabsTrigger value="register" disabled={!canRegister}>注册</TabsTrigger>
                 </TabsList>
                 <TabsContent value="login" className="pt-4" />
                 <TabsContent value="register" className="pt-4">
@@ -94,6 +144,17 @@ export function PortalLoginPage({ initialMode = 'login' }: { initialMode?: Mode 
                       placeholder="例如：Alice"
                     />
                   </label>
+                  {showInviteCode ? (
+                    <label className="mb-4 flex flex-col gap-2">
+                      <span className="text-sm font-medium text-foreground">邀请码</span>
+                      <Input
+                        value={inviteCode}
+                        onChange={(event) => setInviteCode(event.target.value)}
+                        placeholder={registrationPolicyQuery.data?.inviteCodeRequired ? '必填' : '可选'}
+                        autoComplete="one-time-code"
+                      />
+                    </label>
+                  ) : null}
                 </TabsContent>
               </Tabs>
 
@@ -118,13 +179,34 @@ export function PortalLoginPage({ initialMode = 'login' }: { initialMode?: Mode 
                 />
               </label>
 
-              {(formError || mutation.error) ? (
-                <InlineError error={mutation.error ?? new Error(formError ?? '认证失败。')} title="门户认证失败" />
+              {(formError || mutation.error || oauthStartMutation.error || registrationPolicyQuery.error || oauthProvidersQuery.error) ? (
+                <InlineError
+                  error={mutation.error ?? oauthStartMutation.error ?? registrationPolicyQuery.error ?? oauthProvidersQuery.error ?? new Error(formError ?? '认证失败。')}
+                  title="门户认证失败"
+                />
               ) : null}
 
-              <Button type="submit" disabled={mutation.isPending}>
+              <Button type="submit" disabled={mutation.isPending || (mode === 'register' && !passwordRegistrationEnabled)}>
                 {mode === 'login' ? '登录门户' : '创建账号并进入'}
               </Button>
+
+              {oauthProviders.length ? (
+                <div className="flex flex-col gap-3 border-t border-border/60 pt-4">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {oauthProviders.map((provider) => (
+                      <Button
+                        key={provider.provider}
+                        type="button"
+                        variant="outline"
+                        disabled={oauthStartMutation.isPending || (mode === 'register' && !socialRegistrationEnabled)}
+                        onClick={() => oauthStartMutation.mutate(provider)}
+                      >
+                        {provider.displayName}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </form>
           </CardContent>
         </Card>

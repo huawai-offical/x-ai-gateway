@@ -332,6 +332,12 @@ public class GatewayObservabilityService {
         RouteCandidateView candidateView = candidate.candidate();
         map.put("credentialId", candidateView.candidate().credentialId());
         map.put("providerType", candidateView.candidate().providerType().name());
+        map.put("runtimeProvider", candidateView.candidate().runtimeProviderKey());
+        map.put("siteKind", candidateView.candidate().siteKind() == null
+                ? null
+                : candidateView.candidate().siteKind().name());
+        map.put("protocolSuite", candidateView.candidate().runtimeProfile().protocolSuite());
+        map.put("vendorCode", candidateView.candidate().vendorCode());
         map.put("modelKey", candidateView.candidate().modelKey());
         map.put("bindingPriority", candidateView.bindingPriority());
         map.put("bindingWeight", candidateView.bindingWeight());

@@ -75,6 +75,11 @@ public class CredentialAdminController {
         return credentialAdminService.testConnectivity(request);
     }
 
+    @PostMapping("/{id}/connectivity-test")
+    public CredentialConnectivityResponse testSavedCredentialConnectivity(@PathVariable Long id) {
+        return credentialAdminService.testSavedCredentialConnectivity(id);
+    }
+
     @PutMapping("/{id}")
     public CredentialResponse update(@PathVariable Long id, @Valid @RequestBody CredentialRequest request) {
         return credentialAdminService.update(id, request);

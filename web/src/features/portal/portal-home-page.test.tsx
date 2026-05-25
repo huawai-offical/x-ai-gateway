@@ -106,6 +106,7 @@ describe('PortalHomePage', () => {
     const exactPortalRoutes = new Set([
       '/portal',
       '/portal/redeem',
+      '/portal/invitations',
       '/portal/keys',
       '/portal/subscriptions',
       '/portal/usage',

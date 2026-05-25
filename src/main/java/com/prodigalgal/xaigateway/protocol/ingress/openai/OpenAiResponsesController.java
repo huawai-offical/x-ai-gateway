@@ -51,8 +51,6 @@ public class OpenAiResponsesController {
     private final OpenAiResponsesRequestMapper openAiResponsesRequestMapper;
     private final ObjectMapper objectMapper;
     private final OpenAiResponsesEncoder openAiResponsesEncoder;
-    private final OpenAiResponsesLocalLifecycleService openAiResponsesLocalLifecycleService;
-    private final OpenAiResponsesFileSearchBindingService openAiResponsesFileSearchBindingService;
     private final GatewayOpenAiPassthroughService gatewayOpenAiPassthroughService;
 
     public OpenAiResponsesController(
@@ -63,7 +61,6 @@ public class OpenAiResponsesController {
             OpenAiIdempotencyReplayService openAiIdempotencyReplayService,
             OpenAiResponsesRequestMapper openAiResponsesRequestMapper,
             ObjectMapper objectMapper,
-            OpenAiResponsesFileSearchBindingService openAiResponsesFileSearchBindingService,
             GatewayOpenAiPassthroughService gatewayOpenAiPassthroughService) {
         this.distributedKeyAuthenticationService = distributedKeyAuthenticationService;
         this.gatewayChatExecutionService = gatewayChatExecutionService;
@@ -73,8 +70,6 @@ public class OpenAiResponsesController {
         this.openAiResponsesRequestMapper = openAiResponsesRequestMapper;
         this.objectMapper = objectMapper;
         this.openAiResponsesEncoder = new OpenAiResponsesEncoder(objectMapper);
-        this.openAiResponsesLocalLifecycleService = new OpenAiResponsesLocalLifecycleService(objectMapper);
-        this.openAiResponsesFileSearchBindingService = openAiResponsesFileSearchBindingService;
         this.gatewayOpenAiPassthroughService = gatewayOpenAiPassthroughService;
     }
 
@@ -121,13 +116,9 @@ public class OpenAiResponsesController {
                 conversationId,
                 userAgent
         );
-        JsonNode boundRequestBody = openAiResponsesFileSearchBindingService.bindLocalVectorStores(
-                distributedKey.id(),
-                requestBody
-        );
         CanonicalRequest canonicalRequest = openAiResponsesRequestMapper.toCanonicalRequest(
                 distributedKey.keyPrefix(),
-                boundRequestBody,
+                requestBody,
                 metadata
         );
 
@@ -254,7 +245,12 @@ public class OpenAiResponsesController {
                     null
             );
         } catch (IllegalArgumentException exception) {
-            return ResponseEntity.ok(openAiResponsesLocalLifecycleService.inputTokens(requestBody));
+            return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED)
+                    .body(openAiError(
+                            "invalid_request_error",
+                            "native_input_tokens_required",
+                            "/v1/responses/input_tokens requires an OpenAI Direct native route. Gateway-local token estimation is not exposed on this official API surface because it cannot guarantee provider-native accounting."
+                    ));
         }
     }
 

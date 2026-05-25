@@ -119,6 +119,58 @@ beforeEach(() => {
       }
     }
 
+    if (url === '/admin/observability/health') {
+      return {
+        sampledFrom: '2026-04-20T06:00:00Z',
+        sampledTo: '2026-04-20T12:00:00Z',
+        total: {
+          totalRequests: 240,
+          successfulRequests: 216,
+          failedRequests: 18,
+          canceledRequests: 6,
+          successRate: 0.9,
+          availabilityRate: 0.925,
+          errorRate: 0.075,
+          avgDurationMs: 688,
+          lastSuccessfulAt: '2026-04-20T11:58:00Z',
+          lastFailedAt: '2026-04-20T11:43:00Z',
+        },
+        credentials: [
+          {
+            credentialId: 101,
+            providerType: 'OPENAI_DIRECT',
+            credentialLabel: 'openai-main',
+            credentialPrefix: 'sk-live',
+            totalRequests: 120,
+            successfulRequests: 111,
+            failedRequests: 7,
+            canceledRequests: 2,
+            successRate: 0.925,
+            availabilityRate: 0.942,
+            errorRate: 0.058,
+            avgDurationMs: 642,
+            lastSuccessfulAt: '2026-04-20T11:58:00Z',
+            lastFailedAt: '2026-04-20T11:43:00Z',
+          },
+        ],
+        providers: [
+          {
+            providerType: 'OPENAI_DIRECT',
+            totalRequests: 120,
+            successfulRequests: 111,
+            failedRequests: 7,
+            canceledRequests: 2,
+            successRate: 0.925,
+            availabilityRate: 0.942,
+            errorRate: 0.058,
+            avgDurationMs: 642,
+            lastSuccessfulAt: '2026-04-20T11:58:00Z',
+            lastFailedAt: '2026-04-20T11:43:00Z',
+          },
+        ],
+      }
+    }
+
     if (url === '/admin/ops/slo') {
       return {
         summary: {
@@ -199,9 +251,17 @@ describe('OpsPage', () => {
     expect(await screen.findByText('事件处置视图')).toBeInTheDocument()
     expect(await screen.findByText('链路追踪')).toBeInTheDocument()
     expect(await screen.findByText('关键时间序列')).toBeInTheDocument()
+    expect(await screen.findByText('总体成功率')).toBeInTheDocument()
+    expect(await screen.findByText('总体可用率')).toBeInTheDocument()
+    expect(await screen.findByText('总体失败率')).toBeInTheDocument()
+    expect((await screen.findAllByText('平均耗时')).length).toBeGreaterThan(0)
+    expect(await screen.findByText('凭证最近窗口健康统计')).toBeInTheDocument()
+    expect(await screen.findByText('openai-main')).toBeInTheDocument()
+    expect((await screen.findAllByText('OPENAI_DIRECT')).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText('92.5%')).length).toBeGreaterThan(0)
     expect(await screen.findAllByText('缓存命中率')).toHaveLength(2)
     expect(await screen.findByText('TPM 使用量')).toBeInTheDocument()
-    expect(await screen.findAllByText('延迟 P95')).toHaveLength(2)
+    expect(await screen.findByText('延迟 P95')).toBeInTheDocument()
     expect(await screen.findByText('失败请求趋势')).toBeInTheDocument()
     expect(await screen.findByText('缓存 Token 收益')).toBeInTheDocument()
     expect(await screen.findByText('热点来源与缓存画像')).toBeInTheDocument()

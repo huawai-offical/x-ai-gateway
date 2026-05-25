@@ -10,6 +10,7 @@ import com.prodigalgal.xaigateway.gateway.core.auth.DistributedKeyView;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlan;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalExecutionPlanCompilation;
+import com.prodigalgal.xaigateway.gateway.core.canonical.DefaultCanonicalResourceMapper;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol;
 import com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalRequest;
 import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileService;
@@ -19,6 +20,10 @@ import com.prodigalgal.xaigateway.gateway.core.interop.RouteSelectionMode;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlanCompiler;
 import com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityService;
 import com.prodigalgal.xaigateway.gateway.core.observability.GatewayRequestLifecycleService;
+import com.prodigalgal.xaigateway.gateway.core.observability.GatewayRequestTraceDetailService;
+import com.prodigalgal.xaigateway.gateway.core.observability.RequestTraceContentKind;
+import com.prodigalgal.xaigateway.gateway.core.observability.RequestTraceDirection;
+import com.prodigalgal.xaigateway.gateway.core.observability.RequestTraceStage;
 import com.prodigalgal.xaigateway.gateway.core.routing.GatewayRouteSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
@@ -36,10 +41,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.springframework.http.ResponseEntity;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -578,6 +585,87 @@ class GatewayResourceExecutionServiceTests {
         Mockito.verify(gatewayRouteSelectionService, Mockito.never()).select(any());
     }
 
+    @Test
+    void shouldRecordResourceTraceMetadataSourceAndWireLimitations() {
+        GatewayRouteSelectionService gatewayRouteSelectionService = Mockito.mock(GatewayRouteSelectionService.class);
+        UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        CredentialCryptoService credentialCryptoService = Mockito.mock(CredentialCryptoService.class);
+        DistributedKeyGovernanceService distributedKeyGovernanceService = Mockito.mock(DistributedKeyGovernanceService.class);
+        DistributedKeyQueryService distributedKeyQueryService = Mockito.mock(DistributedKeyQueryService.class);
+        AccountSelectionService accountSelectionService = Mockito.mock(AccountSelectionService.class);
+        GatewayRequestFeatureService gatewayRequestFeatureService = Mockito.mock(GatewayRequestFeatureService.class);
+        TranslationExecutionPlanCompiler translationExecutionPlanCompiler = Mockito.mock(TranslationExecutionPlanCompiler.class);
+        GatewayResourceExecutor embeddingsExecutor = Mockito.mock(GatewayResourceExecutor.class);
+        GatewayFileService gatewayFileService = Mockito.mock(GatewayFileService.class);
+        GatewayObservabilityService gatewayObservabilityService = Mockito.mock(GatewayObservabilityService.class);
+        GatewayRequestTraceDetailService traceDetailService = Mockito.mock(GatewayRequestTraceDetailService.class);
+
+        GatewayResourceExecutionService service = service(
+                gatewayRouteSelectionService,
+                upstreamCredentialRepository,
+                credentialCryptoService,
+                distributedKeyGovernanceService,
+                distributedKeyQueryService,
+                accountSelectionService,
+                gatewayRequestFeatureService,
+                translationExecutionPlanCompiler,
+                List.of(embeddingsExecutor),
+                gatewayObservabilityService,
+                Mockito.mock(GatewayRequestLifecycleService.class),
+                gatewayFileService,
+                traceDetailService
+        );
+
+        RouteSelectionResult selectionResult = selectionResult(ProviderType.GEMINI_DIRECT, UpstreamSiteKind.GEMINI_DIRECT);
+        UpstreamCredentialEntity credential = credential(selectionResult.selectedCandidate().candidate().credentialId(), ProviderType.GEMINI_DIRECT);
+        ObjectNode requestBody = new ObjectMapper().createObjectNode();
+        requestBody.put("model", "text-embedding-004");
+        requestBody.put("input", "hello");
+
+        Mockito.when(gatewayRouteSelectionService.select(any())).thenReturn(selectionResult);
+        Mockito.when(gatewayObservabilityService.nextRequestId()).thenReturn("req-resource-trace-source");
+        Mockito.when(upstreamCredentialRepository.findById(101L)).thenReturn(Optional.of(credential));
+        Mockito.when(credentialCryptoService.decrypt("cipher")).thenReturn("api-key");
+        Mockito.when(distributedKeyQueryService.findActiveByKeyPrefix("sk-gw-test"))
+                .thenReturn(Optional.of(new DistributedKeyView(1L, "test", "sk-gw-test", "masked", List.of(), List.of(), List.of())));
+        Mockito.when(accountSelectionService.resolveActiveAccount(anyLong(), any(), any(), anyInt())).thenReturn(Optional.empty());
+        Mockito.when(gatewayRequestFeatureService.describe(eq("POST"), eq("/v1/embeddings"), any()))
+                .thenReturn(new GatewayRequestSemantics(
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType.EMBEDDING,
+                        com.prodigalgal.xaigateway.gateway.core.interop.TranslationOperation.EMBEDDING_CREATE,
+                        List.of(com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature.EMBEDDINGS),
+                        true
+                ));
+        Mockito.when(translationExecutionPlanCompiler.compileSelected(any(), Mockito.any(com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest.class), any(), any()))
+                .thenReturn(compilation("/v1/embeddings", "text-embedding-004"));
+        Mockito.when(embeddingsExecutor.supports(Mockito.any(com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalResourceRequest.class), any())).thenReturn(true);
+        Mockito.when(embeddingsExecutor.executeJson(any(), any(), eq("text-embedding-004")))
+                .thenReturn(ResponseEntity.ok(new ObjectMapper().createObjectNode().put("object", "list")));
+
+        ResponseEntity<tools.jackson.databind.JsonNode> response = service.executeJson(
+                "sk-gw-test",
+                "/v1/embeddings",
+                requestBody,
+                "text-embedding-004"
+        );
+
+        assertEquals(200, response.getStatusCode().value());
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, ?>> metadataCaptor = ArgumentCaptor.forClass(Map.class);
+        Mockito.verify(traceDetailService, Mockito.atLeastOnce()).record(
+                Mockito.eq("req-resource-trace-source"),
+                Mockito.eq(RequestTraceStage.UPSTREAM_REQUEST),
+                Mockito.eq(RequestTraceDirection.UPSTREAM),
+                Mockito.eq(RequestTraceContentKind.JSON),
+                Mockito.any(),
+                metadataCaptor.capture()
+        );
+        Map<String, ?> metadata = metadataCaptor.getValue();
+        assertEquals("gateway_constructed_upstream_resource_request_summary", metadata.get("payloadSource"));
+        assertEquals("structured gateway/executor summary, not raw upstream HTTP wire body", metadata.get("wireBodyLimitation"));
+        assertFalse((Boolean) metadata.get("wireBody"));
+    }
+
 
     private RouteSelectionResult selectionResult(ProviderType providerType, UpstreamSiteKind siteKind) {
         CatalogCandidateView candidate = selectionCandidate(101L, "candidate", providerType, siteKind);
@@ -782,7 +870,7 @@ class GatewayResourceExecutionServiceTests {
             GatewayObservabilityService gatewayObservabilityService,
             GatewayRequestLifecycleService gatewayRequestLifecycleService,
             GatewayFileService gatewayFileService) {
-        return new GatewayResourceExecutionService(
+        return service(
                 gatewayRouteSelectionService,
                 upstreamCredentialRepository,
                 credentialCryptoService,
@@ -795,8 +883,52 @@ class GatewayResourceExecutionServiceTests {
                 gatewayObservabilityService,
                 gatewayRequestLifecycleService,
                 gatewayFileService,
+                null
+        );
+    }
+
+    private GatewayResourceExecutionService service(
+            GatewayRouteSelectionService gatewayRouteSelectionService,
+            UpstreamCredentialRepository upstreamCredentialRepository,
+            CredentialCryptoService credentialCryptoService,
+            DistributedKeyGovernanceService distributedKeyGovernanceService,
+            DistributedKeyQueryService distributedKeyQueryService,
+            AccountSelectionService accountSelectionService,
+            GatewayRequestFeatureService gatewayRequestFeatureService,
+            TranslationExecutionPlanCompiler translationExecutionPlanCompiler,
+            List<GatewayResourceExecutor> gatewayResourceExecutors,
+            GatewayObservabilityService gatewayObservabilityService,
+            GatewayRequestLifecycleService gatewayRequestLifecycleService,
+            GatewayFileService gatewayFileService,
+            GatewayRequestTraceDetailService traceDetailService) {
+        return new GatewayResourceExecutionService(
+                gatewayRouteSelectionService,
+                upstreamCredentialRepository,
+                credentialCryptoService,
+                distributedKeyGovernanceService,
+                distributedKeyQueryService,
+                accountSelectionService,
+                credentialMaterialResolver(accountSelectionService, credentialCryptoService),
+                gatewayRequestFeatureService,
+                translationExecutionPlanCompiler,
+                gatewayResourceExecutors,
+                gatewayObservabilityService,
+                gatewayRequestLifecycleService,
+                gatewayFileService,
+                new DefaultCanonicalResourceMapper(),
                 new ObjectMapper(),
-                new com.prodigalgal.xaigateway.infra.config.GatewayProperties()
+                new com.prodigalgal.xaigateway.infra.config.GatewayProperties(),
+                traceDetailService
+        );
+    }
+
+    private com.prodigalgal.xaigateway.gateway.core.credential.CredentialMaterialResolver credentialMaterialResolver(
+            AccountSelectionService accountSelectionService,
+            CredentialCryptoService credentialCryptoService) {
+        return new com.prodigalgal.xaigateway.gateway.core.credential.CredentialMaterialResolver(
+                accountSelectionService,
+                credentialCryptoService,
+                new ObjectMapper()
         );
     }
 }

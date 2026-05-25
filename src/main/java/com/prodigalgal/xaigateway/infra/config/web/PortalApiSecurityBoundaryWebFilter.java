@@ -57,6 +57,7 @@ public class PortalApiSecurityBoundaryWebFilter implements WebFilter {
     private boolean isPublicPortalEndpoint(String path) {
         return "/portal/auth/session".equals(path)
                 || "/portal/auth/register".equals(path)
+                || "/portal/auth/registration-policy".equals(path)
                 || "/portal/auth/login".equals(path)
                 || "/portal/auth/logout".equals(path)
                 || "/portal/auth/captcha/challenge".equals(path)

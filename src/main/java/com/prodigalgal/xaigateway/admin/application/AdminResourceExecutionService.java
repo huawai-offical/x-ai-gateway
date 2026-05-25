@@ -54,7 +54,7 @@ public class AdminResourceExecutionService {
                 method,
                 request.requestPath(),
                 request.requestedModel(),
-                GatewayDegradationPolicy.ALLOW_LOSSY,
+                GatewayDegradationPolicy.STRICT,
                 GatewayClientFamily.GENERIC_OPENAI,
                 payloadForExplain(method, request, payload)
         );

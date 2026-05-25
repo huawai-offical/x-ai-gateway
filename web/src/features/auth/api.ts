@@ -5,6 +5,8 @@ import type {
   AdminAuthSettingsUpdatePayload,
   AdminLoginPayload,
   AdminSession,
+  PortalRegistrationPolicy,
+  PortalRegistrationPolicyUpdatePayload,
 } from './types'
 
 export function getAdminSession() {
@@ -33,6 +35,16 @@ export function getAdminAuthSettings() {
 
 export function updateAdminAuthSettings(payload: AdminAuthSettingsUpdatePayload) {
   return apiClient.put<AdminAuthSettings>('/admin/auth/settings', {
+    body: payload,
+  })
+}
+
+export function getPortalRegistrationPolicyForAdmin() {
+  return apiClient.get<PortalRegistrationPolicy>('/admin/security/registration-policy')
+}
+
+export function updatePortalRegistrationPolicyForAdmin(payload: PortalRegistrationPolicyUpdatePayload) {
+  return apiClient.put<PortalRegistrationPolicy>('/admin/security/registration-policy', {
     body: payload,
   })
 }

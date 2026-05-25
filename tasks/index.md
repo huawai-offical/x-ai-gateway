@@ -96,6 +96,16 @@
 | P0-CODEX-06y | [TASK-20260523-006 资源入口事实源去重](done/TASK-20260523-006-resource-surface-registry-dedup.md) | Done | 已收敛入口解析、入口能力矩阵、默认 path/surface/default model，并删除厂商详情独立特性解析重复区块 |
 | P0-CODEX-06z | [TASK-20260523-007 厂商目录标题层级与表格边界再平衡](done/TASK-20260523-007-provider-catalog-title-border-rebalance.md) | Done | 厂商管理页标题收敛为单一目录标题，并恢复厂商目录表格单层轻量边界 |
 | P0-CODEX-06aa | [TASK-20260523-009 协议入口兼容画像结构化编辑](done/TASK-20260523-009-protocol-endpoint-structured-profile-editor.md) | Done | 已移除协议入口高级 JSON 编辑，改为结构化兼容画像、thinking/reasoning 控件和只读运行时画像预览 |
+| P0-CODEX-06aa1 | [TASK-20260525-003 协议入口运行时策略页签汉化](done/TASK-20260525-003-protocol-endpoint-runtime-policy-localization.md) | Done | 已将协议入口新增/编辑弹窗“运行时策略”字段标签收口为中文，并用前端定向测试防回退 |
+| P0-CODEX-06aa2 | [TASK-20260525-004 上游凭证详情编辑合并与可用性探测](done/TASK-20260525-004-credential-detail-probe-parent.md) | Done | 已将 API Key 凭证详情与编辑合并，补用量/探测展示与保存凭证联通性测试持久化 |
+| P0-OBS-01 | [TASK-20260525-005 请求详情追踪与转换审计](done/TASK-20260525-005-request-trace-detail-audit-parent.md) | Done | 建立 requestId 维度的请求详情追踪，并补充凭证/总体最近窗口可用率与成功率统计 |
+| P0-OBS-01c | [TASK-20260525-005-03 凭证与运维健康统计](done/TASK-20260525-005-03-observability-health-metrics.md) | Done | 基于 request_log 最近窗口统计总体、Provider、凭证维度成功率、可用率、失败率与平均耗时 |
+| P0-OBS-02 | [TASK-20260525-006 请求详情追踪保留、采样与归档增强](done/TASK-20260525-006-trace-detail-retention-sampling-archive-parent.md) | Done | 为 trace detail 增加 TTL、采样、归档摘要和 metadata 精确截断/脱敏字段 |
+| P0-OBS-03 | [TASK-20260525-008 ADR-0011 请求日志与请求详情拆表闭环](done/TASK-20260525-008-adr0011-request-log-trace-detail-split-closure.md) | Done | 审计并闭环 request_log / request_trace_detail / archive 拆表决策，补齐 payload 来源与限制 metadata |
+| P0-ARCH-04 | [TASK-20260525-007 异步边界同步代码排查](done/TASK-20260525-007-async-boundary-sync-code-audit-parent.md) | Done | 已确认 WebFlux 入口与同步服务核心混合形态，并输出阻塞热路径报告 |
+| P0-ARCH-04a | [TASK-20260525-007-03 Chat Runtime 响应式边界改造](backlog/TASK-20260525-007-03-chat-runtime-reactive-boundary.md) | Backlog | 将公开 chat/responses 非流式热路径迁移为 reactive 执行 |
+| P0-ARCH-04b | [TASK-20260525-007-04 Resource Executor 响应式边界改造](backlog/TASK-20260525-007-04-resource-executor-reactive-boundary.md) | Backlog | 将 embeddings/rerank/passthrough 等 resource executor 从同步契约迁移为 reactive |
+| P0-ARCH-04c | [TASK-20260525-007-05 阻塞基础设施隔离与防回退护栏](backlog/TASK-20260525-007-05-blocking-infra-isolation-guardrails.md) | Backlog | 建立 JPA/Redis/file/OAuth 阻塞隔离和 no-block 静态护栏 |
 | P0-CODEX-06ab | [TASK-20260523-010 功能性媒体 API 厂商互转补齐](done/TASK-20260523-010-functional-media-provider-translation-parity.md) | Done | Gemini/Vertex audio_translation 与 image_variation 已进入 native executor；Anthropic audio/image 资源边界已拆清 |
 | P0-FUNC-01 | [TASK-20260514-020 OpenAI 多模态支撑参数边界收紧](done/TASK-20260514-020-openai-multimodal-supporting-parameters.md) | Done | 已清理 Audio translations 与 Images edits/variations 残留，并固定多模态支撑参数 |
 | P0-FUNC-02 | [TASK-20260514-021 OpenAI Files、Uploads、Models 功能性支撑面](done/TASK-20260514-021-openai-files-uploads-models-functional-support.md) | Done | 已补 Files list 参数与 envelope，并确认 Batches/Fine-tuning 不回到公开支持面 |
@@ -288,13 +298,13 @@
 | [TASK-20260514-019 OpenAI Conversations、Webhooks 与 Responses 工具生态](done/TASK-20260514-019-openai-conversations-webhooks-tools.md) | Done | High | TASK-20260514-016 / 013 |
 | [TASK-20260514-020 OpenAI 多模态支撑参数边界收紧](done/TASK-20260514-020-openai-multimodal-supporting-parameters.md) | Done | High | TASK-20260514-016 / 014 / REP-20260521 |
 | [TASK-20260514-021 OpenAI Files、Uploads、Models 功能性支撑面](done/TASK-20260514-021-openai-files-uploads-models-functional-support.md) | Done | High | TASK-20260514-016 / 014 / REP-20260521 |
-| [TASK-20260514-023 OpenAI Vector Stores 对话 RAG 支撑面](done/TASK-20260514-023-openai-vector-stores-full-stack.md) | Done | High | TASK-20260514-016 / 014；仅保留 Responses file_search/RAG 后端支撑，不代表保留独立向量控制台 |
+| [TASK-20260514-023 OpenAI Vector Stores 对话 RAG 支撑面](done/TASK-20260514-023-openai-vector-stores-full-stack.md) | Done | High | TASK-20260514-016 / 014；仅保留 gateway-local RAG 后端支撑，不代表保留独立向量控制台或 Responses hosted file_search 本地成功 |
 | [TASK-20260517-003 OpenAI Vector Stores 本地 Lifecycle 基线](done/TASK-20260517-003-openai-vector-stores-local-lifecycle-baseline.md) | Done | High | TASK-20260514-023；控制台已下线，后端支撑面暂保留 |
 | [TASK-20260517-004 OpenAI Vector Store Files 本地 Attachment Lifecycle 基线](done/TASK-20260517-004-openai-vector-store-files-local-attachment-lifecycle.md) | Done | High | TASK-20260514-023；控制台已下线，后端支撑面暂保留 |
 | [TASK-20260517-005 OpenAI Vector Store File Batches 本地 Lifecycle 基线](done/TASK-20260517-005-openai-vector-store-file-batches-local-lifecycle.md) | Done | High | TASK-20260514-023；控制台已下线，后端支撑面暂保留 |
 | [TASK-20260518-001 OpenAI Vector Store File Content 本地读取基线](done/TASK-20260518-001-openai-vector-store-file-content-local-read-baseline.md) | Done | High | TASK-20260514-023；控制台已下线，后端支撑面暂保留 |
 | [TASK-20260518-002 OpenAI Vector Store Search 本地文本检索基线](done/TASK-20260518-002-openai-vector-store-search-local-text-baseline.md) | Done | High | TASK-20260514-023；控制台已下线，后端支撑面暂保留 |
-| [TASK-20260518-003 OpenAI Responses File Search 本地 Vector Store 绑定基线](done/TASK-20260518-003-openai-responses-file-search-local-vector-store-binding.md) | Done | High | TASK-20260514-023；保留 Responses file_search 绑定，不代表保留向量调试沙盒 |
+| [TASK-20260518-003 OpenAI Responses File Search 本地 Vector Store 绑定基线](done/TASK-20260518-003-openai-responses-file-search-local-vector-store-binding.md) | Done | High | TASK-20260514-023；历史基线已由 TASK-20260524-001-04 supersede，当前 Responses hosted file_search 必须 native-required |
 | [TASK-20260518-004 OpenAI Vector Store 本地 Ingestion 产物基线](done/TASK-20260518-004-openai-vector-store-local-ingestion-artifact-baseline.md) | Done | High | TASK-20260514-023；控制台已下线，后端支撑面暂保留 |
 | [TASK-20260514-029 对话与 Tools OpenAPI、Catalog、Conformance 与 SDK 事实源统一](done/TASK-20260514-029-openai-openapi-catalog-conformance-sdk.md) | Done | Critical | TASK-20260514-016 / 015 / TASK-20260519-002 |
 | [TASK-20260514-029-01 功能性服务 API Coverage Matrix Source](done/TASK-20260514-029-01-functional-service-api-coverage-matrix-source.md) | Done | Critical | TASK-20260514-029 |
@@ -348,12 +358,34 @@
 | [TASK-20260523-015 能力快照与刷新语义重构](backlog/TASK-20260523-015-capability-snapshot-refresh-semantics-redesign.md) | Backlog | Medium | REP-20260523 |
 | [TASK-20260523-016 账号分组分类、入口覆盖反推与 Distributed Key 授权展示](backlog/TASK-20260523-016-account-group-taxonomy-endpoint-coverage.md) | Backlog | High | REP-20260523 |
 | [TASK-20260523-017 控制台 Apple-level UI/UX 精修](done/TASK-20260523-017-console-apple-level-uiux-polish.md) | Done | High | REQ-20260523-012 |
-| [TASK-20260524-001 头部自有模型厂商 Native 与无损翻译网关总控父任务](in-progress/TASK-20260524-001-head-provider-native-lossless-gateway-parent.md) | In Progress | Critical | REQ-20260524-001 |
+| [TASK-20260524-001 头部自有模型厂商 Native 与无损翻译网关总控父任务](in-progress/TASK-20260524-001-head-provider-native-lossless-gateway-parent.md) | In Progress | Critical | REQ-20260524-001；当前口径为头部自研模型厂商 native/provider-specific profile + lossless-only hard-fail |
 | [TASK-20260524-001-01 核心厂商目录收敛与非模型 Provider 清理](done/TASK-20260524-001-01-provider-catalog-core-vendor-prune.md) | Done | Critical | TASK-20260524-001 |
-| [TASK-20260524-001-02 支持厂商 Native Adapter 最小契约](in-progress/TASK-20260524-001-02-native-adapter-minimum-contract.md) | In Progress | Critical | TASK-20260524-001 |
-| [TASK-20260524-001-03 跨协议资源属性无损翻译矩阵](in-progress/TASK-20260524-001-03-lossless-translation-matrix.md) | In Progress | Critical | TASK-20260524-001 |
-| [TASK-20260524-001-04 不可对应能力直接失败与假成功清理](in-progress/TASK-20260524-001-04-unsupported-capability-hard-fail.md) | In Progress | Critical | TASK-20260524-001 |
-| [TASK-20260524-001-05 文档、OpenAPI 与 Smoke 范围对齐](in-progress/TASK-20260524-001-05-docs-openapi-smoke-alignment.md) | In Progress | High | TASK-20260524-001 |
+| [TASK-20260524-001-02 支持厂商 Native Adapter 最小契约](done/TASK-20260524-001-02-native-adapter-minimum-contract.md) | Done | Critical | TASK-20260524-001；nativeAdapterContract、provider-specific smoke protocol/path adapter、Admin/Public 透出与 contract drift 验证已闭环 |
+| [TASK-20260524-001-03 跨协议资源属性无损翻译矩阵](done/TASK-20260524-001-03-lossless-translation-matrix.md) | Done | Critical | TASK-20260524-001；Lossless Matrix、blocked plan、mapper negative、smoke 分类、public docs/OpenAPI 与 conformance 主线验证已闭环 |
+| [TASK-20260524-001-04 不可对应能力直接失败与假成功清理](done/TASK-20260524-001-04-unsupported-capability-hard-fail.md) | Done | Critical | TASK-20260524-001；Responses compact/input_tokens/file_search、resource blocked plan、media native route required 与 Realtime current-down 口径已闭环 |
+| [TASK-20260524-001-05 文档、OpenAPI 与 Smoke 范围对齐](done/TASK-20260524-001-05-docs-openapi-smoke-alignment.md) | Done | High | TASK-20260524-001 |
+| [TASK-20260524-001-06 Provider-specific OpenAI-compatible Runtime Profile 拆分](done/TASK-20260524-001-06-provider-specific-runtime-profile-split.md) | Done | Critical | TASK-20260524-001；MiMo/DeepSeek/xAI runtime profile、smoke fixture、interop debug、observability 与非持久化迁移记录已闭环 |
+| [TASK-20260524-001-07 Cohere / Jina Native Executor 与 Smoke 闭环](in-progress/TASK-20260524-001-07-native-executor-smoke-for-embed-rerank-providers.md) | In Progress | High | TASK-20260524-001；executor/smoke/test、fixture 样本与结构证据已落地，待真实 key live smoke |
+| [TASK-20260524-001-08 Degraded 能力层与无损翻译矩阵隔离](done/TASK-20260524-001-08-degraded-capability-layer-isolation.md) | Done | Critical | TASK-20260524-001；已完成 blocked plan 守门、catalog 旧 hint 迁移、错误规则阻断语义与 targeted 回归 |
+| [TASK-20260524-002 删除 Admin 厂商 OAuth 连接并配置化 Portal 社交 OAuth](done/TASK-20260524-002-admin-oauth-removal-portal-social-oauth-config-parent.md) | Done | Critical | REQ-20260524-002；删除误导性上游厂商 OAuth 连接，保留并配置化 Portal 社交 OAuth，已补注册渠道治理与绑定入口 |
+| [TASK-20260524-002-01 删除 Admin 厂商 OAuth 连接入口](done/TASK-20260524-002-01-remove-admin-upstream-oauth-connection.md) | Done | Critical | TASK-20260524-002 |
+| [TASK-20260524-002-02 Portal 社交 OAuth 后台配置](done/TASK-20260524-002-02-portal-social-oauth-admin-config.md) | Done | High | TASK-20260524-002 |
+| [TASK-20260524-002-03 Portal 已注册用户社交 OAuth 绑定](done/TASK-20260524-002-03-portal-social-oauth-account-binding.md) | Done | High | TASK-20260524-002 |
+| [TASK-20260524-002-04 Portal 注册渠道策略与邀请码渠道](done/TASK-20260524-002-04-portal-registration-channel-policy.md) | Done | High | TASK-20260524-002 |
+| [TASK-20260524-003 Portal 完整邀请码系统](done/TASK-20260524-003-portal-invitation-code-system-parent.md) | Done | High | REQ-20260524-003；将邀请码从注册策略内存白名单升级为持久化库存、核销记录和 Admin 管理 |
+| [TASK-20260524-003-01 邀请码数据模型与 Admin 服务](done/TASK-20260524-003-01-invitation-code-data-service.md) | Done | High | TASK-20260524-003 |
+| [TASK-20260524-003-02 Portal 注册邀请码核销](done/TASK-20260524-003-02-portal-registration-invitation-redemption.md) | Done | High | TASK-20260524-003 |
+| [TASK-20260524-003-03 Admin 邀请码管理页面](done/TASK-20260524-003-03-admin-invitation-code-ui.md) | Done | High | TASK-20260524-003 |
+| [TASK-20260524-004 邀请码归属、OAuth 首次注册与奖励赠品](done/TASK-20260524-004-invitation-code-owner-oauth-rewards-parent.md) | Done | High | REQ-20260524-004；把邀请码升级为所有首次注册渠道共享的归属与奖励载体 |
+| [TASK-20260524-004-01 邀请码归属人与奖励后端模型](done/TASK-20260524-004-01-invitation-code-owner-reward-backend.md) | Done | High | TASK-20260524-004 |
+| [TASK-20260524-004-02 社交 OAuth 首次注册邀请码支持](done/TASK-20260524-004-02-social-oauth-invitation-registration.md) | Done | High | TASK-20260524-004 |
+| [TASK-20260524-004-03 邀请码归属奖励与 OAuth 注册前端](done/TASK-20260524-004-03-invitation-owner-reward-frontend.md) | Done | High | TASK-20260524-004 |
+| [TASK-20260524-005 邀请增长系统完整化](done/TASK-20260524-005-invitation-growth-system-parent.md) | Done | High | REQ-20260524-005；套餐、返佣、邀请层级、排行榜与访问组/账号组边界收口已闭环 |
+| [TASK-20260524-005-01 增长奖励后端模型与核销服务](done/TASK-20260524-005-01-growth-backend-model-service.md) | Done | High | TASK-20260524-005 |
+| [TASK-20260524-005-02 增长系统 Admin 与 Portal API](done/TASK-20260524-005-02-growth-admin-portal-api.md) | Done | High | TASK-20260524-005 |
+| [TASK-20260524-005-03 增长系统前端与访问组/账号组命名收口](done/TASK-20260524-005-03-growth-frontend-and-naming.md) | Done | High | TASK-20260524-005；Admin 邀请码奖励字段/排行榜、Portal 我的邀请页面和核心命名收口已完成，`bun run typecheck` 通过 |
+| [TASK-20260525-001 Admin 邀请树展示补齐父任务](done/TASK-20260525-001-admin-invitation-tree-ui-parent.md) | Done | High | REQ-20260525-001；补齐 Admin 邀请树查询与展示，focused test 与 typecheck 通过 |
+| [TASK-20260525-001-01 Admin 邀请树前端接入](done/TASK-20260525-001-01-admin-invitation-tree-frontend.md) | Done | High | TASK-20260525-001 |
 | [TASK-20260516-014 OpenAI Responses Tools Registry 与非 function Tool 显式边界](done/TASK-20260516-014-openai-responses-tool-registry-boundary.md) | Done | High | TASK-20260514-019 / 013 |
 | [TASK-20260516-015 OpenAI Conversations 本地 Lifecycle](done/TASK-20260516-015-openai-conversations-local-lifecycle.md) | Done | High | TASK-20260514-019 |
 | [TASK-20260516-016 OpenAI Webhooks 接收入口与事件落库](done/TASK-20260516-016-openai-webhooks-ingress-event-persistence.md) | Done | High | TASK-20260514-019 |

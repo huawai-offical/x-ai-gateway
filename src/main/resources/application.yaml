@@ -109,3 +109,12 @@ gateway:
       flush-interval: ${GATEWAY_OBSERVABILITY_ASYNC_FLUSH_INTERVAL:PT1S}
       batch-size: ${GATEWAY_OBSERVABILITY_ASYNC_BATCH_SIZE:200}
       redis-failure-backoff: ${GATEWAY_OBSERVABILITY_ASYNC_REDIS_FAILURE_BACKOFF:PT30S}
+    trace-detail:
+      enabled: ${GATEWAY_TRACE_DETAIL_ENABLED:true}
+      sampling-rate: ${GATEWAY_TRACE_DETAIL_SAMPLING_RATE:1.0}
+      retention-ttl: ${GATEWAY_TRACE_DETAIL_RETENTION_TTL:P7D}
+      max-payload-length: ${GATEWAY_TRACE_DETAIL_MAX_PAYLOAD_LENGTH:12000}
+      max-metadata-length: ${GATEWAY_TRACE_DETAIL_MAX_METADATA_LENGTH:4000}
+      cleanup-enabled: ${GATEWAY_TRACE_DETAIL_CLEANUP_ENABLED:true}
+      cleanup-interval: ${GATEWAY_TRACE_DETAIL_CLEANUP_INTERVAL:PT1H}
+      cleanup-batch-size: ${GATEWAY_TRACE_DETAIL_CLEANUP_BATCH_SIZE:1000}

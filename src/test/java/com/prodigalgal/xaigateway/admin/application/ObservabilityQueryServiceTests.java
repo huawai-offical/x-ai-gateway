@@ -7,13 +7,17 @@ import com.prodigalgal.xaigateway.gateway.core.observability.GatewayRequestStatu
 import com.prodigalgal.xaigateway.gateway.core.resource.GatewayAsyncResourceType;
 import com.prodigalgal.xaigateway.infra.persistence.entity.CacheHitLogEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.RequestLogEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.RequestTraceDetailEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.RouteDecisionLogEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCacheReferenceEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UsageRecordEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.CacheHitLogRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.RequestLogRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.RequestTraceDetailRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.RouteDecisionLogRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCacheReferenceRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UsageRecordRepository;
 import java.time.Instant;
 import java.util.List;
@@ -22,6 +26,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
 import org.springframework.data.domain.Pageable;
+import org.springframework.test.util.ReflectionTestUtils;
 import tools.jackson.databind.node.JsonNodeFactory;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -38,6 +43,7 @@ class ObservabilityQueryServiceTests {
         RouteDecisionLogRepository routeDecisionLogRepository = Mockito.mock(RouteDecisionLogRepository.class);
         CacheHitLogRepository cacheHitLogRepository = Mockito.mock(CacheHitLogRepository.class);
         RequestLogRepository requestLogRepository = Mockito.mock(RequestLogRepository.class);
+        RequestTraceDetailRepository requestTraceDetailRepository = Mockito.mock(RequestTraceDetailRepository.class);
         UpstreamCacheReferenceRepository upstreamCacheReferenceRepository = Mockito.mock(UpstreamCacheReferenceRepository.class);
         UsageRecordRepository usageRecordRepository = Mockito.mock(UsageRecordRepository.class);
 
@@ -238,6 +244,7 @@ class ObservabilityQueryServiceTests {
         RouteDecisionLogRepository routeDecisionLogRepository = Mockito.mock(RouteDecisionLogRepository.class);
         CacheHitLogRepository cacheHitLogRepository = Mockito.mock(CacheHitLogRepository.class);
         RequestLogRepository requestLogRepository = Mockito.mock(RequestLogRepository.class);
+        RequestTraceDetailRepository requestTraceDetailRepository = Mockito.mock(RequestTraceDetailRepository.class);
         UpstreamCacheReferenceRepository upstreamCacheReferenceRepository = Mockito.mock(UpstreamCacheReferenceRepository.class);
         UsageRecordRepository usageRecordRepository = Mockito.mock(UsageRecordRepository.class);
         AsyncResourceAdminService asyncResourceAdminService = Mockito.mock(AsyncResourceAdminService.class);
@@ -284,6 +291,7 @@ class ObservabilityQueryServiceTests {
         RouteDecisionLogRepository routeDecisionLogRepository = Mockito.mock(RouteDecisionLogRepository.class);
         CacheHitLogRepository cacheHitLogRepository = Mockito.mock(CacheHitLogRepository.class);
         RequestLogRepository requestLogRepository = Mockito.mock(RequestLogRepository.class);
+        RequestTraceDetailRepository requestTraceDetailRepository = Mockito.mock(RequestTraceDetailRepository.class);
         UpstreamCacheReferenceRepository upstreamCacheReferenceRepository = Mockito.mock(UpstreamCacheReferenceRepository.class);
         UsageRecordRepository usageRecordRepository = Mockito.mock(UsageRecordRepository.class);
         AsyncResourceAdminService asyncResourceAdminService = Mockito.mock(AsyncResourceAdminService.class);
@@ -353,10 +361,35 @@ class ObservabilityQueryServiceTests {
                         JsonNodeFactory.instance.objectNode()
                 )));
 
+        RequestTraceDetailEntity traceDetail = new RequestTraceDetailEntity();
+        ReflectionTestUtils.setField(traceDetail, "id", 11L);
+        ReflectionTestUtils.setField(traceDetail, "createdAt", Instant.parse("2026-04-07T08:00:02Z"));
+        traceDetail.setRequestId("req-1");
+        traceDetail.setStage("UPSTREAM_REQUEST");
+        traceDetail.setDirection("UPSTREAM");
+        traceDetail.setContentKind("JSON");
+        traceDetail.setPayloadJson("{\"model\":\"gpt-4o\"}");
+        traceDetail.setMetadataJson("{\"providerType\":\"OPENAI_DIRECT\"}");
+        traceDetail.setPayloadHash("payload-hash");
+        traceDetail.setMetadataHash("metadata-hash");
+        traceDetail.setOriginalLength(200);
+        traceDetail.setStoredLength(120);
+        traceDetail.setMetadataOriginalLength(5000);
+        traceDetail.setMetadataStoredLength(4000);
+        traceDetail.setTruncated(true);
+        traceDetail.setMetadataTruncated(true);
+        traceDetail.setRedacted(true);
+        traceDetail.setMetadataRedacted(true);
+        traceDetail.setExpiresAt(Instant.parse("2026-04-14T08:00:02Z"));
+        when(requestTraceDetailRepository.findAllByRequestIdOrderByCreatedAtAscIdAsc("req-1"))
+                .thenReturn(List.of(traceDetail));
+
         ObservabilityQueryService service = new ObservabilityQueryService(
                 routeDecisionLogRepository,
                 cacheHitLogRepository,
                 requestLogRepository,
+                requestTraceDetailRepository,
+                null,
                 upstreamCacheReferenceRepository,
                 usageRecordRepository,
                 asyncResourceAdminService
@@ -367,6 +400,13 @@ class ObservabilityQueryServiceTests {
         assertNotNull(trace.routeDecision());
         assertEquals(1, trace.cacheHits().size());
         assertEquals(1, trace.upstreamCacheReferences().size());
+        assertEquals(1, trace.traceDetails().size());
+        assertEquals("metadata-hash", trace.traceDetails().getFirst().metadataHash());
+        assertEquals(5000, trace.traceDetails().getFirst().metadataOriginalLength());
+        assertEquals(4000, trace.traceDetails().getFirst().metadataStoredLength());
+        assertTrue(trace.traceDetails().getFirst().metadataTruncated());
+        assertTrue(trace.traceDetails().getFirst().metadataRedacted());
+        assertEquals(Instant.parse("2026-04-14T08:00:02Z"), trace.traceDetails().getFirst().expiresAt());
         assertNotNull(trace.asyncResourceSummary());
         assertNotNull(trace.asyncResourceDetail());
     }
@@ -462,6 +502,78 @@ class ObservabilityQueryServiceTests {
         assertEquals(20, rows.get(0).cacheHitTokens());
         assertTrue(rows.get(0).filterSummaryJson().contains("route_candidate_summary"));
         assertTrue(rows.get(0).errorSummary().contains("Bearer ***"));
+    }
+
+    @Test
+    void shouldAggregateHealthMetricsByTotalProviderAndCredential() {
+        RouteDecisionLogRepository routeDecisionLogRepository = Mockito.mock(RouteDecisionLogRepository.class);
+        CacheHitLogRepository cacheHitLogRepository = Mockito.mock(CacheHitLogRepository.class);
+        RequestLogRepository requestLogRepository = Mockito.mock(RequestLogRepository.class);
+        UpstreamCredentialRepository upstreamCredentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+        UpstreamCacheReferenceRepository upstreamCacheReferenceRepository = Mockito.mock(UpstreamCacheReferenceRepository.class);
+        UsageRecordRepository usageRecordRepository = Mockito.mock(UsageRecordRepository.class);
+
+        Instant from = Instant.parse("2026-05-25T00:00:00Z");
+        Instant to = Instant.parse("2026-05-25T06:00:00Z");
+        RequestLogEntity success = requestLog("req-success", "upload_1");
+        success.setCredentialId(101L);
+        success.setStartedAt(Instant.parse("2026-05-25T01:00:00Z"));
+        success.setCompletedAt(Instant.parse("2026-05-25T01:00:01Z"));
+        success.setDurationMs(100L);
+        success.setStatus(GatewayRequestStatus.COMPLETED);
+        RequestLogEntity failed = requestLog("req-failed", "upload_1");
+        failed.setCredentialId(101L);
+        failed.setStartedAt(Instant.parse("2026-05-25T02:00:00Z"));
+        failed.setCompletedAt(Instant.parse("2026-05-25T02:00:02Z"));
+        failed.setDurationMs(300L);
+        failed.setStatus(GatewayRequestStatus.FAILED);
+        RequestLogEntity canceled = requestLog("req-canceled", "upload_1");
+        canceled.setCredentialId(102L);
+        canceled.setProviderType(ProviderType.GEMINI_DIRECT);
+        canceled.setStartedAt(Instant.parse("2026-05-25T03:00:00Z"));
+        canceled.setCompletedAt(Instant.parse("2026-05-25T03:00:03Z"));
+        canceled.setDurationMs(200L);
+        canceled.setStatus(GatewayRequestStatus.CANCELED);
+
+        when(requestLogRepository.searchHealthWithinWindow(ProviderType.OPENAI_DIRECT, null, from, to))
+                .thenReturn(List.of(success, failed));
+
+        UpstreamCredentialEntity credential = new UpstreamCredentialEntity();
+        ReflectionTestUtils.setField(credential, "id", 101L);
+        credential.setCredentialName("openai-main");
+        credential.setProviderType(ProviderType.OPENAI_DIRECT);
+        credential.setApiKeyFingerprint("abcdef1234567890");
+        when(upstreamCredentialRepository.findAllByIdInAndDeletedFalse(List.of(101L)))
+                .thenReturn(List.of(credential));
+
+        ObservabilityQueryService service = new ObservabilityQueryService(
+                routeDecisionLogRepository,
+                cacheHitLogRepository,
+                requestLogRepository,
+                null,
+                upstreamCredentialRepository,
+                upstreamCacheReferenceRepository,
+                usageRecordRepository,
+                null
+        );
+
+        var health = service.health(ProviderType.OPENAI_DIRECT, null, from, to);
+
+        assertEquals(from, health.sampledFrom());
+        assertEquals(to, health.sampledTo());
+        assertEquals(2, health.total().totalRequests());
+        assertEquals(1, health.total().successfulRequests());
+        assertEquals(1, health.total().failedRequests());
+        assertEquals(0.5D, health.total().successRate());
+        assertEquals(0.5D, health.total().availabilityRate());
+        assertEquals(200D, health.total().avgDurationMs());
+        assertEquals(1, health.providers().size());
+        assertEquals(ProviderType.OPENAI_DIRECT, health.providers().get(0).providerType());
+        assertEquals(1, health.credentials().size());
+        assertEquals(101L, health.credentials().get(0).credentialId());
+        assertEquals("openai-main", health.credentials().get(0).credentialLabel());
+        assertEquals("abcdef123456", health.credentials().get(0).credentialPrefix());
+        verify(requestLogRepository).searchHealthWithinWindow(ProviderType.OPENAI_DIRECT, null, from, to);
     }
 
     private RequestLogEntity requestLog(String requestId, String gatewayResourceKey) {

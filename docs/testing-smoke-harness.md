@@ -106,20 +106,24 @@ Invoke-RestMethod `
 - 只有显式设置 `allowWriteProbes=true` 时，Realtime client secret 才会执行短 TTL text-only session probe：
   - `POST /v1/realtime/client_secrets`，默认 `model=gpt-realtime-mini`、`output_modalities=["text"]`、`max_output_tokens=1`、`expires_after.seconds=60`。
 - 401/403 归类为 `NO_PERMISSION`，429/rate/quota/limit 归类为 `BUDGET_BLOCKED`，404 归类为 `UNSUPPORTED`。
-- Anthropic、Gemini、Vertex、Codex 的真实 smoke 也按同一 OpenAI 标准功能区收紧；不为 Anthropic message batches、Gemini/Vertex batch prediction、tuning、evals、pipeline/job/admin 或非 Responses Codex 内部接口保留 smoke 预算。
+- Anthropic、Gemini、Vertex、Codex 的真实 smoke 也按功能性服务 API 与各自 native/profile 边界收紧；不为 Anthropic message batches、Gemini/Vertex batch prediction、tuning、evals、pipeline/job/admin 或非 Responses Codex 内部接口保留 smoke 预算。
 
-### Gemini / MiMo 功能性服务 API Smoke 范围
+### 核心 Provider Native / Provider-specific 功能性 Smoke 范围
 
 关联需求：[REQ-20260519-001](requirements/REQ-20260519-001-functional-real-smoke-gemini-mimo.md)
 关联任务：[TASK-20260519-001](../tasks/done/TASK-20260519-001-functional-real-smoke-gemini-mimo.md)
 
-当前没有 OpenAI Direct key 时，真实 smoke 可以先使用 Google Gemini key 与小米 MiMo key，但只用于功能性服务 API。当前项目 MiMo 预设与本地协议入口使用 token-plan 地址：OpenAI-compatible Base URL 为 `https://token-plan-sgp.xiaomimimo.com/v1`，Anthropic-compatible Base URL 为 `https://token-plan-sgp.xiaomimimo.com/anthropic`；这证明它可用于对话协议兼容 smoke，不证明 OpenAI Direct 全量资源族。
+当前没有 OpenAI Direct key 时，真实 smoke 可以先使用 Google Gemini key 与小米 MiMo key，但只用于核心 provider native 或 provider-specific 功能性服务 API。当前项目 MiMo 预设与本地协议入口使用 token-plan 地址：MiMo provider-specific OpenAI-compatible Base URL 为 `https://token-plan-sgp.xiaomimimo.com/v1`，MiMo provider-specific Anthropic-compatible Base URL 为 `https://token-plan-sgp.xiaomimimo.com/anthropic`；这证明它可用于 MiMo 对话协议兼容 smoke，不证明 generic OpenAI-compatible 或 OpenAI Direct 全量资源族。
+
+`mimo_openai` 与 `mimo_anthropic` 是 MiMo provider-specific profile，不是 generic fallback。`openai_compatible` / `anthropic_compatible` 只能作为兼容旧请求的 alias 使用：只有命中 MiMo baseUrl 或明确 MiMo profile 时才归一到 `XIAOMI_MIMO_*`；其它自有厂商 compatible 入口保持自己的 generic protocol 语义，不得冒充 MiMo official smoke。Dify、OpenRouter、Together、Fireworks、SiliconFlow 与 generic compatible 不在默认 official smoke 预算中；如需纳入，必须单独建立 provider-specific 范围、凭证、预算和验收边界。
 
 | Provider | Protocol | Default base URL | Auth strategy | 默认模型 | 默认 family | 默认 live 行为 | 明确排除 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Gemini | Gemini native | `https://generativelanguage.googleapis.com` | `API_KEY_QUERY` / profile 驱动 | `gemini-2.5-flash` | `generate_content`、`stream_generate_content`、`tool_calling` | dry-run；live 需 `allowLive=true` 与 key 引用 | batch prediction、pipeline/job/admin、tuning |
-| MiMo | OpenAI-compatible | `https://token-plan-sgp.xiaomimimo.com/v1` | profile 驱动，优先允许 `api-key`，兼容 SDK-style key 配置 | `mimo-v2-pro` | `chat_completions`、`chat_streaming`、`chat_tools` | dry-run；billable live 需显式 allow | Responses、Files、Uploads、Vector Stores、Realtime client secret、Batches、Fine-tuning、Evals、Admin |
-| MiMo | Anthropic-compatible | `https://token-plan-sgp.xiaomimimo.com/anthropic` | profile 驱动，`api-key` / Anthropic-compatible header 由站点档案声明 | `mimo-v2-pro` | `messages`、`messages_streaming`、`tool_use` | dry-run；billable live 需显式 allow | Message Batches、Admin、Files、Evals |
+| MiMo | MiMo provider-specific OpenAI-compatible | `https://token-plan-sgp.xiaomimimo.com/v1` | profile 驱动，优先允许 `api-key`，兼容 SDK-style key 配置 | `mimo-v2-pro` | `chat_completions`、`chat_streaming`、`chat_tools` | dry-run；billable live 需显式 allow | generic OpenAI-compatible fallback、Responses、Files、Uploads、Vector Stores、Realtime client secret、Batches、Fine-tuning、Evals、Admin |
+| MiMo | MiMo provider-specific Anthropic-compatible | `https://token-plan-sgp.xiaomimimo.com/anthropic` | profile 驱动，`api-key` / Anthropic-compatible header 由站点档案声明 | `mimo-v2-pro` | `messages`、`messages_streaming`、`tool_use` | dry-run；billable live 需显式 allow | generic Anthropic-compatible fallback、Message Batches、Admin、Files、Evals |
+| Cohere | Cohere native | `https://api.cohere.ai` | Bearer | `embed-v4.0`、`rerank-v3.5` | `embeddings`、`rerank` | dry-run；live 需双 gate 与 `COHERE_API_KEY` / `XAI_GATEWAY_COHERE_API_KEY` | chat、files、uploads、OpenAI-compatible generic fallback |
+| Jina | Jina native | `https://api.jina.ai` | Bearer | `jina-embeddings-v3`、`jina-reranker-v2-base-multilingual` | `embeddings`、`rerank` | dry-run；live 需双 gate 与 `JINA_API_KEY` / `XAI_GATEWAY_JINA_API_KEY` | chat、files、uploads、OpenAI-compatible generic fallback |
 
 默认分类规则：
 
@@ -127,6 +131,8 @@ Invoke-RestMethod `
 - 缺少真实 key 或未开启 live，返回 `SKIPPED`，`skippedReason=DRY_RUN` 或 `NO_CREDENTIAL`。
 - billable generation 默认返回 `BUDGET_BLOCKED`，只有显式 budget/allow flag 通过后才发起 live。
 - provider auth header、base URL、model 与 protocol 必须来自 credential/site profile 或 smoke request，不能硬编码 OpenAI Direct。
+- MiMo compatible 口径必须记录为 provider-specific profile；`mimo_openai` / `mimo_anthropic` 是首选请求值，`openai_compatible` / `anthropic_compatible` 仅保留为旧请求 alias，且只有 MiMo baseUrl/profile 才会归一到 `XIAOMI_MIMO_*`。
+- Dify/OpenRouter/Together/Fireworks/SiliconFlow/generic 的 fixture 或 live probe 不进入默认 official smoke；即使它们也暴露 OpenAI-compatible 端点，也不能被 sample 或 verifier 当作核心 provider。
 - record/replay fixture 必须包含 `provider`、`protocol`、`resourceFamily`、`model`、`baseUrlHost`、`classification`、`skippedReason`，并递归脱敏 key、Authorization、`api-key`、`x-api-key`、organization/project。
 
 已实现入口：
@@ -137,7 +143,7 @@ POST /admin/credentials/{id}/functional-provider/smoke
 
 请求字段：
 
-- `protocol`：可选，支持 `gemini_native`、`mimo_openai` / `openai_compatible`、`mimo_anthropic` / `anthropic_compatible`；未传时按 credential `providerType` 推断。
+- `protocol`：可选，支持 `gemini_native`、`mimo_openai` / `openai_compatible`、`mimo_anthropic` / `anthropic_compatible`；`mimo_openai` / `mimo_anthropic` 是 MiMo provider-specific profile，generic alias 只是兼容旧请求，不表示默认 official smoke fallback，未传时按 credential `providerType` 与 site profile 推断。
 - `baseUrl`：可选，覆盖 credential base URL；MiMo OpenAI-compatible 可传 `https://token-plan-sgp.xiaomimimo.com/v1`，runner 会生成 `/v1/chat/completions`。
 - `model`：可选，默认 Gemini `gemini-2.5-flash`、MiMo `mimo-v2-pro`。
 - `resourceFamilies`：可选；未传时使用矩阵默认 family，显式传入范围外 family 时返回 `UNSUPPORTED`。
@@ -187,6 +193,18 @@ Invoke-RestMethod `
 
 这个示例会真实访问上游并可能产生极低成本；批量 smoke 默认不得带 `allowLive=true` 与 `allowBillableProbes=true`。
 
+Cohere/Jina native live gate 命令：
+
+```powershell
+$env:XAI_GATEWAY_FUNCTIONAL_PROVIDER_LIVE_SMOKE = "true"
+$env:XAI_GATEWAY_ALLOW_BILLABLE_SMOKE = "true"
+$env:COHERE_API_KEY = "<cohere-key>"
+$env:JINA_API_KEY = "<jina-key>"
+.\gradlew.bat test --tests "com.prodigalgal.xaigateway.admin.application.FunctionalProviderSmokeLiveGateTests"
+```
+
+这个测试默认不会访问网络：未设置 `XAI_GATEWAY_FUNCTIONAL_PROVIDER_LIVE_SMOKE=true` 和 `XAI_GATEWAY_ALLOW_BILLABLE_SMOKE=true` 时，JUnit assumption 会把用例标记为 skipped；缺少 `COHERE_API_KEY` / `XAI_GATEWAY_COHERE_API_KEY` 或 `JINA_API_KEY` / `XAI_GATEWAY_JINA_API_KEY` 时，对应 provider 也会 skipped。只有双 gate 与真实 key 同时存在时，测试才会访问 Cohere `/v2/embed`、`/v2/rerank` 和 Jina `/v1/embeddings`、`/v1/rerank`，并要求 record/replay fixture 通过 `FunctionalProviderSmokeRecordReplayFixtureVerifier`。这条 live gate 不能用 dry-run、sample fixture 或本地模拟结果替代。
+
 ### Functional Provider Certification 与脱敏 Fixture
 
 关联任务：[TASK-20260519-001-03](../tasks/done/TASK-20260519-001-03-smoke-record-replay-redaction-budget.md)
@@ -209,7 +227,7 @@ fixture schema：
 src/test/resources/conformance/functional-provider-smoke-record-replay-fixture.sample.json
 ```
 
-功能性 provider fixture 与 OpenAI Direct fixture 分离，原因是它必须记录 provider/protocol/model，并允许 Gemini `/v1beta/models/...:generateContent`、MiMo OpenAI-compatible `/v1/chat/completions`、MiMo Anthropic-compatible `/v1/messages` 三类路径。record/replay policy 固定为：
+功能性 provider fixture 与 OpenAI Direct fixture 分离，原因是它必须记录 provider-specific provider/protocol/model，并允许 Gemini `/v1beta/models/...:generateContent`、MiMo provider-specific OpenAI-compatible `/v1/chat/completions`、MiMo provider-specific Anthropic-compatible `/v1/messages`、DeepSeek provider-specific OpenAI-compatible `/v1/chat/completions`、xAI provider-specific OpenAI-compatible `/v1/chat/completions`、Cohere native `/v2/embed` / `/v2/rerank`、Jina native `/v1/embeddings` / `/v1/rerank` 等路径。MiMo、DeepSeek、xAI、Cohere、Jina 离线 fixture 使用 `XIAOMI_MIMO`、`DEEPSEEK`、`XAI`、`COHERE`、`JINA` 以及对应 provider-specific protocol 字符串，不使用顶层 `OPENAI_COMPATIBLE` 泛名。
 
 - `network=disabled_by_default`
 - `billableOperations=replay_only`
@@ -219,11 +237,13 @@ src/test/resources/conformance/functional-provider-smoke-record-replay-fixture.s
 - `liveExecutionRequiresAllowLive=true`
 - `billableExecutionRequiresAllowBillableProbes=true`
 
-功能性 provider verifier `FunctionalProviderSmokeRecordReplayFixtureVerifier` 是离线校验器，只读取本地 fixture，不访问 Gemini 或 MiMo。校验范围包括：
+功能性 provider verifier `FunctionalProviderSmokeRecordReplayFixtureVerifier` 是离线校验器，只读取本地 fixture，不访问 Gemini、MiMo、DeepSeek 或 xAI。校验范围包括：
 
 - 顶层 `schemaVersion`、`providerType`、`protocol`、`baseUrlHost`、`recordedAt`、`certificationStatus`、`summary`。
 - 每个 fixture 的 `providerType`、`protocol`、`resourceFamily`、`model`、`classification`、`skippedReason`、`method`、`path`、`billable`、`writeOperation`、`evidence` 和 `requestPreview`。
-- path 必须与 protocol 匹配：Gemini 只允许 GenerateContent 路径，OpenAI-compatible 只允许 Chat Completions，Anthropic-compatible 只允许 Messages。
+- path 必须与 provider-specific protocol 匹配：Gemini native 只允许 GenerateContent 路径，`XIAOMI_MIMO_OPENAI_COMPATIBLE`、`DEEPSEEK_OPENAI_COMPATIBLE`、`XAI_OPENAI_COMPATIBLE` 只允许 Chat Completions，`XIAOMI_MIMO_ANTHROPIC_COMPATIBLE` 只允许 Messages。
+- Cohere/Jina native fixture 只允许 `EMBEDDINGS` / `RERANK` 作为成功 family；chat、files、uploads 等非 embed/rerank family 只能记录 `UNSUPPORTED`，不得记录为 PASS。
+- `DIFY`、`OPENROUTER`、`TOGETHER`、`FIREWORKS`、`SILICONFLOW`、`OPENAI_COMPATIBLE_GENERIC` 与顶层 `OPENAI_COMPATIBLE` 不是 functional provider official smoke 的允许 fixture provider/protocol。
 - `summary` 与 fixture classification 计数必须一致。
 - 递归扫描并拦截未脱敏 `Bearer ...`、`sk-...`、`AIza...`、`api-key=...`、`x-goog-api-key=...`、真实 `org-*`、真实 `proj-*` 和常见第三方 token。
 

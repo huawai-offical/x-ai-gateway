@@ -804,7 +804,7 @@ class OpenAiNativeGatewayChatRuntimeTests {
                   "conversationProfile": {
                     "ingressProtocol": "responses",
                     "upstreamSurface": "chat_completions",
-                    "responsesCompatibility": {"mode": "emulate_with_chat_completions"},
+                    "responsesCompatibility": {"mode": "lossless_to_chat_completions"},
                     "reasoning": {
                       "requestField": "extra_body.thinking",
                       "requestEnabledValue": {"type": "enabled"},

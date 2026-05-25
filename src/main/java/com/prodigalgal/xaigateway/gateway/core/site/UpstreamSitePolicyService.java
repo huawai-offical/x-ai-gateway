@@ -23,6 +23,9 @@ public class UpstreamSitePolicyService {
                     ? UpstreamSiteKind.AZURE_OPENAI
                     : UpstreamSiteKind.OPENAI_DIRECT;
             case OPENAI_COMPATIBLE -> {
+                if (normalized.contains("xiaomimimo.com") || normalized.contains("api.mimo-v2.com")) {
+                    yield UpstreamSiteKind.XIAOMI_MIMO;
+                }
                 if (normalized.contains("api.deepseek.com")) {
                     yield UpstreamSiteKind.DEEPSEEK;
                 }
@@ -116,7 +119,7 @@ public class UpstreamSitePolicyService {
                     "provider-native",
                     null
             );
-            case DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE, MINIMAX, TOGETHER, FIREWORKS, OPENROUTER -> new SitePolicy(
+            case XIAOMI_MIMO, DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE, MINIMAX, TOGETHER, FIREWORKS, OPENROUTER -> new SitePolicy(
                     ProviderFamily.OPENAI,
                     AuthStrategy.BEARER,
                     PathStrategy.OPENAI_V1,
@@ -362,7 +365,7 @@ public class UpstreamSitePolicyService {
                     : InteropCapabilityLevel.UNSUPPORTED;
             case REASONING -> supportsThinking ? InteropCapabilityLevel.NATIVE : InteropCapabilityLevel.UNSUPPORTED;
             case RESPONSE_OBJECT -> policy.supportedProtocols().contains("responses")
-                    ? InteropCapabilityLevel.EMULATED
+                    ? InteropCapabilityLevel.NATIVE
                     : InteropCapabilityLevel.UNSUPPORTED;
             case EMBEDDINGS -> supportsEmbeddings && policy.supportsEmbeddings()
                     ? InteropCapabilityLevel.NATIVE
@@ -399,7 +402,7 @@ public class UpstreamSitePolicyService {
 
     private boolean supportsOpenAiStyleResource(UpstreamSiteKind siteKind) {
         return switch (siteKind) {
-            case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE,
+            case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, XIAOMI_MIMO, DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE,
                     MINIMAX, GROK, MISTRAL, COHERE, JINA, TOGETHER, FIREWORKS, OPENROUTER -> true;
             default -> false;
         };

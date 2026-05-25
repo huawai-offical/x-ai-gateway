@@ -65,6 +65,7 @@ public final class ProtocolSuite {
             Map.entry(UpstreamSiteKind.OPENAI_DIRECT, OPENAI_NATIVE),
             Map.entry(UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC, OPENAI_COMPATIBLE_GENERIC),
             Map.entry(UpstreamSiteKind.AZURE_OPENAI, AZURE_OPENAI_COMPATIBLE),
+            Map.entry(UpstreamSiteKind.XIAOMI_MIMO, XIAOMI_MIMO_OPENAI_COMPATIBLE),
             Map.entry(UpstreamSiteKind.DEEPSEEK, DEEPSEEK_OPENAI_COMPATIBLE),
             Map.entry(UpstreamSiteKind.QWEN, QWEN_OPENAI_COMPATIBLE),
             Map.entry(UpstreamSiteKind.MOONSHOT, MOONSHOT_OPENAI_COMPATIBLE),

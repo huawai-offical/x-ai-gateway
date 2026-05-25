@@ -7,3 +7,15 @@ databaseChangeLog:
       file: db/changelog/changes/db.changelog-0003-protocol-suite-authorization.yaml
   - include:
       file: db/changelog/changes/db.changelog-0004-provider-protocol-endpoints.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0005-invitation-codes.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0006-invitation-code-owner-rewards.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0007-invitation-growth-system.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0008-credential-connectivity-probe.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0009-request-trace-detail.yaml
+  - include:
+      file: db/changelog/changes/db.changelog-0010-request-trace-detail-retention.yaml

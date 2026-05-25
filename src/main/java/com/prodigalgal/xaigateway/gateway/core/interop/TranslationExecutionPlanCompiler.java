@@ -270,7 +270,7 @@ public class TranslationExecutionPlanCompiler {
         );
         NonChatDegradationOutcome degradationOutcome = nonChatDegradationPolicyService.evaluate(
                 semantics,
-                GatewayDegradationPolicy.ALLOW_LOSSY,
+                GatewayDegradationPolicy.STRICT,
                 policyDecision
         );
         List<String> blockedReasons = mergeReasons(degradationOutcome.blockedReasons(), matrixBlockers);
@@ -448,6 +448,11 @@ public class TranslationExecutionPlanCompiler {
         }
         UpstreamSiteKind siteKind = candidate.siteKind();
         ProviderType providerType = candidate.providerType();
+        if (sourceProtocol == CanonicalIngressProtocol.RESPONSES
+                && isOpenAiStyleProvider(providerType, siteKind)
+                && siteKind != UpstreamSiteKind.OPENAI_DIRECT) {
+            return CanonicalIngressProtocol.OPENAI;
+        }
         if (isOpenAiStyleProvider(providerType, siteKind) && supportsIngressProtocol(sourceProtocol, candidate)) {
             return sourceProtocol;
         }
@@ -455,7 +460,7 @@ public class TranslationExecutionPlanCompiler {
             return switch (siteKind) {
                 case ANTHROPIC_DIRECT -> CanonicalIngressProtocol.ANTHROPIC_NATIVE;
                 case GEMINI_DIRECT, VERTEX_AI -> CanonicalIngressProtocol.GOOGLE_NATIVE;
-                case OPENAI_DIRECT, AZURE_OPENAI, OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, QWEN, MOONSHOT,
+                case OPENAI_DIRECT, AZURE_OPENAI, OPENAI_COMPATIBLE_GENERIC, XIAOMI_MIMO, DEEPSEEK, QWEN, MOONSHOT,
                         SILICONFLOW, VOLCENGINE, MINIMAX, DIFY, GROK, MISTRAL, COHERE, JINA, TOGETHER,
                         FIREWORKS, OPENROUTER, PERPLEXITY -> CanonicalIngressProtocol.OPENAI;
                 case OLLAMA_DIRECT -> CanonicalIngressProtocol.UNKNOWN;
@@ -479,6 +484,7 @@ public class TranslationExecutionPlanCompiler {
         return siteKind == UpstreamSiteKind.OPENAI_DIRECT
                 || siteKind == UpstreamSiteKind.AZURE_OPENAI
                 || siteKind == UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC
+                || siteKind == UpstreamSiteKind.XIAOMI_MIMO
                 || siteKind == UpstreamSiteKind.DEEPSEEK
                 || siteKind == UpstreamSiteKind.QWEN
                 || siteKind == UpstreamSiteKind.MOONSHOT

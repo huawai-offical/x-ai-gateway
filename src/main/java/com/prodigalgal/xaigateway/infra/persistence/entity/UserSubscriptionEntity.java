@@ -55,6 +55,12 @@ public class UserSubscriptionEntity {
     @Column(name = "notes", columnDefinition = "text")
     private String notes;
 
+    @Column(name = "source_type", length = 64)
+    private String sourceType;
+
+    @Column(name = "source_id", length = 128)
+    private String sourceId;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false, columnDefinition = "timestamp with time zone")
     private Instant createdAt;
@@ -121,6 +127,22 @@ public class UserSubscriptionEntity {
 
     public void setNotes(String notes) {
         this.notes = notes;
+    }
+
+    public String getSourceType() {
+        return sourceType;
+    }
+
+    public void setSourceType(String sourceType) {
+        this.sourceType = sourceType;
+    }
+
+    public String getSourceId() {
+        return sourceId;
+    }
+
+    public void setSourceId(String sourceId) {
+        this.sourceId = sourceId;
     }
 
     public Instant getCreatedAt() {

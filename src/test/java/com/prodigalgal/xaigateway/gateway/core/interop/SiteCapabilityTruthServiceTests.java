@@ -207,7 +207,7 @@ class SiteCapabilityTruthServiceTests {
     }
 
     @Test
-    void shouldTreatCohereChatAsNativeButModerationAsUnsupported() {
+    void shouldTreatCohereAsEmbedRerankNativeButNotGeneralChatOrFiles() {
         SiteCapabilitySnapshotRepository repository = Mockito.mock(SiteCapabilitySnapshotRepository.class);
         Mockito.when(repository.findBySiteProfile_Id(7L)).thenReturn(Optional.of(snapshot(false, true, false, false, false, false, false, false, false, false)));
         SiteCapabilityTruthService service = new SiteCapabilityTruthService(new UpstreamSitePolicyService(), repository);
@@ -226,8 +226,8 @@ class SiteCapabilityTruthServiceTests {
                 "command-a-03-2025",
                 "command-a-03-2025",
                 List.of("openai"),
-                true,
-                true,
+                false,
+                false,
                 false,
                 true,
                 false,
@@ -238,7 +238,11 @@ class SiteCapabilityTruthServiceTests {
                 InteropCapabilityLevel.NATIVE
         );
 
-        assertEquals(InteropCapabilityLevel.NATIVE, service.capabilityLevel(candidate, InteropFeature.CHAT_TEXT));
+        assertEquals(InteropCapabilityLevel.UNSUPPORTED, service.capabilityLevel(candidate, InteropFeature.CHAT_TEXT));
+        assertEquals(InteropCapabilityLevel.NATIVE, service.capabilityLevel(candidate, InteropFeature.EMBEDDINGS));
+        assertEquals(InteropCapabilityLevel.NATIVE, service.capabilityLevel(candidate, InteropFeature.RERANK));
+        assertEquals(InteropCapabilityLevel.UNSUPPORTED, service.capabilityLevel(candidate, InteropFeature.FILE_OBJECT));
+        assertEquals(InteropCapabilityLevel.UNSUPPORTED, service.capabilityLevel(candidate, InteropFeature.UPLOAD_CREATE));
         assertEquals(InteropCapabilityLevel.UNSUPPORTED, service.capabilityLevel(candidate, InteropFeature.MODERATION));
     }
 
@@ -654,6 +658,22 @@ class SiteCapabilityTruthServiceTests {
         assertEquals(
                 InteropCapabilityLevel.UNSUPPORTED,
                 service.resolve(siteProfile(UpstreamSiteKind.DIFY), fullSnapshot, InteropFeature.RERANK).effectiveLevel()
+        );
+        assertEquals(
+                InteropCapabilityLevel.UNSUPPORTED,
+                service.resolve(siteProfile(UpstreamSiteKind.COHERE), fullSnapshot, InteropFeature.CHAT_TEXT).effectiveLevel()
+        );
+        assertEquals(
+                InteropCapabilityLevel.UNSUPPORTED,
+                service.resolve(siteProfile(UpstreamSiteKind.COHERE), fullSnapshot, InteropFeature.TOOLS).effectiveLevel()
+        );
+        assertEquals(
+                InteropCapabilityLevel.NATIVE,
+                service.resolve(siteProfile(UpstreamSiteKind.COHERE), fullSnapshot, InteropFeature.EMBEDDINGS).effectiveLevel()
+        );
+        assertEquals(
+                InteropCapabilityLevel.NATIVE,
+                service.resolve(siteProfile(UpstreamSiteKind.COHERE), fullSnapshot, InteropFeature.RERANK).effectiveLevel()
         );
 
         assertEquals(

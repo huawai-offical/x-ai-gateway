@@ -8,7 +8,9 @@ x-ai-gateway 不以 OpenAI、Anthropic、Gemini、Vertex、Codex 等官方 API �
 
 - 2026-05-21 起，控制台已收紧并下线 `官方账号运行态`、`Native 命名空间兼容`、`Provider 参考差距`、`成本路由策略中心`、`向量检索排障沙盒` 等前端入口；相关 Markdown 若仍保留，多用于历史实现记录、后端保留接口说明或公开 API 兼容事实源。
 - 2026-05-22 起，`站点档案` 以“厂商管理 / API 入口”口径重新进入现役控制台，承接厂商、协议入口、conversation profile、模型能力、预设导入和 capability matrix。旧 `Provider 参考差距` 仍不恢复。
-- `/admin/accounts/group/{groupId}`、`/admin/accounts/{id}`、freeze/runtime-reset/import/quota-refresh/smoke、`/admin/provider-sites`、`/admin/provider-sites/{id}/capabilities`、`/admin/provider-sites/capability-matrix`、`/admin/vector-stores*` 以及公开 `/v1/vector_stores*`、`/v1/files*`、Responses `file_search` 本地绑定当前保留。
+- `/admin/accounts/group/{groupId}`、`/admin/accounts/{id}`、freeze/runtime-reset/import/quota-refresh/smoke、`/admin/provider-sites`、`/admin/provider-sites/{id}/capabilities`、`/admin/provider-sites/capability-matrix`、`/admin/vector-stores*` 以及公开 `/v1/vector_stores*`、`/v1/files*` 当前仍作为 gateway-local 支撑面保留；Responses hosted `file_search` 不再通过本地 Vector Store 绑定伪装成功，必须走 OpenAI Direct/native hosted lifecycle，否则返回 `native_hosted_tool_required`。
+- 2026-05-24 起，网关公开定义收口为“头部自有模型厂商 native + provider-specific native profile + lossless-only + hard-fail”：客户端可用 OpenAI、Anthropic、Gemini 等头部厂商协议接入，但只有目标厂商 native 或 provider-specific native profile 可执行、且资源属性可无损翻译时才成功；gateway-local 能力只作为本地支撑能力，不得伪装成厂商 official/native 成功。
+- Dify、OpenRouter、Together、Fireworks、SiliconFlow 与 generic compatible 不进入默认核心承诺；OpenAI-style 只是入口协议，不代表任意 OpenAI-compatible 都可成功；`/responses/compact` 无 native 等价时必须 `unsupported/native_compaction_required`。
 
 ## 需求
 
@@ -74,7 +76,7 @@ x-ai-gateway 不以 OpenAI、Anthropic、Gemini、Vertex、Codex 等官方 API �
 - [REQ-20260517-005 OpenAI Vector Store File Batches 本地 Lifecycle 基线](requirements/REQ-20260517-005-openai-vector-store-file-batches-local-lifecycle.md)
 - [REQ-20260518-001 OpenAI Vector Store File Content 本地读取基线](requirements/REQ-20260518-001-openai-vector-store-file-content-local-read-baseline.md)
 - [REQ-20260518-002 OpenAI Vector Store Search 本地文本检索基线](requirements/REQ-20260518-002-openai-vector-store-search-local-text-baseline.md)
-- [REQ-20260518-003 OpenAI Responses File Search 本地 Vector Store 绑定基线](requirements/REQ-20260518-003-openai-responses-file-search-local-vector-store-binding.md)
+- [REQ-20260518-003 OpenAI Responses File Search 本地 Vector Store 绑定基线（历史，当前默认已由 TASK-20260524-001-04 收口为 native-required）](requirements/REQ-20260518-003-openai-responses-file-search-local-vector-store-binding.md)
 - [REQ-20260518-004 OpenAI Vector Store 本地 Ingestion 产物基线](requirements/REQ-20260518-004-openai-vector-store-local-ingestion-artifact-baseline.md)
 - [REQ-20260518-005 对话与 Tools 功能性服务 API 范围收窄](requirements/REQ-20260518-005-functional-service-api-scope.md)
 - [REQ-20260518-006 非核心 API 兼容代码彻底清理](requirements/REQ-20260518-006-non-core-api-code-eradication.md)
@@ -126,6 +128,14 @@ x-ai-gateway 不以 OpenAI、Anthropic、Gemini、Vertex、Codex 等官方 API �
 - [REQ-20260523-011 凭证与厂商领域模型梳理](requirements/REQ-20260523-011-credential-provider-domain-model-clarification.md)
 - [REQ-20260523-012 控制台 Apple-level UI/UX 精修](requirements/REQ-20260523-012-console-apple-level-uiux-polish.md)
 - [REQ-20260524-001 头部自有模型厂商 Native 与无损翻译网关范围](requirements/REQ-20260524-001-head-provider-native-lossless-gateway-scope.md)
+- [REQ-20260524-002 删除 Admin 厂商 OAuth 连接并配置化 Portal 社交 OAuth](requirements/REQ-20260524-002-admin-oauth-removal-portal-social-oauth-config.md)
+- [REQ-20260524-003 Portal 完整邀请码系统](requirements/REQ-20260524-003-portal-invitation-code-system.md)
+- [REQ-20260524-004 邀请码归属、OAuth 首次注册与奖励赠品](requirements/REQ-20260524-004-invitation-code-owner-oauth-rewards.md)
+- [REQ-20260524-005 邀请增长系统完整化](requirements/REQ-20260524-005-invitation-growth-system.md)
+- [REQ-20260525-001 Admin 邀请树展示补齐](requirements/REQ-20260525-001-admin-invitation-tree-ui.md)
+- [REQ-20260525-005 请求详情追踪与转换审计](requirements/REQ-20260525-005-request-trace-detail-audit.md)
+- [REQ-20260525-006 请求详情追踪保留、采样与归档增强](requirements/REQ-20260525-006-trace-detail-retention-sampling-archive.md)
+- [REQ-20260525-007 异步边界同步代码排查](requirements/REQ-20260525-007-async-boundary-sync-code-audit.md)
 
 ## 决策
 
@@ -139,6 +149,7 @@ x-ai-gateway 不以 OpenAI、Anthropic、Gemini、Vertex、Codex 等官方 API �
 - [ADR-0008 云端代理优先的 CLI 接入架构](decisions/ADR-0008-cloud-cli-access-without-local-proxy.md)
 - [ADR-0009 Desktop Companion 不进入服务端主线](decisions/ADR-0009-desktop-companion-out-of-mainline.md)
 - [ADR-0010 对话与 Tools 功能性服务 API 作为产品范围](decisions/ADR-0010-functional-service-api-scope.md)
+- [ADR-0011 请求日志主记录与请求详情追踪拆表](decisions/ADR-0011-request-log-trace-detail-split.md)
 
 ## 报告
 
@@ -164,6 +175,9 @@ x-ai-gateway 不以 OpenAI、Anthropic、Gemini、Vertex、Codex 等官方 API �
 - [REP-20260523 凭证与厂商领域模型关系梳理](reports/REP-20260523-credential-provider-domain-model.md)
 - [REP-20260524-001 Native Adapter 最小契约](reports/REP-20260524-001-native-adapter-minimum-contract.md)
 - [REP-20260524-002 跨协议资源属性无损翻译矩阵](reports/REP-20260524-002-lossless-translation-matrix.md)
+- [REP-20260524-003 网关定义口径同步](reports/REP-20260524-003-gateway-definition-sync.md)
+- [REP-20260525-007 异步边界同步代码排查](reports/REP-20260525-007-async-boundary-sync-code-audit.md)
+- [REP-20260525-008 ADR-0011 请求日志与请求详情拆表闭环审计](reports/REP-20260525-008-adr0011-request-log-trace-detail-split-closure-audit.md)
 
 ## 迁移记录
 

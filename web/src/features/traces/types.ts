@@ -126,11 +126,35 @@ export type AsyncResourceDetail = {
   metadataJson?: unknown
 }
 
+export type TraceDetailEntry = {
+  id?: number
+  requestId?: string | null
+  stage?: string | null
+  direction?: string | null
+  contentKind?: string | null
+  payloadJson?: unknown
+  metadataJson?: unknown
+  payloadHash?: string | null
+  metadataHash?: string | null
+  originalLength?: number | null
+  storedLength?: number | null
+  metadataOriginalLength?: number | null
+  metadataStoredLength?: number | null
+  truncated?: boolean | null
+  metadataTruncated?: boolean | null
+  redacted?: boolean | null
+  metadataRedacted?: boolean | null
+  expiresAt?: string | null
+  createdAt?: string | null
+  [key: string]: unknown
+}
+
 export type ObservabilityTraceResponse = {
   requestLog?: RequestLogEntry | null
   routeDecision?: RouteDecisionEntry | null
   cacheHits: CacheHitEntry[]
   upstreamCacheReferences: UpstreamCacheReferenceEntry[]
+  traceDetails?: TraceDetailEntry[]
   asyncResourceSummary?: AsyncResourceSummary | null
   asyncResourceDetail?: AsyncResourceDetail | null
 }

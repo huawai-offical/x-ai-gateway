@@ -2,11 +2,13 @@
 
 ## 本批范围
 
+> 2026-05-24 口径提示：本文保留 `TASK-20260514-003` 的历史长尾 adapter 闭环记录。当前默认核心支持不再以长尾聚合或 generic OpenAI-compatible 为目标；xAI、Perplexity、Vertex 等只有在具备 provider-specific native profile、明确资源边界和可验证 smoke 时才进入核心或条件支持。
+
 本批闭环 `TASK-20260514-003` 的第一组高价值 provider：
 
 | Provider | Catalog code | Site kind | 支持状态 | Adapter 边界 |
 | --- | --- | --- | --- | --- |
-| xAI Grok | `xai` | `GROK` | `SUPPORTED` | OpenAI-compatible chat/responses；web search、files 等专有能力只记录边界，不泛化为全量 lifecycle。 |
+| xAI Grok | `xai` | `GROK` | `SUPPORTED` | provider-specific OpenAI-style chat/profile；web search、files 等专有能力只记录边界，不泛化为全量 lifecycle。 |
 | Perplexity | `perplexity` | `PERPLEXITY` | `SUPPORTED` | `/v1/web_search` 转换为 Perplexity Sonar `/v1/sonar`，保留 search filter 与 citation/source 返回。 |
 | Vertex AI | `vertex` | `VERTEX_AI` | `SUPPORTED` | Google Cloud project/location + bearer/service account native path，与 AI Studio API key surface 分开治理。 |
 

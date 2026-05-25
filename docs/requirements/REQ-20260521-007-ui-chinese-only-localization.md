@@ -76,9 +76,11 @@
 - 已完成控制台高频链路的第二轮深度汉化，包括 `request logs`、`traces`、`upstream cache`、`portal home`、`Codex onboarding`、`dashboard`、`incidents`、`credentials`、`OAuth connect/callback`、`resources`、`governance`、`windows` 等页面。
 - 已删除 `dashboard`、`incidents`、`resources`、`ops alerts` 等页面中的解释性正文或迁移提示，避免继续暴露“页面为何这样设计”的说明文案。
 - 已把 `requestId`、`gatewayResourceKey`、`providerType`、`distributedKeyId`、`Session Key`、`API Key / Secret` 等用户可见口径继续收紧为中文或更自然的中英混排。
+- 已补齐协议入口新增/编辑弹窗“2. 运行时策略”页签汉化，将 `Provider Type`、`Site Kind`、`Auth Strategy`、`Path Strategy`、`Model Addressing`、`Error Schema`、`Stream Transport` 等可见字段标签收口为中文，同时保留底层枚举值和 API payload。
 - 当前仍保留 In Progress，用于继续承接 Console、Portal/Public/Workbench 中尚未完全收口的零散残留。
 
 ## 已验证范围
 
 - 通过：`bun run typecheck`
 - 通过：`bun run vitest run src/app/navigation.test.ts src/app/operations-router.test.tsx src/app/layout.test.tsx src/features/dashboard/dashboard-page.test.tsx src/features/ops/ops-page.test.tsx src/features/incidents/incidents-page.test.tsx src/features/request-logs/request-logs-page.test.tsx src/features/accounts/codex-onboarding-page.test.tsx src/features/accounts/oauth-connect-page.test.tsx src/features/portal/portal-home-page.test.tsx src/features/traces/traces-page.test.tsx src/features/upstream-cache/upstream-cache-page.test.tsx src/features/credentials/credentials-page.test.tsx src/features/resources/resources-page.test.tsx src/features/ops/ops-alerts-page.test.tsx src/features/ops/governance-page.test.tsx src/features/operations/windows-page.test.tsx`
+- 通过：`bun run test -- src/features/provider-sites/provider-site-detail-page.test.tsx`

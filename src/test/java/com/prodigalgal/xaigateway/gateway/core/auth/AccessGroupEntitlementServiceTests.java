@@ -6,10 +6,12 @@ import com.prodigalgal.xaigateway.infra.persistence.entity.DistributedKeyEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayUserEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.PlanAccessGroupEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SubscriptionPlanEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UserAccessGroupGrantEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UserSubscriptionEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyAccessGroupGrantRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.DistributedKeyRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.PlanAccessGroupRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UserAccessGroupGrantRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UserSubscriptionRepository;
 import java.time.Instant;
 import java.util.List;
@@ -25,11 +27,13 @@ class AccessGroupEntitlementServiceTests {
     private final DistributedKeyAccessGroupGrantRepository keyGrantRepository = Mockito.mock(DistributedKeyAccessGroupGrantRepository.class);
     private final UserSubscriptionRepository userSubscriptionRepository = Mockito.mock(UserSubscriptionRepository.class);
     private final DistributedKeyRepository distributedKeyRepository = Mockito.mock(DistributedKeyRepository.class);
+    private final UserAccessGroupGrantRepository userAccessGroupGrantRepository = Mockito.mock(UserAccessGroupGrantRepository.class);
     private final AccessGroupEntitlementService service = new AccessGroupEntitlementService(
             planAccessGroupRepository,
             keyGrantRepository,
             userSubscriptionRepository,
-            distributedKeyRepository
+            distributedKeyRepository,
+            userAccessGroupGrantRepository
     );
 
     @Test
@@ -47,6 +51,8 @@ class AccessGroupEntitlementServiceTests {
                 .thenReturn(List.of(subscription));
         Mockito.when(planAccessGroupRepository.findAllByPlan_IdInAndActiveTrueOrderByPriorityAscCreatedAtAsc(List.of(3L)))
                 .thenReturn(List.of(binding));
+        Mockito.when(userAccessGroupGrantRepository.findAllByUser_IdAndStatusOrderByCreatedAtDesc(1L, "ACTIVE"))
+                .thenReturn(List.of());
 
         ResolvedAccessPolicy policy = service.resolveForDistributedKey(key);
 
@@ -78,6 +84,27 @@ class AccessGroupEntitlementServiceTests {
         assertEquals(List.of("anthropic.native"), policy.allowedProtocolSuites());
         assertEquals(List.of("claude-sonnet-4"), policy.allowedModels());
         assertEquals(30, policy.rpmLimit());
+    }
+
+    @Test
+    void shouldIncludeUserAccessGroupGrantInDistributedKeyPolicy() {
+        GatewayUserEntity user = user(1L);
+        DistributedKeyEntity key = key(10L, user);
+        AccessGroupEntity granted = group(7L, "gift-access", List.of("deepseek.openai_compatible"), List.of("deepseek-chat"), 40);
+        UserAccessGroupGrantEntity grant = userGrant(user, granted);
+
+        Mockito.when(keyGrantRepository.findAllByDistributedKey_IdAndActiveTrueOrderByPriorityAscCreatedAtAsc(10L))
+                .thenReturn(List.of());
+        Mockito.when(userSubscriptionRepository.findAllByUser_IdOrderByCreatedAtDesc(1L)).thenReturn(List.of());
+        Mockito.when(userAccessGroupGrantRepository.findAllByUser_IdAndStatusOrderByCreatedAtDesc(1L, "ACTIVE"))
+                .thenReturn(List.of(grant));
+
+        ResolvedAccessPolicy policy = service.resolveForDistributedKey(key);
+
+        assertEquals(List.of("gift-access"), policy.sourceAccessGroups());
+        assertEquals(List.of("deepseek.openai_compatible"), policy.allowedProtocolSuites());
+        assertEquals(List.of("deepseek-chat"), policy.allowedModels());
+        assertEquals(40, policy.rpmLimit());
     }
 
     private GatewayUserEntity user(Long id) {
@@ -136,7 +163,7 @@ class AccessGroupEntitlementServiceTests {
         subscription.setPlan(plan);
         subscription.setStatus("ACTIVE");
         subscription.setStartsAt(Instant.parse("2026-04-24T00:00:00Z"));
-        subscription.setExpiresAt(Instant.parse("2026-05-24T00:00:00Z"));
+        subscription.setExpiresAt(Instant.parse("2026-06-24T00:00:00Z"));
         return subscription;
     }
 
@@ -147,6 +174,16 @@ class AccessGroupEntitlementServiceTests {
         grant.setGrantMode(mode);
         grant.setActive(true);
         grant.setPriority(100);
+        return grant;
+    }
+
+    private UserAccessGroupGrantEntity userGrant(GatewayUserEntity user, AccessGroupEntity group) {
+        UserAccessGroupGrantEntity grant = new UserAccessGroupGrantEntity();
+        grant.setUser(user);
+        grant.setAccessGroup(group);
+        grant.setStatus("ACTIVE");
+        grant.setStartsAt(Instant.parse("2026-04-24T00:00:00Z"));
+        grant.setExpiresAt(Instant.parse("2026-06-24T00:00:00Z"));
         return grant;
     }
 }

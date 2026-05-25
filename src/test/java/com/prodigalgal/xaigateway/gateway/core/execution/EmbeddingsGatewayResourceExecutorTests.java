@@ -79,6 +79,22 @@ class EmbeddingsGatewayResourceExecutorTests {
         )));
     }
 
+    @Test
+    void shouldNotUseGenericOpenAiCompatibleExecutorForCohereOrJinaNativeEmbeddings() {
+        assertFalse(executor.supports(request(), candidate(
+                ProviderType.OPENAI_COMPATIBLE,
+                UpstreamSiteKind.COHERE,
+                AuthStrategy.BEARER,
+                PathStrategy.OPENAI_V1
+        )));
+        assertFalse(executor.supports(request(), candidate(
+                ProviderType.OPENAI_COMPATIBLE,
+                UpstreamSiteKind.JINA,
+                AuthStrategy.BEARER,
+                PathStrategy.OPENAI_V1
+        )));
+    }
+
     private CanonicalResourceRequest request() {
         return new CanonicalResourceRequest(
                 "sk-gw-test",

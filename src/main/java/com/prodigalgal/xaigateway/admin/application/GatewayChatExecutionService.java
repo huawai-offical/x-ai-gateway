@@ -38,6 +38,10 @@ import com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestFeatureServ
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlanCompiler;
 import com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityService;
 import com.prodigalgal.xaigateway.gateway.core.observability.GatewayRequestLifecycleService;
+import com.prodigalgal.xaigateway.gateway.core.observability.GatewayRequestTraceDetailService;
+import com.prodigalgal.xaigateway.gateway.core.observability.RequestTraceContentKind;
+import com.prodigalgal.xaigateway.gateway.core.observability.RequestTraceDirection;
+import com.prodigalgal.xaigateway.gateway.core.observability.RequestTraceStage;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageCompleteness;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageSource;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageView;
@@ -65,8 +69,10 @@ import com.prodigalgal.xaigateway.protocol.ingress.openai.OpenAiResponsesRequest
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -99,6 +105,7 @@ public class GatewayChatExecutionService {
     private final RoutingPolicyRuntimeConfigService routingPolicyRuntimeConfigService;
     private final RoutingPolicyRuntimeEnforcementService routingPolicyRuntimeEnforcementService;
     private final CloudCliRequestFilterService cloudCliRequestFilterService;
+    private final GatewayRequestTraceDetailService gatewayRequestTraceDetailService;
 
     @Autowired
     public GatewayChatExecutionService(
@@ -121,7 +128,8 @@ public class GatewayChatExecutionService {
             GatewayProperties gatewayProperties,
             RoutingPolicyRuntimeConfigService routingPolicyRuntimeConfigService,
             RoutingPolicyRuntimeEnforcementService routingPolicyRuntimeEnforcementService,
-            CloudCliRequestFilterService cloudCliRequestFilterService) {
+            CloudCliRequestFilterService cloudCliRequestFilterService,
+            GatewayRequestTraceDetailService gatewayRequestTraceDetailService) {
         this.gatewayRouteSelectionService = gatewayRouteSelectionService;
         this.upstreamCredentialRepository = upstreamCredentialRepository;
         this.credentialCryptoService = credentialCryptoService;
@@ -142,6 +150,7 @@ public class GatewayChatExecutionService {
         this.routingPolicyRuntimeConfigService = routingPolicyRuntimeConfigService;
         this.routingPolicyRuntimeEnforcementService = routingPolicyRuntimeEnforcementService;
         this.cloudCliRequestFilterService = cloudCliRequestFilterService;
+        this.gatewayRequestTraceDetailService = gatewayRequestTraceDetailService;
     }
 
     public GatewayChatExecutionService(
@@ -184,7 +193,8 @@ public class GatewayChatExecutionService {
                 gatewayProperties,
                 routingPolicyRuntimeConfigService,
                 routingPolicyRuntimeEnforcementService,
-                new CloudCliRequestFilterService()
+                new CloudCliRequestFilterService(),
+                null
         );
     }
 
@@ -226,7 +236,8 @@ public class GatewayChatExecutionService {
                 gatewayProperties,
                 null,
                 null,
-                new CloudCliRequestFilterService()
+                new CloudCliRequestFilterService(),
+                null
         );
     }
 
@@ -269,6 +280,10 @@ public class GatewayChatExecutionService {
         ));
         GatewayRequestSemantics semantics = gatewayRequestFeatureService.describe("POST", filteredRequest.requestPath(), routeBody);
         gatewayRequestLifecycleService.startRequest(requestId, selectionResult, filteredRequest, false, startedAt);
+        recordTrace(requestId, RequestTraceStage.DOWNSTREAM_REQUEST, RequestTraceDirection.DOWNSTREAM, RequestTraceContentKind.JSON, routeBody,
+                traceMetadata(RequestTraceStage.DOWNSTREAM_REQUEST, "protocol", filteredRequest.ingressProtocol().name(), "requestPath", filteredRequest.requestPath()));
+        recordTrace(requestId, RequestTraceStage.CANONICAL_REQUEST, RequestTraceDirection.INTERNAL, RequestTraceContentKind.JSON, filteredRequest,
+                traceMetadata(RequestTraceStage.CANONICAL_REQUEST, "filterApplied", !filterResult.appliedRuleIds().isEmpty()));
 
         try {
             List<RouteExecutionAttempt> attempts = new ArrayList<>();
@@ -284,20 +299,31 @@ public class GatewayChatExecutionService {
                         semantics,
                         routeBody
                 );
-                UpstreamCredentialEntity credential = getRequiredCredential(candidate.candidate().credentialId());
-                ResolvedCredentialMaterial credentialMaterial = credentialMaterialResolver.resolve(candidateSelection, credential);
+                CanonicalExecutionPlan executionPlan = executionPlanCompilation.canonicalPlan();
+                recordTrace(requestId, RequestTraceStage.TRANSLATION_PLAN, RequestTraceDirection.INTERNAL, RequestTraceContentKind.JSON, executionPlan,
+                        traceMetadata(RequestTraceStage.TRANSLATION_PLAN, "candidateIndex", index + 1, "providerType", candidate.candidate().providerType().name()));
+                UpstreamCredentialEntity credential = null;
+                ResolvedCredentialMaterial credentialMaterial = null;
                 try {
-                    GatewayChatRuntime runtime = resolveRuntime(candidate.candidate(), executionPlanCompilation.canonicalPlan().executionBackend());
+                    ensureExecutable(executionPlan);
+                    credential = getRequiredCredential(candidate.candidate().credentialId());
+                    credentialMaterial = credentialMaterialResolver.resolve(candidateSelection, credential);
+                    GatewayChatRuntime runtime = resolveRuntime(candidate.candidate(), executionPlan.executionBackend());
+                    recordTrace(requestId, RequestTraceStage.UPSTREAM_REQUEST, RequestTraceDirection.UPSTREAM, RequestTraceContentKind.JSON,
+                            upstreamChatRequestSnapshot(candidateSelection, filteredRequest, executionPlan),
+                            traceMetadata(RequestTraceStage.UPSTREAM_REQUEST, "credentialId", candidate.candidate().credentialId(), "backend", backendName(executionPlan)));
                     CanonicalResponse result = runtime.execute(new GatewayChatRuntimeContext(
                             candidateSelection,
                             credential,
                             credentialMaterial,
                             filteredRequest,
-                            executionPlanCompilation.canonicalPlan()
+                            executionPlan
                     ));
                     if (isEmptyCanonicalResult(result)) {
                         throw new IllegalStateException("上游响应为空。");
                     }
+                    recordTrace(requestId, RequestTraceStage.UPSTREAM_RESPONSE, RequestTraceDirection.UPSTREAM, RequestTraceContentKind.JSON, result,
+                            traceMetadata(RequestTraceStage.UPSTREAM_RESPONSE, "providerType", candidate.candidate().providerType().name()));
 
                     attempts.add(new RouteExecutionAttempt(
                             index + 1,
@@ -336,8 +362,12 @@ public class GatewayChatExecutionService {
                             credentialMaterial.accountId(),
                             null
                     );
-                    return new CanonicalExecutionResult(requestId, finalSelection, executionPlanCompilation.canonicalPlan(), enriched);
+                    recordTrace(requestId, RequestTraceStage.DOWNSTREAM_RESPONSE, RequestTraceDirection.DOWNSTREAM, RequestTraceContentKind.JSON, downstreamChatResponseSnapshot(enriched),
+                            traceMetadata(RequestTraceStage.DOWNSTREAM_RESPONSE, "status", "COMPLETED", "stream", false));
+                    return new CanonicalExecutionResult(requestId, finalSelection, executionPlan, enriched);
                 } catch (RuntimeException exception) {
+                    recordTraceError(requestId, RequestTraceStage.ERROR, RequestTraceDirection.INTERNAL, exception,
+                            traceMetadata(RequestTraceStage.ERROR, "candidateIndex", index + 1, "providerType", candidate.candidate().providerType().name()));
                     attempts.add(new RouteExecutionAttempt(
                             index + 1,
                             candidate.candidate().credentialId(),
@@ -345,9 +375,7 @@ public class GatewayChatExecutionService {
                             "FAILED_BEFORE_FIRST_BYTE",
                             fallbackDetail(exception)
                     ));
-                    gatewayRouteSelectionService.invalidateSelection(candidateSelection);
-                    gatewayRouteSelectionService.markCredentialCooldown(candidate.candidate().credentialId(), fallbackDetail(exception));
-                    recordRoutingPolicyFailure(candidate, credential, fallbackDetail(exception));
+                    recordCandidateFailure(candidateSelection, candidate, credential, exception);
                     lastException = exception;
                     if (!shouldFallback(exception) || index == maxAttempts - 1) {
                         RouteSelectionResult failedSelection = candidateSelection.withAttempts(List.copyOf(attempts));
@@ -360,7 +388,7 @@ public class GatewayChatExecutionService {
                                 exception,
                                 GatewayUsageView.empty(),
                                 startedAt,
-                                credentialMaterial.accountId(),
+                                credentialMaterial == null ? null : credentialMaterial.accountId(),
                                 null
                         );
                         throw exception;
@@ -404,6 +432,10 @@ public class GatewayChatExecutionService {
         ));
         GatewayRequestSemantics semantics = gatewayRequestFeatureService.describe("POST", filteredRequest.requestPath(), routeBody);
         gatewayRequestLifecycleService.startRequest(requestId, selectionResult, filteredRequest, true, startedAt);
+        recordTrace(requestId, RequestTraceStage.DOWNSTREAM_REQUEST, RequestTraceDirection.DOWNSTREAM, RequestTraceContentKind.JSON, routeBody,
+                traceMetadata(RequestTraceStage.DOWNSTREAM_REQUEST, "protocol", filteredRequest.ingressProtocol().name(), "requestPath", filteredRequest.requestPath(), "stream", true));
+        recordTrace(requestId, RequestTraceStage.CANONICAL_REQUEST, RequestTraceDirection.INTERNAL, RequestTraceContentKind.JSON, filteredRequest,
+                traceMetadata(RequestTraceStage.CANONICAL_REQUEST, "filterApplied", !filterResult.appliedRuleIds().isEmpty(), "stream", true));
         AtomicReference<CanonicalUsage> lastVisibleUsage = new AtomicReference<>(CanonicalUsage.empty());
         AtomicBoolean terminalRecorded = new AtomicBoolean(false);
         AtomicReference<RouteSelectionResult> finalSelectionRef = new AtomicReference<>(selectionResult);
@@ -482,6 +514,8 @@ public class GatewayChatExecutionService {
                             selectedAccountIdRef.get(),
                             firstTokenLatencyMsRef.get()
                     );
+                    recordTraceError(requestId, RequestTraceStage.ERROR, RequestTraceDirection.INTERNAL, error,
+                            traceMetadata(RequestTraceStage.ERROR, "status", "FAILED", "stream", true));
                 })
                 .doOnCancel(() -> {
                     RouteSelectionResult finalSelection = finalSelectionRef.get().withAttempts(List.copyOf(attempts));
@@ -521,17 +555,23 @@ public class GatewayChatExecutionService {
         RouteSelectionResult candidateSelection = selectionForCandidate(baseSelection, candidate, attempts);
         finalSelectionRef.set(candidateSelection);
 
-        UpstreamCredentialEntity credential = getRequiredCredential(candidate.candidate().credentialId());
-        ResolvedCredentialMaterial credentialMaterial = credentialMaterialResolver.resolve(candidateSelection, credential);
-        selectedAccountIdRef.set(credentialMaterial.accountId());
         CanonicalExecutionPlanCompilation executionPlanCompilation = translationExecutionPlanCompiler.compileSelected(
                 candidateSelection,
                 request,
                 semantics,
                 routeBody
         );
-        planRef.set(executionPlanCompilation.canonicalPlan());
-        GatewayChatRuntime runtime = resolveRuntime(candidate.candidate(), executionPlanCompilation.canonicalPlan().executionBackend());
+        CanonicalExecutionPlan executionPlan = ensureExecutable(executionPlanCompilation.canonicalPlan());
+        planRef.set(executionPlan);
+        recordTrace(requestId, RequestTraceStage.TRANSLATION_PLAN, RequestTraceDirection.INTERNAL, RequestTraceContentKind.JSON, executionPlan,
+                traceMetadata(RequestTraceStage.TRANSLATION_PLAN, "candidateIndex", candidateIndex + 1, "providerType", candidate.candidate().providerType().name(), "stream", true));
+        UpstreamCredentialEntity credential = getRequiredCredential(candidate.candidate().credentialId());
+        ResolvedCredentialMaterial credentialMaterial = credentialMaterialResolver.resolve(candidateSelection, credential);
+        selectedAccountIdRef.set(credentialMaterial.accountId());
+        GatewayChatRuntime runtime = resolveRuntime(candidate.candidate(), executionPlan.executionBackend());
+        recordTrace(requestId, RequestTraceStage.UPSTREAM_REQUEST, RequestTraceDirection.UPSTREAM, RequestTraceContentKind.JSON,
+                upstreamChatRequestSnapshot(candidateSelection, request, executionPlan),
+                traceMetadata(RequestTraceStage.UPSTREAM_REQUEST, "credentialId", candidate.candidate().credentialId(), "backend", backendName(executionPlan), "stream", true));
         AtomicBoolean firstOutputCommitted = new AtomicBoolean(false);
         AtomicBoolean successRecorded = new AtomicBoolean(false);
 
@@ -540,7 +580,7 @@ public class GatewayChatExecutionService {
                         credential,
                         credentialMaterial,
                         request,
-                        executionPlanCompilation.canonicalPlan()
+                        executionPlan
                 ))
                 .doOnNext(event -> {
                     if (isVisibleStreamEvent(event)) {
@@ -548,6 +588,8 @@ public class GatewayChatExecutionService {
                         firstOutputCommitted.set(true);
                     }
                     if (event.terminal() && successRecorded.compareAndSet(false, true)) {
+                        recordTrace(requestId, RequestTraceStage.UPSTREAM_RESPONSE, RequestTraceDirection.UPSTREAM, RequestTraceContentKind.JSON, event,
+                                traceMetadata(RequestTraceStage.UPSTREAM_RESPONSE, "providerType", candidate.candidate().providerType().name(), "stream", true, "terminal", true));
                         attempts.add(new RouteExecutionAttempt(
                                 candidateIndex + 1,
                                 candidate.candidate().credentialId(),
@@ -575,8 +617,13 @@ public class GatewayChatExecutionService {
                         gatewayRouteSelectionService.recordSuccessfulSelection(finalSelection);
                         recordRoutingPolicySuccess(candidate, credential);
                     }
+                    recordTrace(requestId, RequestTraceStage.DOWNSTREAM_RESPONSE, RequestTraceDirection.DOWNSTREAM, RequestTraceContentKind.JSON,
+                            traceMetadata(RequestTraceStage.DOWNSTREAM_RESPONSE, "streamCompleted", true, "firstTokenLatencyMs", firstTokenLatencyMsRef.get()),
+                            traceMetadata(RequestTraceStage.DOWNSTREAM_RESPONSE, "status", "COMPLETED", "stream", true));
                 })
                 .onErrorResume(error -> {
+                    recordTraceError(requestId, RequestTraceStage.ERROR, RequestTraceDirection.UPSTREAM, error,
+                            traceMetadata(RequestTraceStage.ERROR, "candidateIndex", candidateIndex + 1, "stream", true));
                     String outcome = firstOutputCommitted.get() ? "FAILED_AFTER_FIRST_BYTE" : "FAILED_BEFORE_FIRST_BYTE";
                     attempts.add(new RouteExecutionAttempt(
                             candidateIndex + 1,
@@ -587,9 +634,7 @@ public class GatewayChatExecutionService {
                     ));
                     RouteSelectionResult failedSelection = candidateSelection.withAttempts(List.copyOf(attempts));
                     finalSelectionRef.set(failedSelection);
-                    gatewayRouteSelectionService.invalidateSelection(candidateSelection);
-                    gatewayRouteSelectionService.markCredentialCooldown(candidate.candidate().credentialId(), fallbackDetail(error));
-                    recordRoutingPolicyFailure(candidate, credential, fallbackDetail(error));
+                    recordCandidateFailure(candidateSelection, candidate, credential, error);
                     if (!firstOutputCommitted.get()
                             && shouldFallback(error)
                             && candidateIndex + 1 < maxAttempts
@@ -664,6 +709,155 @@ public class GatewayChatExecutionService {
             );
         }
         return GatewayUsageView.empty();
+    }
+
+    private void recordTrace(
+            String requestId,
+            RequestTraceStage stage,
+            RequestTraceDirection direction,
+            RequestTraceContentKind contentKind,
+            Object payload,
+            Map<String, ?> metadata) {
+        if (gatewayRequestTraceDetailService == null) {
+            return;
+        }
+        gatewayRequestTraceDetailService.record(
+                requestId,
+                stage,
+                direction,
+                contentKind,
+                payload,
+                metadata == null ? Map.of() : metadata
+        );
+    }
+
+    private void recordTraceError(
+            String requestId,
+            RequestTraceStage stage,
+            RequestTraceDirection direction,
+            Throwable error,
+            Map<String, ?> metadata) {
+        if (gatewayRequestTraceDetailService == null) {
+            return;
+        }
+        gatewayRequestTraceDetailService.recordError(requestId, stage, direction, error, metadata == null ? Map.of() : metadata);
+    }
+
+    private Map<String, Object> upstreamChatRequestSnapshot(
+            RouteSelectionResult selectionResult,
+            CanonicalRequest request,
+            CanonicalExecutionPlan executionPlan) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        if (selectionResult != null) {
+            putIfPresent(snapshot, "distributedKeyId", selectionResult.distributedKeyId());
+            putIfPresent(snapshot, "protocol", selectionResult.protocol());
+            putIfPresent(snapshot, "providerType", selectionResult.selectedCandidate() == null
+                    ? null
+                    : selectionResult.selectedCandidate().candidate().providerType());
+            putIfPresent(snapshot, "credentialId", selectionResult.selectedCandidate() == null
+                    ? null
+                    : selectionResult.selectedCandidate().candidate().credentialId());
+            putIfPresent(snapshot, "credentialName", selectionResult.selectedCandidate() == null
+                    ? null
+                    : selectionResult.selectedCandidate().candidate().credentialName());
+            putIfPresent(snapshot, "baseUrl", selectionResult.selectedCandidate() == null
+                    ? null
+                    : selectionResult.selectedCandidate().candidate().baseUrl());
+            putIfPresent(snapshot, "selectionSource", selectionResult.selectionSource());
+        }
+        if (request != null) {
+            putIfPresent(snapshot, "requestPath", request.requestPath());
+            putIfPresent(snapshot, "requestedModel", request.requestedModel());
+            putIfPresent(snapshot, "messageCount", request.messages() == null ? 0 : request.messages().size());
+            putIfPresent(snapshot, "toolCount", request.tools() == null ? 0 : request.tools().size());
+            putIfPresent(snapshot, "temperature", request.temperature());
+            putIfPresent(snapshot, "maxTokens", request.maxTokens());
+            putIfPresent(snapshot, "hasReasoning", request.reasoning() != null);
+            putIfPresent(snapshot, "hasProviderExtensions", request.providerExtensions() != null && !request.providerExtensions().isNull());
+        }
+        if (executionPlan != null) {
+            putIfPresent(snapshot, "executionBackend", backendName(executionPlan));
+            putIfPresent(snapshot, "executionKind", executionPlan.executionKind());
+            putIfPresent(snapshot, "resourceType", executionPlan.resourceType());
+            putIfPresent(snapshot, "operation", executionPlan.operation());
+            putIfPresent(snapshot, "supportStatus", executionPlan.supportStatus());
+            putIfPresent(snapshot, "degradationLevel", executionPlan.degradationLevel());
+            putIfPresent(snapshot, "routeSelectionMode", executionPlan.routeSelectionMode());
+        }
+        return snapshot;
+    }
+
+    private Map<String, Object> downstreamChatResponseSnapshot(CanonicalResponse response) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        if (response == null) {
+            return snapshot;
+        }
+        putIfPresent(snapshot, "requestId", response.requestId());
+        putIfPresent(snapshot, "publicModel", response.publicModel());
+        putIfPresent(snapshot, "finishReason", response.finishReason());
+        putIfPresent(snapshot, "outputText", response.outputText());
+        putIfPresent(snapshot, "reasoning", response.reasoning());
+        putIfPresent(snapshot, "toolCalls", response.toolCalls());
+        putIfPresent(snapshot, "usage", response.usage());
+        putIfPresent(snapshot, "hasRawResponse", response.rawResponse() != null && !response.rawResponse().isNull());
+        return snapshot;
+    }
+
+    private Map<String, Object> traceMetadata(RequestTraceStage stage, Object... entries) {
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("payloadSource", payloadSource(stage));
+        metadata.put("wireBody", stage == RequestTraceStage.DOWNSTREAM_REQUEST);
+        metadata.put("wireBodyLimitation", wireBodyLimitation(stage));
+        if (entries == null) {
+            return metadata;
+        }
+        for (int index = 0; index + 1 < entries.length; index += 2) {
+            Object key = entries[index];
+            Object value = entries[index + 1];
+            if (key != null && value != null) {
+                metadata.put(String.valueOf(key), value);
+            }
+        }
+        return metadata;
+    }
+
+    private String payloadSource(RequestTraceStage stage) {
+        if (stage == null) {
+            return "gateway_trace_snapshot";
+        }
+        return switch (stage) {
+            case DOWNSTREAM_REQUEST -> "downstream_parsed_request_body";
+            case CANONICAL_REQUEST -> "gateway_canonical_request_model";
+            case TRANSLATION_PLAN -> "gateway_translation_execution_plan";
+            case UPSTREAM_REQUEST -> "gateway_constructed_upstream_request_summary";
+            case UPSTREAM_RESPONSE -> "gateway_runtime_sdk_response_summary";
+            case DOWNSTREAM_RESPONSE -> "gateway_downstream_response_summary";
+            case ERROR -> "gateway_error_summary";
+            case CUSTOM -> "gateway_custom_trace_snapshot";
+        };
+    }
+
+    private String wireBodyLimitation(RequestTraceStage stage) {
+        if (stage == RequestTraceStage.DOWNSTREAM_REQUEST) {
+            return "parsed downstream body after gateway ingress handling; sensitive fields may be redacted";
+        }
+        if (stage == RequestTraceStage.UPSTREAM_REQUEST || stage == RequestTraceStage.UPSTREAM_RESPONSE) {
+            return "structured gateway/runtime summary, not raw upstream HTTP wire body";
+        }
+        return "structured gateway snapshot, not raw HTTP wire body";
+    }
+
+    private String backendName(CanonicalExecutionPlan executionPlan) {
+        if (executionPlan == null || executionPlan.executionBackend() == null) {
+            return null;
+        }
+        return executionPlan.executionBackend().name();
+    }
+
+    private void putIfPresent(Map<String, Object> target, String key, Object value) {
+        if (value != null) {
+            target.put(key, value);
+        }
     }
 
     private GatewayUsageView toUsageView(
@@ -864,6 +1058,9 @@ public class GatewayChatExecutionService {
     }
 
     private boolean shouldFallback(Throwable throwable) {
+        if (throwable instanceof BlockedExecutionPlanException) {
+            return false;
+        }
         if (throwable instanceof com.prodigalgal.xaigateway.gateway.core.auth.GatewayUnauthorizedException) {
             return false;
         }
@@ -913,6 +1110,43 @@ public class GatewayChatExecutionService {
     private void recordRoutingPolicyFailure(RouteCandidateView candidate, UpstreamCredentialEntity credential, String reason) {
         if (routingPolicyRuntimeEnforcementService != null) {
             routingPolicyRuntimeEnforcementService.recordFailure(candidate, credential, reason);
+        }
+    }
+
+    private CanonicalExecutionPlan ensureExecutable(CanonicalExecutionPlan executionPlan) {
+        if (executionPlan == null || executionPlan.executable()) {
+            return executionPlan;
+        }
+        if (executionPlan.blockerReasons() != null && !executionPlan.blockerReasons().isEmpty()) {
+            throw new BlockedExecutionPlanException(executionPlan, String.join("；", executionPlan.blockerReasons()));
+        }
+        throw new BlockedExecutionPlanException(executionPlan, "当前请求在 planner 阶段被阻止执行。");
+    }
+
+    private void recordCandidateFailure(
+            RouteSelectionResult candidateSelection,
+            RouteCandidateView candidate,
+            UpstreamCredentialEntity credential,
+            Throwable throwable) {
+        if (throwable instanceof BlockedExecutionPlanException) {
+            return;
+        }
+        gatewayRouteSelectionService.invalidateSelection(candidateSelection);
+        gatewayRouteSelectionService.markCredentialCooldown(candidate.candidate().credentialId(), fallbackDetail(throwable));
+        recordRoutingPolicyFailure(candidate, credential, fallbackDetail(throwable));
+    }
+
+    private static class BlockedExecutionPlanException extends IllegalArgumentException {
+        private final CanonicalExecutionPlan executionPlan;
+
+        private BlockedExecutionPlanException(CanonicalExecutionPlan executionPlan, String message) {
+            super(message);
+            this.executionPlan = executionPlan;
+        }
+
+        @SuppressWarnings("unused")
+        private CanonicalExecutionPlan executionPlan() {
+            return executionPlan;
         }
     }
 

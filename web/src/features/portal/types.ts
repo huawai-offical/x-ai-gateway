@@ -59,6 +59,22 @@ export type PortalSocialOAuthProvider = {
   defaultScopes: string[]
 }
 
+export type PortalSocialOAuthStartResponse = {
+  provider: string
+  state: string
+  authorizationUrl: string
+  expiresAt?: string | null
+}
+
+export type PortalRegistrationPolicy = {
+  allowedEmailDomains: string[]
+  allowedRegistrationChannels: string[]
+  inviteCodeRequired: boolean
+  inviteCodesConfigured: boolean
+  emailVerificationRequiredForKeyCreation: boolean
+  updatedAt?: string | null
+}
+
 export type PortalEmailVerificationStartResponse = {
   verificationId: string
   verificationCode: string
@@ -213,4 +229,30 @@ export type PortalChannelStatus = {
   blockedReason?: string | null
   supportedProtocols: string[]
   refreshedAt?: string | null
+}
+
+export type PortalInvitationSummary = {
+  userId: number
+  directInviteCount: number
+  totalInviteCount: number
+  referrerRewardTokenCredits: number
+  latestInviteAt?: string | null
+  directInvites: PortalInvitationUser[]
+  leaderboard: PortalInvitationLeaderboardEntry[]
+}
+
+export type PortalInvitationUser = {
+  userId: number
+  email: string
+  displayName?: string | null
+  invitedAt?: string | null
+}
+
+export type PortalInvitationLeaderboardEntry = {
+  userId: number
+  displayName?: string | null
+  directInviteCount: number
+  totalInviteCount: number
+  referrerRewardTokenCredits: number
+  latestInviteAt?: string | null
 }

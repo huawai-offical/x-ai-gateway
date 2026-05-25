@@ -785,11 +785,12 @@ class CredentialAdminServiceTests {
         assertEquals("DRY_RUN_READY", response.status());
         assertEquals("SKIPPED", response.classification());
         assertEquals("DRY_RUN", response.skippedReason());
-        assertEquals("OPENAI_COMPATIBLE", response.protocol());
+        assertEquals("XIAOMI_MIMO_OPENAI_COMPATIBLE", response.protocol());
         assertEquals(3, response.items().size());
         assertEquals(3, response.summary().get("SKIPPED"));
         assertTrue(response.items().stream().anyMatch(item -> "CHAT_TOOLS".equals(item.resourceFamily())));
-        assertTrue(response.toString().contains("authorization=Bearer ***"));
+        assertTrue(response.toString().contains("api-key=***"));
+        assertFalse(response.toString().contains("authorization=Bearer ***"));
         assertFalse(response.toString().contains("mimo-secret"));
         Mockito.verify(cryptoService, Mockito.never()).decrypt(Mockito.anyString());
         Mockito.verify(credentialRepository, Mockito.never()).save(Mockito.any());
@@ -818,6 +819,7 @@ class CredentialAdminServiceTests {
         assertEquals("DRY_RUN_READY", response.status());
         assertEquals("ANTHROPIC_COMPATIBLE", response.protocol());
         String preview = response.items().getFirst().requestPreview().toString();
+        assertTrue(preview.contains("protocol=ANTHROPIC_COMPATIBLE"));
         assertTrue(preview.contains("anthropic-version=2023-06-01"));
         assertTrue(preview.contains("api-key=***"));
         assertFalse(preview.contains("authorization"));
@@ -882,9 +884,9 @@ class CredentialAdminServiceTests {
     @Test
     void shouldExecuteFunctionalProviderSmokeWhenLiveAndBillableAreExplicitlyAllowed() throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
-        AtomicReference<String> authorization = new AtomicReference<>();
+        AtomicReference<String> apiKey = new AtomicReference<>();
         server.createContext("/v1/chat/completions", exchange -> {
-            authorization.set(exchange.getRequestHeaders().getFirst("authorization"));
+            apiKey.set(exchange.getRequestHeaders().getFirst("api-key"));
             exchange.getResponseHeaders().add("x-request-id", "req-functional-provider");
             sendJson(exchange, 200, """
                     {"id":"chatcmpl_1","object":"chat.completion","model":"mimo-v2-pro","usage":{"completion_tokens":1},"choices":[{"index":0}]}
@@ -916,11 +918,115 @@ class CredentialAdminServiceTests {
             assertEquals("PASS", response.classification());
             assertEquals(1, response.summary().get("PASS"));
             assertEquals("req-functional-provider", response.items().getFirst().upstreamRequestId());
-            assertEquals("Bearer mimo-secret", authorization.get());
+            assertEquals("mimo-secret", apiKey.get());
             assertNotNull(credential.getLastUsedAt());
             assertEquals(null, credential.getLastErrorCode());
             assertFalse(response.toString().contains("mimo-secret"));
             Mockito.verify(cryptoService).decrypt("cipher-openai");
+            Mockito.verify(credentialRepository).save(credential);
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void shouldPersistSavedCredentialConnectivitySuccess() throws IOException {
+        HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+        AtomicReference<String> authorization = new AtomicReference<>();
+        server.createContext("/v1/chat/completions", exchange -> {
+            authorization.set(exchange.getRequestHeaders().getFirst("authorization"));
+            exchange.getResponseHeaders().add("x-request-id", "req-connectivity-ok");
+            sendJson(exchange, 200, """
+                    {"id":"chatcmpl_1","object":"chat.completion","model":"deepseek-chat","choices":[{"message":{"content":"OK"}}]}
+                    """);
+        });
+        server.start();
+        try {
+            UpstreamCredentialRepository credentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+            CredentialCryptoService cryptoService = Mockito.mock(CredentialCryptoService.class);
+            SupportedModelCatalogService modelCatalogService = Mockito.mock(SupportedModelCatalogService.class);
+            ProviderProtocolEndpointRepository endpointRepository = Mockito.mock(ProviderProtocolEndpointRepository.class);
+            CredentialAdminService service = service(
+                    credentialRepository,
+                    cryptoService,
+                    modelCatalogService,
+                    Mockito.mock(UpstreamAccountGroupRepository.class),
+                    Mockito.mock(ProviderSiteRegistryService.class),
+                    endpointRepository
+            );
+            UpstreamCredentialEntity credential = credential(22L, ProviderType.OPENAI_COMPATIBLE);
+            credential.setBaseUrl("https://api.deepseek.com");
+            credential.setProtocolEndpointId(220L);
+            credential.setSupportedModels(List.of("deepseek-chat"));
+            ProviderProtocolEndpointEntity endpoint = protocolEndpoint(
+                    220L,
+                    15L,
+                    ProviderType.OPENAI_COMPATIBLE,
+                    UpstreamSiteKind.DEEPSEEK,
+                    "http://127.0.0.1:" + server.getAddress().getPort(),
+                    null
+            );
+            endpoint.setProtocolSuite("deepseek.openai_compatible");
+            Mockito.when(credentialRepository.findById(22L)).thenReturn(Optional.of(credential));
+            Mockito.when(credentialRepository.save(Mockito.any())).thenAnswer(invocation -> invocation.getArgument(0));
+            Mockito.when(endpointRepository.findById(220L)).thenReturn(Optional.of(endpoint));
+            Mockito.when(cryptoService.decrypt("cipher-openai")).thenReturn("deepseek-secret");
+            Mockito.when(modelCatalogService.normalize(List.of("deepseek-chat"))).thenReturn(List.of("deepseek-chat"));
+
+            var response = service.testSavedCredentialConnectivity(22L);
+
+            assertTrue(response.reachable());
+            assertEquals("AVAILABLE", response.status());
+            assertEquals("deepseek-chat", response.model());
+            assertEquals("req-connectivity-ok", response.upstreamRequestId());
+            assertEquals("OK", response.responseSummary());
+            assertEquals("Bearer deepseek-secret", authorization.get());
+            assertEquals("AVAILABLE", credential.getConnectivityStatus());
+            assertEquals("req-connectivity-ok", credential.getLastConnectivityUpstreamRequestId());
+            assertEquals("OK", credential.getLastConnectivityResponseSummary());
+            assertEquals(null, credential.getLastConnectivityErrorMessage());
+            assertNotNull(credential.getLastConnectivityTestAt());
+            Mockito.verify(credentialRepository).save(credential);
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void shouldPersistSavedCredentialConnectivityFailureAndRedactSecret() throws IOException {
+        HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+        server.createContext("/v1/chat/completions", exchange -> sendJson(exchange, 401, """
+                {"error":{"type":"authentication_error","message":"invalid Bearer deepseek-secret"}}
+                """));
+        server.start();
+        try {
+            UpstreamCredentialRepository credentialRepository = Mockito.mock(UpstreamCredentialRepository.class);
+            CredentialCryptoService cryptoService = Mockito.mock(CredentialCryptoService.class);
+            SupportedModelCatalogService modelCatalogService = Mockito.mock(SupportedModelCatalogService.class);
+            CredentialAdminService service = service(
+                    credentialRepository,
+                    cryptoService,
+                    modelCatalogService,
+                    Mockito.mock(UpstreamAccountGroupRepository.class),
+                    Mockito.mock(ProviderSiteRegistryService.class)
+            );
+            UpstreamCredentialEntity credential = credential(23L, ProviderType.OPENAI_COMPATIBLE);
+            credential.setBaseUrl("http://127.0.0.1:" + server.getAddress().getPort());
+            credential.setSupportedModels(List.of("deepseek-chat"));
+            Mockito.when(credentialRepository.findById(23L)).thenReturn(Optional.of(credential));
+            Mockito.when(credentialRepository.save(Mockito.any())).thenAnswer(invocation -> invocation.getArgument(0));
+            Mockito.when(cryptoService.decrypt("cipher-openai")).thenReturn("deepseek-secret");
+            Mockito.when(modelCatalogService.normalize(List.of("deepseek-chat"))).thenReturn(List.of("deepseek-chat"));
+
+            var response = service.testSavedCredentialConnectivity(23L);
+
+            assertFalse(response.reachable());
+            assertEquals("UNAVAILABLE", response.status());
+            assertFalse(response.errorMessage().contains("deepseek-secret"));
+            assertEquals("UNAVAILABLE", credential.getConnectivityStatus());
+            assertFalse(credential.getLastConnectivityErrorMessage().contains("deepseek-secret"));
+            assertEquals(null, credential.getLastConnectivityResponseSummary());
+            assertNotNull(credential.getLastConnectivityTestAt());
             Mockito.verify(credentialRepository).save(credential);
         } finally {
             server.stop(0);
@@ -965,7 +1071,7 @@ class CredentialAdminServiceTests {
                     response.recordReplayFixture().replayPolicy().get("fixtureSource"));
             assertTrue(credential.getCredentialMetadataJson().contains("functional_provider_smoke_certification"));
             assertTrue(credential.getCredentialMetadataJson().contains("recordReplayFixture"));
-            assertTrue(credential.getCredentialMetadataJson().contains("OPENAI_COMPATIBLE"));
+            assertTrue(credential.getCredentialMetadataJson().contains("XIAOMI_MIMO_OPENAI_COMPATIBLE"));
             assertFalse(credential.getCredentialMetadataJson().contains("mimo-secret"));
             Mockito.verify(cryptoService).decrypt("cipher-openai");
             Mockito.verify(credentialRepository, Mockito.atLeastOnce()).save(credential);

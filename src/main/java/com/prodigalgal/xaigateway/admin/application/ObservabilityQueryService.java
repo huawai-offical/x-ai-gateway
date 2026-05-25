@@ -4,21 +4,31 @@ import com.prodigalgal.xaigateway.admin.api.AsyncResourceDetailResponse;
 import com.prodigalgal.xaigateway.admin.api.AsyncResourceSummaryResponse;
 import com.prodigalgal.xaigateway.admin.api.CacheHitLogResponse;
 import com.prodigalgal.xaigateway.admin.api.CodexObservabilityRequestResponse;
+import com.prodigalgal.xaigateway.admin.api.CredentialHealthMetricResponse;
+import com.prodigalgal.xaigateway.admin.api.HealthMetricResponse;
+import com.prodigalgal.xaigateway.admin.api.ObservabilityHealthResponse;
 import com.prodigalgal.xaigateway.admin.api.ObservabilitySummaryResponse;
 import com.prodigalgal.xaigateway.admin.api.ObservabilityTraceResponse;
+import com.prodigalgal.xaigateway.admin.api.ProviderHealthMetricResponse;
 import com.prodigalgal.xaigateway.admin.api.RequestLogResponse;
+import com.prodigalgal.xaigateway.admin.api.RequestTraceDetailResponse;
 import com.prodigalgal.xaigateway.admin.api.RouteDecisionLogResponse;
 import com.prodigalgal.xaigateway.admin.api.UpstreamCacheReferenceResponse;
+import com.prodigalgal.xaigateway.gateway.core.observability.GatewayRequestStatus;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.infra.persistence.entity.CacheHitLogEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.RequestLogEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.RequestTraceDetailEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.RouteDecisionLogEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCacheReferenceEntity;
+import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity;
 import com.prodigalgal.xaigateway.infra.persistence.entity.UsageRecordEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.CacheHitLogRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.RequestLogRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.RequestTraceDetailRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.RouteDecisionLogRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCacheReferenceRepository;
+import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import com.prodigalgal.xaigateway.infra.persistence.repository.UsageRecordRepository;
 import java.time.Duration;
 import java.time.Instant;
@@ -31,6 +41,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -48,6 +60,8 @@ public class ObservabilityQueryService {
     private final RouteDecisionLogRepository routeDecisionLogRepository;
     private final CacheHitLogRepository cacheHitLogRepository;
     private final RequestLogRepository requestLogRepository;
+    private final RequestTraceDetailRepository requestTraceDetailRepository;
+    private final UpstreamCredentialRepository upstreamCredentialRepository;
     private final UpstreamCacheReferenceRepository upstreamCacheReferenceRepository;
     private final UsageRecordRepository usageRecordRepository;
     private final AsyncResourceAdminService asyncResourceAdminService;
@@ -57,12 +71,16 @@ public class ObservabilityQueryService {
             RouteDecisionLogRepository routeDecisionLogRepository,
             CacheHitLogRepository cacheHitLogRepository,
             RequestLogRepository requestLogRepository,
+            RequestTraceDetailRepository requestTraceDetailRepository,
+            UpstreamCredentialRepository upstreamCredentialRepository,
             UpstreamCacheReferenceRepository upstreamCacheReferenceRepository,
             UsageRecordRepository usageRecordRepository,
             AsyncResourceAdminService asyncResourceAdminService) {
         this.routeDecisionLogRepository = routeDecisionLogRepository;
         this.cacheHitLogRepository = cacheHitLogRepository;
         this.requestLogRepository = requestLogRepository;
+        this.requestTraceDetailRepository = requestTraceDetailRepository;
+        this.upstreamCredentialRepository = upstreamCredentialRepository;
         this.upstreamCacheReferenceRepository = upstreamCacheReferenceRepository;
         this.usageRecordRepository = usageRecordRepository;
         this.asyncResourceAdminService = asyncResourceAdminService;
@@ -78,9 +96,30 @@ public class ObservabilityQueryService {
                 routeDecisionLogRepository,
                 cacheHitLogRepository,
                 requestLogRepository,
+                null,
+                null,
                 upstreamCacheReferenceRepository,
                 usageRecordRepository,
                 null
+        );
+    }
+
+    public ObservabilityQueryService(
+            RouteDecisionLogRepository routeDecisionLogRepository,
+            CacheHitLogRepository cacheHitLogRepository,
+            RequestLogRepository requestLogRepository,
+            UpstreamCacheReferenceRepository upstreamCacheReferenceRepository,
+            UsageRecordRepository usageRecordRepository,
+            AsyncResourceAdminService asyncResourceAdminService) {
+        this(
+                routeDecisionLogRepository,
+                cacheHitLogRepository,
+                requestLogRepository,
+                null,
+                null,
+                upstreamCacheReferenceRepository,
+                usageRecordRepository,
+                asyncResourceAdminService
         );
     }
 
@@ -350,6 +389,7 @@ public class ObservabilityQueryService {
                 routeDecision,
                 cacheHits,
                 upstreamCacheReferences,
+                requestTraceDetails(requestId),
                 asyncResourceSummary,
                 asyncResourceDetail
         );
@@ -409,6 +449,60 @@ public class ObservabilityQueryService {
                 totalCacheHitTokens,
                 totalCacheWriteTokens,
                 totalSavedInputTokens
+        );
+    }
+
+    public ObservabilityHealthResponse health(
+            ProviderType providerType,
+            Long credentialId,
+            Instant from,
+            Instant to) {
+        TimeWindow window = resolveHealthWindow(from, to);
+        List<RequestLogEntity> requestLogs = requestLogRepository.searchHealthWithinWindow(
+                providerType,
+                credentialId,
+                window.from(),
+                window.to()
+        );
+
+        HealthAccumulator total = new HealthAccumulator();
+        Map<ProviderType, HealthAccumulator> providerAccumulators = new LinkedHashMap<>();
+        Map<CredentialHealthKey, HealthAccumulator> credentialAccumulators = new LinkedHashMap<>();
+
+        for (RequestLogEntity requestLog : requestLogs) {
+            total.accept(requestLog);
+            providerAccumulators
+                    .computeIfAbsent(requestLog.getProviderType(), ignored -> new HealthAccumulator())
+                    .accept(requestLog);
+            CredentialHealthKey key = new CredentialHealthKey(requestLog.getCredentialId(), requestLog.getProviderType());
+            credentialAccumulators
+                    .computeIfAbsent(key, ignored -> new HealthAccumulator())
+                    .accept(requestLog);
+        }
+
+        Map<Long, UpstreamCredentialEntity> credentialsById = resolveCredentialsById(credentialAccumulators.keySet());
+
+        List<CredentialHealthMetricResponse> credentialMetrics = credentialAccumulators.entrySet().stream()
+                .map(entry -> toCredentialHealthMetric(entry.getKey(), entry.getValue(), credentialsById.get(entry.getKey().credentialId())))
+                .sorted(Comparator
+                        .comparingLong(CredentialHealthMetricResponse::failedRequests).reversed()
+                        .thenComparing(CredentialHealthMetricResponse::successRate)
+                        .thenComparing(item -> item.credentialId() == null ? Long.MAX_VALUE : item.credentialId()))
+                .toList();
+        List<ProviderHealthMetricResponse> providerMetrics = providerAccumulators.entrySet().stream()
+                .map(entry -> toProviderHealthMetric(entry.getKey(), entry.getValue()))
+                .sorted(Comparator
+                        .comparingLong(ProviderHealthMetricResponse::failedRequests).reversed()
+                        .thenComparing(ProviderHealthMetricResponse::successRate)
+                        .thenComparing(item -> item.providerType() == null ? "" : item.providerType().name()))
+                .toList();
+
+        return new ObservabilityHealthResponse(
+                window.from(),
+                window.to(),
+                total.toHealthMetric(),
+                credentialMetrics,
+                providerMetrics
         );
     }
 
@@ -575,6 +669,100 @@ public class ObservabilityQueryService {
         return new TimeWindow(resolvedFrom, resolvedTo);
     }
 
+    private TimeWindow resolveHealthWindow(Instant from, Instant to) {
+        Instant resolvedTo = to == null ? Instant.now() : to;
+        Instant resolvedFrom = from == null ? resolvedTo.minus(DEFAULT_PARTIAL_WINDOW) : from;
+        if (resolvedFrom.isAfter(resolvedTo)) {
+            throw new IllegalArgumentException("from 不能晚于 to。");
+        }
+        return new TimeWindow(resolvedFrom, resolvedTo);
+    }
+
+    private Map<Long, UpstreamCredentialEntity> resolveCredentialsById(Set<CredentialHealthKey> keys) {
+        if (upstreamCredentialRepository == null || keys == null || keys.isEmpty()) {
+            return Map.of();
+        }
+        List<Long> ids = keys.stream()
+                .map(CredentialHealthKey::credentialId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        return upstreamCredentialRepository.findAllByIdInAndDeletedFalse(ids).stream()
+                .collect(Collectors.toMap(
+                        UpstreamCredentialEntity::getId,
+                        Function.identity(),
+                        (left, right) -> left,
+                        LinkedHashMap::new
+                ));
+    }
+
+    private CredentialHealthMetricResponse toCredentialHealthMetric(
+            CredentialHealthKey key,
+            HealthAccumulator accumulator,
+            UpstreamCredentialEntity credential) {
+        HealthMetricResponse metric = accumulator.toHealthMetric();
+        ProviderType providerType = credential == null ? key.providerType() : credential.getProviderType();
+        return new CredentialHealthMetricResponse(
+                key.credentialId(),
+                providerType,
+                credential == null ? fallbackCredentialLabel(key) : credential.getCredentialName(),
+                credential == null ? null : shortFingerprint(credential.getApiKeyFingerprint()),
+                metric.totalRequests(),
+                metric.successfulRequests(),
+                metric.failedRequests(),
+                metric.canceledRequests(),
+                metric.successRate(),
+                metric.availabilityRate(),
+                metric.errorRate(),
+                metric.cancellationRate(),
+                metric.avgDurationMs(),
+                metric.lastSuccessfulAt(),
+                metric.lastFailedAt()
+        );
+    }
+
+    private ProviderHealthMetricResponse toProviderHealthMetric(ProviderType providerType, HealthAccumulator accumulator) {
+        HealthMetricResponse metric = accumulator.toHealthMetric();
+        return new ProviderHealthMetricResponse(
+                providerType,
+                metric.totalRequests(),
+                metric.successfulRequests(),
+                metric.failedRequests(),
+                metric.canceledRequests(),
+                metric.successRate(),
+                metric.availabilityRate(),
+                metric.errorRate(),
+                metric.cancellationRate(),
+                metric.avgDurationMs(),
+                metric.lastSuccessfulAt(),
+                metric.lastFailedAt()
+        );
+    }
+
+    private String fallbackCredentialLabel(CredentialHealthKey key) {
+        if (key == null || key.credentialId() == null) {
+            return "未知凭证";
+        }
+        return "凭证 " + key.credentialId();
+    }
+
+    private String shortFingerprint(String fingerprint) {
+        if (fingerprint == null || fingerprint.isBlank()) {
+            return null;
+        }
+        return fingerprint.length() <= 12 ? fingerprint : fingerprint.substring(0, 12);
+    }
+
+    private double ratio(long numerator, long denominator) {
+        if (denominator <= 0) {
+            return 0D;
+        }
+        return (double) numerator / (double) denominator;
+    }
+
     private String normalizeStatus(String status) {
         if (status == null || status.isBlank()) {
             return null;
@@ -737,6 +925,39 @@ public class ObservabilityQueryService {
                 entity.getDurationMs(),
                 entity.getErrorCode(),
                 entity.getErrorMessage()
+        );
+    }
+
+    private List<RequestTraceDetailResponse> requestTraceDetails(String requestId) {
+        if (requestTraceDetailRepository == null || requestId == null || requestId.isBlank()) {
+            return List.of();
+        }
+        return requestTraceDetailRepository.findAllByRequestIdOrderByCreatedAtAscIdAsc(requestId).stream()
+                .map(this::toRequestTraceDetailResponse)
+                .toList();
+    }
+
+    private RequestTraceDetailResponse toRequestTraceDetailResponse(RequestTraceDetailEntity entity) {
+        return new RequestTraceDetailResponse(
+                entity.getId(),
+                entity.getRequestId(),
+                entity.getStage(),
+                entity.getDirection(),
+                entity.getContentKind(),
+                entity.getPayloadJson(),
+                entity.getMetadataJson(),
+                entity.getPayloadHash(),
+                entity.getMetadataHash(),
+                entity.getOriginalLength(),
+                entity.getStoredLength(),
+                entity.getMetadataOriginalLength(),
+                entity.getMetadataStoredLength(),
+                entity.isTruncated(),
+                entity.isMetadataTruncated(),
+                entity.isRedacted(),
+                entity.isMetadataRedacted(),
+                entity.getExpiresAt(),
+                entity.getCreatedAt()
         );
     }
 
@@ -1038,5 +1259,79 @@ public class ObservabilityQueryService {
     }
 
     private record TimeWindow(Instant from, Instant to) {
+    }
+
+    private record CredentialHealthKey(Long credentialId, ProviderType providerType) {
+    }
+
+    private class HealthAccumulator {
+        private long totalRequests;
+        private long successfulRequests;
+        private long failedRequests;
+        private long canceledRequests;
+        private long totalDurationMs;
+        private long durationSampleCount;
+        private Instant lastSuccessfulAt;
+        private Instant lastFailedAt;
+
+        private void accept(RequestLogEntity requestLog) {
+            if (requestLog == null) {
+                return;
+            }
+            totalRequests++;
+            GatewayRequestStatus status = requestLog.getStatus();
+            Instant completedAt = firstNonNullInstant(requestLog.getCompletedAt(), requestLog.getStartedAt(), requestLog.getCreatedAt());
+            if (status == GatewayRequestStatus.COMPLETED) {
+                successfulRequests++;
+                lastSuccessfulAt = maxInstant(lastSuccessfulAt, completedAt);
+            } else if (status == GatewayRequestStatus.FAILED) {
+                failedRequests++;
+                lastFailedAt = maxInstant(lastFailedAt, completedAt);
+            } else if (status == GatewayRequestStatus.CANCELED) {
+                canceledRequests++;
+            }
+            if (requestLog.getDurationMs() != null && requestLog.getDurationMs() >= 0) {
+                totalDurationMs += requestLog.getDurationMs();
+                durationSampleCount++;
+            }
+        }
+
+        private HealthMetricResponse toHealthMetric() {
+            return new HealthMetricResponse(
+                    totalRequests,
+                    successfulRequests,
+                    failedRequests,
+                    canceledRequests,
+                    ratio(successfulRequests, totalRequests),
+                    totalRequests == 0 ? 0D : 1D - ratio(failedRequests, totalRequests),
+                    ratio(failedRequests, totalRequests),
+                    ratio(canceledRequests, totalRequests),
+                    ratio(totalDurationMs, durationSampleCount),
+                    lastSuccessfulAt,
+                    lastFailedAt
+            );
+        }
+    }
+
+    private Instant firstNonNullInstant(Instant... values) {
+        if (values == null) {
+            return null;
+        }
+        for (Instant value : values) {
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private Instant maxInstant(Instant current, Instant candidate) {
+        if (candidate == null) {
+            return current;
+        }
+        if (current == null || candidate.isAfter(current)) {
+            return candidate;
+        }
+        return current;
     }
 }

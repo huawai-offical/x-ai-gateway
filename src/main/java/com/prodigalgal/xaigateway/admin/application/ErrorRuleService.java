@@ -6,7 +6,6 @@ import com.prodigalgal.xaigateway.admin.api.ErrorRuleRequest;
 import com.prodigalgal.xaigateway.admin.api.ErrorRuleResponse;
 import com.prodigalgal.xaigateway.gateway.core.error.ErrorRuleMatchContext;
 import com.prodigalgal.xaigateway.gateway.core.error.GatewayRuleMatchedException;
-import com.prodigalgal.xaigateway.gateway.core.interop.GatewayDegradationPolicy;
 import com.prodigalgal.xaigateway.infra.persistence.entity.ErrorRuleEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.ErrorRuleRepository;
 import org.springframework.stereotype.Service;
@@ -144,10 +143,9 @@ public class ErrorRuleService {
                     context.message() == null ? "上游错误透传。" : context.message());
         }
         if ("DOWNGRADE".equals(action)) {
-            String policy = rule.getDowngradePolicy() == null ? GatewayDegradationPolicy.ALLOW_EMULATED.name() : rule.getDowngradePolicy();
             return new GatewayRuleMatchedException(rule.getRewriteStatus() == null ? 409 : rule.getRewriteStatus(),
-                    rule.getRewriteCode() == null ? "DOWNGRADED_BY_RULE" : rule.getRewriteCode(),
-                    rule.getRewriteMessage() == null ? "请求被错误规则降级到策略 " + policy : rule.getRewriteMessage());
+                    rule.getRewriteCode() == null ? "BLOCKED_BY_DEGRADATION_RULE" : rule.getRewriteCode(),
+                    rule.getRewriteMessage() == null ? "请求命中旧降级规则；当前网关不执行降级成功，已按阻断处理。" : rule.getRewriteMessage());
         }
         if ("BLOCK".equals(action)) {
             return new GatewayRuleMatchedException(rule.getRewriteStatus() == null ? 400 : rule.getRewriteStatus(),

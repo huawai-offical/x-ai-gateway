@@ -4,6 +4,7 @@ public enum UpstreamSiteKind {
     OPENAI_DIRECT,
     OPENAI_COMPATIBLE_GENERIC,
     AZURE_OPENAI,
+    XIAOMI_MIMO,
     DEEPSEEK,
     QWEN,
     MOONSHOT,

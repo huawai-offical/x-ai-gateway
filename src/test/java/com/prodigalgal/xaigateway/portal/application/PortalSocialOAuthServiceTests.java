@@ -17,12 +17,14 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
 import org.springframework.test.util.ReflectionTestUtils;
 import reactor.core.publisher.Mono;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 
@@ -212,5 +214,326 @@ class PortalSocialOAuthServiceTests {
         assertEquals("github", identities.getFirst().provider());
         assertTrue(remaining.isEmpty());
         Mockito.verify(identityRepository).delete(identity);
+    }
+
+    @Test
+    void shouldBindSocialIdentityToCurrentPortalUser() {
+        PortalSocialOauthSessionRepository sessionRepository = Mockito.mock(PortalSocialOauthSessionRepository.class);
+        GatewayUserSocialIdentityRepository identityRepository = Mockito.mock(GatewayUserSocialIdentityRepository.class);
+        GatewayUserRepository userRepository = Mockito.mock(GatewayUserRepository.class);
+        PortalAuthService portalAuthService = Mockito.mock(PortalAuthService.class);
+        GatewayProperties properties = new GatewayProperties();
+        properties.getWeb().setPublicBaseUrl("https://gateway.example.com");
+        SocialOAuthProfileClient profileClient = googleProfileClient("google-current-7", "other@example.com", "Other Email");
+        PortalSocialOAuthService service = new PortalSocialOAuthService(
+                sessionRepository,
+                identityRepository,
+                userRepository,
+                portalAuthService,
+                properties,
+                List.of(profileClient)
+        );
+        Mockito.when(sessionRepository.save(any())).thenAnswer(invocation -> {
+            PortalSocialOauthSessionEntity session = invocation.getArgument(0);
+            Mockito.when(sessionRepository.findByState(session.getState())).thenReturn(Optional.of(session));
+            return session;
+        });
+        GatewayUserEntity currentUser = user(91L, "password-user@example.com");
+        var exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/portal").build());
+        var webSession = exchange.getSession().block();
+        webSession.getAttributes().put("portalUserId", 91L);
+        Mockito.when(portalAuthService.requireCurrentPortalUser(webSession)).thenReturn(currentUser);
+        Mockito.when(identityRepository.findByProviderAndExternalSubject(SocialOAuthProvider.GOOGLE, "google-current-7"))
+                .thenReturn(Optional.empty());
+        Mockito.when(identityRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        Mockito.when(portalAuthService.authenticateExternalUser(any(), any()))
+                .thenReturn(Mono.just(new PortalSessionResponse(true, 91L, "password-user@example.com", null, null, null)));
+
+        var start = service.start("google", new PortalSocialOAuthStartRequest("google-client", "/portal/security", List.of()));
+        var session = service.complete(
+                "google",
+                new PortalSocialOAuthCallbackRequest(start.state(), "code-bind", null, null, null, null),
+                exchange
+        ).block();
+
+        assertTrue(session.authenticated());
+        ArgumentCaptor<GatewayUserSocialIdentityEntity> identityCaptor = ArgumentCaptor.forClass(GatewayUserSocialIdentityEntity.class);
+        Mockito.verify(identityRepository).save(identityCaptor.capture());
+        assertEquals(91L, identityCaptor.getValue().getUser().getId());
+        assertEquals("other@example.com", identityCaptor.getValue().getEmail());
+        Mockito.verify(userRepository, Mockito.never()).save(any());
+    }
+
+    @Test
+    void shouldRejectBindingSocialIdentityOwnedByOtherUser() {
+        PortalSocialOauthSessionRepository sessionRepository = Mockito.mock(PortalSocialOauthSessionRepository.class);
+        GatewayUserSocialIdentityRepository identityRepository = Mockito.mock(GatewayUserSocialIdentityRepository.class);
+        GatewayUserRepository userRepository = Mockito.mock(GatewayUserRepository.class);
+        PortalAuthService portalAuthService = Mockito.mock(PortalAuthService.class);
+        GatewayProperties properties = new GatewayProperties();
+        properties.getWeb().setPublicBaseUrl("https://gateway.example.com");
+        PortalSocialOAuthService service = new PortalSocialOAuthService(
+                sessionRepository,
+                identityRepository,
+                userRepository,
+                portalAuthService,
+                properties,
+                List.of(googleProfileClient("google-owned-7", "owned@example.com", "Owned"))
+        );
+        Mockito.when(sessionRepository.save(any())).thenAnswer(invocation -> {
+            PortalSocialOauthSessionEntity session = invocation.getArgument(0);
+            Mockito.when(sessionRepository.findByState(session.getState())).thenReturn(Optional.of(session));
+            return session;
+        });
+        GatewayUserEntity currentUser = user(91L, "password-user@example.com");
+        GatewayUserEntity owner = user(92L, "owner@example.com");
+        GatewayUserSocialIdentityEntity existing = new GatewayUserSocialIdentityEntity();
+        existing.setUser(owner);
+        existing.setProvider(SocialOAuthProvider.GOOGLE);
+        existing.setExternalSubject("google-owned-7");
+        var exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/portal").build());
+        var webSession = exchange.getSession().block();
+        webSession.getAttributes().put("portalUserId", 91L);
+        Mockito.when(portalAuthService.requireCurrentPortalUser(webSession)).thenReturn(currentUser);
+        Mockito.when(identityRepository.findByProviderAndExternalSubject(SocialOAuthProvider.GOOGLE, "google-owned-7"))
+                .thenReturn(Optional.of(existing));
+
+        var start = service.start("google", new PortalSocialOAuthStartRequest("google-client", "/portal/security", List.of()));
+
+        assertThrows(IllegalArgumentException.class, () -> service.complete(
+                "google",
+                new PortalSocialOAuthCallbackRequest(start.state(), "code-bind", null, null, null, null),
+                exchange
+        ).block());
+    }
+
+    @Test
+    void shouldRejectSocialRegistrationWhenChannelClosed() {
+        PortalSocialOauthSessionRepository sessionRepository = Mockito.mock(PortalSocialOauthSessionRepository.class);
+        GatewayUserSocialIdentityRepository identityRepository = Mockito.mock(GatewayUserSocialIdentityRepository.class);
+        GatewayUserRepository userRepository = Mockito.mock(GatewayUserRepository.class);
+        PortalAuthService portalAuthService = Mockito.mock(PortalAuthService.class);
+        PortalSecurityService portalSecurityService = Mockito.mock(PortalSecurityService.class);
+        GatewayProperties properties = new GatewayProperties();
+        properties.getWeb().setPublicBaseUrl("https://gateway.example.com");
+        ObjectProvider<PortalSecurityService> securityProvider = new ObjectProvider<>() {
+            @Override
+            public PortalSecurityService getObject(Object... args) {
+                return portalSecurityService;
+            }
+
+            @Override
+            public PortalSecurityService getIfAvailable() {
+                return portalSecurityService;
+            }
+
+            @Override
+            public PortalSecurityService getIfUnique() {
+                return portalSecurityService;
+            }
+
+            @Override
+            public PortalSecurityService getObject() {
+                return portalSecurityService;
+            }
+        };
+        PortalSocialOAuthService service = new PortalSocialOAuthService(
+                sessionRepository,
+                identityRepository,
+                userRepository,
+                portalAuthService,
+                properties,
+                null,
+                securityProvider,
+                List.of(googleProfileClient("google-new-7", "new@example.com", "New User"))
+        );
+        Mockito.when(sessionRepository.save(any())).thenAnswer(invocation -> {
+            PortalSocialOauthSessionEntity session = invocation.getArgument(0);
+            Mockito.when(sessionRepository.findByState(session.getState())).thenReturn(Optional.of(session));
+            return session;
+        });
+        Mockito.when(portalAuthService.requireCurrentPortalUser(any())).thenThrow(new RuntimeException("anonymous"));
+        Mockito.when(identityRepository.findByProviderAndExternalSubject(SocialOAuthProvider.GOOGLE, "google-new-7"))
+                .thenReturn(Optional.empty());
+        Mockito.when(userRepository.findByEmailIgnoreCase("new@example.com")).thenReturn(Optional.empty());
+        Mockito.doThrow(new IllegalArgumentException("当前注册渠道已关闭。"))
+                .when(portalSecurityService)
+                .verifyRegistrationPolicy("new@example.com", null, PortalSecurityService.REGISTRATION_CHANNEL_SOCIAL_OAUTH);
+
+        var start = service.start("google", new PortalSocialOAuthStartRequest("google-client", "/portal/security", List.of()));
+
+        assertThrows(IllegalArgumentException.class, () -> service.complete(
+                "google",
+                new PortalSocialOAuthCallbackRequest(start.state(), "code-new", null, null, null, null),
+                MockServerWebExchange.from(MockServerHttpRequest.get("/portal").build())
+        ).block());
+        Mockito.verify(userRepository, Mockito.never()).save(any());
+    }
+
+    @Test
+    void shouldRedeemInvitationCodeWhenSocialOAuthCreatesNewUser() {
+        PortalSocialOauthSessionRepository sessionRepository = Mockito.mock(PortalSocialOauthSessionRepository.class);
+        GatewayUserSocialIdentityRepository identityRepository = Mockito.mock(GatewayUserSocialIdentityRepository.class);
+        GatewayUserRepository userRepository = Mockito.mock(GatewayUserRepository.class);
+        PortalAuthService portalAuthService = Mockito.mock(PortalAuthService.class);
+        PortalSecurityService portalSecurityService = Mockito.mock(PortalSecurityService.class);
+        InvitationCodeRedemptionService redemptionService = Mockito.mock(InvitationCodeRedemptionService.class);
+        GatewayProperties properties = new GatewayProperties();
+        properties.getWeb().setPublicBaseUrl("https://gateway.example.com");
+        PortalSocialOAuthService service = new PortalSocialOAuthService(
+                sessionRepository,
+                identityRepository,
+                userRepository,
+                portalAuthService,
+                properties,
+                null,
+                provider(portalSecurityService),
+                provider(redemptionService),
+                List.of(googleProfileClient("google-invite-7", "invite@example.com", "Invite User"))
+        );
+        Mockito.when(sessionRepository.save(any())).thenAnswer(invocation -> {
+            PortalSocialOauthSessionEntity session = invocation.getArgument(0);
+            Mockito.when(sessionRepository.findByState(session.getState())).thenReturn(Optional.of(session));
+            return session;
+        });
+        Mockito.when(portalAuthService.requireCurrentPortalUser(any())).thenThrow(new RuntimeException("anonymous"));
+        Mockito.when(identityRepository.findByProviderAndExternalSubject(SocialOAuthProvider.GOOGLE, "google-invite-7"))
+                .thenReturn(Optional.empty());
+        Mockito.when(userRepository.findByEmailIgnoreCase("invite@example.com")).thenReturn(Optional.empty());
+        Mockito.when(userRepository.save(any())).thenAnswer(invocation -> {
+            GatewayUserEntity user = invocation.getArgument(0);
+            ReflectionTestUtils.setField(user, "id", 501L);
+            return user;
+        });
+        Mockito.when(identityRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        Mockito.when(portalAuthService.authenticateExternalUser(any(), any()))
+                .thenReturn(Mono.just(new PortalSessionResponse(true, 501L, "invite@example.com", null, null, null)));
+
+        var start = service.start("google", new PortalSocialOAuthStartRequest("google-client", "/portal", List.of(), " invite-social "));
+        var session = service.complete(
+                "google",
+                new PortalSocialOAuthCallbackRequest(start.state(), "code-invite", null, null, null, null),
+                MockServerWebExchange.from(MockServerHttpRequest.get("/portal").build())
+        ).block();
+
+        assertTrue(session.authenticated());
+        Mockito.verify(portalSecurityService).verifyRegistrationPolicy(
+                "invite@example.com",
+                "INVITE-SOCIAL",
+                PortalSecurityService.REGISTRATION_CHANNEL_SOCIAL_OAUTH
+        );
+        ArgumentCaptor<GatewayUserEntity> userCaptor = ArgumentCaptor.forClass(GatewayUserEntity.class);
+        Mockito.verify(redemptionService).redeemForRegistration(
+                Mockito.eq("INVITE-SOCIAL"),
+                userCaptor.capture(),
+                Mockito.eq("invite@example.com"),
+                Mockito.eq(PortalSecurityService.REGISTRATION_CHANNEL_SOCIAL_OAUTH),
+                Mockito.eq("PORTAL_SOCIAL_OAUTH")
+        );
+        assertEquals(501L, userCaptor.getValue().getId());
+    }
+
+    @Test
+    void shouldNotRedeemInvitationCodeWhenBindingSocialOAuthToCurrentUser() {
+        PortalSocialOauthSessionRepository sessionRepository = Mockito.mock(PortalSocialOauthSessionRepository.class);
+        GatewayUserSocialIdentityRepository identityRepository = Mockito.mock(GatewayUserSocialIdentityRepository.class);
+        GatewayUserRepository userRepository = Mockito.mock(GatewayUserRepository.class);
+        PortalAuthService portalAuthService = Mockito.mock(PortalAuthService.class);
+        PortalSecurityService portalSecurityService = Mockito.mock(PortalSecurityService.class);
+        InvitationCodeRedemptionService redemptionService = Mockito.mock(InvitationCodeRedemptionService.class);
+        GatewayProperties properties = new GatewayProperties();
+        properties.getWeb().setPublicBaseUrl("https://gateway.example.com");
+        PortalSocialOAuthService service = new PortalSocialOAuthService(
+                sessionRepository,
+                identityRepository,
+                userRepository,
+                portalAuthService,
+                properties,
+                null,
+                provider(portalSecurityService),
+                provider(redemptionService),
+                List.of(googleProfileClient("google-bind-invite-7", "bind@example.com", "Bind User"))
+        );
+        Mockito.when(sessionRepository.save(any())).thenAnswer(invocation -> {
+            PortalSocialOauthSessionEntity session = invocation.getArgument(0);
+            Mockito.when(sessionRepository.findByState(session.getState())).thenReturn(Optional.of(session));
+            return session;
+        });
+        GatewayUserEntity currentUser = user(601L, "current@example.com");
+        var exchange = MockServerWebExchange.from(MockServerHttpRequest.get("/portal").build());
+        var webSession = exchange.getSession().block();
+        webSession.getAttributes().put("portalUserId", 601L);
+        Mockito.when(portalAuthService.requireCurrentPortalUser(webSession)).thenReturn(currentUser);
+        Mockito.when(identityRepository.findByProviderAndExternalSubject(SocialOAuthProvider.GOOGLE, "google-bind-invite-7"))
+                .thenReturn(Optional.empty());
+        Mockito.when(identityRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        Mockito.when(portalAuthService.authenticateExternalUser(any(), any()))
+                .thenReturn(Mono.just(new PortalSessionResponse(true, 601L, "current@example.com", null, null, null)));
+
+        var start = service.start("google", new PortalSocialOAuthStartRequest("google-client", "/portal/security", List.of(), "INVITE-BIND"));
+        service.complete(
+                "google",
+                new PortalSocialOAuthCallbackRequest(start.state(), "code-bind", null, null, null, null),
+                exchange
+        ).block();
+
+        Mockito.verify(portalSecurityService, Mockito.never()).verifyRegistrationPolicy(
+                Mockito.anyString(),
+                Mockito.anyString(),
+                Mockito.anyString()
+        );
+        Mockito.verify(redemptionService, Mockito.never()).redeemForRegistration(
+                Mockito.anyString(),
+                Mockito.any(),
+                Mockito.anyString(),
+                Mockito.anyString(),
+                Mockito.anyString()
+        );
+    }
+
+    private SocialOAuthProfileClient googleProfileClient(String subject, String email, String displayName) {
+        return new SocialOAuthProfileClient() {
+            @Override
+            public boolean supports(SocialOAuthProvider provider) {
+                return provider == SocialOAuthProvider.GOOGLE;
+            }
+
+            @Override
+            public SocialOAuthProfile exchange(SocialOAuthTokenExchangeRequest request) {
+                return new SocialOAuthProfile(SocialOAuthProvider.GOOGLE, subject, email, displayName, "{}");
+            }
+        };
+    }
+
+    private GatewayUserEntity user(Long id, String email) {
+        GatewayUserEntity user = new GatewayUserEntity();
+        ReflectionTestUtils.setField(user, "id", id);
+        user.setEmail(email);
+        user.setActive(true);
+        return user;
+    }
+
+    private <T> ObjectProvider<T> provider(T value) {
+        return new ObjectProvider<>() {
+            @Override
+            public T getObject(Object... args) {
+                return value;
+            }
+
+            @Override
+            public T getIfAvailable() {
+                return value;
+            }
+
+            @Override
+            public T getIfUnique() {
+                return value;
+            }
+
+            @Override
+            public T getObject() {
+                return value;
+            }
+        };
     }
 }

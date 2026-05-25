@@ -1,10 +1,10 @@
 package com.prodigalgal.xaigateway.gateway.core.resource;
 
 import com.prodigalgal.xaigateway.infra.persistence.entity.GatewayAsyncResourceEntity;
+import com.prodigalgal.xaigateway.gateway.core.error.GatewayRuleMatchedException;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Locale;
-import java.util.UUID;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -73,8 +73,12 @@ class GeminiVeoMediaProviderAdapter implements MediaProviderAdapter {
 
     @Override
     public MediaProviderCreateResult create(String resourceKey, Long distributedKeyId, ObjectNode requestPayload, Instant now) {
-        String providerTaskId = "gemini_veo_" + UUID.randomUUID().toString().replace("-", "");
-        String status = normalizeStatus(firstText(requestPayload, "status", "initial_status"), "queued");
+        String providerTaskId = requireText(
+                requestPayload,
+                "provider_task_id",
+                "Gemini/Veo Video task requires real provider_task_id; local adapter task creation is disabled."
+        );
+        String status = normalizeStatus(firstText(requestPayload, "provider_status", "status", "initial_status"), "queued");
 
         ObjectNode response = objectMapper.createObjectNode();
         response.put("id", resourceKey);
@@ -86,8 +90,9 @@ class GeminiVeoMediaProviderAdapter implements MediaProviderAdapter {
         response.put("provider_adapter", adapterName());
         response.put("provider_task_id", providerTaskId);
         putIfPresent(response, "model", text(requestPayload, "model"));
+        putIfPresent(response, "output_url", firstText(requestPayload, "output_url", "video_url", "download_url"));
         if ("completed".equals(status)) {
-            attachArtifact(response, resourceKey, now);
+            attachArtifact(response, requestPayload, now);
         }
 
         ObjectNode metadata = objectMapper.createObjectNode();
@@ -97,9 +102,9 @@ class GeminiVeoMediaProviderAdapter implements MediaProviderAdapter {
         metadata.put("provider_family", providerFamily());
         metadata.put("provider_adapter", adapterName());
         metadata.put("provider_task_id", providerTaskId);
-        metadata.put("provider_support_tier", "provider_specific_adapter");
-        metadata.put("provider_support_status", "SUPPORTED");
-        metadata.put("provider_smoke_hint", "使用 provider_mode=adapter, provider_family=gemini 执行本地 Veo 生命周期 smoke；真实 key 仅从环境变量注入。");
+        metadata.put("provider_support_tier", "provider_specific_native_profile_required");
+        metadata.put("provider_support_status", "NATIVE_REQUIRED");
+        metadata.put("provider_smoke_hint", "只接受真实 Gemini/Veo provider 响应证据；缺少 provider_task_id 或 artifact URL 时 hard-fail。");
         metadata.put("distributed_key_id", distributedKeyId == null ? 0L : distributedKeyId);
         appendEvent(metadata, "created", status, now);
 
@@ -108,14 +113,7 @@ class GeminiVeoMediaProviderAdapter implements MediaProviderAdapter {
 
     @Override
     public ObjectNode get(GatewayAsyncResourceEntity entity, ObjectNode metadata, ObjectNode response, Instant now) {
-        if (!isTerminal(response.path("status").asText(entity.getStatus()))) {
-            response.put("status", "completed");
-            response.put("completed_at", epoch(now));
-            attachArtifact(response, entity.getResourceKey(), now);
-            metadata.put("provider_status", "completed");
-            metadata.put("artifact_expires_at", epoch(now.plusSeconds(3_600)));
-            appendEvent(metadata, "synced", "completed", now);
-        }
+        appendEvent(metadata, "read", response.path("status").asText(entity.getStatus()), now);
         return response;
     }
 
@@ -134,38 +132,46 @@ class GeminiVeoMediaProviderAdapter implements MediaProviderAdapter {
     @Override
     public ObjectNode download(GatewayAsyncResourceEntity entity, ObjectNode metadata, ObjectNode response, Instant now) {
         if (!"completed".equalsIgnoreCase(response.path("status").asText(entity.getStatus()))) {
-            throw new IllegalStateException("当前 Video 任务尚未完成，不能下载产物。");
+            throw mediaNativeRouteRequired("当前 Video 任务尚未完成或缺少真实 provider artifact，不能下载。");
         }
-        JsonNode artifact = response.path("artifacts").isArray() && !response.path("artifacts").isEmpty()
-                ? response.path("artifacts").get(0)
-                : null;
+        JsonNode artifact = requireArtifact(response);
         ObjectNode download = objectMapper.createObjectNode();
         download.put("id", entity.getResourceKey() + "_download");
         download.put("object", "media.artifact_download");
         download.put("resource_id", entity.getResourceKey());
         download.put("provider_family", providerFamily());
         download.put("provider_adapter", adapterName());
-        download.put("artifact_id", artifact == null ? entity.getResourceKey() + "_artifact" : artifact.path("id").asText());
-        download.put("content_type", artifact == null ? "video/mp4" : artifact.path("mime_type").asText("video/mp4"));
-        download.put("download_url", artifact == null ? downloadUrl(entity.getResourceKey()) : artifact.path("download_url").asText(downloadUrl(entity.getResourceKey())));
+        download.put("artifact_id", artifact.path("id").asText());
+        download.put("content_type", artifact.path("mime_type").asText("video/mp4"));
+        download.put("download_url", artifact.path("download_url").asText());
         download.put("expires_at", metadata.path("artifact_expires_at").asLong(epoch(now.plusSeconds(3_600))));
         appendEvent(metadata, "downloaded", response.path("status").asText(entity.getStatus()), now);
         return download;
     }
 
-    private void attachArtifact(ObjectNode response, String resourceKey, Instant now) {
+    private void attachArtifact(ObjectNode response, ObjectNode source, Instant now) {
+        String outputUrl = firstText(source, "output_url", "video_url", "download_url");
+        if (outputUrl == null) {
+            throw mediaNativeRouteRequired("Gemini/Veo completed task requires real provider artifact URL.");
+        }
         var artifacts = response.putArray("artifacts");
         artifacts.addObject()
-                .put("id", resourceKey + "_artifact_0")
+                .put("id", defaultString(firstText(source, "artifact_id", "provider_artifact_id"), "provider_artifact_0"))
                 .put("type", "video")
                 .put("mime_type", "video/mp4")
-                .put("download_url", downloadUrl(resourceKey))
+                .put("download_url", outputUrl)
                 .put("expires_at", epoch(now.plusSeconds(3_600)));
-        response.put("output_url", downloadUrl(resourceKey));
+        response.put("output_url", outputUrl);
     }
 
-    private String downloadUrl(String resourceKey) {
-        return "https://gateway.local/api/v1/videos/" + resourceKey + "/download";
+    private JsonNode requireArtifact(ObjectNode response) {
+        JsonNode artifact = response.path("artifacts").isArray() && !response.path("artifacts").isEmpty()
+                ? response.path("artifacts").get(0)
+                : null;
+        if (artifact == null || artifact.path("download_url").asText("").isBlank()) {
+            throw mediaNativeRouteRequired("当前 Video 任务没有真实 provider artifact，不能下载。");
+        }
+        return artifact;
     }
 
     private boolean isAdapterMode(String providerMode) {
@@ -186,6 +192,18 @@ class GeminiVeoMediaProviderAdapter implements MediaProviderAdapter {
 
     private String normalizeStatus(String status, String fallback) {
         return status == null || status.isBlank() ? fallback : status.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String requireText(JsonNode node, String fieldName, String message) {
+        String value = text(node, fieldName);
+        if (value == null) {
+            throw mediaNativeRouteRequired(message);
+        }
+        return value;
+    }
+
+    private GatewayRuleMatchedException mediaNativeRouteRequired(String message) {
+        return new GatewayRuleMatchedException(501, "native_route_required", message);
     }
 
     private boolean isTerminal(String status) {
@@ -220,6 +238,10 @@ class GeminiVeoMediaProviderAdapter implements MediaProviderAdapter {
         if (value != null && !value.isBlank()) {
             node.put(fieldName, value);
         }
+    }
+
+    private String defaultString(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value;
     }
 
     private void appendEvent(ObjectNode metadata, String eventType, String status, Instant now) {
@@ -267,7 +289,11 @@ class SunoMusicMediaProviderAdapter implements MediaProviderAdapter {
 
     @Override
     public MediaProviderCreateResult create(String resourceKey, Long distributedKeyId, ObjectNode requestPayload, Instant now) {
-        String providerTaskId = "suno_music_" + UUID.randomUUID().toString().replace("-", "");
+        String providerTaskId = requireText(
+                requestPayload,
+                "provider_task_id",
+                "Suno Music task requires real provider_task_id; local adapter task creation is disabled."
+        );
         String rawStatus = normalizeProviderStatus(firstText(requestPayload, "provider_status", "status", "initial_status"), "submitted");
         String status = normalizeGatewayStatus(rawStatus);
         String action = normalizeAction(firstText(requestPayload, "action", "task_action", "mode"));
@@ -311,11 +337,11 @@ class SunoMusicMediaProviderAdapter implements MediaProviderAdapter {
         metadata.put("provider_task_id", providerTaskId);
         metadata.put("provider_action", action);
         metadata.put("provider_fetch_mode", "batch_polling");
-        metadata.put("provider_support_tier", "provider_specific_adapter");
-        metadata.put("provider_support_status", "SUPPORTED");
+        metadata.put("provider_support_tier", "provider_specific_native_profile_required");
+        metadata.put("provider_support_status", "NATIVE_REQUIRED");
         metadata.put("provider_capability", "music_generation");
         metadata.put("provider_pricing_source", "operator_configured_suno_music_pricing");
-        metadata.put("provider_smoke_hint", "设置 XAG_SMOKE_SUNO=true、XAG_SMOKE_SUNO_BASE_URL 与 XAG_SMOKE_SUNO_API_KEY/SUNO_API_KEY 后才执行真实 Suno-like smoke；默认跳过且不消耗额度。");
+        metadata.put("provider_smoke_hint", "只接受真实 Suno provider 响应证据；缺少 provider_task_id 或 artifact URL 时 hard-fail。");
         metadata.put("provider_status", rawStatus);
         metadata.put("distributed_key_id", distributedKeyId == null ? 0L : distributedKeyId);
         appendFailureClasses(metadata);
@@ -326,15 +352,7 @@ class SunoMusicMediaProviderAdapter implements MediaProviderAdapter {
 
     @Override
     public ObjectNode get(GatewayAsyncResourceEntity entity, ObjectNode metadata, ObjectNode response, Instant now) {
-        if (!isTerminal(response.path("status").asText(entity.getStatus()))) {
-            response.put("status", "completed");
-            response.put("provider_status", "success");
-            response.put("completed_at", epoch(now));
-            attachArtifact(response, entity.getResourceKey(), response, now);
-            metadata.put("provider_status", "success");
-            metadata.put("artifact_expires_at", epoch(now.plusSeconds(3_600)));
-            appendEvent(metadata, "synced", "completed", now);
-        }
+        appendEvent(metadata, "read", response.path("status").asText(entity.getStatus()), now);
         return response;
     }
 
@@ -354,20 +372,18 @@ class SunoMusicMediaProviderAdapter implements MediaProviderAdapter {
     @Override
     public ObjectNode download(GatewayAsyncResourceEntity entity, ObjectNode metadata, ObjectNode response, Instant now) {
         if (!"completed".equalsIgnoreCase(response.path("status").asText(entity.getStatus()))) {
-            throw new IllegalStateException("当前 Music 任务尚未完成，不能下载产物。");
+            throw mediaNativeRouteRequired("当前 Music 任务尚未完成或缺少真实 provider artifact，不能下载。");
         }
-        JsonNode artifact = response.path("artifacts").isArray() && !response.path("artifacts").isEmpty()
-                ? response.path("artifacts").get(0)
-                : null;
+        JsonNode artifact = requireArtifact(response);
         ObjectNode download = objectMapper.createObjectNode();
         download.put("id", entity.getResourceKey() + "_download");
         download.put("object", "media.artifact_download");
         download.put("resource_id", entity.getResourceKey());
         download.put("provider_family", providerFamily());
         download.put("provider_adapter", adapterName());
-        download.put("artifact_id", artifact == null ? entity.getResourceKey() + "_artifact" : artifact.path("id").asText());
-        download.put("content_type", artifact == null ? "audio/mpeg" : artifact.path("mime_type").asText("audio/mpeg"));
-        download.put("download_url", artifact == null ? downloadUrl(entity.getResourceKey()) : artifact.path("download_url").asText(downloadUrl(entity.getResourceKey())));
+        download.put("artifact_id", artifact.path("id").asText());
+        download.put("content_type", artifact.path("mime_type").asText("audio/mpeg"));
+        download.put("download_url", artifact.path("download_url").asText());
         download.put("expires_at", metadata.path("artifact_expires_at").asLong(epoch(now.plusSeconds(3_600))));
         appendEvent(metadata, "downloaded", response.path("status").asText(entity.getStatus()), now);
         return download;
@@ -376,12 +392,14 @@ class SunoMusicMediaProviderAdapter implements MediaProviderAdapter {
     private void attachArtifact(ObjectNode response, String resourceKey, JsonNode source, Instant now) {
         var artifacts = response.putArray("artifacts");
         ObjectNode audio = artifacts.addObject();
-        audio.put("id", resourceKey + "_artifact_0");
+        audio.put("id", defaultString(firstText(source, "artifact_id", "provider_artifact_id"), resourceKey + "_artifact_0"));
         audio.put("type", "audio");
         audio.put("mime_type", "audio/mpeg");
-        audio.put("download_url", firstText(source, "audio_url", "output_url", "download_url") == null
-                ? downloadUrl(resourceKey)
-                : firstText(source, "audio_url", "output_url", "download_url"));
+        String audioUrl = firstText(source, "audio_url", "output_url", "download_url");
+        if (audioUrl == null) {
+            throw mediaNativeRouteRequired("Suno completed task requires real provider artifact URL.");
+        }
+        audio.put("download_url", audioUrl);
         audio.put("expires_at", epoch(now.plusSeconds(3_600)));
         String imageUrl = firstText(source, "image_url", "cover_url");
         if (imageUrl != null) {
@@ -392,7 +410,7 @@ class SunoMusicMediaProviderAdapter implements MediaProviderAdapter {
             cover.put("download_url", imageUrl);
             cover.put("expires_at", epoch(now.plusSeconds(3_600)));
         }
-        response.put("output_url", audio.path("download_url").asText(downloadUrl(resourceKey)));
+        response.put("output_url", audio.path("download_url").asText());
     }
 
     private void attachUsage(ObjectNode response, ObjectNode requestPayload) {
@@ -421,8 +439,14 @@ class SunoMusicMediaProviderAdapter implements MediaProviderAdapter {
         classes.add("PROVIDER_RATE_LIMITED");
     }
 
-    private String downloadUrl(String resourceKey) {
-        return "https://gateway.local/api/v1/music/" + resourceKey + "/download";
+    private JsonNode requireArtifact(ObjectNode response) {
+        JsonNode artifact = response.path("artifacts").isArray() && !response.path("artifacts").isEmpty()
+                ? response.path("artifacts").get(0)
+                : null;
+        if (artifact == null || artifact.path("download_url").asText("").isBlank()) {
+            throw mediaNativeRouteRequired("当前 Music 任务没有真实 provider artifact，不能下载。");
+        }
+        return artifact;
     }
 
     private boolean isAdapterMode(String providerMode) {
@@ -496,6 +520,18 @@ class SunoMusicMediaProviderAdapter implements MediaProviderAdapter {
 
     private String defaultString(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private String requireText(JsonNode node, String fieldName, String message) {
+        String value = text(node, fieldName);
+        if (value == null) {
+            throw mediaNativeRouteRequired(message);
+        }
+        return value;
+    }
+
+    private GatewayRuleMatchedException mediaNativeRouteRequired(String message) {
+        return new GatewayRuleMatchedException(501, "native_route_required", message);
     }
 
     private void putIfPresent(ObjectNode node, String fieldName, String value) {

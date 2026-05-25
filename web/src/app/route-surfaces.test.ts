@@ -8,6 +8,7 @@ describe('route surfaces', () => {
     ['/status', 'public'],
     ['/portal', 'portal'],
     ['/portal/keys', 'portal'],
+    ['/portal/invitations', 'portal'],
     ['/portal/security', 'portal'],
     ['/portal/announcements/notice-1', 'portal'],
     ['/login', 'console'],

@@ -151,7 +151,7 @@ export const uxAcceptancePages: UxAcceptancePage[] = [
     critical: true,
     viewports: ['desktop', 'mobile'],
     states: ['loading', 'empty', 'loaded', 'error', 'permissionDenied'],
-    emptyStateCta: '无 Codex 账号时引导导入 auth.json 或发起 OAuth 连接。',
+    emptyStateCta: '无 Codex 账号时引导导入 auth.json。',
     errorRecovery: '运行态失败时保留账号分组上下文，并说明 quota、smoke、冻结或绑定 Key 的失败原因。',
     highRiskInputs: ['resource-picker', 'masked-secret', 'danger-confirm', 'mobile-table-overflow'],
     destructiveActions: ['freeze-account', 'runtime-reset', 'batch-recovery-preflight'],

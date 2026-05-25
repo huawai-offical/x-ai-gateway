@@ -425,7 +425,7 @@ export function AccountGroupDetailPage() {
   const importMutation = useTypedMutation<Account | OfficialAccountQuotaResponse, void>({
     mutationFn: async (): Promise<Account | OfficialAccountQuotaResponse> => {
       if (!groupQuery.data) {
-        throw new Error('账号分组信息未就绪，无法导入。')
+        throw new Error('上游账号组/凭证池信息未就绪，无法导入。')
       }
       if (isCodexGroup(groupQuery.data)) {
         return apiRequest<OfficialAccountQuotaResponse>('/admin/accounts/official/import', {
@@ -510,7 +510,7 @@ export function AccountGroupDetailPage() {
         payload: buildAccountGroupPayload(editForm),
       })
     } catch (error) {
-      setEditError(error instanceof Error ? error.message : '无法更新账号分组。')
+      setEditError(error instanceof Error ? error.message : '无法更新上游账号组/凭证池。')
     }
   }
 
@@ -519,8 +519,8 @@ export function AccountGroupDetailPage() {
       return
     }
     const confirmed = await confirm({
-      title: '删除账号分组',
-      description: `确认删除“${group.groupName}”吗？删除后会回到账号分组列表。`,
+      title: '删除上游账号组/凭证池',
+      description: `确认删除“${group.groupName}”吗？删除后会回到上游账号组/凭证池列表。`,
       confirmLabel: '删除',
       destructive: true,
     })
@@ -624,10 +624,10 @@ export function AccountGroupDetailPage() {
       group
         ? [
       { key: 'provider', label: '提供方类型', value: group.providerType },
-      { key: 'group-id', label: '账号分组 ID', value: group.id },
+      { key: 'group-id', label: '上游账号组/凭证池 ID', value: group.id },
       { key: 'group-default', label: '系统默认分组', value: group.defaultGroup ? '是' : '否' },
       { key: 'group-active', label: '启用状态', value: group.active === false ? '停用' : '启用' },
-      { key: 'group-oauth', label: 'OAuth 账号数', value: formatCount(group.oauthAccountCount ?? accountsQuery.data?.length ?? 0) },
+      { key: 'group-accounts', label: '账号数', value: formatCount(group.oauthAccountCount ?? accountsQuery.data?.length ?? 0) },
       { key: 'group-api', label: 'API Key 账号数', value: formatCount(group.apiCredentialCount ?? credentialsQuery.data?.length ?? 0) },
       { key: 'group-total', label: '总账号数', value: formatCount(group.totalAccountCount ?? ((group.oauthAccountCount ?? accountsQuery.data?.length ?? 0) + (group.apiCredentialCount ?? credentialsQuery.data?.length ?? 0))) },
       { key: 'created-at', label: '创建时间', value: formatInstant(group.createdAt) },
@@ -641,13 +641,13 @@ export function AccountGroupDetailPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageSection
-        kicker="账号分组详情"
-        title={group?.groupName ?? '账号分组'}
+        kicker="上游账号组/凭证池详情"
+        title={group?.groupName ?? '上游账号组/凭证池'}
         actions={
           group ? (
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" onClick={() => openEditDialog(group)}>
-                编辑账号分组
+                编辑上游账号组/凭证池
               </Button>
               <Button
                 type="button"
@@ -655,7 +655,7 @@ export function AccountGroupDetailPage() {
                 onClick={() => toggleGroupMutation.mutate({ id: group.id, active: !(group.active ?? true) })}
                 disabled={toggleGroupMutation.isPending}
               >
-                {group.active === false ? '启用账号分组' : '停用账号分组'}
+                {group.active === false ? '启用上游账号组/凭证池' : '停用上游账号组/凭证池'}
               </Button>
               <Button
                 type="button"
@@ -669,19 +669,13 @@ export function AccountGroupDetailPage() {
               >
                 导入 auth.json 接入
               </Button>
-              <Button asChild>
-                <Link to={accountConnectPath(group)}>
-                  发起 OAuth 连接
-                  <ArrowUpRightIcon data-icon="inline-end" />
-                </Link>
-              </Button>
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => void handleDeleteGroup()}
                 disabled={deleteGroupMutation.isPending || group.defaultGroup}
               >
-                删除账号分组
+                删除上游账号组/凭证池
               </Button>
             </div>
           ) : null
@@ -690,7 +684,7 @@ export function AccountGroupDetailPage() {
         {groupQuery.isPending ? (
           <PageSkeleton count={1} />
         ) : groupQuery.error ? (
-          <InlineError error={groupQuery.error} title="账号分组详情加载失败" />
+          <InlineError error={groupQuery.error} title="上游账号组/凭证池详情加载失败" />
         ) : group ? (
           <div className="flex flex-col gap-6">
             <InfoGrid items={groupItems} columnsClassName="md:grid-cols-2 xl:grid-cols-3" />
@@ -722,9 +716,9 @@ export function AccountGroupDetailPage() {
 
             {bindMutation.error ? <InlineError error={bindMutation.error} title="绑定分布式 Key 失败" /> : null}
             {distributedKeysQuery.error ? <InlineError error={distributedKeysQuery.error} title="分布式 Key 列表加载失败" /> : null}
-            {updateGroupMutation.error ? <InlineError error={updateGroupMutation.error} title="账号分组保存失败" /> : null}
-            {toggleGroupMutation.error ? <InlineError error={toggleGroupMutation.error} title="账号分组状态更新失败" /> : null}
-            {deleteGroupMutation.error ? <InlineError error={deleteGroupMutation.error} title="账号分组删除失败" /> : null}
+            {updateGroupMutation.error ? <InlineError error={updateGroupMutation.error} title="上游账号组/凭证池保存失败" /> : null}
+            {toggleGroupMutation.error ? <InlineError error={toggleGroupMutation.error} title="上游账号组/凭证池状态更新失败" /> : null}
+            {deleteGroupMutation.error ? <InlineError error={deleteGroupMutation.error} title="上游账号组/凭证池删除失败" /> : null}
 
             <form className="flex flex-col gap-4 rounded-xl border border-border/45 bg-muted/15 p-4 md:flex-row md:items-end" onSubmit={handleBind}>
               <label className="flex min-w-0 flex-1 flex-col gap-2">
@@ -789,7 +783,7 @@ export function AccountGroupDetailPage() {
             ) : null}
           </div>
         ) : (
-          <EmptyState title="未找到账号分组" />
+          <EmptyState title="未找到上游账号组/凭证池" />
         )}
       </PageSection>
 
@@ -963,15 +957,15 @@ export function AccountGroupDetailPage() {
                 )}
               </PaginatedRows>
             ) : (
-              <EmptyState title="当前 Codex 账号分组还没有可观测的运行态账号" />
+              <EmptyState title="当前 Codex 上游账号组/凭证池还没有可观测的运行态账号" />
             )}
           </div>
         </PageSection>
       ) : null}
 
       <PageSection
-        kicker="账号分组成员"
-        title="池内 OAuth 账号"
+        kicker="上游账号组/凭证池成员"
+        title="池内账号"
       >
         {accountsQuery.isPending ? (
           <PageSkeleton count={1} />
@@ -1021,11 +1015,11 @@ export function AccountGroupDetailPage() {
             )}
           </PaginatedRows>
         ) : (
-          <EmptyState title="当前账号分组还没有账号" />
+          <EmptyState title="当前上游账号组/凭证池还没有账号" />
         )}
       </PageSection>
 
-      <PageSection kicker="账号分组成员" title="池内 API Key 账号">
+      <PageSection kicker="上游账号组/凭证池成员" title="池内 API Key 账号">
         {credentialsQuery.isPending ? (
           <PageSkeleton count={1} />
         ) : credentialsQuery.error ? (
@@ -1040,7 +1034,7 @@ export function AccountGroupDetailPage() {
                   <th className="w-[28%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">账号名称</th>
                   <th className="w-[16%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">提供方</th>
                   <th className="w-[12%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">状态</th>
-                  <th className="w-[16%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">账号分组</th>
+                  <th className="w-[16%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">上游账号组/凭证池</th>
                   <th className="w-[14%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">最近使用</th>
                   <th className="w-[14%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">操作</th>
                 </tr>
@@ -1070,7 +1064,7 @@ export function AccountGroupDetailPage() {
             )}
           </PaginatedRows>
         ) : (
-          <EmptyState title="当前账号分组还没有 API Key 账号" />
+          <EmptyState title="当前上游账号组/凭证池还没有 API Key 账号" />
         )}
       </PageSection>
 
@@ -1087,14 +1081,14 @@ export function AccountGroupDetailPage() {
       >
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>编辑账号分组</DialogTitle>
-            <DialogDescription>更新账号分组基础信息与能力范围。</DialogDescription>
+            <DialogTitle>编辑上游账号组/凭证池</DialogTitle>
+            <DialogDescription>更新上游账号与凭证池基础信息和能力范围。</DialogDescription>
           </DialogHeader>
 
           <form className="flex flex-col gap-4" onSubmit={handleUpdateGroup}>
             <div className="grid gap-4 md:grid-cols-2">
               <label className="flex flex-col gap-2">
-                <span className="text-sm font-medium text-foreground">账号分组名称</span>
+                <span className="text-sm font-medium text-foreground">上游账号组/凭证池名称</span>
                 <Input
                   value={editForm.groupName}
                   onChange={(event) => setEditForm((current) => ({ ...current, groupName: event.target.value }))}
@@ -1163,11 +1157,11 @@ export function AccountGroupDetailPage() {
                 checked={editForm.active}
                 onChange={(event) => setEditForm((current) => ({ ...current, active: event.target.checked }))}
               />
-              <span className="text-sm font-medium text-foreground">启用账号分组</span>
+              <span className="text-sm font-medium text-foreground">启用上游账号组/凭证池</span>
             </label>
 
             {(editError || updateGroupMutation.error) ? (
-              <InlineError error={updateGroupMutation.error ?? new Error(editError ?? '账号分组保存失败')} title="账号分组保存失败" />
+              <InlineError error={updateGroupMutation.error ?? new Error(editError ?? '上游账号组/凭证池保存失败')} title="上游账号组/凭证池保存失败" />
             ) : null}
 
             <DialogFooter>
@@ -1194,7 +1188,7 @@ export function AccountGroupDetailPage() {
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>支持模型选择</DialogTitle>
-            <DialogDescription>选择此账号分组支持的模型。</DialogDescription>
+            <DialogDescription>选择此上游账号组/凭证池支持的模型。</DialogDescription>
           </DialogHeader>
 
           <div className="flex flex-col gap-4">
@@ -1323,7 +1317,7 @@ export function AccountGroupDetailPage() {
                 )}
               </PaginatedRows>
             ) : (
-              <EmptyState title="当前账号分组没有可预检的 Codex 运行态账号" />
+              <EmptyState title="当前上游账号组/凭证池没有可预检的 Codex 运行态账号" />
             )}
             <CodePanel
               title="runtime-batch-recovery.redacted.json"
@@ -1333,7 +1327,7 @@ export function AccountGroupDetailPage() {
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/45 bg-muted/14 px-4 py-3">
                 <div>
                   <div className="text-sm font-medium text-foreground">{runtimeBatchResult.auditEventTitle ?? 'Codex Runtime 批量恢复审计事件'}</div>
-                  <div className="text-xs text-muted-foreground">事件 ID {runtimeBatchResult.auditEventId}，已按账号分组过滤系统事件。</div>
+                  <div className="text-xs text-muted-foreground">事件 ID {runtimeBatchResult.auditEventId}，已按上游账号组/凭证池过滤系统事件。</div>
                 </div>
                 <Button type="button" variant="outline" asChild>
                   <Link to={batchAuditEventsPath(id)}>
@@ -1370,7 +1364,7 @@ export function AccountGroupDetailPage() {
       >
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>OAuth 账号详情</DialogTitle>
+            <DialogTitle>账号详情</DialogTitle>
             <DialogDescription>查看账号详情。</DialogDescription>
           </DialogHeader>
           {accountDetailQuery.isPending ? (
@@ -1382,7 +1376,7 @@ export function AccountGroupDetailPage() {
               <InfoGrid
                 items={[
                   { key: 'id', label: '账号 ID', value: accountDetailQuery.data.id },
-                  { key: 'groupId', label: '账号分组 ID', value: accountDetailQuery.data.groupId ?? '未分组' },
+                  { key: 'groupId', label: '上游账号组/凭证池 ID', value: accountDetailQuery.data.groupId ?? '未分组' },
                   { key: 'accountName', label: '账号名称', value: accountDetailQuery.data.accountName },
                   { key: 'providerType', label: '提供方', value: accountDetailQuery.data.providerType },
                   { key: 'externalAccountId', label: '外部账号 ID', value: accountDetailQuery.data.externalAccountId ?? '无' },
@@ -1513,8 +1507,8 @@ export function AccountGroupDetailPage() {
                   { key: 'credentialName', label: '账号名称', value: credentialDetailQuery.data.credentialName },
                   { key: 'providerType', label: '提供方', value: credentialDetailQuery.data.providerType },
                   { key: 'authKind', label: '认证类型', value: credentialDetailQuery.data.authKind },
-                  { key: 'group', label: '账号分组', value: credentialDetailQuery.data.groupName ?? '未分组' },
-                  { key: 'groupId', label: '账号分组 ID', value: credentialDetailQuery.data.groupId ?? '未分组' },
+                  { key: 'group', label: '上游账号组/凭证池', value: credentialDetailQuery.data.groupName ?? '未分组' },
+                  { key: 'groupId', label: '上游账号组/凭证池 ID', value: credentialDetailQuery.data.groupId ?? '未分组' },
                   { key: 'active', label: '启用状态', value: credentialDetailQuery.data.active ? '启用' : '停用' },
                   { key: 'fingerprint', label: '指纹', value: credentialDetailQuery.data.secretFingerprint },
                   { key: 'baseUrl', label: '基础 URL', value: credentialDetailQuery.data.baseUrl },
@@ -1754,7 +1748,7 @@ function groupToForm(group: AccountGroup): AccountGroupForm {
 
 function buildAccountGroupPayload(form: AccountGroupForm) {
   if (!form.groupName.trim()) {
-    throw new Error('账号分组名称不能为空。')
+    throw new Error('上游账号组/凭证池名称不能为空。')
   }
 
   return {
@@ -1979,11 +1973,6 @@ function resolveRouteProviderType(providerType: string | undefined) {
     return 'ANTHROPIC_DIRECT'
   }
   return 'OPENAI_DIRECT'
-}
-
-function accountConnectPath(group: AccountGroup) {
-  const providerSlug = group.providerType === 'CODEX_OAUTH' ? 'codex' : group.providerType.toLowerCase()
-  return `/console/accounts/connect/${providerSlug}?groupId=${group.id}`
 }
 
 function batchAuditEventsPath(groupId: string | undefined) {

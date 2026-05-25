@@ -430,7 +430,7 @@ describe('AccountGroupDetailPage', () => {
     expect((await screen.findAllByText('codex-real-test')).length).toBeGreaterThan(0)
 
     fireEvent.click(screen.getAllByRole('button', { name: '查看' })[0])
-    const detailDialog = await screen.findByRole('dialog', { name: 'OAuth 账号详情' })
+    const detailDialog = await screen.findByRole('dialog', { name: '账号详情' })
     fireEvent.click(await screen.findByRole('button', { name: /隔离账号/ }))
     fireEvent.click(await screen.findByRole('button', { name: /重置运行态/ }))
     fireEvent.click(await screen.findByRole('button', { name: /刷新模型/ }))

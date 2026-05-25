@@ -6,11 +6,7 @@ public enum GatewayDegradationPolicy {
     ALLOW_LOSSY;
 
     public boolean allows(InteropCapabilityLevel level) {
-        return switch (this) {
-            case STRICT -> level == InteropCapabilityLevel.NATIVE;
-            case ALLOW_EMULATED -> level == InteropCapabilityLevel.NATIVE || level == InteropCapabilityLevel.EMULATED;
-            case ALLOW_LOSSY -> level != InteropCapabilityLevel.UNSUPPORTED;
-        };
+        return level == InteropCapabilityLevel.NATIVE;
     }
 
     public static GatewayDegradationPolicy from(String raw) {

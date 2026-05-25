@@ -1,8 +1,11 @@
 import { type ReactNode, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { ArrowUpRightIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
@@ -514,10 +517,28 @@ export function RequestLogsPage() {
       </PageSection>
 
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="max-w-4xl" aria-describedby={undefined}>
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>{detailTitle}</DialogTitle>
+            <DialogDescription>
+              这里展示当前观测行的原始字段；完整请求与上游载荷阶段请跳转到链路追踪按 requestId 联查。
+            </DialogDescription>
           </DialogHeader>
+          {detailPayload && getDetailRequestId(detailPayload) ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/45 bg-muted/16 px-4 py-3 text-sm text-muted-foreground">
+              <span className="break-all">requestId：{getDetailRequestId(detailPayload)}</span>
+              <Button type="button" variant="outline" size="sm" asChild>
+                <Link to={`/console/traces?requestId=${encodeURIComponent(getDetailRequestId(detailPayload) ?? '')}`}>
+                  去链路追踪查看完整请求详情
+                  <ArrowUpRightIcon data-icon="inline-end" />
+                </Link>
+              </Button>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-border/45 bg-muted/16 px-4 py-3 text-sm text-muted-foreground">
+              当前记录没有 requestId，无法生成链路追踪深链。
+            </div>
+          )}
           <pre className="scrollbar-subtle max-h-[70vh] overflow-auto rounded-xl border border-border/45 bg-muted/16 p-4 text-xs leading-6 text-foreground">
             {JSON.stringify(detailPayload ?? {}, null, 2)}
           </pre>
@@ -571,6 +592,12 @@ function openDetail(
   setTitle(title)
   setPayload(payload)
   setOpen(true)
+}
+
+function getDetailRequestId(payload: DetailPayload) {
+  return 'requestId' in payload && typeof payload.requestId === 'string' && payload.requestId.trim()
+    ? payload.requestId.trim()
+    : null
 }
 
 function toneByStatus(status?: string | null) {

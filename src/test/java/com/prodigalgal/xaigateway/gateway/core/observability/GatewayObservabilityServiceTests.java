@@ -4,6 +4,7 @@ import com.prodigalgal.xaigateway.gateway.core.auth.GatewayClientFamily;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CatalogCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropCapabilityLevel;
 import com.prodigalgal.xaigateway.gateway.core.interop.SupportStatus;
+import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateEvaluation;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateView;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionSource;
@@ -28,6 +29,7 @@ import org.mockito.Mockito;
 import tools.jackson.databind.ObjectMapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GatewayObservabilityServiceTests {
 
@@ -131,6 +133,52 @@ class GatewayObservabilityServiceTests {
         Mockito.verify(cacheHitLogRepository).save(Mockito.any(CacheHitLogEntity.class));
     }
 
+    @Test
+    void shouldSerializeRuntimeProviderInCandidateSummary() throws Exception {
+        RouteDecisionLogRepository routeDecisionLogRepository = Mockito.mock(RouteDecisionLogRepository.class);
+        ObjectMapper objectMapper = new ObjectMapper();
+        GatewayObservabilityService service = new GatewayObservabilityService(
+                routeDecisionLogRepository,
+                Mockito.mock(CacheHitLogRepository.class),
+                Mockito.mock(UpstreamCacheReferenceRepository.class),
+                objectMapper
+        );
+
+        service.recordRouteDecision("req-mimo", providerSpecificSelectionResult(
+                "https://token-plan-sgp.xiaomimimo.com/v1",
+                "mimo-v2.5-pro"
+        ));
+        service.recordRouteDecision("req-deepseek", providerSpecificSelectionResult(
+                "https://api.deepseek.com",
+                "deepseek-chat"
+        ));
+        service.recordRouteDecision("req-xai", providerSpecificSelectionResult(
+                "https://api.x.ai/v1",
+                "grok-4.3"
+        ));
+
+        ArgumentCaptor<RouteDecisionLogEntity> routeCaptor = ArgumentCaptor.forClass(RouteDecisionLogEntity.class);
+        Mockito.verify(routeDecisionLogRepository, Mockito.times(3)).save(routeCaptor.capture());
+        var mimoCandidate = objectMapper.readTree(routeCaptor.getAllValues().get(0).getCandidateSummaryJson())
+                .path("candidates")
+                .get(0);
+        assertEquals("XIAOMI_MIMO", mimoCandidate.path("runtimeProvider").asText());
+        assertEquals("XIAOMI_MIMO", mimoCandidate.path("siteKind").asText());
+        assertEquals("xiaomi_mimo.openai_compatible", mimoCandidate.path("protocolSuite").asText());
+        var deepSeekCandidate = objectMapper.readTree(routeCaptor.getAllValues().get(1).getCandidateSummaryJson())
+                .path("candidates")
+                .get(0);
+        assertEquals("DEEPSEEK", deepSeekCandidate.path("runtimeProvider").asText());
+        assertEquals("DEEPSEEK", deepSeekCandidate.path("siteKind").asText());
+        assertEquals("deepseek.openai_compatible", deepSeekCandidate.path("protocolSuite").asText());
+        var xaiCandidate = objectMapper.readTree(routeCaptor.getAllValues().get(2).getCandidateSummaryJson())
+                .path("candidates")
+                .get(0);
+        assertEquals("XAI", xaiCandidate.path("runtimeProvider").asText());
+        assertEquals("GROK", xaiCandidate.path("siteKind").asText());
+        assertEquals("grok.openai_compatible", xaiCandidate.path("protocolSuite").asText());
+    }
+
     private RouteSelectionResult selectionResult() {
         CatalogCandidateView candidate = new CatalogCandidateView(
                 101L,
@@ -172,6 +220,57 @@ class GatewayObservabilityServiceTests {
                 RouteSelectionSource.WEIGHTED_HASH,
                 selected,
                 List.of(selected)
+        );
+    }
+
+    private RouteSelectionResult providerSpecificSelectionResult(String baseUrl, String model) {
+        CatalogCandidateView candidate = new CatalogCandidateView(
+                101L,
+                model,
+                ProviderType.OPENAI_COMPATIBLE,
+                baseUrl,
+                model,
+                model,
+                List.of("openai", "responses"),
+                true,
+                true,
+                false,
+                false,
+                true,
+                true,
+                ReasoningTransport.OPENAI_CHAT
+        );
+        RouteCandidateView selected = new RouteCandidateView(candidate, 11L, 10, 100);
+        RouteCandidateEvaluation evaluation = new RouteCandidateEvaluation(
+                selected,
+                true,
+                "HEALTHY",
+                null,
+                false,
+                RouteSelectionSource.WEIGHTED_HASH,
+                0D,
+                List.of(),
+                List.of()
+        );
+        return new RouteSelectionResult(
+                1L,
+                "sk-gw-test",
+                model,
+                model,
+                model,
+                "openai",
+                "prefix",
+                "fingerprint",
+                model,
+                GatewayClientFamily.GENERIC_OPENAI,
+                null,
+                List.of(),
+                null,
+                RouteSelectionSource.WEIGHTED_HASH,
+                selected,
+                List.of(selected),
+                List.of(evaluation),
+                List.of()
         );
     }
 }

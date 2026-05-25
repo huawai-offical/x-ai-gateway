@@ -55,9 +55,7 @@ public class GoogleSocialOAuthProfileClient implements SocialOAuthProfileClient 
 
     @Override
     public boolean supports(SocialOAuthProvider provider) {
-        return provider == SocialOAuthProvider.GOOGLE
-                && configured(gatewayProperties.getOauth().getGoogleSocialClientId())
-                && configured(gatewayProperties.getOauth().getGoogleSocialClientSecret());
+        return provider == SocialOAuthProvider.GOOGLE;
     }
 
     @Override
@@ -68,12 +66,12 @@ public class GoogleSocialOAuthProfileClient implements SocialOAuthProfileClient 
     @Override
     public SocialOAuthProfile exchange(SocialOAuthTokenExchangeRequest request) {
         JsonNode token = webClient.post()
-                .uri(URI.create(gatewayProperties.getOauth().getGoogleSocialTokenEndpoint()))
+                .uri(URI.create(firstConfigured(request.tokenEndpoint(), gatewayProperties.getOauth().getGoogleSocialTokenEndpoint())))
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                 .accept(MediaType.APPLICATION_JSON)
                 .body(BodyInserters
-                        .fromFormData("client_id", gatewayProperties.getOauth().getGoogleSocialClientId())
-                        .with("client_secret", gatewayProperties.getOauth().getGoogleSocialClientSecret())
+                        .fromFormData("client_id", firstConfigured(request.clientId(), gatewayProperties.getOauth().getGoogleSocialClientId()))
+                        .with("client_secret", firstConfigured(request.clientSecret(), gatewayProperties.getOauth().getGoogleSocialClientSecret()))
                         .with("code", request.code())
                         .with("grant_type", "authorization_code")
                         .with("redirect_uri", request.redirectUri())
@@ -84,7 +82,7 @@ public class GoogleSocialOAuthProfileClient implements SocialOAuthProfileClient 
 
         String idToken = text(token, "id_token");
         if (idToken != null) {
-            JsonNode claims = verifyIdToken(idToken);
+            JsonNode claims = verifyIdToken(idToken, request.clientId(), request.jwksUri());
             return profileFromClaims(claims, "id_token");
         }
 
@@ -93,7 +91,7 @@ public class GoogleSocialOAuthProfileClient implements SocialOAuthProfileClient 
             throw new IllegalArgumentException("Google OAuth token response 缺少 access_token/id_token。");
         }
         JsonNode userInfo = webClient.get()
-                .uri(URI.create(gatewayProperties.getOauth().getGoogleSocialUserInfoEndpoint()))
+                .uri(URI.create(firstConfigured(request.userInfoEndpoint(), gatewayProperties.getOauth().getGoogleSocialUserInfoEndpoint())))
                 .headers(headers -> headers.setBearerAuth(accessToken))
                 .accept(MediaType.APPLICATION_JSON)
                 .retrieve()
@@ -103,6 +101,10 @@ public class GoogleSocialOAuthProfileClient implements SocialOAuthProfileClient 
     }
 
     JsonNode verifyIdToken(String idToken) {
+        return verifyIdToken(idToken, gatewayProperties.getOauth().getGoogleSocialClientId(), gatewayProperties.getOauth().getGoogleSocialJwksUri());
+    }
+
+    JsonNode verifyIdToken(String idToken, String clientId, String jwksUri) {
         try {
             String[] parts = idToken.split("\\.");
             if (parts.length != 3) {
@@ -113,14 +115,14 @@ public class GoogleSocialOAuthProfileClient implements SocialOAuthProfileClient 
             if (!"RS256".equals(text(header, "alg"))) {
                 throw new IllegalArgumentException("Google id_token 仅支持 RS256。");
             }
-            PublicKey publicKey = resolvePublicKey(text(header, "kid"));
+            PublicKey publicKey = resolvePublicKey(text(header, "kid"), firstConfigured(jwksUri, gatewayProperties.getOauth().getGoogleSocialJwksUri()));
             Signature signature = Signature.getInstance("SHA256withRSA");
             signature.initVerify(publicKey);
             signature.update((parts[0] + "." + parts[1]).getBytes(java.nio.charset.StandardCharsets.UTF_8));
             if (!signature.verify(Base64.getUrlDecoder().decode(parts[2]))) {
                 throw new IllegalArgumentException("Google id_token 签名验证失败。");
             }
-            validateClaims(claims);
+            validateClaims(claims, clientId);
             return claims;
         } catch (IllegalArgumentException exception) {
             throw exception;
@@ -130,12 +132,16 @@ public class GoogleSocialOAuthProfileClient implements SocialOAuthProfileClient 
     }
 
     private PublicKey resolvePublicKey(String kid) throws Exception {
-        JsonNode jwks = jwksCache.getJwks(gatewayProperties.getOauth().getGoogleSocialJwksUri());
+        return resolvePublicKey(kid, gatewayProperties.getOauth().getGoogleSocialJwksUri());
+    }
+
+    private PublicKey resolvePublicKey(String kid, String jwksUri) throws Exception {
+        JsonNode jwks = jwksCache.getJwks(jwksUri);
         PublicKey publicKey = resolvePublicKey(jwks, kid);
         if (publicKey != null) {
             return publicKey;
         }
-        publicKey = resolvePublicKey(jwksCache.refresh(gatewayProperties.getOauth().getGoogleSocialJwksUri()), kid);
+        publicKey = resolvePublicKey(jwksCache.refresh(jwksUri), kid);
         if (publicKey != null) {
             return publicKey;
         }
@@ -173,11 +179,15 @@ public class GoogleSocialOAuthProfileClient implements SocialOAuthProfileClient 
     }
 
     private void validateClaims(JsonNode claims) {
+        validateClaims(claims, gatewayProperties.getOauth().getGoogleSocialClientId());
+    }
+
+    private void validateClaims(JsonNode claims, String clientId) {
         String issuer = text(claims, "iss");
         if (!List.of("https://accounts.google.com", "accounts.google.com").contains(issuer)) {
             throw new IllegalArgumentException("Google id_token issuer 非法。");
         }
-        if (!gatewayProperties.getOauth().getGoogleSocialClientId().equals(text(claims, "aud"))) {
+        if (!firstConfigured(clientId, gatewayProperties.getOauth().getGoogleSocialClientId()).equals(text(claims, "aud"))) {
             throw new IllegalArgumentException("Google id_token audience 非法。");
         }
         long expiresAt = claims.path("exp").asLong(0L);
@@ -239,5 +249,9 @@ public class GoogleSocialOAuthProfileClient implements SocialOAuthProfileClient 
 
     private boolean configured(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private String firstConfigured(String primary, String fallback) {
+        return configured(primary) ? primary.trim() : fallback;
     }
 }

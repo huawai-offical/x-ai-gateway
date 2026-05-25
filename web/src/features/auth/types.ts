@@ -37,6 +37,23 @@ export type AdminAuthSettingsUpdatePayload = {
   newPassword?: string
 }
 
+export type PortalRegistrationPolicy = {
+  allowedEmailDomains: string[]
+  allowedRegistrationChannels: string[]
+  inviteCodeRequired: boolean
+  inviteCodesConfigured: boolean
+  emailVerificationRequiredForKeyCreation: boolean
+  updatedAt?: string | null
+}
+
+export type PortalRegistrationPolicyUpdatePayload = {
+  allowedEmailDomains: string[]
+  allowedRegistrationChannels: string[]
+  inviteCodeRequired: boolean
+  inviteCodes?: string[] | null
+  emailVerificationRequiredForKeyCreation: boolean
+}
+
 export type PowSolveState =
   | { status: 'idle'; nonce: string; attempts: number }
   | { status: 'solving'; nonce: string; attempts: number }

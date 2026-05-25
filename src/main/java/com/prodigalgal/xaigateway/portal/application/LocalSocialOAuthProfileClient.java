@@ -1,9 +1,7 @@
 package com.prodigalgal.xaigateway.portal.application;
 
 import java.util.Locale;
-import org.springframework.stereotype.Component;
 
-@Component
 public class LocalSocialOAuthProfileClient implements SocialOAuthProfileClient {
 
     @Override

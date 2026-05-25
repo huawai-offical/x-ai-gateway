@@ -59,9 +59,11 @@ import { opsApi } from './api'
 import type {
   AnalyticsBreakdownItem,
   CapacityPressureItem,
+  CredentialHealthMetric,
   DistributedKeyAnalyticsItem,
   OpsAnalyticsOverview,
   OpsCapacitySummary,
+  OpsHealthOverview,
   OpsSloRisk,
   OpsSloSummary,
   OpsSummary,
@@ -186,8 +188,19 @@ export function OpsPage() {
     refetchInterval: 30_000,
   })
 
+  const healthQuery = useTypedQuery<OpsHealthOverview>({
+    queryKey: ['ops-health', timeWindow.from, timeWindow.to],
+    queryFn: () =>
+      opsApi.health({
+        from: timeWindow.from,
+        to: timeWindow.to,
+      }),
+    refetchInterval: 30_000,
+  })
+
   const overview = overviewQuery.data
   const summary = summaryQuery.data
+  const health = healthQuery.data
 
   const trendData = useMemo(() => {
     if (!overview) return []
@@ -242,6 +255,7 @@ export function OpsPage() {
   )
 
   const overviewMetrics = useMemo(() => {
+    const healthTotal = health?.total
     const sampledMinutes = overview ? sampledMinutesForOverview(overview) : 0
     const cacheHitRatio =
       overview && overview.sampledRouteDecisionCount > 0
@@ -257,6 +271,32 @@ export function OpsPage() {
         hint: summary ? `最近快照 ${formatInstant(summary.snapshot.observedAt)}` : '等待实时快照',
       },
       {
+        label: '总体成功率',
+        value: healthTotal ? formatPercent(healthTotal.successRate) : '--',
+        hint: healthTotal
+          ? `${formatCompactNumber(healthTotal.successfulRequests)}/${formatCompactNumber(healthTotal.totalRequests)} 成功`
+          : '等待健康统计',
+      },
+      {
+        label: '总体可用率',
+        value: healthTotal ? formatPercent(healthTotal.availabilityRate) : '--',
+        hint: health ? `${formatInstant(health.sampledFrom)} - ${formatInstant(health.sampledTo)}` : '等待健康统计',
+      },
+      {
+        label: '总体失败率',
+        value: healthTotal ? formatPercent(healthTotal.errorRate) : summary ? formatPercent(summary.snapshot.errorRate) : '--',
+        hint: healthTotal
+          ? `失败 ${formatCompactNumber(healthTotal.failedRequests)} · 取消 ${formatCompactNumber(healthTotal.canceledRequests)}`
+          : '等待健康统计',
+      },
+      {
+        label: '平均耗时',
+        value: healthTotal ? `${healthTotal.avgDurationMs.toFixed(0)} ms` : `${latestLatency.toFixed(0)} ms`,
+        hint: healthTotal?.lastSuccessfulAt
+          ? `最近成功 ${formatInstant(healthTotal.lastSuccessfulAt)}`
+          : '来自健康统计窗口',
+      },
+      {
         label: '缓存命中率',
         value: formatPercent(cacheHitRatio),
         hint: overview ? `${overview.sampledCacheHitCount}/${overview.sampledRouteDecisionCount} 命中` : '等待分析窗口',
@@ -267,24 +307,14 @@ export function OpsPage() {
         hint: `${RANGE_OPTIONS.find((item) => item.value === rangeKey)?.label ?? '当前窗口'} 平均 Token 吞吐`,
       },
       {
-        label: '延迟 P95',
-        value: `${latestLatency.toFixed(0)} ms`,
-        hint: '来自 request_log duration 分桶聚合',
-      },
-      {
         label: '活跃告警',
         value: summary?.snapshot.activeAlerts ?? 0,
         hint: summary?.snapshot.affectedEntities.length
           ? `${summary.snapshot.affectedEntities.length} 个受影响对象`
           : '当前无显式受影响对象',
       },
-      {
-        label: '上游失败',
-        value: summary?.snapshot.providerFailures ?? 0,
-        hint: summary ? `错误率 ${formatPercent(summary.snapshot.errorRate)}` : '等待实时快照',
-      },
     ]
-  }, [overview, rangeKey, summary, totalTokens, trendData])
+  }, [health, overview, rangeKey, summary, totalTokens, trendData])
 
   const overviewEntries = useMemo<OverviewEntry[]>(
     () => [
@@ -377,14 +407,16 @@ export function OpsPage() {
             </div>
           </div>
 
-          {summaryQuery.isPending || overviewQuery.isPending ? (
+          {summaryQuery.isPending || overviewQuery.isPending || healthQuery.isPending ? (
             <PageSkeleton count={2} />
           ) : summaryQuery.error ? (
             <InlineError error={summaryQuery.error} title="实时摘要加载失败" />
           ) : overviewQuery.error ? (
             <InlineError error={overviewQuery.error} title="分析概览加载失败" />
+          ) : healthQuery.error ? (
+            <InlineError error={healthQuery.error} title="健康统计加载失败" />
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               {overviewMetrics.map((metric) => (
                 <MetricCard
                   key={metric.label}
@@ -618,6 +650,45 @@ export function OpsPage() {
         </PageSection>
 
       </div>
+
+      <PageSection
+        kicker="凭证健康"
+        title="凭证最近窗口健康统计"
+      >
+        {healthQuery.isPending ? (
+          <PageSkeleton count={2} />
+        ) : healthQuery.error ? (
+          <InlineError error={healthQuery.error} title="凭证健康加载失败" />
+        ) : health?.credentials.length ? (
+          <PaginatedRows items={health.credentials} itemLabel="个凭证">
+            {({ pageItems }) => (
+              <div className="overflow-hidden rounded-2xl border border-border/60 bg-card/92">
+                <table className="w-full table-fixed text-sm">
+                  <thead className="bg-muted/30">
+                    <tr>
+                      <th className="w-[22%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">凭证</th>
+                      <th className="w-[14%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">Provider</th>
+                      <th className="w-[10%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">请求</th>
+                      <th className="w-[12%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">成功率</th>
+                      <th className="w-[12%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">可用率</th>
+                      <th className="w-[12%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">失败率</th>
+                      <th className="w-[10%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">平均耗时</th>
+                      <th className="w-[18%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">最近状态</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pageItems.map((item) => (
+                      <CredentialHealthRow key={`${item.providerType}-${item.credentialId}`} item={item} />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </PaginatedRows>
+        ) : (
+          <EmptyState title="当前窗口没有凭证健康样本" />
+        )}
+      </PageSection>
 
       <PageSection
         kicker="访问密钥洞察"
@@ -867,6 +938,45 @@ function BreakdownCard({
   )
 }
 
+function CredentialHealthRow({ item }: { item: CredentialHealthMetric }) {
+  return (
+    <tr className="border-b border-border/40 align-top">
+      <td className="px-4 py-3">
+        <div className="truncate font-medium text-foreground">{credentialHealthLabel(item)}</div>
+        <div className="truncate text-xs text-muted-foreground">
+          {item.credentialPrefix || '无前缀'} · ID {item.credentialId}
+        </div>
+      </td>
+      <td className="px-4 py-3 text-muted-foreground">{item.providerType}</td>
+      <td className="px-4 py-3 text-muted-foreground">{formatCompactNumber(item.totalRequests)}</td>
+      <td className="px-4 py-3">
+        <StatusBadge tone={rateTone(item.successRate)}>
+          {formatPercent(item.successRate)}
+        </StatusBadge>
+      </td>
+      <td className="px-4 py-3">
+        <StatusBadge tone={rateTone(item.availabilityRate)}>
+          {formatPercent(item.availabilityRate)}
+        </StatusBadge>
+      </td>
+      <td className="px-4 py-3">
+        <StatusBadge tone={errorRateTone(item.errorRate)}>
+          {formatPercent(item.errorRate)}
+        </StatusBadge>
+      </td>
+      <td className="truncate px-4 py-3 text-muted-foreground">{item.avgDurationMs.toFixed(0)} ms</td>
+      <td className="px-4 py-3">
+        <div className="truncate text-muted-foreground">
+          成功 {formatHealthInstant(item.lastSuccessfulAt)}
+        </div>
+        <div className="truncate text-xs text-muted-foreground">
+          失败 {formatHealthInstant(item.lastFailedAt)}
+        </div>
+      </td>
+    </tr>
+  )
+}
+
 function RiskCard({ risk }: { risk: OpsSloRisk }) {
   return (
     <Card className="border-border/60 bg-background/88 shadow-sm">
@@ -997,6 +1107,26 @@ function formatCompactNumber(value: number) {
     notation: 'compact',
     maximumFractionDigits: value >= 100 ? 0 : 1,
   }).format(value)
+}
+
+function formatHealthInstant(value?: string | null) {
+  return value ? formatInstant(value) : '暂无'
+}
+
+function credentialHealthLabel(item: CredentialHealthMetric) {
+  return item.credentialLabel || item.credentialPrefix || `凭证 ${item.credentialId}`
+}
+
+function rateTone(value: number) {
+  if (value >= 0.98) return 'success'
+  if (value >= 0.9) return 'warning'
+  return 'danger'
+}
+
+function errorRateTone(value: number) {
+  if (value <= 0.01) return 'success'
+  if (value <= 0.1) return 'warning'
+  return 'danger'
 }
 
 function riskTone(riskLevel: string) {

@@ -133,6 +133,11 @@ public class GatewayInteropPlanService {
             debug.put("modelGroup", compilation.selectionResult().modelGroup());
             debug.put("clientFamily", compilation.selectionResult().clientFamily().name().toLowerCase(Locale.ROOT));
             debug.put("governanceNotes", compilation.selectionResult().governanceNotes());
+            debug.put("runtimeProvider", compilation.selectionResult().selectedCandidate().candidate().runtimeProviderKey());
+            debug.put("runtimeProtocolSuite", compilation.selectionResult().selectedCandidate().candidate().runtimeProfile().protocolSuite());
+            debug.put("siteKind", compilation.selectionResult().selectedCandidate().candidate().siteKind() == null
+                    ? null
+                    : compilation.selectionResult().selectedCandidate().candidate().siteKind().name());
             if (errorRuleService != null) {
                 debug.put("potentialErrorRules", errorRuleService.potentialMatches(
                         compilation.selectionResult().selectedCandidate().candidate().providerType().name(),

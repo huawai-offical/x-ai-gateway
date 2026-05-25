@@ -80,4 +80,38 @@ class NonChatDegradationPolicyServiceTests {
         assertEquals("fallback=disabled(selection_mode=stored_lineage)", outcome.fallbackPolicyReason());
         assertTrue(outcome.blockedReasons().isEmpty());
     }
+
+    @Test
+    void shouldBlockEmulatedAndLossyCapabilitiesEvenWhenLegacyPolicyAllowsThem() {
+        GatewayRequestSemantics semantics = new GatewayRequestSemantics(
+                TranslationResourceType.RESPONSE,
+                TranslationOperation.RESPONSE_CREATE,
+                List.of(InteropFeature.RESPONSE_OBJECT),
+                RouteSelectionMode.CATALOG_SELECTION
+        );
+        NonChatRoutePolicyDecision policyDecision = new NonChatRoutePolicyDecision(
+                RouteSelectionMode.CATALOG_SELECTION,
+                ExecutionBackend.NATIVE,
+                List.of(ExecutionBackend.NATIVE),
+                InteropCapabilityLevel.EMULATED,
+                InteropCapabilityLevel.NATIVE,
+                InteropCapabilityLevel.EMULATED,
+                SupportStatus.DEGRADED,
+                "translated_execution",
+                List.of(),
+                List.of("response_object 当前为非 native 兼容展示，只能观测，不能作为执行成功条件。"),
+                "catalog_selection"
+        );
+
+        NonChatDegradationOutcome outcome = service.evaluate(
+                semantics,
+                GatewayDegradationPolicy.ALLOW_LOSSY,
+                policyDecision
+        );
+
+        assertEquals(SupportStatus.BLOCKED, outcome.supportStatus());
+        assertEquals(InteropCapabilityLevel.UNSUPPORTED, outcome.degradationLevel());
+        assertTrue(outcome.blockedReasons().stream().anyMatch(reason -> reason.contains("不能作为真实执行成功条件")));
+        assertTrue(outcome.blockedReasons().stream().anyMatch(reason -> reason.contains("只允许 native 执行")));
+    }
 }

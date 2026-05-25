@@ -49,8 +49,7 @@ public class AdminConsoleSecurityConfiguration {
                                 "/admin/auth/session",
                                 "/admin/auth/challenge",
                                 "/admin/auth/login",
-                                "/admin/auth/logout",
-                                "/admin/oauth/*/callback"
+                                "/admin/auth/logout"
                         ).permitAll()
                         .pathMatchers("/admin/**").authenticated()
                         .anyExchange().permitAll()

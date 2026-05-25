@@ -64,18 +64,19 @@ public class PublicDocsBundleService {
                 List.of(
                         "路由优先遵守 Distributed Key 的 allowedModels、allowedProviderTypes、clientFamily 与 Route Policy runtime state。",
                         "Retry/Fallback 触发后，trace 中会保留 route decision、provider、credential 与 degradation level。",
-                        "跨协议资源属性只允许 Lossless Translation Matrix 判定为 LOSSLESS 的请求继续执行；NATIVE_REQUIRED 或 UNSUPPORTED 会直接返回错误，例如 native_route_required、unsupported_translation_attribute、native_image_edit_required、native_audio_translation_required 或 native_compaction_required，不通过 header、metadata 或 local fake 伪装成功。",
+                        "跨协议资源属性只允许 Lossless Translation Matrix 判定为 LOSSLESS 的请求继续执行；NATIVE_REQUIRED 或 UNSUPPORTED 会直接返回错误，例如 native_route_required、unsupported_translation_attribute、native_hosted_tool_required、native_input_tokens_required、native_image_edit_required、native_audio_translation_required 或 native_compaction_required，不通过 header、metadata 或 local fake 伪装成功。",
                         "默认核心 provider preset 只保留 OpenAI、Azure OpenAI、MiMo、DeepSeek、Qwen、Moonshot、Volcengine、MiniMax、xAI、Perplexity、Cohere、Jina、Mistral、Anthropic、Gemini 和 Vertex；Dify、OpenRouter、Together、Fireworks、SiliconFlow 与 generic OpenAI-compatible 不再进入默认核心兼容承诺。",
                         "OpenAI Direct 可使用 response_format、tools/tool_choice、modalities/audio、web_search_options 等 typed Chat 参数；OpenAI-compatible 站点需以 provider capability matrix 为准。",
                         "Stored Chat list/messages 使用 OpenAI-compatible list envelope，limit 默认 20 且范围为 1 到 100，order 默认 asc；Chat Completion list 使用数据库游标查询下推租户、类型前缀、model、createdAt/id cursor 与排序，metadata 继续做 JSON 精确过滤。",
-                        "Stored Responses 支持本地 retrieve/delete/cancel、input_items list 与 input_tokens deterministic estimate；/v1/responses/compact 只允许 OpenAI Direct native route，route 不可用或非 native 时返回 native_compaction_required，不提供本地 opaque marker 伪成功。带 OpenAI Direct upstream lineage 的 stored Response 会对 retrieve/delete/cancel/input_items 走远端 passthrough，未知远端 resp_ id 只有提供 model query 或 X-AI-Gateway-OpenAI-Model header 时才允许 route-hint passthrough。",
+                        "Stored Responses 支持本地 retrieve/delete/cancel 与 input_items list；/v1/responses/input_tokens 和 /v1/responses/compact 只允许 OpenAI Direct native route，route 不可用或非 native 时分别返回 native_input_tokens_required / native_compaction_required，不提供本地估算或 opaque marker 伪成功。带 OpenAI Direct upstream lineage 的 stored Response 会对 retrieve/delete/cancel/input_items 走远端 passthrough，未知远端 resp_ id 只有提供 model query 或 X-AI-Gateway-OpenAI-Model header 时才允许 route-hint passthrough。",
                         "Stored Responses retrieve 与 input_items 已接收 include query 参数；本地 stored baseline 对 include 采用 no-op acceptance，带 upstream lineage 或显式 route hint 的 OpenAI Direct 对象会把 include 原样转发到上游。",
                         "OpenAI Direct 非流式 Responses create 会优先返回上游原始 Responses JSON，并把 model 重写为 public model；OpenAI Direct stream=true 时透传上游原始 SSE 事件；无 native raw 能力时回退 canonical encoder。",
-                        "Responses tools 当前执行 function tools；file_search 可校验本地 vector_store_ids 并把本地 search 结果注入上下文，但不声明 hosted file_search_call lifecycle；web_search_preview、mcp、custom、code_interpreter、computer_use_preview、image_generation、shell/apply_patch 等仍会显式拒绝。",
+                        "Responses tools 当前执行 function tools；hosted file_search 必须走 OpenAI Direct native route，非 native 路径返回 native_hosted_tool_required，不再用本地 Vector Store 结果注入上下文伪装 hosted file_search_call 成功；web_search_preview、mcp、custom、code_interpreter、computer_use_preview、image_generation、shell/apply_patch 等仍会显式拒绝。",
                         "OpenAI Conversations 使用 gateway local lineage，支持 conversation create/retrieve/update/delete 与 item create/list/retrieve/delete；item list 默认 order=desc、limit=20，一次最多追加 20 个 item。",
-                        "OpenAI Vector Stores 使用 gateway local lifecycle 基线，支持 vector_store create/list/retrieve/update/delete、vector_store.file attach/list/retrieve/delete/content、本地 chunk ingestion、本地文本 search、Responses file_search 本地绑定以及 vector_store.file_batch create/retrieve/cancel/list files；真实 embedding/vector index 入库、语义向量检索和 hosted file_search_call lifecycle 仍按 TASK-20260514-023 后续拆分。",
+                        "OpenAI Vector Stores 使用 gateway local lifecycle 基线，支持 vector_store create/list/retrieve/update/delete、vector_store.file attach/list/retrieve/delete/content、本地 chunk ingestion、本地文本 search 以及 vector_store.file_batch create/retrieve/cancel/list files；默认 Responses hosted file_search 不再绑定本地 Vector Store 成功返回，真实 embedding/vector index 入库、语义向量检索和 hosted file_search_call lifecycle 仍按 TASK-20260514-023 后续拆分。",
                         "非流式 Chat/Responses 支持 Idempotency-Key 本地响应重放；同 key 不同请求体会被拒绝，幂等记录默认保留 24 小时。",
                         "Chat stream 支持 stream_options.include_usage，开启后会在 [DONE] 前输出 choices=[] 的 usage chunk；Responses canonical stream event 会携带本地单调递增 sequence_number，并按 stream_options.include_obfuscation 控制 delta event obfuscation 字段；OpenAI Direct raw SSE 保留上游原始 sequence 与 event shape。",
+                        "OpenAI Realtime WebSocket `/v1/realtime` 是历史归档入口，当前公开 docs/OpenAPI 不声明可用；需要 Realtime 只能按真实 native route 和后续 smoke 重新启用，不能由本地 Live Session 事件代理伪造成功。",
                         "OpenAI Webhooks 提供 POST /v1/webhooks/openai 接收入口，按 Standard Webhooks 校验 webhook-id、webhook-timestamp、webhook-signature，使用 raw body 验签，并把合法 event 保存为本地 WEBHOOK_EVENT；重复 delivery 或重复 event id 返回 duplicate=true 且不重复落库。",
                         "OpenAI path 本地限流命中会返回 429、rate_limit_error，并带 Retry-After 与 x-ratelimit remaining/reset headers。",
                         "Files、Uploads、Models 和 Vector Stores 仅作为对话、tools、RAG/file_search 的支撑能力公开；官方非核心 API 不纳入公开兼容面。",
@@ -99,7 +100,7 @@ public class PublicDocsBundleService {
                         "openai.responses-local-lifecycle",
                         "openai.streaming-event-usage-sequence",
                         "openai.responses-stream-obfuscation",
-                       "openai.responses-input-tokens-compact",
+                       "openai.responses-input-tokens-native-required",
                        "openai.responses-input-tokens-native-passthrough",
                         "openai.responses-compact-native-passthrough",
                         "openai.responses-native-json-passthrough",
@@ -107,7 +108,7 @@ public class PublicDocsBundleService {
                         "openai.responses-remote-lifecycle-passthrough",
                         "openai.responses-untracked-remote-lifecycle-route-hints",
                         "openai.responses-tool-registry-boundary",
-                        "openai.responses-file-search-local-vector-store-binding",
+                        "openai.responses-hosted-file-search-native-required",
                         "openai.conversations-local-lifecycle",
                         "openai.vector-stores-local-lifecycle",
                         "openai.vector-store-files-local-attachment",
@@ -151,18 +152,19 @@ public class PublicDocsBundleService {
                 List.of(
                         "Routing honors Distributed Key model/provider/client-family restrictions and Route Policy runtime state.",
                         "Retry/Fallback decisions are visible in traces with provider, credential and degradation details.",
-                        "Cross-protocol resource attributes execute only when the Lossless Translation Matrix classifies them as LOSSLESS; NATIVE_REQUIRED or UNSUPPORTED returns hard errors such as native_route_required, unsupported_translation_attribute, native_image_edit_required, native_audio_translation_required or native_compaction_required instead of header, metadata or local-fake success.",
+                        "Cross-protocol resource attributes execute only when the Lossless Translation Matrix classifies them as LOSSLESS; NATIVE_REQUIRED or UNSUPPORTED returns hard errors such as native_route_required, unsupported_translation_attribute, native_hosted_tool_required, native_input_tokens_required, native_image_edit_required, native_audio_translation_required or native_compaction_required instead of header, metadata or local-fake success.",
                         "The default core provider presets are OpenAI, Azure OpenAI, MiMo, DeepSeek, Qwen, Moonshot, Volcengine, MiniMax, xAI, Perplexity, Cohere, Jina, Mistral, Anthropic, Gemini and Vertex. Dify, OpenRouter, Together, Fireworks, SiliconFlow and generic OpenAI-compatible presets are outside the default core compatibility promise.",
                         "OpenAI Direct supports typed Chat parameters such as response_format, tools/tool_choice, modalities/audio and web_search_options; OpenAI-compatible sites still depend on the provider capability matrix.",
                         "Stored Chat list/messages use the OpenAI-compatible list envelope; limit defaults to 20 with range 1 to 100, and order defaults to asc. Chat Completion lists push tenant, key prefix, model, createdAt/id cursor and order into database queries while keeping exact JSON metadata filtering.",
-                        "Stored Responses support local retrieve/delete/cancel, input_items lists and input_tokens deterministic estimates; /v1/responses/compact requires an OpenAI Direct native route and returns native_compaction_required when no native route is available. No local opaque-marker compaction success is returned. Stored Responses with OpenAI Direct upstream lineage use remote passthrough for retrieve/delete/cancel/input_items, and unknown remote resp_ ids require a model query or X-AI-Gateway-OpenAI-Model header for route-hint passthrough.",
+                        "Stored Responses support local retrieve/delete/cancel and input_items lists; /v1/responses/input_tokens and /v1/responses/compact require an OpenAI Direct native route and return native_input_tokens_required / native_compaction_required when no native route is available. No local token estimate or opaque-marker compaction success is returned. Stored Responses with OpenAI Direct upstream lineage use remote passthrough for retrieve/delete/cancel/input_items, and unknown remote resp_ ids require a model query or X-AI-Gateway-OpenAI-Model header for route-hint passthrough.",
                         "Stored Responses retrieve and input_items accept the include query parameter; the local stored baseline treats include as no-op acceptance, while OpenAI Direct objects with upstream lineage or explicit route hints forward include to upstream.",
                         "OpenAI Direct non-streaming Responses create prefers the upstream raw Responses JSON and rewrites model to the public model; OpenAI Direct stream=true passes through upstream raw SSE events; canonical encoding remains the fallback when no native raw capability exists.",
-                        "Responses tools currently execute function tools; file_search can validate local vector_store_ids and inject local search context, but hosted file_search_call lifecycle is not claimed. web_search_preview, mcp, custom, code_interpreter, computer_use_preview, image_generation, shell and apply_patch remain explicitly rejected.",
+                        "Responses tools currently execute function tools; hosted file_search requires an OpenAI Direct native route, and non-native paths return native_hosted_tool_required instead of injecting local Vector Store context as a fake hosted file_search_call success. web_search_preview, mcp, custom, code_interpreter, computer_use_preview, image_generation, shell and apply_patch remain explicitly rejected.",
                         "OpenAI Conversations use gateway local lineage and support conversation create/retrieve/update/delete plus item create/list/retrieve/delete; item lists default to order=desc and limit=20, and each create call accepts at most 20 items.",
-                        "OpenAI Vector Stores use a gateway-local lifecycle baseline for vector_store create/list/retrieve/update/delete, vector_store.file attach/list/retrieve/delete/content, local chunk ingestion, local text search, Responses file_search local binding and vector_store.file_batch create/retrieve/cancel/list files; real embedding/vector index ingestion, semantic vector retrieval and hosted file_search_call lifecycle remain tracked under TASK-20260514-023.",
+                        "OpenAI Vector Stores use a gateway-local lifecycle baseline for vector_store create/list/retrieve/update/delete, vector_store.file attach/list/retrieve/delete/content, local chunk ingestion, local text search and vector_store.file_batch create/retrieve/cancel/list files; default Responses hosted file_search no longer binds local Vector Stores as a successful response. Real embedding/vector index ingestion, semantic vector retrieval and hosted file_search_call lifecycle remain tracked under TASK-20260514-023.",
                         "Non-streaming Chat/Responses support local Idempotency-Key response replay; reusing a key with a different request body is rejected, and records are retained for 24 hours by default.",
                         "Chat streams support stream_options.include_usage by emitting a choices=[] usage chunk before [DONE]; Responses canonical stream events include a local monotonic sequence_number and honor stream_options.include_obfuscation for delta event obfuscation fields; OpenAI Direct raw SSE keeps upstream sequence and event shape.",
+                        "OpenAI Realtime WebSocket `/v1/realtime` is a historical archived entrypoint and is not claimed as currently available in public docs/OpenAPI. Realtime must be re-enabled through real native routes and smoke evidence, not local Live Session event proxy success.",
                         "OpenAI Webhooks expose POST /v1/webhooks/openai, verify webhook-id, webhook-timestamp and webhook-signature against the raw body, persist valid events as local WEBHOOK_EVENT records, and return duplicate=true without another write for duplicate deliveries or duplicate event ids.",
                         "Local rate limit hits on OpenAI paths return 429, rate_limit_error, Retry-After and x-ratelimit remaining/reset headers.",
                         "Files, Uploads, Models and Vector Stores are exposed only as support surfaces for conversations, tools and RAG/file_search; official non-core APIs are outside the public compatibility surface.",
@@ -186,7 +188,7 @@ public class PublicDocsBundleService {
                         "openai.responses-local-lifecycle",
                         "openai.streaming-event-usage-sequence",
                         "openai.responses-stream-obfuscation",
-                        "openai.responses-input-tokens-compact",
+                        "openai.responses-input-tokens-native-required",
                         "openai.responses-input-tokens-native-passthrough",
                         "openai.responses-compact-native-passthrough",
                         "openai.responses-native-json-passthrough",
@@ -194,7 +196,7 @@ public class PublicDocsBundleService {
                         "openai.responses-remote-lifecycle-passthrough",
                         "openai.responses-untracked-remote-lifecycle-route-hints",
                         "openai.responses-tool-registry-boundary",
-                        "openai.responses-file-search-local-vector-store-binding",
+                        "openai.responses-hosted-file-search-native-required",
                         "openai.conversations-local-lifecycle",
                         "openai.vector-stores-local-lifecycle",
                         "openai.vector-store-files-local-attachment",
@@ -250,7 +252,7 @@ public class PublicDocsBundleService {
         addCodexResponsesRequestBody(codexResponses);
         addIdempotencyHeader(codexResponses);
         ObjectNode responsesInputTokens = addPath(paths, "post", "/v1/responses/input_tokens", "Count Response input tokens", true);
-        responsesInputTokens.put("description", "Counts Response input tokens. OpenAI Direct routes use native upstream counting when available; route-unavailable cases fall back to the local deterministic estimate.");
+        responsesInputTokens.put("description", "Counts Response input tokens. OpenAI Direct routes use native upstream counting when available; route-unavailable or non-native cases fail with native_input_tokens_required instead of returning a local deterministic estimate.");
         addResponsesRequestBody(responsesInputTokens);
         ObjectNode responsesCompact = addPath(paths, "post", "/v1/responses/compact", "Compact Response input context", true);
         responsesCompact.put("description", "Compacts Response input context. OpenAI Direct routes use native upstream compaction when available; route-unavailable or non-native cases fail with native_compaction_required instead of returning a local opaque marker.");
@@ -280,7 +282,7 @@ public class PublicDocsBundleService {
         audioTranscriptions.put("description", "Transcribes an uploaded audio file through provider-governed routing as part of the multimodal conversation support surface.");
         addAudioTranscriptionRequestBody(audioTranscriptions);
         ObjectNode audioTranslations = addPath(paths, "post", "/v1/audio/translations", "Create audio translation for multimodal input", true);
-        audioTranslations.put("description", "Translates an uploaded audio file only when the selected provider exposes an equivalent native audio translation surface. Cross-protocol requests that require translation fail with native_audio_translation_required instead of local emulation.");
+        audioTranslations.put("description", "Translates an uploaded audio file only when the selected provider exposes an equivalent native audio translation surface. Cross-protocol requests that require translation fail with native_audio_translation_required instead of a local substitute.");
         addAudioTranslationRequestBody(audioTranslations);
         ObjectNode audioSpeech = addPath(paths, "post", "/v1/audio/speech", "Create speech audio for multimodal output", true);
         audioSpeech.put("description", "Generates speech audio through provider-governed routing for multimodal response output.");
@@ -289,10 +291,10 @@ public class PublicDocsBundleService {
         imageGeneration.put("description", "Creates image generations through provider-governed routing for the multimodal output surface.");
         addImageGenerationRequestBody(imageGeneration);
         ObjectNode imageEdit = addPath(paths, "post", "/v1/images/edits", "Create image edit for multimodal output", true);
-        imageEdit.put("description", "Creates image edits only when the selected provider exposes an equivalent native image edit surface. Cross-protocol requests that require translation fail with native_image_edit_required instead of local emulation.");
+        imageEdit.put("description", "Creates image edits only when the selected provider exposes an equivalent native image edit surface. Cross-protocol requests that require translation fail with native_image_edit_required instead of a local substitute.");
         addImageEditRequestBody(imageEdit);
         ObjectNode imageVariation = addPath(paths, "post", "/v1/images/variations", "Create image variation for multimodal output", true);
-        imageVariation.put("description", "Creates image variations only when the selected provider exposes an equivalent native image variation surface. Cross-protocol requests that require translation fail with native_image_variation_required instead of local emulation.");
+        imageVariation.put("description", "Creates image variations only when the selected provider exposes an equivalent native image variation surface. Cross-protocol requests that require translation fail with native_image_variation_required instead of a local substitute.");
         addImageVariationRequestBody(imageVariation);
         ObjectNode moderationCreate = addPath(paths, "post", "/v1/moderations", "Create moderation classification", true);
         moderationCreate.put("description", "Runs moderation classification for conversation safety and governance support.");
@@ -417,15 +419,24 @@ public class PublicDocsBundleService {
         geminiGenerateContent.put("description", "Accepts Gemini generateContent-style requests for conversation, streaming and tools-capable provider adapters within the functional service API scope.");
         addModelPathParameter(geminiGenerateContent);
         addGeminiGenerateContentRequestBody(geminiGenerateContent);
-        addPath(paths, "post", "/api/v1/videos/generations", "创建 Video async task", true);
-        addPath(paths, "get", "/api/v1/videos/{videoId}", "读取 Video async task", true);
-        addPath(paths, "post", "/api/v1/videos/{videoId}/cancel", "取消 Video async task", true);
-        addPath(paths, "get", "/api/v1/videos/{videoId}/download", "下载 Video async task 产物引用", true);
-        addPath(paths, "post", "/api/v1/music/generations", "创建 Music async task", true);
-        addPath(paths, "get", "/api/v1/music/{musicId}", "读取 Music async task", true);
-        addPath(paths, "post", "/api/v1/music/{musicId}/cancel", "取消 Music async task", true);
-        addPath(paths, "get", "/api/v1/music/{musicId}/download", "下载 Music async task 产物引用", true);
-        addPath(paths, "get", "/api/v1/media/provider-matrix", "读取 Video/Music provider support matrix", true);
+        ObjectNode videoCreate = addPath(paths, "post", "/api/v1/videos/generations", "创建 Video async task", true);
+        videoCreate.put("description", "Creates Video tasks only through a provider native route or provider-specific native profile. Gateway-local completed/download artifact fallback is disabled and route-unavailable cases fail with native_route_required.");
+        ObjectNode videoGet = addPath(paths, "get", "/api/v1/videos/{videoId}", "读取 Video async task", true);
+        videoGet.put("description", "Reads a Video task backed by upstream/native provider evidence; local adapter reads do not advance queued tasks to completed.");
+        ObjectNode videoCancel = addPath(paths, "post", "/api/v1/videos/{videoId}/cancel", "取消 Video async task", true);
+        videoCancel.put("description", "Cancels a Video task only within its real upstream/native lifecycle or existing local lineage; it does not create success artifacts.");
+        ObjectNode videoDownload = addPath(paths, "get", "/api/v1/videos/{videoId}/download", "下载 Video async task 产物引用", true);
+        videoDownload.put("description", "Returns a download reference only when a real provider artifact URL exists; no gateway.local artifact URL is synthesized.");
+        ObjectNode musicCreate = addPath(paths, "post", "/api/v1/music/generations", "创建 Music async task", true);
+        musicCreate.put("description", "Creates Music tasks only through a provider native route or provider-specific native profile. Gateway-local completed/download artifact fallback is disabled and route-unavailable cases fail with native_route_required.");
+        ObjectNode musicGet = addPath(paths, "get", "/api/v1/music/{musicId}", "读取 Music async task", true);
+        musicGet.put("description", "Reads a Music task backed by upstream/native provider evidence; local adapter reads do not advance queued tasks to completed.");
+        ObjectNode musicCancel = addPath(paths, "post", "/api/v1/music/{musicId}/cancel", "取消 Music async task", true);
+        musicCancel.put("description", "Cancels a Music task only within its real upstream/native lifecycle or existing local lineage; it does not create success artifacts.");
+        ObjectNode musicDownload = addPath(paths, "get", "/api/v1/music/{musicId}/download", "下载 Music async task 产物引用", true);
+        musicDownload.put("description", "Returns a download reference only when a real provider artifact URL exists; no gateway.local artifact URL is synthesized.");
+        ObjectNode mediaMatrix = addPath(paths, "get", "/api/v1/media/provider-matrix", "读取 Video/Music provider support matrix", true);
+        mediaMatrix.put("description", "Returns the Video/Music support matrix using native/profile-required and hard-fail terminology; generic compatible providers are not implied to support media tasks.");
         ObjectNode components = root.putObject("components");
         components.putObject("securitySchemes")
                 .putObject("bearerAuth")
@@ -441,7 +452,7 @@ public class PublicDocsBundleService {
                         "openai",
                         "/v1",
                         List.of("OpenAI SDK", "Codex", "OpenCode", "OpenClaw", "curl"),
-                        List.of("chat.completions", "chat.typed-parameters", "stored_chat.completions", "responses", "responses.lifecycle", "responses.file_search_local_vector_store_binding", "conversations.local_lineage", "vector_stores.local_lifecycle", "vector_store_files.local_attachment", "vector_store_files.local_ingestion_artifact", "vector_store_files.local_content_read", "vector_stores.local_text_search", "vector_store_file_batches.local_lifecycle", "webhooks.ingress_event_persistence", "embeddings", "files", "models", "lossless.translation-matrix"),
+                        List.of("chat.completions", "chat.typed-parameters", "stored_chat.completions", "responses", "responses.lifecycle", "responses.hosted_file_search_native_required", "conversations.local_lineage", "vector_stores.local_lifecycle", "vector_store_files.local_attachment", "vector_store_files.local_ingestion_artifact", "vector_store_files.local_content_read", "vector_stores.local_text_search", "vector_store_file_batches.local_lifecycle", "webhooks.ingress_event_persistence", "embeddings", "files", "models", "lossless.translation-matrix"),
                         "OpenAI-compatible clients should use /v1 as base path. OpenAI Direct supports typed Chat parameters; third-party compatible sites are governed by provider capability and the Lossless Translation Matrix."
                 ),
                 new PublicDocsCompatibilityResponse(
@@ -695,7 +706,7 @@ public class PublicDocsBundleService {
         addProperty(properties, "metadata", "object", "OpenAI metadata object preserved by the gateway.");
         addProperty(properties, "include", "array", "Additional output fields requested by OpenAI Responses clients.");
         addProperty(properties, "previous_response_id", "string", "Previous Response id for conversation continuation.");
-        addProperty(properties, "tools", "array", "Responses tool definitions. Function tools execute through canonical tool calling; file_search can bind local vector_store_ids and inject local search context; other hosted/MCP/custom tools are rejected explicitly instead of being ignored.");
+        addProperty(properties, "tools", "array", "Responses tool definitions. Function tools execute through canonical tool calling; hosted file_search requires OpenAI Direct native execution and otherwise fails with native_hosted_tool_required; other hosted/MCP/custom tools are rejected explicitly instead of being ignored.");
         addProperty(properties, "tool_choice", "object", "Responses tool choice string or object. Non-function forced tool choices are rejected explicitly until their execution boundary is implemented.");
     }
 
@@ -1245,6 +1256,18 @@ public class PublicDocsBundleService {
                         501,
                         zh ? "Responses compact 必须走 OpenAI Direct native route；网关不会返回本地 opaque marker 伪成功。" : "Responses compact requires an OpenAI Direct native route; the gateway does not return a local opaque-marker success.",
                         zh ? "配置 OpenAI Direct route，或不要调用 compact 能力。" : "Configure an OpenAI Direct route or avoid invoking compact."
+                ),
+                new PublicDocsErrorCodeResponse(
+                        "native_input_tokens_required",
+                        501,
+                        zh ? "Responses input_tokens 必须走 OpenAI Direct native route；网关不会返回本地 token 估算伪成功。" : "Responses input_tokens requires an OpenAI Direct native route; the gateway does not return a local token-estimate success.",
+                        zh ? "配置 OpenAI Direct route，或不要调用 input_tokens 能力。" : "Configure an OpenAI Direct route or avoid invoking input_tokens."
+                ),
+                new PublicDocsErrorCodeResponse(
+                        "native_hosted_tool_required",
+                        501,
+                        zh ? "Responses hosted tool 需要原厂 native lifecycle；网关不会用本地结果伪装 hosted tool 成功。" : "The Responses hosted tool requires the provider-native lifecycle; the gateway does not fake hosted tool success with local results.",
+                        zh ? "改走 OpenAI Direct native route，或移除 hosted tool。" : "Use an OpenAI Direct native route or remove the hosted tool."
                 ),
                 new PublicDocsErrorCodeResponse(
                         "insufficient_balance",

@@ -54,6 +54,31 @@ class PublicOpenApiSnapshotTests {
         assertTrue(root.path("paths").has("/v1/audio/translations"));
         assertTrue(root.path("paths").has("/v1/images/edits"));
         assertTrue(root.path("paths").has("/v1/images/variations"));
+        assertFalse(root.path("paths").has("/v1/realtime"));
+        assertTrue(root.path("paths")
+                .path("/api/v1/videos/generations")
+                .path("post")
+                .path("description")
+                .asText()
+                .contains("native_route_required"));
+        assertTrue(root.path("paths")
+                .path("/api/v1/videos/{videoId}/download")
+                .path("get")
+                .path("description")
+                .asText()
+                .contains("real provider artifact URL"));
+        assertTrue(root.path("paths")
+                .path("/api/v1/music/generations")
+                .path("post")
+                .path("description")
+                .asText()
+                .contains("native_route_required"));
+        assertTrue(root.path("paths")
+                .path("/api/v1/music/{musicId}/download")
+                .path("get")
+                .path("description")
+                .asText()
+                .contains("real provider artifact URL"));
         assertTrue(root.path("paths")
                 .path("/v1/audio/translations")
                 .path("post")
@@ -113,9 +138,21 @@ class PublicOpenApiSnapshotTests {
         assertTrue(responsesProperties.has("stream_options"));
         assertTrue(responsesProperties.path("stream_options").path("description").asText().contains("include_obfuscation"));
         assertTrue(responsesProperties.has("tools"));
-        assertTrue(responsesProperties.path("tools").path("description").asText().contains("file_search"));
+        assertTrue(responsesProperties.path("tools").path("description").asText().contains("native_hosted_tool_required"));
         assertTrue(responsesProperties.has("tool_choice"));
         assertTrue(responsesProperties.path("tool_choice").path("description").asText().contains("Non-function"));
+        assertTrue(root.path("paths")
+                .path("/v1/responses/input_tokens")
+                .path("post")
+                .path("description")
+                .asText()
+                .contains("native_input_tokens_required"));
+        assertTrue(root.path("paths")
+                .path("/v1/responses/input_tokens")
+                .path("post")
+                .path("description")
+                .asText()
+                .contains("instead of returning a local deterministic estimate"));
         assertTrue(root.path("paths")
                 .path("/v1/responses/input_tokens")
                 .path("post")
@@ -136,7 +173,7 @@ class PublicOpenApiSnapshotTests {
                 .path("post")
                 .path("description")
                 .asText()
-                .contains("opaque marker emulation"));
+                .contains("opaque-marker success"));
         assertTrue(root.path("paths")
                 .path("/v1/responses/compact")
                 .path("post")

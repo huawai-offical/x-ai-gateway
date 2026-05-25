@@ -89,6 +89,115 @@ class TranslationExecutionPlanCompilerLosslessMatrixTests {
         assertTrue(compilation.canonicalPlan().blockerReasons().isEmpty());
     }
 
+    @Test
+    void shouldBlockResponsesHostedToolWhenResponsesIngressTargetsOpenAiCompatibleChatSurface() {
+        TranslationExecutionPlanCompiler compiler = compilerFor(openAiCompatibleCandidate(UpstreamSiteKind.XIAOMI_MIMO));
+        ObjectNode body = objectMapper.createObjectNode();
+        body.put("model", "mimo-v2.5-pro");
+        body.put("input", "find project notes");
+        body.putArray("tools")
+                .addObject()
+                .put("type", "file_search");
+
+        var compilation = compiler.compilePreview(
+                "sk-gw-test",
+                "responses",
+                "POST",
+                "/v1/responses",
+                "mimo-v2.5-pro",
+                GatewayDegradationPolicy.ALLOW_LOSSY,
+                GatewayClientFamily.GENERIC_OPENAI,
+                body
+        );
+
+        assertEquals(ExecutionKind.BLOCKED, compilation.canonicalPlan().executionKind());
+        assertEquals(SupportStatus.BLOCKED, compilation.canonicalPlan().supportStatus());
+        assertTrue(compilation.canonicalPlan().blockerReasons().stream()
+                .anyMatch(reason -> reason.contains("response.hosted_tool.file_search")
+                        && reason.contains("failure_code=native_hosted_tool_required")));
+    }
+
+    @Test
+    void shouldBlockFileLifecycleWhenOpenAiRequestWouldTranslateToAnthropic() {
+        TranslationExecutionPlanCompiler compiler = compilerFor(anthropicCandidate());
+        ObjectNode body = objectMapper.createObjectNode();
+        body.put("model", "claude-sonnet-4");
+        body.put("purpose", "assistants");
+
+        var compilation = compiler.compilePreview(
+                "sk-gw-test",
+                "openai",
+                "POST",
+                "/v1/files",
+                "claude-sonnet-4",
+                GatewayDegradationPolicy.ALLOW_LOSSY,
+                GatewayClientFamily.GENERIC_OPENAI,
+                body
+        );
+
+        assertEquals(ExecutionKind.BLOCKED, compilation.canonicalPlan().executionKind());
+        assertTrue(compilation.canonicalPlan().blockerReasons().stream()
+                .anyMatch(reason -> reason.contains("file.object_lifecycle")
+                        && reason.contains("failure_code=native_file_lifecycle_required")));
+    }
+
+    @Test
+    void shouldBlockMediaResourceWhenOpenAiRequestWouldTranslateToGemini() {
+        TranslationExecutionPlanCompiler compiler = compilerFor(geminiCandidate());
+        ObjectNode body = objectMapper.createObjectNode();
+        body.put("model", "gemini-2.5-flash-image");
+        body.put("prompt", "draw a precise diagram");
+
+        var compilation = compiler.compilePreview(
+                "sk-gw-test",
+                "openai",
+                "POST",
+                "/v1/images/edits",
+                "gemini-2.5-flash-image",
+                GatewayDegradationPolicy.ALLOW_LOSSY,
+                GatewayClientFamily.GENERIC_OPENAI,
+                body
+        );
+
+        assertEquals(ExecutionKind.BLOCKED, compilation.canonicalPlan().executionKind());
+        assertTrue(compilation.canonicalPlan().blockerReasons().stream()
+                .anyMatch(reason -> reason.contains("image.edit.request")
+                        && reason.contains("failure_code=native_image_edit_required")));
+    }
+
+    @Test
+    void shouldBlockToolStreamingWhenOpenAiRequestWouldTranslateToAnthropic() {
+        TranslationExecutionPlanCompiler compiler = compilerFor(anthropicCandidate());
+        ObjectNode body = objectMapper.createObjectNode();
+        body.put("model", "claude-sonnet-4");
+        body.put("stream", true);
+        body.putArray("messages")
+                .addObject()
+                .put("role", "user")
+                .put("content", "stream a tool call");
+        body.putArray("tools")
+                .addObject()
+                .put("type", "function")
+                .putObject("function")
+                .put("name", "lookup");
+
+        var compilation = compiler.compilePreview(
+                "sk-gw-test",
+                "openai",
+                "POST",
+                "/v1/chat/completions",
+                "claude-sonnet-4",
+                GatewayDegradationPolicy.ALLOW_LOSSY,
+                GatewayClientFamily.GENERIC_OPENAI,
+                body
+        );
+
+        assertEquals(ExecutionKind.BLOCKED, compilation.canonicalPlan().executionKind());
+        assertTrue(compilation.canonicalPlan().blockerReasons().stream()
+                .anyMatch(reason -> reason.contains("stream.tool_call_delta")
+                        && reason.contains("failure_code=native_route_required")));
+    }
+
     private TranslationExecutionPlanCompiler compilerFor(CatalogCandidateView candidate) {
         RouteCandidateView selectedCandidate = new RouteCandidateView(candidate, 1L, 1, 100);
         RouteSelectionResult selectionResult = new RouteSelectionResult(
@@ -172,6 +281,62 @@ class TranslationExecutionPlanCompilerLosslessMatrixTests {
                 true,
                 false,
                 ReasoningTransport.ANTHROPIC,
+                InteropCapabilityLevel.NATIVE
+        );
+    }
+
+    private CatalogCandidateView geminiCandidate() {
+        return new CatalogCandidateView(
+                11L,
+                "gemini",
+                ProviderType.GEMINI_DIRECT,
+                21L,
+                ProviderFamily.GEMINI,
+                UpstreamSiteKind.GEMINI_DIRECT,
+                AuthStrategy.API_KEY_QUERY,
+                PathStrategy.GEMINI_V1BETA_MODELS,
+                ErrorSchemaStrategy.GEMINI_ERROR,
+                "https://generativelanguage.googleapis.com",
+                "gemini-2.5-flash-image",
+                "gemini-2.5-flash-image",
+                List.of("google_native"),
+                true,
+                true,
+                true,
+                true,
+                false,
+                true,
+                true,
+                false,
+                ReasoningTransport.GEMINI_THOUGHTS,
+                InteropCapabilityLevel.NATIVE
+        );
+    }
+
+    private CatalogCandidateView openAiCompatibleCandidate(UpstreamSiteKind siteKind) {
+        return new CatalogCandidateView(
+                12L,
+                "mimo",
+                ProviderType.OPENAI_COMPATIBLE,
+                22L,
+                ProviderFamily.OPENAI,
+                siteKind,
+                AuthStrategy.BEARER,
+                PathStrategy.OPENAI_V1,
+                ErrorSchemaStrategy.OPENAI_ERROR,
+                "https://token-plan-sgp.xiaomimimo.com/v1",
+                "mimo-v2.5-pro",
+                "mimo-v2.5-pro",
+                List.of("openai", "responses"),
+                true,
+                true,
+                true,
+                false,
+                false,
+                true,
+                true,
+                false,
+                ReasoningTransport.OPENAI_CHAT,
                 InteropCapabilityLevel.NATIVE
         );
     }

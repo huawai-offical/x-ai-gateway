@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { to: '/portal/subscriptions', label: '订阅' },
   { to: '/portal/keys', label: '访问密钥' },
   { to: '/portal/redeem', label: '兑换与余额' },
+  { to: '/portal/invitations', label: '我的邀请' },
   { to: '/portal/usage', label: '用量' },
   { to: '/portal/status', label: '服务状态' },
   { to: '/portal/orders', label: '订单' },

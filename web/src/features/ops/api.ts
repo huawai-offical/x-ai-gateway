@@ -7,6 +7,7 @@ import type {
 import type {
   OpsAnalyticsOverview,
   OpsCapacitySummary,
+  OpsHealthOverview,
   OpsSloSummary,
   OpsSummary,
   AlertEvent,
@@ -134,6 +135,13 @@ export const opsApi = {
   summary: () => apiClient.get<OpsSummary>('/admin/ops/summary'),
   sloSummary: () => apiClient.get<OpsSloSummary>('/admin/ops/slo'),
   capacitySummary: () => apiClient.get<OpsCapacitySummary>('/admin/ops/capacity'),
+  health: (params: { from?: string | null; to?: string | null }) =>
+    apiClient.get<OpsHealthOverview>('/admin/observability/health', {
+      params: {
+        from: params.from,
+        to: params.to,
+      },
+    }),
   analyticsOverview: (params?: {
     distributedKeyId?: number | null
     providerType?: string | null

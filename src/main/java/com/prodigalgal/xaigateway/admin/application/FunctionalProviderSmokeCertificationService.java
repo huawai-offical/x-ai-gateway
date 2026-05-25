@@ -5,6 +5,7 @@ import com.prodigalgal.xaigateway.admin.api.FunctionalProviderSmokeCertification
 import com.prodigalgal.xaigateway.admin.api.FunctionalProviderSmokeItemResponse;
 import com.prodigalgal.xaigateway.admin.api.FunctionalProviderSmokeRecordReplayFixture;
 import com.prodigalgal.xaigateway.admin.api.FunctionalProviderSmokeResponse;
+import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Instant;
@@ -20,7 +21,7 @@ class FunctionalProviderSmokeCertificationService {
 
     FunctionalProviderSmokeCertificationResponse certify(FunctionalProviderSmokeResponse smoke, Instant generatedAt) {
         List<FunctionalProviderSmokeCertificationFixture> fixtures = smoke.items().stream()
-                .map(this::fixture)
+                .map(item -> fixture(item, smoke))
                 .toList();
         String certificationStatus = certificationStatus(smoke.summary(), smoke.dryRun());
         FunctionalProviderSmokeRecordReplayFixture recordReplayFixture = recordReplayFixture(
@@ -73,8 +74,8 @@ class FunctionalProviderSmokeCertificationService {
         return new FunctionalProviderSmokeRecordReplayFixture(
                 RECORD_REPLAY_SCHEMA_VERSION,
                 "record_replay",
-                smoke.providerType(),
-                smoke.protocol(),
+                recordReplayProviderType(smoke.providerType(), smoke.protocol(), smoke.baseUrl()),
+                recordReplayProtocol(smoke.protocol(), smoke.baseUrl()),
                 sanitizeText(smoke.baseUrl()),
                 baseUrlHost(smoke.baseUrl()),
                 certificationStatus,
@@ -90,7 +91,7 @@ class FunctionalProviderSmokeCertificationService {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("schemaVersion", fixture.schemaVersion());
         result.put("replayMode", fixture.replayMode());
-        result.put("providerType", fixture.providerType().name());
+        result.put("providerType", fixture.providerType());
         result.put("protocol", fixture.protocol());
         result.put("baseUrl", fixture.baseUrl());
         result.put("baseUrlHost", fixture.baseUrlHost());
@@ -109,7 +110,7 @@ class FunctionalProviderSmokeCertificationService {
 
     private Map<String, Object> fixtureMetadata(FunctionalProviderSmokeCertificationFixture fixture) {
         Map<String, Object> item = new LinkedHashMap<>();
-        item.put("providerType", fixture.providerType().name());
+        item.put("providerType", fixture.providerType());
         item.put("protocol", fixture.protocol());
         item.put("resourceFamily", fixture.resourceFamily());
         item.put("status", fixture.status());
@@ -130,10 +131,15 @@ class FunctionalProviderSmokeCertificationService {
         return item;
     }
 
-    private FunctionalProviderSmokeCertificationFixture fixture(FunctionalProviderSmokeItemResponse item) {
+    private FunctionalProviderSmokeCertificationFixture fixture(
+            FunctionalProviderSmokeItemResponse item,
+            FunctionalProviderSmokeResponse smoke) {
+        ProviderType providerType = item.providerType() == null ? smoke.providerType() : item.providerType();
+        String protocol = firstNonBlank(item.protocol(), smoke.protocol());
+        String baseUrl = firstNonBlank(baseUrlFromPreview(item.requestPreview()), smoke.baseUrl());
         return new FunctionalProviderSmokeCertificationFixture(
-                item.providerType(),
-                item.protocol(),
+                recordReplayProviderType(providerType, protocol, baseUrl),
+                recordReplayProtocol(protocol, baseUrl),
                 item.resourceFamily(),
                 item.status(),
                 item.classification(),
@@ -149,8 +155,227 @@ class FunctionalProviderSmokeCertificationService {
                 item.failureType(),
                 sanitizeText(item.failureMessage()),
                 sanitizeMap(item.evidence()),
-                sanitizeMap(item.requestPreview())
+                recordReplayRequestPreview(item.requestPreview(), providerType, protocol, baseUrl)
         );
+    }
+
+    private String recordReplayProviderType(ProviderType providerType, String protocol, String baseUrl) {
+        if (providerType == ProviderType.GEMINI_DIRECT) {
+            return "GEMINI_DIRECT";
+        }
+        if (isMimoProtocol(protocol) || isMimoBaseUrl(baseUrl)) {
+            return "XIAOMI_MIMO";
+        }
+        if (isDeepSeekProtocol(protocol) || isDeepSeekBaseUrl(baseUrl)) {
+            return "DEEPSEEK";
+        }
+        if (isXaiProtocol(protocol) || isXaiBaseUrl(baseUrl)) {
+            return "XAI";
+        }
+        if (isQwenProtocol(protocol) || isQwenBaseUrl(baseUrl)) {
+            return "QWEN";
+        }
+        if (isMoonshotProtocol(protocol) || isMoonshotBaseUrl(baseUrl)) {
+            return "MOONSHOT";
+        }
+        if (isVolcengineProtocol(protocol) || isVolcengineBaseUrl(baseUrl)) {
+            return "VOLCENGINE";
+        }
+        if (isMiniMaxProtocol(protocol) || isMiniMaxBaseUrl(baseUrl)) {
+            return "MINIMAX";
+        }
+        if (isMistralProtocol(protocol) || isMistralBaseUrl(baseUrl)) {
+            return "MISTRAL";
+        }
+        if (isPerplexityProtocol(protocol) || isPerplexityBaseUrl(baseUrl)) {
+            return "PERPLEXITY";
+        }
+        if (isCohereProtocol(protocol) || isCohereBaseUrl(baseUrl)) {
+            return "COHERE";
+        }
+        if (isJinaProtocol(protocol) || isJinaBaseUrl(baseUrl)) {
+            return "JINA";
+        }
+        return providerType == null ? "UNKNOWN" : providerType.name();
+    }
+
+    private String recordReplayProtocol(String protocol, String baseUrl) {
+        String normalized = protocol == null ? "" : protocol.trim().toUpperCase(Locale.ROOT);
+        if ("GEMINI_NATIVE".equals(normalized)) {
+            return "GEMINI_NATIVE";
+        }
+        if (isCohereProtocol(protocol) || isCohereBaseUrl(baseUrl)) {
+            return "COHERE_NATIVE";
+        }
+        if (isJinaProtocol(protocol) || isJinaBaseUrl(baseUrl)) {
+            return "JINA_NATIVE";
+        }
+        if ("ANTHROPIC_COMPATIBLE".equals(normalized) && (isMimoProtocol(protocol) || isMimoBaseUrl(baseUrl))) {
+            return "XIAOMI_MIMO_ANTHROPIC_COMPATIBLE";
+        }
+        if ("OPENAI_COMPATIBLE".equals(normalized) && (isMimoProtocol(protocol) || isMimoBaseUrl(baseUrl))) {
+            return "XIAOMI_MIMO_OPENAI_COMPATIBLE";
+        }
+        if ("OPENAI_COMPATIBLE".equals(normalized) && (isDeepSeekProtocol(protocol) || isDeepSeekBaseUrl(baseUrl))) {
+            return "DEEPSEEK_OPENAI_COMPATIBLE";
+        }
+        if ("OPENAI_COMPATIBLE".equals(normalized) && (isXaiProtocol(protocol) || isXaiBaseUrl(baseUrl))) {
+            return "XAI_OPENAI_COMPATIBLE";
+        }
+        if ("OPENAI_COMPATIBLE".equals(normalized) && (isQwenProtocol(protocol) || isQwenBaseUrl(baseUrl))) {
+            return "QWEN_OPENAI_COMPATIBLE";
+        }
+        if ("OPENAI_COMPATIBLE".equals(normalized) && (isMoonshotProtocol(protocol) || isMoonshotBaseUrl(baseUrl))) {
+            return "MOONSHOT_OPENAI_COMPATIBLE";
+        }
+        if ("OPENAI_COMPATIBLE".equals(normalized) && (isVolcengineProtocol(protocol) || isVolcengineBaseUrl(baseUrl))) {
+            return "VOLCENGINE_OPENAI_COMPATIBLE";
+        }
+        if ("OPENAI_COMPATIBLE".equals(normalized) && (isMiniMaxProtocol(protocol) || isMiniMaxBaseUrl(baseUrl))) {
+            return "MINIMAX_OPENAI_COMPATIBLE";
+        }
+        if ("OPENAI_COMPATIBLE".equals(normalized) && (isMistralProtocol(protocol) || isMistralBaseUrl(baseUrl))) {
+            return "MISTRAL_OPENAI_COMPATIBLE";
+        }
+        if ("OPENAI_COMPATIBLE".equals(normalized) && (isPerplexityProtocol(protocol) || isPerplexityBaseUrl(baseUrl))) {
+            return "PERPLEXITY_OPENAI_COMPATIBLE";
+        }
+        return normalized.isBlank() ? "UNKNOWN" : normalized;
+    }
+
+    private boolean isMimoProtocol(String protocol) {
+        if (protocol == null || protocol.isBlank()) {
+            return false;
+        }
+        String normalized = protocol.trim().toUpperCase(Locale.ROOT);
+        return normalized.contains("MIMO")
+                || normalized.contains("XIAOMI");
+    }
+
+    private boolean isMimoBaseUrl(String baseUrl) {
+        if (baseUrl == null) {
+            return false;
+        }
+        String normalized = baseUrl.toLowerCase(Locale.ROOT);
+        return normalized.contains("xiaomimimo.com")
+                || normalized.contains("api.mimo-v2.com");
+    }
+
+    private boolean isDeepSeekProtocol(String protocol) {
+        if (protocol == null || protocol.isBlank()) {
+            return false;
+        }
+        return protocol.trim().toUpperCase(Locale.ROOT).contains("DEEPSEEK");
+    }
+
+    private boolean isDeepSeekBaseUrl(String baseUrl) {
+        return baseUrl != null && baseUrl.toLowerCase(Locale.ROOT).contains("deepseek.com");
+    }
+
+    private boolean isXaiProtocol(String protocol) {
+        if (protocol == null || protocol.isBlank()) {
+            return false;
+        }
+        String normalized = protocol.trim().toUpperCase(Locale.ROOT);
+        return normalized.contains("XAI") || normalized.contains("GROK");
+    }
+
+    private boolean isXaiBaseUrl(String baseUrl) {
+        return baseUrl != null && baseUrl.toLowerCase(Locale.ROOT).contains("api.x.ai");
+    }
+
+    private boolean isQwenProtocol(String protocol) {
+        return containsProtocol(protocol, "QWEN");
+    }
+
+    private boolean isQwenBaseUrl(String baseUrl) {
+        return baseUrl != null && baseUrl.toLowerCase(Locale.ROOT).contains("dashscope.aliyuncs.com");
+    }
+
+    private boolean isMoonshotProtocol(String protocol) {
+        return containsProtocol(protocol, "MOONSHOT") || containsProtocol(protocol, "KIMI");
+    }
+
+    private boolean isMoonshotBaseUrl(String baseUrl) {
+        return baseUrl != null && baseUrl.toLowerCase(Locale.ROOT).contains("moonshot.cn");
+    }
+
+    private boolean isVolcengineProtocol(String protocol) {
+        return containsProtocol(protocol, "VOLCENGINE") || containsProtocol(protocol, "DOUBAO");
+    }
+
+    private boolean isVolcengineBaseUrl(String baseUrl) {
+        return baseUrl != null && baseUrl.toLowerCase(Locale.ROOT).contains("volces.com");
+    }
+
+    private boolean isMiniMaxProtocol(String protocol) {
+        return containsProtocol(protocol, "MINIMAX");
+    }
+
+    private boolean isMiniMaxBaseUrl(String baseUrl) {
+        return baseUrl != null && baseUrl.toLowerCase(Locale.ROOT).contains("minimax.chat");
+    }
+
+    private boolean isMistralProtocol(String protocol) {
+        return containsProtocol(protocol, "MISTRAL");
+    }
+
+    private boolean isMistralBaseUrl(String baseUrl) {
+        return baseUrl != null && baseUrl.toLowerCase(Locale.ROOT).contains("mistral.ai");
+    }
+
+    private boolean isPerplexityProtocol(String protocol) {
+        return containsProtocol(protocol, "PERPLEXITY") || containsProtocol(protocol, "SONAR");
+    }
+
+    private boolean isPerplexityBaseUrl(String baseUrl) {
+        return baseUrl != null && baseUrl.toLowerCase(Locale.ROOT).contains("perplexity.ai");
+    }
+
+    private boolean isCohereProtocol(String protocol) {
+        if (protocol == null || protocol.isBlank()) {
+            return false;
+        }
+        return protocol.trim().toUpperCase(Locale.ROOT).contains("COHERE");
+    }
+
+    private boolean isCohereBaseUrl(String baseUrl) {
+        return baseUrl != null && baseUrl.toLowerCase(Locale.ROOT).contains("api.cohere.ai");
+    }
+
+    private boolean isJinaProtocol(String protocol) {
+        if (protocol == null || protocol.isBlank()) {
+            return false;
+        }
+        return protocol.trim().toUpperCase(Locale.ROOT).contains("JINA");
+    }
+
+    private boolean isJinaBaseUrl(String baseUrl) {
+        return baseUrl != null && baseUrl.toLowerCase(Locale.ROOT).contains("api.jina.ai");
+    }
+
+    private boolean containsProtocol(String protocol, String token) {
+        return protocol != null && protocol.trim().toUpperCase(Locale.ROOT).contains(token);
+    }
+
+    private String baseUrlFromPreview(Map<String, Object> requestPreview) {
+        if (requestPreview == null) {
+            return null;
+        }
+        Object baseUrl = requestPreview.get("baseUrl");
+        return baseUrl == null ? null : String.valueOf(baseUrl);
+    }
+
+    private Map<String, Object> recordReplayRequestPreview(
+            Map<String, Object> requestPreview,
+            ProviderType providerType,
+            String protocol,
+            String fallbackBaseUrl) {
+        Map<String, Object> preview = new LinkedHashMap<>(sanitizeMap(requestPreview));
+        String baseUrl = firstNonBlank(baseUrlFromPreview(preview), fallbackBaseUrl);
+        preview.put("providerType", recordReplayProviderType(providerType, protocol, baseUrl));
+        preview.put("protocol", recordReplayProtocol(protocol, baseUrl));
+        return Map.copyOf(preview);
     }
 
     private String certificationStatus(Map<String, Integer> summary, boolean dryRun) {
@@ -182,6 +407,15 @@ class FunctionalProviderSmokeCertificationService {
         return summary.getOrDefault(key, 0);
     }
 
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return null;
+    }
+
     @SuppressWarnings("unchecked")
     private Map<String, Object> sanitizeMap(Map<String, Object> source) {
         if (source == null || source.isEmpty()) {
@@ -199,7 +433,7 @@ class FunctionalProviderSmokeCertificationService {
             map.forEach((key, child) -> {
                 if (key != null) {
                     String normalizedKey = String.valueOf(key);
-                    sanitized.put(normalizedKey, isSensitiveKey(normalizedKey) ? "***" : sanitize(child));
+                    sanitized.put(normalizedKey, shouldRedactKey(normalizedKey) ? "***" : sanitize(child));
                 }
             });
             return sanitized;
@@ -244,6 +478,13 @@ class FunctionalProviderSmokeCertificationService {
                 || normalized.contains("project")
                 || normalized.contains("cookie")
                 || "key".equals(normalized);
+    }
+
+    private boolean shouldRedactKey(String key) {
+        if ("secretMaterial".equals(key)) {
+            return false;
+        }
+        return isSensitiveKey(key);
     }
 
     private String baseUrlHost(String baseUrl) {

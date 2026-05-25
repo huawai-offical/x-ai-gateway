@@ -18,6 +18,7 @@ import com.prodigalgal.xaigateway.gateway.core.file.GatewayFileService;
 import com.prodigalgal.xaigateway.gateway.core.interop.InteropFeature;
 import com.prodigalgal.xaigateway.gateway.core.interop.SiteCapabilityTruthService;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteSelectionResult;
+import com.prodigalgal.xaigateway.gateway.core.error.GatewayRuleMatchedException;
 import com.prodigalgal.xaigateway.gateway.core.shared.AuthStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.PathStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
@@ -2514,21 +2515,21 @@ public class GatewayAsyncResourceService {
         video.add(mediaProviderMatrixItem(
                 "openai_compatible",
                 "OpenAI-compatible Video",
-                "SUPPORTED",
-                "native_openai_style",
+                "CONDITIONAL",
+                "provider_specific_native_profile_required",
                 "/v1/videos/generations",
-                "支持 create/get/cancel，适用于 OpenAI direct 和兼容站点。"
+                "只有目标站点明确声明 native/profile Video task surface 时才执行；generic compatible 不默认支持。"
         ));
         video.add(mediaProviderMatrixItem(
                 "gemini",
                 "Gemini / Vertex Video",
-                "SUPPORTED",
-                "provider_specific_adapter",
+                "NATIVE_REQUIRED",
+                "provider_specific_native_profile_required",
                 "Gemini Veo provider adapter",
-                "支持 provider_mode=adapter 的 create/get/cancel/download 本地生命周期；真实 smoke 需环境变量注入凭证。",
+                "必须由 Gemini/Veo native task 响应提供 provider task id 和 artifact；网关不创建本地 completed/download 假产物。",
                 "video_generation",
                 "operator_configured_gemini_veo_pricing",
-                "设置 XAG_SMOKE_GEMINI=true 与 Gemini key 后执行真实 smoke；默认跳过。"
+                "设置 XAG_SMOKE_GEMINI=true 与 Gemini key 后只记录真实 provider 响应证据；默认 hard-fail。"
         ));
         video.add(mediaProviderMatrixItem(
                 "minimax",
@@ -2551,21 +2552,21 @@ public class GatewayAsyncResourceService {
         music.add(mediaProviderMatrixItem(
                 "openai_compatible",
                 "OpenAI-compatible Music",
-                "SUPPORTED",
-                "native_openai_style",
+                "CONDITIONAL",
+                "provider_specific_native_profile_required",
                 "/v1/music/generations",
-                "支持 create/get/cancel，适用于 OpenAI-compatible 音频生成站点。"
+                "只有目标站点明确声明 native/profile Music task surface 时才执行；generic compatible 不默认支持。"
         ));
         music.add(mediaProviderMatrixItem(
                 "suno",
                 "Suno-like Music",
-                "SUPPORTED",
-                "provider_specific_adapter",
+                "NATIVE_REQUIRED",
+                "provider_specific_native_profile_required",
                 "Suno Music provider adapter",
-                "支持 provider_mode=adapter, provider_family=suno 的 create/get/cancel/download 本地生命周期；真实 smoke 仅在显式环境变量启用时访问远端。",
+                "必须由 Suno native/profile 响应提供 provider task id 和 artifact；网关不创建本地 completed/download 假产物。",
                 "music_generation",
                 "operator_configured_suno_music_pricing",
-                "设置 XAG_SMOKE_SUNO=true、XAG_SMOKE_SUNO_BASE_URL 与 Suno key 后执行真实 smoke；默认跳过。"
+                "设置 XAG_SMOKE_SUNO=true、XAG_SMOKE_SUNO_BASE_URL 与 Suno key 后只记录真实 provider 响应证据；默认 hard-fail。"
         ));
         music.add(mediaProviderMatrixItem(
                 "minimax",
@@ -2764,51 +2765,6 @@ public class GatewayAsyncResourceService {
         return response;
     }
 
-    private JsonNode createLocalMediaTask(
-            Long distributedKeyId,
-            JsonNode requestBody,
-            GatewayAsyncResourceType type,
-            String idPrefix,
-            String objectName,
-            String taskKind) {
-        ObjectNode payload = copyObject(requireObject(requestBody));
-        String resourceKey = idPrefix + UUID.randomUUID().toString().replace("-", "");
-        String status = text(payload, "status");
-        status = status == null ? "queued" : status.trim().toLowerCase(Locale.ROOT);
-
-        ObjectNode response = objectMapper.createObjectNode();
-        response.put("id", resourceKey);
-        response.put("object", objectName);
-        response.put("status", status);
-        response.put("created", now().getEpochSecond());
-        response.put("task_kind", taskKind);
-        putIfPresent(response, "model", text(payload, "model"));
-        if (payload.has("metadata")) {
-            response.set("metadata", payload.path("metadata").deepCopy());
-        }
-
-        ObjectNode metadata = objectMapper.createObjectNode();
-        metadata.put("object_mode", "gateway_local_async_task");
-        metadata.put("task_kind", taskKind);
-        metadata.put("provider_mode", "local_contract");
-        metadata.put("provider_support_tier", "local_contract");
-        metadata.put("provider_support_status", "LOCAL_ONLY");
-        metadata.put("provider_smoke_hint", "本地 contract smoke，不访问真实 provider。");
-        appendEvent(metadata, "created", status);
-
-        GatewayAsyncResourceEntity entity = new GatewayAsyncResourceEntity();
-        entity.setResourceKey(resourceKey);
-        entity.setDistributedKeyId(distributedKeyId);
-        entity.setResourceType(type);
-        entity.setRequestModel(text(payload, "model"));
-        entity.setStatus(status);
-        entity.setRequestPayloadJson(writeJson(payload));
-        entity.setResponsePayloadJson(writeJson(response));
-        entity.setMetadataJson(writeJson(metadata));
-        gatewayAsyncResourceRepository.save(entity);
-        return response;
-    }
-
     private JsonNode createMediaTask(
             Long distributedKeyId,
             JsonNode requestBody,
@@ -2823,7 +2779,7 @@ public class GatewayAsyncResourceService {
             return createProviderSpecificMediaTask(distributedKeyId, sourcePayload, type, idPrefix, adapter.get());
         }
         if (!useUpstreamMediaProvider(sourcePayload)) {
-            return createLocalMediaTask(distributedKeyId, sourcePayload, type, idPrefix, objectName, taskKind);
+            throw mediaNativeRouteRequired(type);
         }
         Long preferredCredentialId = sourcePayload.hasNonNull("preferred_credential_id")
                 ? sourcePayload.path("preferred_credential_id").asLong()
@@ -2838,6 +2794,15 @@ public class GatewayAsyncResourceService {
         String providerMode = text(payload, "provider_mode");
         return providerMode != null && ("upstream".equalsIgnoreCase(providerMode) || "provider".equalsIgnoreCase(providerMode))
                 || payload.hasNonNull("preferred_credential_id");
+    }
+
+    private GatewayRuleMatchedException mediaNativeRouteRequired(GatewayAsyncResourceType type) {
+        String resourceName = type == GatewayAsyncResourceType.VIDEO ? "Video" : "Music";
+        return new GatewayRuleMatchedException(
+                501,
+                "native_route_required",
+                resourceName + " generation requires a provider native route or provider-specific native profile; gateway-local media task success is disabled."
+        );
     }
 
     private JsonNode createProviderSpecificMediaTask(
@@ -2989,6 +2954,7 @@ public class GatewayAsyncResourceService {
         }
         return switch (siteKind) {
             case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, AZURE_OPENAI -> "openai_compatible";
+            case XIAOMI_MIMO -> "xiaomi_mimo";
             case MINIMAX -> "minimax";
             case GEMINI_DIRECT, VERTEX_AI -> "gemini";
             case ANTHROPIC_DIRECT -> "anthropic";
@@ -3028,14 +2994,6 @@ public class GatewayAsyncResourceService {
             return "需要先接入 Gemini/Veo 专有 adapter，再执行真实 Video smoke。";
         }
         return "需要 provider-specific adapter 或外部 async bridge。";
-    }
-
-    private JsonNode getLocalMediaTask(
-            String resourceKey,
-            Long distributedKeyId,
-            GatewayAsyncResourceType type) {
-        GatewayAsyncResourceEntity entity = getRequired(resourceKey, type, distributedKeyId);
-        return readJson(entity.getResponsePayloadJson());
     }
 
     private JsonNode cancelLocalMediaTask(

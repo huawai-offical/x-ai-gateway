@@ -10,6 +10,7 @@ import com.prodigalgal.xaigateway.gateway.core.shared.AuthStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ExecutionBackend;
 import com.prodigalgal.xaigateway.gateway.core.shared.PathStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
+import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
 import com.prodigalgal.xaigateway.provider.adapter.gemini.GeminiChatModelFactory;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -48,6 +49,9 @@ public class EmbeddingsGatewayResourceExecutor implements GatewayResourceExecuto
     @Override
     public boolean supports(CanonicalResourceRequest request, CatalogCandidateView candidate) {
         if (request == null || !"/v1/embeddings".equals(request.normalizedPath()) || candidate == null) {
+            return false;
+        }
+        if (candidate.siteKind() == UpstreamSiteKind.COHERE || candidate.siteKind() == UpstreamSiteKind.JINA) {
             return false;
         }
         return switch (candidate.providerType()) {

@@ -19,8 +19,14 @@ public class NonChatDegradationPolicyService {
         if (policyDecision.renderCapabilityLevel() == InteropCapabilityLevel.UNSUPPORTED) {
             blockedReasons.add("当前 ingress 尚无可用 render shape。");
         }
+        if (policyDecision.overallCapabilityLevel() == InteropCapabilityLevel.EMULATED
+                || policyDecision.overallCapabilityLevel() == InteropCapabilityLevel.LOSSY) {
+            blockedReasons.add("当前能力为 "
+                    + policyDecision.overallCapabilityLevel().name().toLowerCase()
+                    + "，只能用于观测或历史兼容展示，不能作为真实执行成功条件。");
+        }
         if (degradationPolicy != null && !degradationPolicy.allows(policyDecision.overallCapabilityLevel())) {
-            blockedReasons.add("当前策略不允许 " + policyDecision.overallCapabilityLevel().name().toLowerCase() + " 执行。");
+            blockedReasons.add("当前策略只允许 native 执行；非 native、不可无损或历史兼容能力必须阻断。");
         }
 
         return new NonChatDegradationOutcome(

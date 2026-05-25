@@ -25,9 +25,7 @@ public class TranslationExplainService {
                 request.method(),
                 request.requestPath(),
                 request.requestedModel(),
-                request.degradationPolicy() == null || request.degradationPolicy().isBlank()
-                        ? GatewayDegradationPolicy.ALLOW_LOSSY
-                        : GatewayDegradationPolicy.from(request.degradationPolicy()),
+                GatewayDegradationPolicy.from(request.degradationPolicy()),
                 GatewayClientFamily.GENERIC_OPENAI,
                 request.body()
         ).canonicalPlan();

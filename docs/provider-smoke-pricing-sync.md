@@ -6,7 +6,7 @@
 
 ## 目标
 
-Provider Catalog 已具备 18 个 preset。本页记录真实 provider smoke 与 pricing metadata 校验的本地执行方式，保证真实凭证只通过环境变量进入测试进程，不落盘、不入库、不进入报告。
+Provider Catalog 以头部自有模型厂商 native API / provider-specific native profile 为默认核心口径。本页记录真实 provider smoke 与 pricing metadata 校验的本地执行方式，保证真实凭证只通过环境变量进入测试进程，不落盘、不入库、不进入报告；Dify、OpenRouter、Together、Fireworks、SiliconFlow 与 generic compatible 不进入默认核心 smoke 或 pricing 承诺。
 
 ## 安全原则
 
@@ -70,7 +70,7 @@ build/reports/xag-smoke/gemini-ai-studio.md
 
 ## 后续扩展
 
-- Qwen、Moonshot、SiliconFlow、Volcengine、MiniMax 可按 OpenAI-compatible smoke 模板扩展。
+- Qwen、Moonshot、Volcengine、MiniMax 可按 provider-specific OpenAI-style/native profile smoke 模板扩展，不能复用 generic fallback 作为核心支持证据。
 - Jina/Cohere 可按 Rerank smoke 模板扩展。
-- Dify 可按 workflow-compatible smoke 模板扩展。
+- SiliconFlow、Dify 等不进入默认核心 provider smoke；如未来保留，只能作为非核心 profile 或 workflow-compatible 场景单独声明凭证、预算和验收边界。
 - 版本化 pricing snapshot 已具备本地事实源；后续可新增受 allowlist、条款和人工批准保护的远端价格同步 job。

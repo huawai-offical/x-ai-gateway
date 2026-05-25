@@ -55,6 +55,33 @@ class ExecutionSupportMatrixServiceTests {
     }
 
     @Test
+    void shouldTreatResponsesObjectAsNativeCapabilitySubjectToLosslessMatrix() {
+        GatewayRequestSemantics responseSemantics = new GatewayRequestSemantics(
+                TranslationResourceType.RESPONSE,
+                TranslationOperation.RESPONSE_CREATE,
+                List.of(InteropFeature.RESPONSE_OBJECT),
+                true
+        );
+
+        assertEquals(
+                InteropCapabilityLevel.NATIVE,
+                service.implementedLevel(
+                        openAiCandidate(ProviderType.OPENAI_DIRECT, UpstreamSiteKind.OPENAI_DIRECT),
+                        responseSemantics,
+                        InteropFeature.RESPONSE_OBJECT
+                )
+        );
+        assertEquals(
+                InteropCapabilityLevel.NATIVE,
+                service.implementedLevel(
+                        openAiCandidate(ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.XIAOMI_MIMO),
+                        responseSemantics,
+                        InteropFeature.RESPONSE_OBJECT
+                )
+        );
+    }
+
+    @Test
     void shouldResolveBlockedStatusWhenBlockersExist() {
         assertEquals(
                 SupportStatus.BLOCKED,
@@ -134,6 +161,46 @@ class ExecutionSupportMatrixServiceTests {
                 InteropCapabilityLevel.UNSUPPORTED,
                 service.implementedLevel(openAiCandidate(ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC), webSearchSemantics, InteropFeature.WEB_SEARCH)
         );
+    }
+
+    @Test
+    void shouldKeepCohereAndJinaExecutionMatrixLimitedToEmbedRerank() {
+        GatewayRequestSemantics chat = new GatewayRequestSemantics(
+                TranslationResourceType.CHAT,
+                TranslationOperation.CHAT_COMPLETION,
+                List.of(InteropFeature.CHAT_TEXT),
+                true
+        );
+        GatewayRequestSemantics embeddings = new GatewayRequestSemantics(
+                TranslationResourceType.EMBEDDING,
+                TranslationOperation.EMBEDDING_CREATE,
+                List.of(InteropFeature.EMBEDDINGS),
+                true
+        );
+        GatewayRequestSemantics rerank = new GatewayRequestSemantics(
+                TranslationResourceType.RERANK,
+                TranslationOperation.RERANK_CREATE,
+                List.of(InteropFeature.RERANK),
+                true
+        );
+        GatewayRequestSemantics file = new GatewayRequestSemantics(
+                TranslationResourceType.FILE,
+                TranslationOperation.FILE_CREATE,
+                List.of(InteropFeature.FILE_OBJECT),
+                true
+        );
+
+        CatalogCandidateView cohere = openAiCandidate(ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.COHERE);
+        CatalogCandidateView jina = openAiCandidate(ProviderType.OPENAI_COMPATIBLE, UpstreamSiteKind.JINA);
+
+        assertEquals(InteropCapabilityLevel.UNSUPPORTED, service.implementedLevel(cohere, chat, InteropFeature.CHAT_TEXT));
+        assertEquals(InteropCapabilityLevel.NATIVE, service.implementedLevel(cohere, embeddings, InteropFeature.EMBEDDINGS));
+        assertEquals(InteropCapabilityLevel.NATIVE, service.implementedLevel(cohere, rerank, InteropFeature.RERANK));
+        assertEquals(InteropCapabilityLevel.UNSUPPORTED, service.implementedLevel(cohere, file, InteropFeature.FILE_OBJECT));
+        assertEquals(InteropCapabilityLevel.UNSUPPORTED, service.implementedLevel(jina, chat, InteropFeature.CHAT_TEXT));
+        assertEquals(InteropCapabilityLevel.NATIVE, service.implementedLevel(jina, embeddings, InteropFeature.EMBEDDINGS));
+        assertEquals(InteropCapabilityLevel.NATIVE, service.implementedLevel(jina, rerank, InteropFeature.RERANK));
+        assertEquals(InteropCapabilityLevel.UNSUPPORTED, service.implementedLevel(jina, file, InteropFeature.FILE_OBJECT));
     }
 
     @Test

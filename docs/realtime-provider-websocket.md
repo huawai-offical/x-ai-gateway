@@ -1,5 +1,7 @@
 # Realtime Provider WebSocket Adapter
 
+> 2026-05-24 当前状态：历史归档 / 当前下线。本文记录的是旧 Realtime WebSocket adapter、连接池和 conformance 基线，不代表当前公开 API 可用能力。按照 REQ-20260524-001，`/v1/realtime` 只有在真实 provider native route、真实 WebSocket/WebRTC/SIP 语义和 smoke 证据重新闭环后才能重新公开；当前不得用本地 Live Session 事件代理、`session.created` 或 metadata 标记伪造成 Realtime 成功。
+
 关联需求：[REQ-20260506-002 第八批高优先级任务闭环设计](requirements/REQ-20260506-002-eighth-priority-task-closure-design.md)  
 生产硬化需求：[REQ-20260506-010 Realtime 与 Media 生产硬化](requirements/REQ-20260506-010-realtime-media-production-hardening.md)  
 关联任务：[TASK-20260501-024 真实 Realtime Provider WebSocket Adapter](../tasks/done/TASK-20260501-024-realtime-real-provider-websocket.md)
@@ -34,9 +36,9 @@ OpenAI-compatible WebSocket 入口任务：[TASK-20260516-008](../tasks/done/TAS
   - `connectionPoolActive`
   - `connectionPoolMaxPerTenant`
 
-## OpenAI-compatible WebSocket 入口
+## OpenAI-compatible WebSocket 入口（历史归档）
 
-- `/v1/realtime?model=...` 已映射为 WebSocket handler，默认 model 为 `gpt-realtime`。
+- `/v1/realtime?model=...` 曾映射为 WebSocket handler，默认 model 为 `gpt-realtime`；当前公开 API 不声明该入口可用。
 - WebSocket 握手复用 Distributed Key `Authorization` 鉴权；缺失或无效鉴权只返回 OpenAI-style `error` event，不创建 Live Session。
 - 握手成功后会创建并 connect `openai_realtime` Live Session，并把首个 outbound event 编码为 `session.created`。
 - JSON text client event 会保留原始 payload，按 `type` 转发给 `LiveSessionService#sendRuntimeEvent`；`input_audio_buffer.append` 这类事件会从 `audio` 或 `delta` base64 字段估算 `audioBytes`。
@@ -87,6 +89,12 @@ OpenAI-compatible WebSocket 入口任务：[TASK-20260516-008](../tasks/done/TAS
 - 连接池租户隔离、连接上限、释放、取消和过期清理。
 - connect/close 写入连接池 lease metadata。
 - OpenAI-compatible `/v1/realtime` WebSocket bridge 覆盖鉴权创建、`session.created`、`session.updated`、非法事件错误、base64 audioBytes 估算和 close 释放。
+
+## 当前下线边界
+
+- 当前 public docs/OpenAPI 不发布 `/v1/realtime` 可用入口。
+- 历史 `session.created`、`session.updated`、本地 audioBytes 估算和 conformance 事件只作为归档证据，不能代表真实 OpenAI Realtime 或 Gemini Live 成功。
+- 未来恢复时必须先完成真实 native provider route、真实网络拨号、二进制帧透传、错误归一和 smoke 验收。
 
 ## 后续边界
 

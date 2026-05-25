@@ -300,7 +300,7 @@ export function AccountGroupsPage() {
       setCreateError(null)
       createMutation.mutate(buildAccountGroupPayload(createForm))
     } catch (error) {
-      setCreateError(error instanceof Error ? error.message : '无法创建账号分组。')
+      setCreateError(error instanceof Error ? error.message : '无法创建上游账号组/凭证池。')
     }
   }
 
@@ -347,7 +347,7 @@ export function AccountGroupsPage() {
         payload: buildAccountGroupPayload(editingForm),
       })
     } catch (error) {
-      setUpdateError(error instanceof Error ? error.message : '无法更新账号分组。')
+      setUpdateError(error instanceof Error ? error.message : '无法更新上游账号组/凭证池。')
     }
   }
 
@@ -371,7 +371,7 @@ export function AccountGroupsPage() {
 
   const parseImportSource = () => {
     if (!selectedImportGroup) {
-      throw new Error('请先选择目标账号分组。')
+      throw new Error('请先选择目标上游账号组/凭证池。')
     }
     if (!importRaw.trim()) {
       throw new Error('请先粘贴认证文本或导入文件。')
@@ -413,7 +413,7 @@ export function AccountGroupsPage() {
     event.preventDefault()
     try {
       if (!selectedImportGroup) {
-        throw new Error('请先选择目标账号分组。')
+        throw new Error('请先选择目标上游账号组/凭证池。')
       }
       setImportError(null)
       const forms = importMode === 'single'
@@ -434,8 +434,8 @@ export function AccountGroupsPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageSection
-        kicker="账号分组管理"
-        title="账号分组与治理"
+        kicker="上游供给"
+        title="上游账号组/凭证池"
         actions={(
           <div className="flex flex-wrap gap-2">
             <Button type="button" onClick={openImportDialog} disabled={!groups.length && !groupsQuery.isPending}>
@@ -452,7 +452,7 @@ export function AccountGroupsPage() {
                 setCreateOpen(true)
               }}
             >
-              创建账号分组
+              创建上游账号组/凭证池
             </Button>
           </div>
         )}
@@ -460,14 +460,14 @@ export function AccountGroupsPage() {
         {mutationError ? (
           <InlineError
             error={mutationError}
-            title="账号分组操作失败"
+            title="上游账号组/凭证池操作失败"
           />
         ) : null}
 
         {groupsQuery.isPending ? (
           <PageSkeleton count={1} />
         ) : groupsQuery.error ? (
-          <InlineError error={groupsQuery.error} title="账号分组列表加载失败" />
+          <InlineError error={groupsQuery.error} title="上游账号组/凭证池列表加载失败" />
         ) : groups.length ? (
           <PaginatedRows items={groups}>
             {({ pageItems }) => (
@@ -475,7 +475,7 @@ export function AccountGroupsPage() {
                 <table className="w-full min-w-[900px] table-fixed text-sm">
                   <thead className="bg-muted/30">
                     <tr>
-                      <th className="w-[24%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">账号分组名称</th>
+                      <th className="w-[24%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">上游账号组/凭证池名称</th>
                       <th className="w-[12%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">状态</th>
                       <th className="w-[14%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">提供方</th>
                       <th className="w-[18%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">账号数</th>
@@ -517,7 +517,7 @@ export function AccountGroupsPage() {
             )}
           </PaginatedRows>
         ) : (
-          <EmptyState title="还没有账号分组" />
+          <EmptyState title="还没有上游账号组/凭证池" />
         )}
       </PageSection>
 
@@ -534,13 +534,13 @@ export function AccountGroupsPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>编辑账号分组</DialogTitle>
-            <DialogDescription>更新账号分组信息。</DialogDescription>
+            <DialogTitle>编辑上游账号组/凭证池</DialogTitle>
+            <DialogDescription>更新上游账号与凭证池的供给范围。</DialogDescription>
           </DialogHeader>
 
           <form className="flex flex-col gap-4" onSubmit={handleUpdate}>
             <label className="flex flex-col gap-2">
-              <span className="text-sm font-medium text-foreground">账号分组名称</span>
+              <span className="text-sm font-medium text-foreground">上游账号组/凭证池名称</span>
               <Input
                 value={editingForm.groupName}
                 onChange={(event) => setEditingForm((current) => ({ ...current, groupName: event.target.value }))}
@@ -609,13 +609,13 @@ export function AccountGroupsPage() {
                 checked={editingForm.active}
                 onChange={(event) => setEditingForm((current) => ({ ...current, active: event.target.checked }))}
               />
-              <span className="text-sm font-medium text-foreground">启用账号分组</span>
+              <span className="text-sm font-medium text-foreground">启用上游账号组/凭证池</span>
             </label>
 
             {(updateMutation.error || updateError) ? (
               <InlineError
-                error={updateMutation.error ?? new Error(updateError ?? '更新账号分组失败')}
-                title="更新账号分组失败"
+                error={updateMutation.error ?? new Error(updateError ?? '更新上游账号组/凭证池失败')}
+                title="更新上游账号组/凭证池失败"
               />
             ) : null}
 
@@ -774,8 +774,8 @@ export function AccountGroupsPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>创建账号分组</DialogTitle>
-            <DialogDescription>填写账号分组信息。</DialogDescription>
+            <DialogTitle>创建上游账号组/凭证池</DialogTitle>
+            <DialogDescription>填写上游账号与凭证池信息。</DialogDescription>
           </DialogHeader>
 
           <form className="flex flex-col gap-4" onSubmit={handleCreate}>
@@ -789,7 +789,7 @@ export function AccountGroupsPage() {
               <TabsContent value="basic" className="pt-3">
                 <div className="grid gap-4 md:grid-cols-2">
                   <label className="flex flex-col gap-2">
-                    <span className="text-sm font-medium text-foreground">账号分组名称</span>
+                    <span className="text-sm font-medium text-foreground">上游账号组/凭证池名称</span>
                     <Input
                       value={createForm.groupName}
                       onChange={(event) => setCreateForm((current) => ({ ...current, groupName: event.target.value }))}
@@ -875,8 +875,8 @@ export function AccountGroupsPage() {
 
             {(createMutation.error || createError) ? (
               <InlineError
-                error={createMutation.error ?? new Error(createError ?? '创建账号分组失败')}
-                title="创建账号分组失败"
+                error={createMutation.error ?? new Error(createError ?? '创建上游账号组/凭证池失败')}
+                title="创建上游账号组/凭证池失败"
               />
             ) : null}
 
@@ -888,7 +888,7 @@ export function AccountGroupsPage() {
                 下一步
               </Button>
               <Button type="submit" disabled={createMutation.isPending}>
-                创建账号分组
+                创建上游账号组/凭证池
               </Button>
             </DialogFooter>
           </form>
@@ -921,13 +921,13 @@ export function AccountGroupsPage() {
               <TabsContent value="group" className="pt-3">
                 <div className="grid gap-4 md:grid-cols-2">
                   <label className="flex flex-col gap-2">
-                    <span className="text-sm font-medium text-foreground">目标账号分组</span>
+                    <span className="text-sm font-medium text-foreground">目标上游账号组/凭证池</span>
                     <select
                       className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                       value={importGroupId}
                       onChange={(event) => setImportGroupId(event.target.value)}
                     >
-                      <option value="">请选择账号分组</option>
+                      <option value="">请选择上游账号组/凭证池</option>
                       {groups.map((group) => (
                         <option key={group.id} value={String(group.id)}>
                           {group.groupName} ({group.providerType})
@@ -1227,7 +1227,7 @@ function resetImportState(
 
 function buildAccountGroupPayload(form: AccountGroupForm) {
   if (!form.groupName.trim()) {
-    throw new Error('账号分组名称不能为空。')
+    throw new Error('上游账号组/凭证池名称不能为空。')
   }
 
   return {

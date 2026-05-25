@@ -45,7 +45,7 @@
 其中：
 
 - `官方账号运行态` 若彻底删除，意味着不仅要删 `/console/accounts*`，还要评估 `/admin/accounts*`、`/admin/accounts/import-auth-json`、官方账号 refresh/freeze/quota 逻辑是否一起清理。
-- `向量 API` 若彻底删除，意味着不仅要删 `/console/vector-stores`，还要评估 `/v1/vector_stores*`、`Responses file_search` 本地绑定、`GatewayAsyncResourceService` 中的 vector store 资源与相关 public docs 是否一起下线。
+- `向量 API` 若彻底删除，意味着不仅要删 `/console/vector-stores`，还要评估 `/v1/vector_stores*`、`GatewayAsyncResourceService` 中的 vector store 资源与相关 public docs 是否一起下线。历史 Responses `file_search` 本地绑定基线已被 `TASK-20260524-001-04` supersede，当前 hosted `file_search` 必须 native-required，不能作为本地绑定成功面保留。
 
 ## 本轮执行假设
 
@@ -54,7 +54,7 @@
 1. 删除控制台中的功能入口、导航、路由、页面、页内跳转和对应前端测试。
 2. 对历史书签和旧路由使用前端 redirect，避免用户进入 404。
 3. 暂不删除 `官方账号` 最小治理接口、`/admin/provider-sites` 的现役模型能力查询面，以及 `/admin/vector-stores*`。
-4. 暂不删除公开 `/v1/vector_stores*`、Responses `file_search` 本地绑定、OpenAPI 兼容实现和相关持久化实体。
+4. 暂不删除公开 `/v1/vector_stores*`、OpenAPI 中明确标注为 gateway-local 的兼容支撑面和相关持久化实体；Responses hosted `file_search` 不再保留本地绑定成功语义。
 
 ## 本轮文档清理口径
 
@@ -81,7 +81,8 @@
 - 当前已统一为“控制台已下线、后端/API 暂保留”的文档状态；随后继续推进 `tasks/` 与 `web/` 的同步收口。
 - 2026-05-21：继续进入 `tasks/` 体系清理，收口 `tasks/index.md` 中仍把 `官方账号运行态`、`能力矩阵`、`Native 命名空间兼容`、`Provider 参考差距`、`站点档案`、`成本路由策略中心`、`向量检索排障沙盒`、旧 `account pool` 与 `live/realtime` 口径当作现役能力的引用。
 - 2026-05-21：前端下线子任务已完成，`web/` 内对应导航、路由、页面、页内跳转、公共说明文案和测试已同步清理；旧路由通过 redirect 继续落到保留主路径。
-- 2026-05-21：在控制台下线之后，后端继续保留的是 `官方账号` 最小治理接口、`/admin/provider-sites` 现役模型能力查询面、`/admin/vector-stores*`、公开 `/v1/vector_stores*` 与 Responses `file_search` 本地绑定；`/admin/cost-routing*`、`/admin/provider-reference-gap`、`/admin/native-compatibility`、`/admin/capability-matrix` 已不再保留。
+- 2026-05-21：在控制台下线之后，后端继续保留的是 `官方账号` 最小治理接口、`/admin/provider-sites` 现役模型能力查询面、`/admin/vector-stores*` 与公开 `/v1/vector_stores*`；`/admin/cost-routing*`、`/admin/provider-reference-gap`、`/admin/native-compatibility`、`/admin/capability-matrix` 已不再保留。
+- 2026-05-24：按最新网关定义同步边界：Responses hosted `file_search` 不再通过本地 Vector Store 绑定返回成功；本需求中早期“Responses file_search 本地绑定保留”表述仅为历史上下文，当前由 `TASK-20260524-001-04` 收口为 OpenAI Direct/native hosted lifecycle required。
 
 ## 本轮验证
 

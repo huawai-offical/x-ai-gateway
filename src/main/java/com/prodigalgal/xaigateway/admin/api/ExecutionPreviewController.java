@@ -62,7 +62,7 @@ public class ExecutionPreviewController {
                 request.httpMethod(),
                 request.requestPath(),
                 request.requestedModel(),
-                GatewayDegradationPolicy.ALLOW_LOSSY,
+                GatewayDegradationPolicy.STRICT,
                 GatewayClientFamily.GENERIC_OPENAI,
                 request.requestBody()
         );

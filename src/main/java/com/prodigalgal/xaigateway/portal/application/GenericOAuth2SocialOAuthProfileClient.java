@@ -44,10 +44,7 @@ public class GenericOAuth2SocialOAuthProfileClient implements SocialOAuthProfile
 
     @Override
     public boolean supports(SocialOAuthProvider provider) {
-        return SUPPORTED_PROVIDERS.contains(provider)
-                && configured(clientId(provider))
-                && configured(tokenEndpoint(provider))
-                && (provider == SocialOAuthProvider.X || configured(clientSecret(provider)));
+        return SUPPORTED_PROVIDERS.contains(provider);
     }
 
     @Override
@@ -62,19 +59,20 @@ public class GenericOAuth2SocialOAuthProfileClient implements SocialOAuthProfile
         }
         JsonNode token = exchangeToken(request);
         return switch (request.provider()) {
-            case QQ -> qqProfile(token);
-            case WECHAT -> wechatProfile(token);
-            case META -> metaProfile(token);
-            case X -> xProfile(token);
+            case QQ -> qqProfile(token, request);
+            case WECHAT -> wechatProfile(token, request);
+            case META -> metaProfile(token, request);
+            case X -> xProfile(token, request);
             default -> throw new IllegalArgumentException("不支持的社交 OAuth provider：" + request.provider().wireName());
         };
     }
 
     private JsonNode exchangeToken(SocialOAuthTokenExchangeRequest request) {
         MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
-        formData.add("client_id", clientId(request.provider()));
-        if (configured(clientSecret(request.provider()))) {
-            formData.add("client_secret", clientSecret(request.provider()));
+        formData.add("client_id", firstConfigured(request.clientId(), clientId(request.provider())));
+        String secret = firstConfigured(request.clientSecret(), clientSecret(request.provider()));
+        if (configured(secret)) {
+            formData.add("client_secret", secret);
         }
         formData.add("code", required(request.code(), "OAuth authorization code"));
         formData.add("grant_type", "authorization_code");
@@ -83,7 +81,7 @@ public class GenericOAuth2SocialOAuthProfileClient implements SocialOAuthProfile
             formData.add("code_verifier", request.codeVerifier());
         }
         String payload = webClient.post()
-                .uri(URI.create(tokenEndpoint(request.provider())))
+                .uri(URI.create(firstConfigured(request.tokenEndpoint(), tokenEndpoint(request.provider()))))
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                 .accept(MediaType.APPLICATION_JSON)
                 .body(BodyInserters.fromFormData(formData))
@@ -93,7 +91,7 @@ public class GenericOAuth2SocialOAuthProfileClient implements SocialOAuthProfile
         return parsePayload(payload);
     }
 
-    private SocialOAuthProfile qqProfile(JsonNode token) {
+    private SocialOAuthProfile qqProfile(JsonNode token, SocialOAuthTokenExchangeRequest request) {
         String accessToken = required(text(token, "access_token"), "QQ access_token");
         String openId = text(token, "openid");
         if (openId == null) {
@@ -106,10 +104,10 @@ public class GenericOAuth2SocialOAuthProfileClient implements SocialOAuthProfile
         }
         openId = required(openId, "QQ openid");
         JsonNode user = get(
-                gatewayProperties.getOauth().getQqSocialUserInfoEndpoint(),
+                firstConfigured(request.userInfoEndpoint(), gatewayProperties.getOauth().getQqSocialUserInfoEndpoint()),
                 Map.of(
                         "access_token", accessToken,
-                        "oauth_consumer_key", gatewayProperties.getOauth().getQqSocialClientId(),
+                        "oauth_consumer_key", firstConfigured(request.clientId(), gatewayProperties.getOauth().getQqSocialClientId()),
                         "openid", openId
                 ),
                 null
@@ -123,11 +121,11 @@ public class GenericOAuth2SocialOAuthProfileClient implements SocialOAuthProfile
         );
     }
 
-    private SocialOAuthProfile wechatProfile(JsonNode token) {
+    private SocialOAuthProfile wechatProfile(JsonNode token, SocialOAuthTokenExchangeRequest request) {
         String accessToken = required(text(token, "access_token"), "WeChat access_token");
         String openId = required(text(token, "openid"), "WeChat openid");
         JsonNode user = get(
-                gatewayProperties.getOauth().getWechatSocialUserInfoEndpoint(),
+                firstConfigured(request.userInfoEndpoint(), gatewayProperties.getOauth().getWechatSocialUserInfoEndpoint()),
                 Map.of("access_token", accessToken, "openid", openId, "lang", "zh_CN"),
                 null
         );
@@ -147,9 +145,9 @@ public class GenericOAuth2SocialOAuthProfileClient implements SocialOAuthProfile
         );
     }
 
-    private SocialOAuthProfile metaProfile(JsonNode token) {
+    private SocialOAuthProfile metaProfile(JsonNode token, SocialOAuthTokenExchangeRequest request) {
         String accessToken = required(text(token, "access_token"), "Meta access_token");
-        JsonNode user = get(gatewayProperties.getOauth().getMetaSocialUserInfoEndpoint(), Map.of(), accessToken);
+        JsonNode user = get(firstConfigured(request.userInfoEndpoint(), gatewayProperties.getOauth().getMetaSocialUserInfoEndpoint()), Map.of(), accessToken);
         String id = required(text(user, "id"), "Meta 用户标识");
         return new SocialOAuthProfile(
                 SocialOAuthProvider.META,
@@ -160,9 +158,9 @@ public class GenericOAuth2SocialOAuthProfileClient implements SocialOAuthProfile
         );
     }
 
-    private SocialOAuthProfile xProfile(JsonNode token) {
+    private SocialOAuthProfile xProfile(JsonNode token, SocialOAuthTokenExchangeRequest request) {
         String accessToken = required(text(token, "access_token"), "X access_token");
-        JsonNode payload = get(gatewayProperties.getOauth().getXSocialUserInfoEndpoint(), Map.of(), accessToken);
+        JsonNode payload = get(firstConfigured(request.userInfoEndpoint(), gatewayProperties.getOauth().getXSocialUserInfoEndpoint()), Map.of(), accessToken);
         JsonNode user = payload.path("data");
         if (user == null || user.isMissingNode() || user.isNull()) {
             user = payload;
@@ -318,6 +316,10 @@ public class GenericOAuth2SocialOAuthProfileClient implements SocialOAuthProfile
 
     private boolean configured(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private String firstConfigured(String primary, String fallback) {
+        return configured(primary) ? primary.trim() : fallback;
     }
 
     private String encode(String value) {

@@ -45,4 +45,19 @@ public interface RequestLogRepository extends JpaRepository<RequestLogEntity, Lo
             @Param("providerType") ProviderType providerType,
             @Param("from") Instant from,
             @Param("to") Instant to);
+
+    @Query("""
+            select entity
+            from RequestLogEntity entity
+            where (:providerType is null or entity.providerType = :providerType)
+              and (:credentialId is null or entity.credentialId = :credentialId)
+              and entity.startedAt >= :from
+              and entity.startedAt <= :to
+            order by entity.startedAt desc
+            """)
+    List<RequestLogEntity> searchHealthWithinWindow(
+            @Param("providerType") ProviderType providerType,
+            @Param("credentialId") Long credentialId,
+            @Param("from") Instant from,
+            @Param("to") Instant to);
 }

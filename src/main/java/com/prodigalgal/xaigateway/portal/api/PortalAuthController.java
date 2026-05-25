@@ -1,17 +1,20 @@
 package com.prodigalgal.xaigateway.portal.api;
 
 import com.prodigalgal.xaigateway.admin.api.PaymentOrderResponse;
+import com.prodigalgal.xaigateway.admin.application.InvitationGrowthService;
 import com.prodigalgal.xaigateway.admin.application.PaymentAdminService;
 import com.prodigalgal.xaigateway.portal.application.PortalAuthService;
 import com.prodigalgal.xaigateway.portal.application.PortalSecurityService;
 import com.prodigalgal.xaigateway.portal.application.PortalSocialOAuthService;
 import jakarta.validation.Valid;
 import java.util.List;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -27,16 +30,19 @@ public class PortalAuthController {
     private final PortalSocialOAuthService portalSocialOAuthService;
     private final PortalSecurityService portalSecurityService;
     private final PaymentAdminService paymentAdminService;
+    private final InvitationGrowthService invitationGrowthService;
 
     public PortalAuthController(
             PortalAuthService portalAuthService,
             PortalSocialOAuthService portalSocialOAuthService,
             PortalSecurityService portalSecurityService,
-            PaymentAdminService paymentAdminService) {
+            PaymentAdminService paymentAdminService,
+            InvitationGrowthService invitationGrowthService) {
         this.portalAuthService = portalAuthService;
         this.portalSocialOAuthService = portalSocialOAuthService;
         this.portalSecurityService = portalSecurityService;
         this.paymentAdminService = paymentAdminService;
+        this.invitationGrowthService = invitationGrowthService;
     }
 
     @GetMapping("/auth/session")
@@ -49,6 +55,11 @@ public class PortalAuthController {
             @Valid @RequestBody PortalRegisterRequest request,
             ServerWebExchange exchange) {
         return portalAuthService.register(request, exchange);
+    }
+
+    @GetMapping("/auth/registration-policy")
+    public PortalRegistrationPolicyResponse registrationPolicy() {
+        return portalSecurityService.registrationPolicy();
     }
 
     @PostMapping("/auth/login")
@@ -162,6 +173,16 @@ public class PortalAuthController {
         return portalSocialOAuthService.complete(provider, request, exchange);
     }
 
+    @GetMapping("/auth/oauth/{provider}/callback")
+    public Mono<ResponseEntity<Void>> oauthRedirectCallback(
+            @PathVariable String provider,
+            @RequestParam(required = false) String state,
+            @RequestParam(required = false) String code,
+            @RequestParam(required = false) String error,
+            ServerWebExchange exchange) {
+        return portalSocialOAuthService.completeRedirect(provider, state, code, error, exchange);
+    }
+
     @GetMapping("/auth/oauth/identities")
     public Mono<List<PortalSocialOAuthIdentityResponse>> oauthIdentities(ServerWebExchange exchange) {
         return exchange.getSession().map(portalSocialOAuthService::identities);
@@ -233,6 +254,11 @@ public class PortalAuthController {
     @GetMapping("/balance-ledger")
     public Mono<List<PortalBalanceLedgerResponse>> balanceLedger(ServerWebExchange exchange) {
         return exchange.getSession().map(portalAuthService::listBalanceLedger);
+    }
+
+    @GetMapping("/invitations/summary")
+    public Mono<PortalInvitationSummaryResponse> invitationSummary(ServerWebExchange exchange) {
+        return exchange.getSession().map(session -> invitationGrowthService.portalSummary(portalAuthService.requireCurrentPortalUser(session)));
     }
 
     @GetMapping("/profile")

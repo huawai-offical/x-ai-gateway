@@ -19,7 +19,7 @@
 7. `向量检索排障沙盒`
 8. `向量 API`
 
-其中前 7 项以控制台页面为主；`向量 API` 和 `官方账号运行态` 则同时连接前端、Admin API、公开协议面与文档事实源。最新边界已确认：`vector` 相关能力暂不删除，`file` 相关 API 与 Responses `file_search` 绑定必须保留。
+其中前 7 项以控制台页面为主；`向量 API` 和 `官方账号运行态` 则同时连接前端、Admin API、公开协议面与文档事实源。最新边界已确认：`vector` 相关 gateway-local 支撑能力暂不删除，`file` 相关 API 保留；历史 Responses `file_search` 本地绑定成功语义已被 `TASK-20260524-001-04` supersede，当前 hosted `file_search` 必须 native-required。
 
 ## 目标
 
@@ -34,7 +34,7 @@
 
 ## 非目标
 
-- 不删除公开 `vector_stores` API、`files` API 与 Responses `file_search` 本地绑定。
+- 不删除公开 `vector_stores` API 与 `files` API；不恢复 Responses hosted `file_search` 本地绑定成功语义。
 - 不贸然删除仍承载官方账号导入、freeze、quota-refresh 与 smoke 的后端逻辑。
 
 ## 输入

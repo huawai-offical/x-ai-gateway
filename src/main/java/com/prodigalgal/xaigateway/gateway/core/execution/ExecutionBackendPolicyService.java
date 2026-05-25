@@ -105,13 +105,16 @@ public class ExecutionBackendPolicyService {
                 case ANTHROPIC_DIRECT, OLLAMA_DIRECT -> List.of();
             };
         }
+        if (semantics.resourceType() == TranslationResourceType.RERANK
+                && (siteKind == UpstreamSiteKind.COHERE || siteKind == UpstreamSiteKind.JINA)) {
+            return List.of(ExecutionBackend.NATIVE);
+        }
         if (supportsGoogleGenAiNativeMedia(providerType, siteKind, semantics)) {
             return List.of(ExecutionBackend.NATIVE);
         }
         if (semantics.resourceType() == TranslationResourceType.AUDIO
                 || semantics.resourceType() == TranslationResourceType.IMAGE
                 || semantics.resourceType() == TranslationResourceType.MODERATION
-                || semantics.resourceType() == TranslationResourceType.RERANK
                 || semantics.resourceType() == TranslationResourceType.WEB_SEARCH) {
             return List.of(ExecutionBackend.PASSTHROUGH);
         }
@@ -131,7 +134,8 @@ public class ExecutionBackendPolicyService {
         }
         return switch (semantics.resourceType()) {
             case EMBEDDING -> List.of(ExecutionBackend.NATIVE);
-            case AUDIO, IMAGE, MODERATION, RERANK, WEB_SEARCH -> List.of(ExecutionBackend.PASSTHROUGH);
+            case AUDIO, IMAGE, MODERATION, WEB_SEARCH -> List.of(ExecutionBackend.PASSTHROUGH);
+            case RERANK -> List.of(ExecutionBackend.NATIVE);
             case FILE, UPLOAD, VIDEO, MUSIC, TASK -> List.of(ExecutionBackend.ORCHESTRATION);
             case CHAT, RESPONSE, UNKNOWN -> List.of();
         };

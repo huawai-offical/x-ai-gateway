@@ -309,6 +309,27 @@ class ObservabilityAdminControllerTests {
                         ),
                         List.of(),
                         List.of(),
+                        List.of(new RequestTraceDetailResponse(
+                                11L,
+                                "req-1",
+                                "UPSTREAM_REQUEST",
+                                "UPSTREAM",
+                                "JSON",
+                                "{\"model\":\"gpt-4o\"}",
+                                "{\"providerType\":\"OPENAI_DIRECT\"}",
+                                "payload-hash",
+                                "metadata-hash",
+                                200,
+                                120,
+                                5000,
+                                4000,
+                                true,
+                                true,
+                                true,
+                                true,
+                                now.plusSeconds(86400),
+                                now
+                        )),
                         new AsyncResourceSummaryResponse(
                                 "upload_1",
                                 GatewayAsyncResourceType.UPLOAD,
@@ -335,7 +356,82 @@ class ObservabilityAdminControllerTests {
                 .expectBody()
                 .jsonPath("$.requestLog.requestId").isEqualTo("req-1")
                 .jsonPath("$.routeDecision.selectionSource").isEqualTo("PREFIX_AFFINITY")
+                .jsonPath("$.traceDetails[0].metadataHash").isEqualTo("metadata-hash")
+                .jsonPath("$.traceDetails[0].metadataTruncated").isEqualTo(true)
+                .jsonPath("$.traceDetails[0].metadataRedacted").isEqualTo(true)
+                .jsonPath("$.traceDetails[0].expiresAt").exists()
                 .jsonPath("$.asyncResourceSummary.resourceKey").isEqualTo("upload_1");
+    }
+
+    @Test
+    void shouldReturnHealthMetrics() {
+        Instant from = Instant.parse("2026-05-25T00:00:00Z");
+        Instant to = Instant.parse("2026-05-25T06:00:00Z");
+        Mockito.when(observabilityQueryService.health(ProviderType.OPENAI_DIRECT, 101L, from, to))
+                .thenReturn(new ObservabilityHealthResponse(
+                        from,
+                        to,
+                        new HealthMetricResponse(
+                                10,
+                                8,
+                                1,
+                                1,
+                                0.8D,
+                                0.9D,
+                                0.1D,
+                                0.1D,
+                                640D,
+                                Instant.parse("2026-05-25T05:58:00Z"),
+                                Instant.parse("2026-05-25T05:30:00Z")
+                        ),
+                        List.of(new CredentialHealthMetricResponse(
+                                101L,
+                                ProviderType.OPENAI_DIRECT,
+                                "openai-main",
+                                "abcdef123456",
+                                10,
+                                8,
+                                1,
+                                1,
+                                0.8D,
+                                0.9D,
+                                0.1D,
+                                0.1D,
+                                640D,
+                                Instant.parse("2026-05-25T05:58:00Z"),
+                                Instant.parse("2026-05-25T05:30:00Z")
+                        )),
+                        List.of(new ProviderHealthMetricResponse(
+                                ProviderType.OPENAI_DIRECT,
+                                10,
+                                8,
+                                1,
+                                1,
+                                0.8D,
+                                0.9D,
+                                0.1D,
+                                0.1D,
+                                640D,
+                                Instant.parse("2026-05-25T05:58:00Z"),
+                                Instant.parse("2026-05-25T05:30:00Z")
+                        ))
+                ));
+
+        webTestClient.get()
+                .uri(uriBuilder -> uriBuilder.path("/admin/observability/health")
+                        .queryParam("providerType", "OPENAI_DIRECT")
+                        .queryParam("credentialId", 101)
+                        .queryParam("from", from)
+                        .queryParam("to", to)
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.total.totalRequests").isEqualTo(10)
+                .jsonPath("$.total.successRate").isEqualTo(0.8D)
+                .jsonPath("$.total.availabilityRate").isEqualTo(0.9D)
+                .jsonPath("$.credentials[0].credentialLabel").isEqualTo("openai-main")
+                .jsonPath("$.providers[0].providerType").isEqualTo("OPENAI_DIRECT");
     }
 
     @Test

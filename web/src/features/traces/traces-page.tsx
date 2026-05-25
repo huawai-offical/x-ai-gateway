@@ -20,6 +20,7 @@ import { apiClient } from '@/lib/api'
 import { useTypedQuery } from '@/lib/typed-react-query'
 import type {
   CacheHitEntry,
+  TraceDetailEntry,
   TraceLookupResponse,
   UpstreamCacheReferenceEntry,
 } from './types'
@@ -60,6 +61,7 @@ export function TracesPage() {
   })
 
   const trace = query.data?.trace
+  const traceDetails = useMemo(() => sortTraceDetails(trace?.traceDetails), [trace?.traceDetails])
   const stages = useMemo(
     () => buildTraceStages(query.data, providerType, requestPath),
     [providerType, query.data, requestPath],
@@ -206,6 +208,7 @@ export function TracesPage() {
                     ['请求路径', requestPath || '无'],
                     ['命中记录', String(query.data.matches.length)],
                     ['缓存命中', String(trace?.cacheHits.length ?? 0)],
+                    ['请求详情阶段', String(traceDetails.length)],
                   ]}
                 />
 
@@ -218,6 +221,8 @@ export function TracesPage() {
                     ['上游引用', String(trace?.upstreamCacheReferences.length ?? 0)],
                   ]}
                 />
+
+                <TraceDetailsPanel details={traceDetails} />
               </div>
             </div>
           </PageSection>
@@ -419,6 +424,85 @@ function TraceContextCard({
   )
 }
 
+function TraceDetailsPanel({ details }: { details: TraceDetailEntry[] }) {
+  if (!details.length) {
+    return (
+      <Card className="border-border/60 bg-card/92 shadow-sm">
+        <CardHeader className="gap-2 border-b border-border/60">
+          <CardTitle className="text-base">请求详情阶段</CardTitle>
+        </CardHeader>
+        <CardContent className="p-5 text-sm leading-6 text-muted-foreground">
+          当前链路返回未包含 traceDetails；后端返回明细后会在这里按创建时间展示请求与上游载荷阶段。
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="px-1 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+        请求详情阶段
+      </div>
+      {details.map((detail, index) => {
+        const payloadPreview = previewTraceValue(detail.payloadJson)
+        const metadataPreview = previewTraceValue(detail.metadataJson)
+
+        return (
+          <Card key={`${detail.id ?? detail.stage ?? 'detail'}-${index}`} className="border-border/60 bg-card/92 shadow-sm">
+            <CardHeader className="gap-3 border-b border-border/60">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <CardTitle className="text-base">{traceDetailStageLabel(detail.stage)}</CardTitle>
+                  <div className="text-xs text-muted-foreground">{detail.stage ?? 'UNKNOWN_STAGE'}</div>
+                </div>
+                {detail.createdAt ? (
+                  <div className="text-right text-xs text-muted-foreground">{formatInstant(detail.createdAt)}</div>
+                ) : null}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <StatusBadge tone={toneForTraceDetail(detail)}>{traceDetailDirectionLabel(detail.direction)}</StatusBadge>
+                <StatusBadge>{traceDetailContentKindLabel(detail.contentKind)}</StatusBadge>
+                {detail.redacted ? <StatusBadge tone="warning">已脱敏</StatusBadge> : null}
+                {detail.truncated ? <StatusBadge tone="warning">已截断</StatusBadge> : null}
+                {detail.metadataRedacted ? <StatusBadge tone="warning">元数据已脱敏</StatusBadge> : null}
+                {detail.metadataTruncated ? <StatusBadge tone="warning">元数据已截断</StatusBadge> : null}
+              </div>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3 p-5 text-sm text-muted-foreground">
+              <TraceMetaItem label="请求 ID" value={detail.requestId ?? '-'} />
+              <TraceMetaItem label="Payload 长度" value={formatTraceDetailLength(detail)} />
+              <TraceMetaItem label="Payload Hash" value={detail.payloadHash ?? '-'} />
+              <TraceMetaItem label="Metadata 长度" value={formatTraceMetadataLength(detail)} />
+              <TraceMetaItem label="Metadata Hash" value={detail.metadataHash ?? '-'} />
+              <TraceMetaItem label="过期时间" value={detail.expiresAt ? formatInstant(detail.expiresAt) : '-'} />
+              {payloadPreview ? <TracePayloadPreview label="载荷预览" value={payloadPreview} /> : null}
+              {metadataPreview ? <TracePayloadPreview label="元数据预览" value={metadataPreview} /> : null}
+              {!payloadPreview && !metadataPreview ? (
+                <div className="rounded-2xl border border-border/60 bg-background px-4 py-3">
+                  当前阶段没有可展示的载荷或元数据。
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+        )
+      })}
+    </div>
+  )
+}
+
+function TracePayloadPreview({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-border/60 bg-background">
+      <div className="border-b border-border/50 px-4 py-2 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+        {label}
+      </div>
+      <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words px-4 py-3 text-xs leading-6 text-foreground">
+        {value}
+      </pre>
+    </div>
+  )
+}
+
 function ActionCard({
   title,
   to,
@@ -460,6 +544,18 @@ function buildTraceLookupUrl(requestId?: string, gatewayResourceKey?: string, up
   if (gatewayResourceKey) params.set('gatewayResourceKey', gatewayResourceKey)
   if (upstreamObjectId) params.set('upstreamObjectId', upstreamObjectId)
   return `/admin/traces/lookup?${params.toString()}`
+}
+
+function sortTraceDetails(details?: TraceDetailEntry[] | null) {
+  if (!details?.length) return []
+  return [...details].sort((left, right) => {
+    const leftTime = left.createdAt ? Date.parse(left.createdAt) : 0
+    const rightTime = right.createdAt ? Date.parse(right.createdAt) : 0
+    const normalizedLeftTime = Number.isFinite(leftTime) ? leftTime : 0
+    const normalizedRightTime = Number.isFinite(rightTime) ? rightTime : 0
+    if (normalizedLeftTime !== normalizedRightTime) return normalizedLeftTime - normalizedRightTime
+    return (left.id ?? 0) - (right.id ?? 0)
+  })
 }
 
 function buildTraceStages(
@@ -560,6 +656,107 @@ function buildTraceStages(
       ],
     },
   ]
+}
+
+function traceDetailStageLabel(stage?: string | null) {
+  if (!stage) return '未标记阶段'
+  const normalized = normalizeTraceToken(stage)
+  const labels: Record<string, string> = {
+    REQUEST_RECEIVED: '接收请求',
+    REQUEST_PARSE: '请求解析',
+    REQUEST_PARSED: '请求解析',
+    REQUEST_NORMALIZED: '请求规范化',
+    REQUEST_REDACTED: '请求脱敏',
+    ROUTE_DECISION: '路由决策',
+    ROUTE_SELECTED: '路由选择',
+    CACHE_LOOKUP: '缓存检索',
+    CACHE_HIT: '缓存命中',
+    CACHE_WRITE: '缓存写入',
+    UPSTREAM_REQUEST: '上游请求',
+    UPSTREAM_RESPONSE: '上游响应',
+    RESPONSE_RECEIVED: '接收响应',
+    RESPONSE_NORMALIZED: '响应规范化',
+    RESPONSE_STREAM: '流式响应',
+    STREAM_EVENT: '流式事件',
+    ASYNC_RESOURCE: '异步资源',
+    ERROR: '异常记录',
+  }
+  if (labels[normalized]) return labels[normalized]
+  if (normalized.includes('UPSTREAM') && normalized.includes('REQUEST')) return '上游请求'
+  if (normalized.includes('UPSTREAM') && normalized.includes('RESPONSE')) return '上游响应'
+  if (normalized.includes('REQUEST') && normalized.includes('REDACT')) return '请求脱敏'
+  if (normalized.includes('REQUEST') && normalized.includes('NORMAL')) return '请求规范化'
+  if (normalized.includes('REQUEST')) return '请求阶段'
+  if (normalized.includes('RESPONSE') && normalized.includes('NORMAL')) return '响应规范化'
+  if (normalized.includes('RESPONSE')) return '响应阶段'
+  if (normalized.includes('ROUTE')) return '路由阶段'
+  if (normalized.includes('CACHE')) return '缓存阶段'
+  if (normalized.includes('ERROR') || normalized.includes('FAIL')) return '异常记录'
+  return stage
+}
+
+function traceDetailDirectionLabel(direction?: string | null) {
+  if (!direction) return '方向未知'
+  const normalized = normalizeTraceToken(direction)
+  const labels: Record<string, string> = {
+    INBOUND: '入站',
+    OUTBOUND: '出站',
+    REQUEST: '请求',
+    RESPONSE: '响应',
+    UPSTREAM: '上游',
+    DOWNSTREAM: '下游',
+    INTERNAL: '内部',
+  }
+  return labels[normalized] ?? direction
+}
+
+function traceDetailContentKindLabel(contentKind?: string | null) {
+  if (!contentKind) return '内容未知'
+  const normalized = normalizeTraceToken(contentKind)
+  const labels: Record<string, string> = {
+    JSON: 'JSON',
+    TEXT: '文本',
+    SSE: 'SSE',
+    MULTIPART: '多段表单',
+    BINARY: '二进制',
+    FORM: '表单',
+  }
+  return labels[normalized] ?? contentKind
+}
+
+function toneForTraceDetail(detail: TraceDetailEntry) {
+  const normalized = `${detail.stage ?? ''} ${detail.direction ?? ''}`.toUpperCase()
+  if (normalized.includes('ERROR') || normalized.includes('FAIL')) return 'danger' as const
+  if (detail.truncated || detail.redacted || detail.metadataTruncated || detail.metadataRedacted) return 'warning' as const
+  if (normalized.includes('RESPONSE')) return 'success' as const
+  if (normalized.includes('REQUEST') || normalized.includes('UPSTREAM')) return 'info' as const
+  return 'neutral' as const
+}
+
+function formatTraceDetailLength(detail: TraceDetailEntry) {
+  const original = detail.originalLength == null ? '-' : String(detail.originalLength)
+  const stored = detail.storedLength == null ? '-' : String(detail.storedLength)
+  return `${stored} / ${original}`
+}
+
+function formatTraceMetadataLength(detail: TraceDetailEntry) {
+  const original = detail.metadataOriginalLength == null ? '-' : String(detail.metadataOriginalLength)
+  const stored = detail.metadataStoredLength == null ? '-' : String(detail.metadataStoredLength)
+  return `${stored} / ${original}`
+}
+
+function previewTraceValue(value: unknown) {
+  if (value == null || value === '') return ''
+  const raw = typeof value === 'string' ? value : JSON.stringify(value, null, 2)
+  if (!raw) return ''
+  return raw.length > 420 ? `${raw.slice(0, 420)}...` : raw
+}
+
+function normalizeTraceToken(value: string) {
+  return value
+    .replace(/([a-z])([A-Z])/g, '$1_$2')
+    .replace(/[-\s.]+/g, '_')
+    .toUpperCase()
 }
 
 function buildCacheItems(

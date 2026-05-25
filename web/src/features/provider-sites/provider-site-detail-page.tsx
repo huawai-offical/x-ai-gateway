@@ -398,7 +398,7 @@ export function ProviderSiteDetailPage() {
               <TabsContent value="runtime" className="pt-3">
                 <div className="grid gap-4 md:grid-cols-2">
                   <label className="flex flex-col gap-2">
-                    <span className="text-sm font-medium text-foreground">Provider Type</span>
+                    <span className="text-sm font-medium text-foreground">厂商类型</span>
                     <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={endpointDraft.providerType} onChange={(event) => setEndpointDraft({ ...endpointDraft, providerType: event.target.value })}>
                       {['OPENAI_DIRECT', 'OPENAI_COMPATIBLE', 'ANTHROPIC_DIRECT', 'GEMINI_DIRECT', 'OLLAMA_DIRECT'].map((option) => (
                         <option key={option} value={option}>{option}</option>
@@ -406,7 +406,7 @@ export function ProviderSiteDetailPage() {
                     </select>
                   </label>
                   <label className="flex flex-col gap-2">
-                    <span className="text-sm font-medium text-foreground">Site Kind</span>
+                    <span className="text-sm font-medium text-foreground">站点类型</span>
                     <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={endpointDraft.siteKind} onChange={(event) => setEndpointDraft({ ...endpointDraft, siteKind: event.target.value })}>
                       {[
                         'OPENAI_DIRECT',
@@ -437,23 +437,23 @@ export function ProviderSiteDetailPage() {
                     </select>
                   </label>
                   <label className="flex flex-col gap-2">
-                    <span className="text-sm font-medium text-foreground">Auth Strategy</span>
+                    <span className="text-sm font-medium text-foreground">鉴权策略</span>
                     <Input value={endpointDraft.authStrategy} onChange={(event) => setEndpointDraft({ ...endpointDraft, authStrategy: event.target.value })} />
                   </label>
                   <label className="flex flex-col gap-2">
-                    <span className="text-sm font-medium text-foreground">Path Strategy</span>
+                    <span className="text-sm font-medium text-foreground">路径策略</span>
                     <Input value={endpointDraft.pathStrategy} onChange={(event) => setEndpointDraft({ ...endpointDraft, pathStrategy: event.target.value })} />
                   </label>
                   <label className="flex flex-col gap-2">
-                    <span className="text-sm font-medium text-foreground">Model Addressing</span>
+                    <span className="text-sm font-medium text-foreground">模型寻址策略</span>
                     <Input value={endpointDraft.modelAddressingStrategy} onChange={(event) => setEndpointDraft({ ...endpointDraft, modelAddressingStrategy: event.target.value })} />
                   </label>
                   <label className="flex flex-col gap-2">
-                    <span className="text-sm font-medium text-foreground">Error Schema</span>
+                    <span className="text-sm font-medium text-foreground">错误结构策略</span>
                     <Input value={endpointDraft.errorSchemaStrategy} onChange={(event) => setEndpointDraft({ ...endpointDraft, errorSchemaStrategy: event.target.value })} />
                   </label>
                   <label className="flex flex-col gap-2 md:col-span-2">
-                    <span className="text-sm font-medium text-foreground">Stream Transport</span>
+                    <span className="text-sm font-medium text-foreground">流式传输方式</span>
                     <Input value={endpointDraft.streamTransport} onChange={(event) => setEndpointDraft({ ...endpointDraft, streamTransport: event.target.value })} />
                   </label>
                 </div>

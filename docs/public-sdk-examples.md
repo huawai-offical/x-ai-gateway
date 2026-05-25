@@ -31,7 +31,7 @@
 
 ### OpenAI Direct native
 
-用于接入 OpenAI Direct/native route，适合 Responses、Conversations、file_search、本地 Vector Store 绑定、Files/Uploads 等对话支撑能力。该模式要求路由命中 OpenAI Direct/native provider，并使用 Distributed Key 认证；它描述的是协议接入方式，不表示控制台仍提供官方账号运行态或向量调试主入口。
+用于接入 OpenAI Direct/native route，适合 Chat、Responses、Files、Uploads 等 OpenAI Direct native 能力；Conversations、`file_search` 本地 Vector Store 绑定等只属于 gateway-local 对话支撑能力，不等价于 OpenAI official/native lifecycle 成功。该模式要求路由命中 OpenAI Direct/native provider，并使用 Distributed Key 认证；它描述的是协议接入方式，不表示控制台仍提供官方账号运行态或向量调试主入口。
 
 ```python
 from openai import OpenAI
@@ -53,9 +53,11 @@ response = client.responses.create(
 print(response.output_text)
 ```
 
-### OpenAI-compatible Generic
+### Provider-specific OpenAI-compatible native profile
 
-用于 MiMo 等兼容 OpenAI Chat 格式的 provider key，chat、streaming、function tools 与 file/uploads 分开建模；Files/Uploads 只有在 capability snapshot 明示支持时才通过 gateway orchestration 开放，不把 chat 兼容性外推为 Realtime、Batches 或完整 object lifecycle。
+用于 MiMo、DeepSeek、xAI、Qwen、Moonshot、Volcengine、MiniMax、Mistral 等拥有 catalog `nativeAdapterContract` 的 provider-specific OpenAI-compatible native profile。它们不是 generic fallback：每个厂商必须在 catalog 中声明自己的 `adapterKind`、`nativeSurface`、`requiredEndpoints`、auth、stream、tools、usage 与 error mapping，chat、streaming、function tools、file/uploads 也必须按各自 native profile 和 capability snapshot 分开建模。
+
+跨协议资源属性只按 Lossless Translation Matrix 执行。不可无损翻译、native-only 或目标厂商无法 native 执行的能力必须硬失败，例如返回 `native_route_required`、`unsupported_translation_attribute`、`native_image_edit_required`、`native_image_variation_required` 或 `native_audio_translation_required`，不能用 warning、metadata、header、local emulation 或 lossy fallback 伪装成成功。Dify、OpenRouter、Together、Fireworks、SiliconFlow 与通用 generic compatible provider 不属于默认核心支持范围；如未来需要接入，只能作为明确标注的非核心可选 profile 单独评估。
 
 ```javascript
 import OpenAI from "openai";
@@ -90,7 +92,7 @@ for await (const chunk of completion) {
 
 ### 自定义 provider adapter
 
-用于直接暴露 Anthropic native、Gemini native、Vertex/Gemini compatible 等 provider 原生对话面。它们仍按本项目功能性服务 API 收紧：只保留可映射到对话、streaming、tools、多模态和必要支撑能力的入口。
+用于直接暴露 Anthropic native、Gemini native、Vertex/Gemini native/profile 等 provider 原生对话面。它们仍按本项目功能性服务 API 收紧：只保留可映射到对话、streaming、tools、多模态和必要支撑能力的入口；不可无损翻译或无 native 等价能力的资源属性必须失败。
 
 ```bash
 curl -sS https://gateway.example.com/v1beta/models/gemini-2.5-flash:generateContent \

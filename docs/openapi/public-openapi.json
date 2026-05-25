@@ -362,7 +362,7 @@
                   },
                   "tools" : {
                     "type" : "array",
-                    "description" : "Responses tool definitions. Function tools execute through canonical tool calling; file_search can bind local vector_store_ids and inject local search context; other hosted/MCP/custom tools are rejected explicitly instead of being ignored."
+                    "description" : "Responses tool definitions. Function tools execute through canonical tool calling; hosted file_search requires OpenAI Direct native execution and otherwise fails with native_hosted_tool_required; other hosted/MCP/custom tools are rejected explicitly instead of being ignored."
                   },
                   "tool_choice" : {
                     "type" : "object",
@@ -462,7 +462,7 @@
             "description" : "OK"
           }
         },
-        "description" : "Counts Response input tokens. OpenAI Direct routes use native upstream counting when available; route-unavailable cases fall back to the local deterministic estimate.",
+        "description" : "Counts Response input tokens. OpenAI Direct routes use native upstream counting when available; route-unavailable or non-native cases fail with native_input_tokens_required instead of returning a local deterministic estimate.",
         "requestBody" : {
           "content" : {
             "application/json" : {
@@ -508,7 +508,7 @@
                   },
                   "tools" : {
                     "type" : "array",
-                    "description" : "Responses tool definitions. Function tools execute through canonical tool calling; file_search can bind local vector_store_ids and inject local search context; other hosted/MCP/custom tools are rejected explicitly instead of being ignored."
+                    "description" : "Responses tool definitions. Function tools execute through canonical tool calling; hosted file_search requires OpenAI Direct native execution and otherwise fails with native_hosted_tool_required; other hosted/MCP/custom tools are rejected explicitly instead of being ignored."
                   },
                   "tool_choice" : {
                     "type" : "object",
@@ -580,7 +580,7 @@
                   },
                   "tools" : {
                     "type" : "array",
-                    "description" : "Responses tool definitions. Function tools execute through canonical tool calling; file_search can bind local vector_store_ids and inject local search context; other hosted/MCP/custom tools are rejected explicitly instead of being ignored."
+                    "description" : "Responses tool definitions. Function tools execute through canonical tool calling; hosted file_search requires OpenAI Direct native execution and otherwise fails with native_hosted_tool_required; other hosted/MCP/custom tools are rejected explicitly instead of being ignored."
                   },
                   "tool_choice" : {
                     "type" : "object",
@@ -921,7 +921,7 @@
             "description" : "OK"
           }
         },
-        "description" : "Translates an uploaded audio file only when the selected provider exposes an equivalent native audio translation surface. Cross-protocol requests that require translation fail with native_audio_translation_required instead of local emulation.",
+        "description" : "Translates an uploaded audio file only when the selected provider exposes an equivalent native audio translation surface. Cross-protocol requests that require translation fail with native_audio_translation_required instead of a local substitute.",
         "requestBody" : {
           "content" : {
             "multipart/form-data" : {
@@ -1070,7 +1070,7 @@
             "description" : "OK"
           }
         },
-        "description" : "Creates image edits only when the selected provider exposes an equivalent native image edit surface. Cross-protocol requests that require translation fail with native_image_edit_required instead of local emulation.",
+        "description" : "Creates image edits only when the selected provider exposes an equivalent native image edit surface. Cross-protocol requests that require translation fail with native_image_edit_required instead of a local substitute.",
         "requestBody" : {
           "content" : {
             "multipart/form-data" : {
@@ -1152,7 +1152,7 @@
             "description" : "OK"
           }
         },
-        "description" : "Creates image variations only when the selected provider exposes an equivalent native image variation surface. Cross-protocol requests that require translation fail with native_image_variation_required instead of local emulation.",
+        "description" : "Creates image variations only when the selected provider exposes an equivalent native image variation surface. Cross-protocol requests that require translation fail with native_image_variation_required instead of a local substitute.",
         "requestBody" : {
           "content" : {
             "multipart/form-data" : {
@@ -2669,7 +2669,8 @@
           "200" : {
             "description" : "OK"
           }
-        }
+        },
+        "description" : "Creates Video tasks only through a provider native route or provider-specific native profile. Gateway-local completed/download artifact fallback is disabled and route-unavailable cases fail with native_route_required."
       }
     },
     "/api/v1/videos/{videoId}" : {
@@ -2684,7 +2685,8 @@
           "200" : {
             "description" : "OK"
           }
-        }
+        },
+        "description" : "Reads a Video task backed by upstream/native provider evidence; local adapter reads do not advance queued tasks to completed."
       }
     },
     "/api/v1/videos/{videoId}/cancel" : {
@@ -2699,7 +2701,8 @@
           "200" : {
             "description" : "OK"
           }
-        }
+        },
+        "description" : "Cancels a Video task only within its real upstream/native lifecycle or existing local lineage; it does not create success artifacts."
       }
     },
     "/api/v1/videos/{videoId}/download" : {
@@ -2714,7 +2717,8 @@
           "200" : {
             "description" : "OK"
           }
-        }
+        },
+        "description" : "Returns a download reference only when a real provider artifact URL exists; no gateway.local artifact URL is synthesized."
       }
     },
     "/api/v1/music/generations" : {
@@ -2729,7 +2733,8 @@
           "200" : {
             "description" : "OK"
           }
-        }
+        },
+        "description" : "Creates Music tasks only through a provider native route or provider-specific native profile. Gateway-local completed/download artifact fallback is disabled and route-unavailable cases fail with native_route_required."
       }
     },
     "/api/v1/music/{musicId}" : {
@@ -2744,7 +2749,8 @@
           "200" : {
             "description" : "OK"
           }
-        }
+        },
+        "description" : "Reads a Music task backed by upstream/native provider evidence; local adapter reads do not advance queued tasks to completed."
       }
     },
     "/api/v1/music/{musicId}/cancel" : {
@@ -2759,7 +2765,8 @@
           "200" : {
             "description" : "OK"
           }
-        }
+        },
+        "description" : "Cancels a Music task only within its real upstream/native lifecycle or existing local lineage; it does not create success artifacts."
       }
     },
     "/api/v1/music/{musicId}/download" : {
@@ -2774,7 +2781,8 @@
           "200" : {
             "description" : "OK"
           }
-        }
+        },
+        "description" : "Returns a download reference only when a real provider artifact URL exists; no gateway.local artifact URL is synthesized."
       }
     },
     "/api/v1/media/provider-matrix" : {
@@ -2789,7 +2797,8 @@
           "200" : {
             "description" : "OK"
           }
-        }
+        },
+        "description" : "Returns the Video/Music support matrix using native/profile-required and hard-fail terminology; generic compatible providers are not implied to support media tasks."
       }
     }
   },

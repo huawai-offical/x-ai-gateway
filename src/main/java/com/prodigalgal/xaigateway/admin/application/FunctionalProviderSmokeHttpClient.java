@@ -20,8 +20,20 @@ import tools.jackson.databind.ObjectMapper;
 class FunctionalProviderSmokeHttpClient {
 
     static final String PROTOCOL_GEMINI_NATIVE = "GEMINI_NATIVE";
-    static final String PROTOCOL_OPENAI_COMPATIBLE = "OPENAI_COMPATIBLE";
-    static final String PROTOCOL_ANTHROPIC_COMPATIBLE = "ANTHROPIC_COMPATIBLE";
+    static final String PROTOCOL_OPENAI_COMPATIBLE = "XIAOMI_MIMO_OPENAI_COMPATIBLE";
+    static final String PROTOCOL_ANTHROPIC_COMPATIBLE = "XIAOMI_MIMO_ANTHROPIC_COMPATIBLE";
+    static final String PROTOCOL_DEEPSEEK_OPENAI_COMPATIBLE = "DEEPSEEK_OPENAI_COMPATIBLE";
+    static final String PROTOCOL_XAI_OPENAI_COMPATIBLE = "XAI_OPENAI_COMPATIBLE";
+    static final String PROTOCOL_QWEN_OPENAI_COMPATIBLE = "QWEN_OPENAI_COMPATIBLE";
+    static final String PROTOCOL_MOONSHOT_OPENAI_COMPATIBLE = "MOONSHOT_OPENAI_COMPATIBLE";
+    static final String PROTOCOL_VOLCENGINE_OPENAI_COMPATIBLE = "VOLCENGINE_OPENAI_COMPATIBLE";
+    static final String PROTOCOL_MINIMAX_OPENAI_COMPATIBLE = "MINIMAX_OPENAI_COMPATIBLE";
+    static final String PROTOCOL_MISTRAL_OPENAI_COMPATIBLE = "MISTRAL_OPENAI_COMPATIBLE";
+    static final String PROTOCOL_PERPLEXITY_OPENAI_COMPATIBLE = "PERPLEXITY_OPENAI_COMPATIBLE";
+    static final String PROTOCOL_COHERE_NATIVE = "COHERE_NATIVE";
+    static final String PROTOCOL_JINA_NATIVE = "JINA_NATIVE";
+    private static final String PROTOCOL_OPENAI_COMPATIBLE_GENERIC = "OPENAI_COMPATIBLE";
+    private static final String PROTOCOL_ANTHROPIC_COMPATIBLE_GENERIC = "ANTHROPIC_COMPATIBLE";
 
     static final String GENERATE_CONTENT = "GENERATE_CONTENT";
     static final String STREAM_GENERATE_CONTENT = "STREAM_GENERATE_CONTENT";
@@ -32,12 +44,34 @@ class FunctionalProviderSmokeHttpClient {
     static final String MESSAGES = "MESSAGES";
     static final String MESSAGES_STREAMING = "MESSAGES_STREAMING";
     static final String TOOL_USE = "TOOL_USE";
+    static final String EMBEDDINGS = "EMBEDDINGS";
+    static final String RERANK = "RERANK";
 
     private static final String DEFAULT_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com";
     private static final String DEFAULT_MIMO_OPENAI_BASE_URL = "https://token-plan-sgp.xiaomimimo.com/v1";
     private static final String DEFAULT_MIMO_ANTHROPIC_BASE_URL = "https://token-plan-sgp.xiaomimimo.com/anthropic";
+    private static final String DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com";
+    private static final String DEFAULT_XAI_BASE_URL = "https://api.x.ai/v1";
+    private static final String DEFAULT_QWEN_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1";
+    private static final String DEFAULT_MOONSHOT_BASE_URL = "https://api.moonshot.cn/v1";
+    private static final String DEFAULT_VOLCENGINE_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3";
+    private static final String DEFAULT_MINIMAX_BASE_URL = "https://api.minimax.chat/v1";
+    private static final String DEFAULT_MISTRAL_BASE_URL = "https://api.mistral.ai/v1";
+    private static final String DEFAULT_PERPLEXITY_BASE_URL = "https://api.perplexity.ai";
+    private static final String DEFAULT_COHERE_BASE_URL = "https://api.cohere.ai";
+    private static final String DEFAULT_JINA_BASE_URL = "https://api.jina.ai/v1";
     private static final String DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
     private static final String DEFAULT_MIMO_MODEL = "mimo-v2-pro";
+    private static final String DEFAULT_DEEPSEEK_MODEL = "deepseek-chat";
+    private static final String DEFAULT_XAI_MODEL = "grok-4.3";
+    private static final String DEFAULT_QWEN_MODEL = "qwen-plus";
+    private static final String DEFAULT_MOONSHOT_MODEL = "moonshot-v1-8k";
+    private static final String DEFAULT_VOLCENGINE_MODEL = "doubao-seed-1-6";
+    private static final String DEFAULT_MINIMAX_MODEL = "abab6.5s-chat";
+    private static final String DEFAULT_MISTRAL_MODEL = "mistral-large-latest";
+    private static final String DEFAULT_PERPLEXITY_MODEL = "sonar";
+    private static final String DEFAULT_COHERE_MODEL = "embed-v4.0";
+    private static final String DEFAULT_JINA_MODEL = "jina-embeddings-v3";
 
     private static final List<String> GEMINI_DEFAULT_FAMILIES = List.of(
             GENERATE_CONTENT,
@@ -54,6 +88,10 @@ class FunctionalProviderSmokeHttpClient {
             MESSAGES_STREAMING,
             TOOL_USE
     );
+    private static final List<String> EMBED_RERANK_DEFAULT_FAMILIES = List.of(
+            EMBEDDINGS,
+            RERANK
+    );
 
     private final ObjectMapper objectMapper;
 
@@ -64,22 +102,101 @@ class FunctionalProviderSmokeHttpClient {
     String resolveProtocol(ProviderType providerType, String requestedProtocol, String requestedBaseUrl) {
         String protocol = normalizeProtocol(requestedProtocol);
         if (!isBlank(protocol)) {
+        if (PROTOCOL_OPENAI_COMPATIBLE_GENERIC.equals(protocol)) {
+            if (isCohereBaseUrl(requestedBaseUrl)) {
+                return PROTOCOL_COHERE_NATIVE;
+                }
+                if (isJinaBaseUrl(requestedBaseUrl)) {
+                    return PROTOCOL_JINA_NATIVE;
+                }
+                if (isDeepSeekBaseUrl(requestedBaseUrl)) {
+                    return PROTOCOL_DEEPSEEK_OPENAI_COMPATIBLE;
+                }
+                if (isXaiBaseUrl(requestedBaseUrl)) {
+                    return PROTOCOL_XAI_OPENAI_COMPATIBLE;
+                }
+                if (isQwenBaseUrl(requestedBaseUrl)) {
+                    return PROTOCOL_QWEN_OPENAI_COMPATIBLE;
+                }
+                if (isMoonshotBaseUrl(requestedBaseUrl)) {
+                    return PROTOCOL_MOONSHOT_OPENAI_COMPATIBLE;
+                }
+                if (isVolcengineBaseUrl(requestedBaseUrl)) {
+                    return PROTOCOL_VOLCENGINE_OPENAI_COMPATIBLE;
+                }
+                if (isMiniMaxBaseUrl(requestedBaseUrl)) {
+                    return PROTOCOL_MINIMAX_OPENAI_COMPATIBLE;
+                }
+                if (isMistralBaseUrl(requestedBaseUrl)) {
+                    return PROTOCOL_MISTRAL_OPENAI_COMPATIBLE;
+                }
+                if (isPerplexityBaseUrl(requestedBaseUrl)) {
+                    return PROTOCOL_PERPLEXITY_OPENAI_COMPATIBLE;
+                }
+                return isMimoBaseUrl(requestedBaseUrl) || (isBlank(requestedBaseUrl) && providerType == ProviderType.OPENAI_COMPATIBLE)
+                        ? PROTOCOL_OPENAI_COMPATIBLE
+                        : PROTOCOL_OPENAI_COMPATIBLE_GENERIC;
+            }
+            if (PROTOCOL_ANTHROPIC_COMPATIBLE_GENERIC.equals(protocol)) {
+                return isMimoBaseUrl(requestedBaseUrl) || (isBlank(requestedBaseUrl) && providerType == ProviderType.ANTHROPIC_DIRECT)
+                        ? PROTOCOL_ANTHROPIC_COMPATIBLE
+                        : PROTOCOL_ANTHROPIC_COMPATIBLE_GENERIC;
+            }
             return protocol;
         }
         if (providerType == ProviderType.GEMINI_DIRECT) {
             return PROTOCOL_GEMINI_NATIVE;
         }
-        if (providerType == ProviderType.OPENAI_COMPATIBLE) {
-            return PROTOCOL_OPENAI_COMPATIBLE;
-        }
-        if (providerType == ProviderType.ANTHROPIC_DIRECT) {
-            return PROTOCOL_ANTHROPIC_COMPATIBLE;
-        }
         String baseUrl = requestedBaseUrl == null ? "" : requestedBaseUrl.toLowerCase(Locale.ROOT);
         if (baseUrl.contains("generativelanguage.googleapis.com")) {
             return PROTOCOL_GEMINI_NATIVE;
         }
-        if (baseUrl.contains("/anthropic")) {
+        if (isCohereBaseUrl(baseUrl)) {
+            return PROTOCOL_COHERE_NATIVE;
+        }
+        if (isJinaBaseUrl(baseUrl)) {
+            return PROTOCOL_JINA_NATIVE;
+        }
+        if (isMimoBaseUrl(baseUrl)) {
+            return baseUrl.contains("/anthropic") ? PROTOCOL_ANTHROPIC_COMPATIBLE : PROTOCOL_OPENAI_COMPATIBLE;
+        }
+        if (isDeepSeekBaseUrl(baseUrl)) {
+            return PROTOCOL_DEEPSEEK_OPENAI_COMPATIBLE;
+        }
+        if (isXaiBaseUrl(baseUrl)) {
+            return PROTOCOL_XAI_OPENAI_COMPATIBLE;
+        }
+        if (isQwenBaseUrl(baseUrl)) {
+            return PROTOCOL_QWEN_OPENAI_COMPATIBLE;
+        }
+        if (isMoonshotBaseUrl(baseUrl)) {
+            return PROTOCOL_MOONSHOT_OPENAI_COMPATIBLE;
+        }
+        if (isVolcengineBaseUrl(baseUrl)) {
+            return PROTOCOL_VOLCENGINE_OPENAI_COMPATIBLE;
+        }
+        if (isMiniMaxBaseUrl(baseUrl)) {
+            return PROTOCOL_MINIMAX_OPENAI_COMPATIBLE;
+        }
+        if (isMistralBaseUrl(baseUrl)) {
+            return PROTOCOL_MISTRAL_OPENAI_COMPATIBLE;
+        }
+        if (isPerplexityBaseUrl(baseUrl)) {
+            return PROTOCOL_PERPLEXITY_OPENAI_COMPATIBLE;
+        }
+        if (!baseUrl.isBlank() && baseUrl.contains("/anthropic")) {
+            return PROTOCOL_ANTHROPIC_COMPATIBLE_GENERIC;
+        }
+        if (!baseUrl.isBlank() && providerType == ProviderType.OPENAI_COMPATIBLE) {
+            return PROTOCOL_OPENAI_COMPATIBLE_GENERIC;
+        }
+        if (!baseUrl.isBlank() && providerType == ProviderType.ANTHROPIC_DIRECT) {
+            return PROTOCOL_ANTHROPIC_COMPATIBLE_GENERIC;
+        }
+        if (providerType == ProviderType.OPENAI_COMPATIBLE) {
+            return PROTOCOL_OPENAI_COMPATIBLE;
+        }
+        if (providerType == ProviderType.ANTHROPIC_DIRECT) {
             return PROTOCOL_ANTHROPIC_COMPATIBLE;
         }
         return PROTOCOL_OPENAI_COMPATIBLE;
@@ -354,7 +471,23 @@ class FunctionalProviderSmokeHttpClient {
             String family,
             String requestedBaseUrl,
             String requestedModel) {
-        if (!List.of(PROTOCOL_GEMINI_NATIVE, PROTOCOL_OPENAI_COMPATIBLE, PROTOCOL_ANTHROPIC_COMPATIBLE).contains(protocol)) {
+        if (!List.of(
+                PROTOCOL_GEMINI_NATIVE,
+                PROTOCOL_OPENAI_COMPATIBLE,
+                PROTOCOL_ANTHROPIC_COMPATIBLE,
+                PROTOCOL_DEEPSEEK_OPENAI_COMPATIBLE,
+                PROTOCOL_XAI_OPENAI_COMPATIBLE,
+                PROTOCOL_QWEN_OPENAI_COMPATIBLE,
+                PROTOCOL_MOONSHOT_OPENAI_COMPATIBLE,
+                PROTOCOL_VOLCENGINE_OPENAI_COMPATIBLE,
+                PROTOCOL_MINIMAX_OPENAI_COMPATIBLE,
+                PROTOCOL_MISTRAL_OPENAI_COMPATIBLE,
+                PROTOCOL_PERPLEXITY_OPENAI_COMPATIBLE,
+                PROTOCOL_COHERE_NATIVE,
+                PROTOCOL_JINA_NATIVE,
+                PROTOCOL_OPENAI_COMPATIBLE_GENERIC,
+                PROTOCOL_ANTHROPIC_COMPATIBLE_GENERIC
+        ).contains(protocol)) {
             return unsupportedPlan(providerType, protocol, family, requestedBaseUrl, requestedModel, "UNSUPPORTED_PROTOCOL");
         }
         String baseUrl = normalizeBaseUrl(firstNonBlank(requestedBaseUrl, defaultBaseUrl(protocol)));
@@ -376,23 +509,49 @@ class FunctionalProviderSmokeHttpClient {
             }
             return unsupportedPlan(providerType, protocol, family, normalizedBase, model, "UNSUPPORTED_FAMILY");
         }
-        if (PROTOCOL_OPENAI_COMPATIBLE.equals(protocol)) {
-            String normalizedBase = removeSuffix(baseUrl, "/v1");
-            if (CHAT_COMPLETIONS.equals(family)) {
+        if (PROTOCOL_COHERE_NATIVE.equals(protocol)) {
+            String normalizedBase = removeSuffix(baseUrl, "/compatibility/v1");
+            normalizedBase = removeSuffix(normalizedBase, "/v1");
+            normalizedBase = removeSuffix(normalizedBase, "/v2");
+            if (EMBEDDINGS.equals(family)) {
                 return plan(providerType, protocol, family, normalizedBase, "POST",
-                        "/v1/chat/completions", "openai_compatible_chat", model, true, false);
+                        "/v2/embed", "cohere_native_embed", model, true, false);
             }
-            if (CHAT_STREAMING.equals(family)) {
+            if (RERANK.equals(family)) {
                 return plan(providerType, protocol, family, normalizedBase, "POST",
-                        "/v1/chat/completions", "openai_compatible_chat_streaming", model, true, false);
-            }
-            if (CHAT_TOOLS.equals(family)) {
-                return plan(providerType, protocol, family, normalizedBase, "POST",
-                        "/v1/chat/completions", "openai_compatible_chat_tools", model, true, false);
+                        "/v2/rerank", "cohere_native_rerank", firstNonBlank(requestedModel, "rerank-v3.5"), true, false);
             }
             return unsupportedPlan(providerType, protocol, family, normalizedBase, model, "UNSUPPORTED_FAMILY");
         }
-        if (PROTOCOL_ANTHROPIC_COMPATIBLE.equals(protocol)) {
+        if (PROTOCOL_JINA_NATIVE.equals(protocol)) {
+            String normalizedBase = removeSuffix(baseUrl, "/v1");
+            if (EMBEDDINGS.equals(family)) {
+                return plan(providerType, protocol, family, normalizedBase, "POST",
+                        "/v1/embeddings", "jina_native_embeddings", model, true, false);
+            }
+            if (RERANK.equals(family)) {
+                return plan(providerType, protocol, family, normalizedBase, "POST",
+                        "/v1/rerank", "jina_native_rerank", firstNonBlank(requestedModel, "jina-reranker-v2-base-multilingual"), true, false);
+            }
+            return unsupportedPlan(providerType, protocol, family, normalizedBase, model, "UNSUPPORTED_FAMILY");
+        }
+        if (isOpenAiCompatibleProtocol(protocol)) {
+            String normalizedBase = normalizeOpenAiCompatibleBaseUrl(protocol, baseUrl);
+            if (CHAT_COMPLETIONS.equals(family)) {
+                return plan(providerType, protocol, family, normalizedBase, "POST",
+                        openAiCompatibleChatPath(protocol), "openai_compatible_chat", model, true, false);
+            }
+            if (CHAT_STREAMING.equals(family)) {
+                return plan(providerType, protocol, family, normalizedBase, "POST",
+                        openAiCompatibleChatPath(protocol), "openai_compatible_chat_streaming", model, true, false);
+            }
+            if (CHAT_TOOLS.equals(family)) {
+                return plan(providerType, protocol, family, normalizedBase, "POST",
+                        openAiCompatibleChatPath(protocol), "openai_compatible_chat_tools", model, true, false);
+            }
+            return unsupportedPlan(providerType, protocol, family, normalizedBase, model, "UNSUPPORTED_FAMILY");
+        }
+        if (isAnthropicCompatibleProtocol(protocol)) {
             if (MESSAGES.equals(family)) {
                 return plan(providerType, protocol, family, baseUrl, "POST",
                         "/v1/messages", "anthropic_compatible_messages", model, true, false);
@@ -468,8 +627,16 @@ class FunctionalProviderSmokeHttpClient {
             headers.put("x-goog-api-key", secret);
             return headers;
         }
-        if (PROTOCOL_ANTHROPIC_COMPATIBLE.equals(plan.protocol())) {
+        if (isAnthropicCompatibleProtocol(plan.protocol())) {
             headers.put("anthropic-version", "2023-06-01");
+            headers.put("api-key", secret);
+            return headers;
+        }
+        if (usesBearerOpenAiCompatibleAuth(plan.protocol())) {
+            headers.put("authorization", "Bearer " + secret);
+            return headers;
+        }
+        if (isOpenAiCompatibleProtocol(plan.protocol())) {
             headers.put("api-key", secret);
             return headers;
         }
@@ -485,8 +652,12 @@ class FunctionalProviderSmokeHttpClient {
         }
         if (PROTOCOL_GEMINI_NATIVE.equals(plan.protocol())) {
             headers.put("x-goog-api-key", "***");
-        } else if (PROTOCOL_ANTHROPIC_COMPATIBLE.equals(plan.protocol())) {
+        } else if (isAnthropicCompatibleProtocol(plan.protocol())) {
             headers.put("anthropic-version", "2023-06-01");
+            headers.put("api-key", "***");
+        } else if (usesBearerOpenAiCompatibleAuth(plan.protocol())) {
+            headers.put("authorization", "Bearer ***");
+        } else if (isOpenAiCompatibleProtocol(plan.protocol())) {
             headers.put("api-key", "***");
         } else {
             headers.put("authorization", "Bearer ***");
@@ -590,6 +761,21 @@ class FunctionalProviderSmokeHttpClient {
                             )
                     ))
             );
+            case "cohere_native_embed" -> Map.of(
+                    "model", plan.model(),
+                    "texts", List.of("ping"),
+                    "input_type", "search_document"
+            );
+            case "jina_native_embeddings" -> Map.of(
+                    "model", plan.model(),
+                    "input", List.of("ping")
+            );
+            case "cohere_native_rerank", "jina_native_rerank" -> Map.of(
+                    "model", plan.model(),
+                    "query", "ping",
+                    "documents", List.of("pong", "other"),
+                    "top_n", 1
+            );
             default -> Map.of();
         };
     }
@@ -624,10 +810,88 @@ class FunctionalProviderSmokeHttpClient {
         if (candidates instanceof List<?> candidatesList) {
             result.put("candidatesSeen", candidatesList.size());
         }
+        String responseSummary = responseSummary(body);
+        if (!isBlank(responseSummary)) {
+            result.put("responseSummary", responseSummary);
+        }
+        Object data = body.get("data");
+        if (data instanceof List<?> dataList) {
+            result.put("dataSeen", dataList.size());
+        }
+        Object embeddings = body.get("embeddings");
+        if (embeddings instanceof List<?> embeddingsList) {
+            result.put("embeddingsSeen", embeddingsList.size());
+        } else if (embeddings instanceof Map<?, ?> embeddingsMap) {
+            result.put("embeddingFields", embeddingsMap.keySet().stream().map(String::valueOf).toList());
+            Object floatVectors = embeddingsMap.get("float");
+            if (floatVectors instanceof List<?> floatVectorList) {
+                result.put("embeddingFloatVectorsSeen", floatVectorList.size());
+            }
+        }
+        Object results = body.get("results");
+        if (results instanceof List<?> resultsList) {
+            result.put("resultsSeen", resultsList.size());
+            if (!resultsList.isEmpty() && resultsList.getFirst() instanceof Map<?, ?> firstResult) {
+                result.put("firstResultFields", firstResult.keySet().stream().map(String::valueOf).toList());
+            }
+        }
+        Object meta = body.get("meta");
+        if (meta instanceof Map<?, ?> metaMap) {
+            Object billedUnits = metaMap.get("billed_units");
+            if (billedUnits instanceof Map<?, ?> billedUnitsMap) {
+                result.put("billedUnitFields", billedUnitsMap.keySet().stream().map(String::valueOf).toList());
+            }
+        }
         if (body.containsKey("_rawText")) {
             result.put("rawTextSeen", true);
         }
         return result;
+    }
+
+    private String responseSummary(Map<String, Object> body) {
+        Object choices = body.get("choices");
+        if (choices instanceof List<?> choicesList
+                && !choicesList.isEmpty()
+                && choicesList.getFirst() instanceof Map<?, ?> firstChoice) {
+            Object message = firstChoice.get("message");
+            if (message instanceof Map<?, ?> messageMap) {
+                String content = text(messageMap.get("content"));
+                if (!isBlank(content)) {
+                    return truncate(content, 240);
+                }
+            }
+            String text = text(firstChoice.get("text"));
+            if (!isBlank(text)) {
+                return truncate(text, 240);
+            }
+        }
+        Object content = body.get("content");
+        if (content instanceof List<?> contentList
+                && !contentList.isEmpty()
+                && contentList.getFirst() instanceof Map<?, ?> firstContent) {
+            String text = text(firstContent.get("text"));
+            if (!isBlank(text)) {
+                return truncate(text, 240);
+            }
+        }
+        Object candidates = body.get("candidates");
+        if (candidates instanceof List<?> candidatesList
+                && !candidatesList.isEmpty()
+                && candidatesList.getFirst() instanceof Map<?, ?> firstCandidate) {
+            Object candidateContent = firstCandidate.get("content");
+            if (candidateContent instanceof Map<?, ?> candidateContentMap) {
+                Object parts = candidateContentMap.get("parts");
+                if (parts instanceof List<?> partsList
+                        && !partsList.isEmpty()
+                        && partsList.getFirst() instanceof Map<?, ?> firstPart) {
+                    String text = text(firstPart.get("text"));
+                    if (!isBlank(text)) {
+                        return truncate(text, 240);
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     private Map<String, Object> readJsonMap(String value) {
@@ -739,10 +1003,13 @@ class FunctionalProviderSmokeHttpClient {
         if (PROTOCOL_GEMINI_NATIVE.equals(protocol)) {
             return GEMINI_DEFAULT_FAMILIES;
         }
-        if (PROTOCOL_ANTHROPIC_COMPATIBLE.equals(protocol)) {
+        if (isEmbedRerankNativeProtocol(protocol)) {
+            return EMBED_RERANK_DEFAULT_FAMILIES;
+        }
+        if (isAnthropicCompatibleProtocol(protocol)) {
             return ANTHROPIC_COMPAT_DEFAULT_FAMILIES;
         }
-        if (PROTOCOL_OPENAI_COMPATIBLE.equals(protocol)) {
+        if (isOpenAiCompatibleProtocol(protocol)) {
             return OPENAI_COMPAT_DEFAULT_FAMILIES;
         }
         if (providerType == ProviderType.GEMINI_DIRECT) {
@@ -761,14 +1028,77 @@ class FunctionalProviderSmokeHttpClient {
         if (PROTOCOL_GEMINI_NATIVE.equals(protocol)) {
             return DEFAULT_GEMINI_BASE_URL;
         }
-        if (PROTOCOL_ANTHROPIC_COMPATIBLE.equals(protocol)) {
+        if (isAnthropicCompatibleProtocol(protocol)) {
             return DEFAULT_MIMO_ANTHROPIC_BASE_URL;
+        }
+        if (PROTOCOL_DEEPSEEK_OPENAI_COMPATIBLE.equals(protocol)) {
+            return DEFAULT_DEEPSEEK_BASE_URL;
+        }
+        if (PROTOCOL_XAI_OPENAI_COMPATIBLE.equals(protocol)) {
+            return DEFAULT_XAI_BASE_URL;
+        }
+        if (PROTOCOL_QWEN_OPENAI_COMPATIBLE.equals(protocol)) {
+            return DEFAULT_QWEN_BASE_URL;
+        }
+        if (PROTOCOL_MOONSHOT_OPENAI_COMPATIBLE.equals(protocol)) {
+            return DEFAULT_MOONSHOT_BASE_URL;
+        }
+        if (PROTOCOL_VOLCENGINE_OPENAI_COMPATIBLE.equals(protocol)) {
+            return DEFAULT_VOLCENGINE_BASE_URL;
+        }
+        if (PROTOCOL_MINIMAX_OPENAI_COMPATIBLE.equals(protocol)) {
+            return DEFAULT_MINIMAX_BASE_URL;
+        }
+        if (PROTOCOL_MISTRAL_OPENAI_COMPATIBLE.equals(protocol)) {
+            return DEFAULT_MISTRAL_BASE_URL;
+        }
+        if (PROTOCOL_PERPLEXITY_OPENAI_COMPATIBLE.equals(protocol)) {
+            return DEFAULT_PERPLEXITY_BASE_URL;
+        }
+        if (PROTOCOL_COHERE_NATIVE.equals(protocol)) {
+            return DEFAULT_COHERE_BASE_URL;
+        }
+        if (PROTOCOL_JINA_NATIVE.equals(protocol)) {
+            return DEFAULT_JINA_BASE_URL;
         }
         return DEFAULT_MIMO_OPENAI_BASE_URL;
     }
 
     private String defaultModel(String protocol) {
-        return PROTOCOL_GEMINI_NATIVE.equals(protocol) ? DEFAULT_GEMINI_MODEL : DEFAULT_MIMO_MODEL;
+        if (PROTOCOL_GEMINI_NATIVE.equals(protocol)) {
+            return DEFAULT_GEMINI_MODEL;
+        }
+        if (PROTOCOL_DEEPSEEK_OPENAI_COMPATIBLE.equals(protocol)) {
+            return DEFAULT_DEEPSEEK_MODEL;
+        }
+        if (PROTOCOL_XAI_OPENAI_COMPATIBLE.equals(protocol)) {
+            return DEFAULT_XAI_MODEL;
+        }
+        if (PROTOCOL_QWEN_OPENAI_COMPATIBLE.equals(protocol)) {
+            return DEFAULT_QWEN_MODEL;
+        }
+        if (PROTOCOL_MOONSHOT_OPENAI_COMPATIBLE.equals(protocol)) {
+            return DEFAULT_MOONSHOT_MODEL;
+        }
+        if (PROTOCOL_VOLCENGINE_OPENAI_COMPATIBLE.equals(protocol)) {
+            return DEFAULT_VOLCENGINE_MODEL;
+        }
+        if (PROTOCOL_MINIMAX_OPENAI_COMPATIBLE.equals(protocol)) {
+            return DEFAULT_MINIMAX_MODEL;
+        }
+        if (PROTOCOL_MISTRAL_OPENAI_COMPATIBLE.equals(protocol)) {
+            return DEFAULT_MISTRAL_MODEL;
+        }
+        if (PROTOCOL_PERPLEXITY_OPENAI_COMPATIBLE.equals(protocol)) {
+            return DEFAULT_PERPLEXITY_MODEL;
+        }
+        if (PROTOCOL_COHERE_NATIVE.equals(protocol)) {
+            return DEFAULT_COHERE_MODEL;
+        }
+        if (PROTOCOL_JINA_NATIVE.equals(protocol)) {
+            return DEFAULT_JINA_MODEL;
+        }
+        return DEFAULT_MIMO_MODEL;
     }
 
     private String normalizeProtocol(String value) {
@@ -781,8 +1111,20 @@ class FunctionalProviderSmokeHttpClient {
                 .toUpperCase(Locale.ROOT);
         return switch (normalized) {
             case "GEMINI", "GOOGLE", "GEMINI_NATIVE" -> PROTOCOL_GEMINI_NATIVE;
-            case "OPENAI", "OPENAI_COMPAT", "OPENAI_COMPATIBLE", "MIMO_OPENAI", "MIMO_OPENAI_COMPATIBLE" -> PROTOCOL_OPENAI_COMPATIBLE;
-            case "ANTHROPIC", "CLAUDE", "ANTHROPIC_COMPAT", "ANTHROPIC_COMPATIBLE", "MIMO_ANTHROPIC", "MIMO_ANTHROPIC_COMPATIBLE" -> PROTOCOL_ANTHROPIC_COMPATIBLE;
+            case "COHERE", "COHERE_NATIVE", "COHERE_EMBED", "COHERE_RERANK" -> PROTOCOL_COHERE_NATIVE;
+            case "JINA", "JINA_NATIVE", "JINA_EMBEDDINGS", "JINA_RERANK" -> PROTOCOL_JINA_NATIVE;
+            case "MIMO_OPENAI", "MIMO_OPENAI_COMPATIBLE", "XIAOMI_MIMO_OPENAI_COMPATIBLE" -> PROTOCOL_OPENAI_COMPATIBLE;
+            case "DEEPSEEK", "DEEPSEEK_OPENAI", "DEEPSEEK_OPENAI_COMPATIBLE" -> PROTOCOL_DEEPSEEK_OPENAI_COMPATIBLE;
+            case "XAI", "XAI_OPENAI", "XAI_OPENAI_COMPATIBLE", "GROK", "GROK_OPENAI", "GROK_OPENAI_COMPATIBLE" -> PROTOCOL_XAI_OPENAI_COMPATIBLE;
+            case "QWEN", "QWEN_OPENAI", "QWEN_OPENAI_COMPATIBLE" -> PROTOCOL_QWEN_OPENAI_COMPATIBLE;
+            case "MOONSHOT", "MOONSHOT_OPENAI", "MOONSHOT_OPENAI_COMPATIBLE", "KIMI", "KIMI_OPENAI", "KIMI_OPENAI_COMPATIBLE" -> PROTOCOL_MOONSHOT_OPENAI_COMPATIBLE;
+            case "VOLCENGINE", "VOLCENGINE_OPENAI", "VOLCENGINE_OPENAI_COMPATIBLE", "DOUBAO", "DOUBAO_OPENAI", "DOUBAO_OPENAI_COMPATIBLE" -> PROTOCOL_VOLCENGINE_OPENAI_COMPATIBLE;
+            case "MINIMAX", "MINIMAX_OPENAI", "MINIMAX_OPENAI_COMPATIBLE" -> PROTOCOL_MINIMAX_OPENAI_COMPATIBLE;
+            case "MISTRAL", "MISTRAL_OPENAI", "MISTRAL_OPENAI_COMPATIBLE" -> PROTOCOL_MISTRAL_OPENAI_COMPATIBLE;
+            case "PERPLEXITY", "PERPLEXITY_OPENAI", "PERPLEXITY_OPENAI_COMPATIBLE", "SONAR", "SONAR_OPENAI", "SONAR_OPENAI_COMPATIBLE" -> PROTOCOL_PERPLEXITY_OPENAI_COMPATIBLE;
+            case "OPENAI", "OPENAI_COMPAT", "OPENAI_COMPATIBLE" -> PROTOCOL_OPENAI_COMPATIBLE_GENERIC;
+            case "MIMO_ANTHROPIC", "MIMO_ANTHROPIC_COMPATIBLE", "XIAOMI_MIMO_ANTHROPIC_COMPATIBLE" -> PROTOCOL_ANTHROPIC_COMPATIBLE;
+            case "ANTHROPIC", "CLAUDE", "ANTHROPIC_COMPAT", "ANTHROPIC_COMPATIBLE" -> PROTOCOL_ANTHROPIC_COMPATIBLE_GENERIC;
             default -> normalized;
         };
     }
@@ -805,6 +1147,8 @@ class FunctionalProviderSmokeHttpClient {
             case "MESSAGE", "MESSAGES" -> MESSAGES;
             case "MESSAGE_STREAM", "MESSAGE_STREAMING", "MESSAGES_STREAMING" -> MESSAGES_STREAMING;
             case "TOOL_USE", "ANTHROPIC_TOOLS" -> TOOL_USE;
+            case "EMBED", "EMBEDDING", "EMBEDDINGS" -> EMBEDDINGS;
+            case "RERANK", "RERANKING" -> RERANK;
             default -> normalized;
         };
         return normalized;
@@ -814,10 +1158,121 @@ class FunctionalProviderSmokeHttpClient {
         if (PROTOCOL_GEMINI_NATIVE.equals(protocol)) {
             return TOOL_CALLING;
         }
-        if (PROTOCOL_ANTHROPIC_COMPATIBLE.equals(protocol)) {
+        if (isAnthropicCompatibleProtocol(protocol)) {
             return TOOL_USE;
         }
         return CHAT_TOOLS;
+    }
+
+    private boolean isOpenAiCompatibleProtocol(String protocol) {
+        return PROTOCOL_OPENAI_COMPATIBLE.equals(protocol)
+                || PROTOCOL_DEEPSEEK_OPENAI_COMPATIBLE.equals(protocol)
+                || PROTOCOL_XAI_OPENAI_COMPATIBLE.equals(protocol)
+                || PROTOCOL_QWEN_OPENAI_COMPATIBLE.equals(protocol)
+                || PROTOCOL_MOONSHOT_OPENAI_COMPATIBLE.equals(protocol)
+                || PROTOCOL_VOLCENGINE_OPENAI_COMPATIBLE.equals(protocol)
+                || PROTOCOL_MINIMAX_OPENAI_COMPATIBLE.equals(protocol)
+                || PROTOCOL_MISTRAL_OPENAI_COMPATIBLE.equals(protocol)
+                || PROTOCOL_PERPLEXITY_OPENAI_COMPATIBLE.equals(protocol)
+                || PROTOCOL_OPENAI_COMPATIBLE_GENERIC.equals(protocol);
+    }
+
+    private boolean isAnthropicCompatibleProtocol(String protocol) {
+        return PROTOCOL_ANTHROPIC_COMPATIBLE.equals(protocol)
+                || PROTOCOL_ANTHROPIC_COMPATIBLE_GENERIC.equals(protocol);
+    }
+
+    private boolean isMimoBaseUrl(String baseUrl) {
+        if (baseUrl == null) {
+            return false;
+        }
+        String normalized = baseUrl.toLowerCase(Locale.ROOT);
+        return normalized.contains("xiaomimimo.com")
+                || normalized.contains("api.mimo-v2.com");
+    }
+
+    private boolean isDeepSeekBaseUrl(String baseUrl) {
+        return baseUrl != null && baseUrl.toLowerCase(Locale.ROOT).contains("deepseek.com");
+    }
+
+    private boolean isXaiBaseUrl(String baseUrl) {
+        return baseUrl != null && baseUrl.toLowerCase(Locale.ROOT).contains("api.x.ai");
+    }
+
+    private boolean isQwenBaseUrl(String baseUrl) {
+        return baseUrl != null && baseUrl.toLowerCase(Locale.ROOT).contains("dashscope.aliyuncs.com");
+    }
+
+    private boolean isMoonshotBaseUrl(String baseUrl) {
+        return baseUrl != null && baseUrl.toLowerCase(Locale.ROOT).contains("moonshot.cn");
+    }
+
+    private boolean isVolcengineBaseUrl(String baseUrl) {
+        return baseUrl != null && baseUrl.toLowerCase(Locale.ROOT).contains("volces.com");
+    }
+
+    private boolean isMiniMaxBaseUrl(String baseUrl) {
+        return baseUrl != null && baseUrl.toLowerCase(Locale.ROOT).contains("minimax.chat");
+    }
+
+    private boolean isMistralBaseUrl(String baseUrl) {
+        return baseUrl != null && baseUrl.toLowerCase(Locale.ROOT).contains("mistral.ai");
+    }
+
+    private boolean isPerplexityBaseUrl(String baseUrl) {
+        return baseUrl != null && baseUrl.toLowerCase(Locale.ROOT).contains("perplexity.ai");
+    }
+
+    private boolean isCohereBaseUrl(String baseUrl) {
+        return baseUrl != null && baseUrl.toLowerCase(Locale.ROOT).contains("api.cohere.ai");
+    }
+
+    private boolean isJinaBaseUrl(String baseUrl) {
+        return baseUrl != null && baseUrl.toLowerCase(Locale.ROOT).contains("api.jina.ai");
+    }
+
+    private boolean isEmbedRerankNativeProtocol(String protocol) {
+        return PROTOCOL_COHERE_NATIVE.equals(protocol)
+                || PROTOCOL_JINA_NATIVE.equals(protocol);
+    }
+
+    private boolean usesBearerOpenAiCompatibleAuth(String protocol) {
+        return PROTOCOL_DEEPSEEK_OPENAI_COMPATIBLE.equals(protocol)
+                || PROTOCOL_XAI_OPENAI_COMPATIBLE.equals(protocol)
+                || PROTOCOL_QWEN_OPENAI_COMPATIBLE.equals(protocol)
+                || PROTOCOL_MOONSHOT_OPENAI_COMPATIBLE.equals(protocol)
+                || PROTOCOL_VOLCENGINE_OPENAI_COMPATIBLE.equals(protocol)
+                || PROTOCOL_MINIMAX_OPENAI_COMPATIBLE.equals(protocol)
+                || PROTOCOL_MISTRAL_OPENAI_COMPATIBLE.equals(protocol)
+                || PROTOCOL_PERPLEXITY_OPENAI_COMPATIBLE.equals(protocol)
+                || PROTOCOL_OPENAI_COMPATIBLE_GENERIC.equals(protocol)
+                || isEmbedRerankNativeProtocol(protocol);
+    }
+
+    private String normalizeOpenAiCompatibleBaseUrl(String protocol, String baseUrl) {
+        if (PROTOCOL_QWEN_OPENAI_COMPATIBLE.equals(protocol)) {
+            return removeSuffix(baseUrl, "/compatible-mode/v1");
+        }
+        if (PROTOCOL_VOLCENGINE_OPENAI_COMPATIBLE.equals(protocol)) {
+            return removeSuffix(baseUrl, "/api/v3");
+        }
+        if (PROTOCOL_PERPLEXITY_OPENAI_COMPATIBLE.equals(protocol)) {
+            return removeSuffix(baseUrl, "/v1");
+        }
+        return removeSuffix(baseUrl, "/v1");
+    }
+
+    private String openAiCompatibleChatPath(String protocol) {
+        if (PROTOCOL_QWEN_OPENAI_COMPATIBLE.equals(protocol)) {
+            return "/compatible-mode/v1/chat/completions";
+        }
+        if (PROTOCOL_VOLCENGINE_OPENAI_COMPATIBLE.equals(protocol)) {
+            return "/api/v3/chat/completions";
+        }
+        if (PROTOCOL_PERPLEXITY_OPENAI_COMPATIBLE.equals(protocol)) {
+            return "/chat/completions";
+        }
+        return "/v1/chat/completions";
     }
 
     private String normalizeBaseUrl(String requestedBaseUrl) {

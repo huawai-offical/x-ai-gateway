@@ -1,10 +1,9 @@
 package com.prodigalgal.xaigateway.admin.api;
 
-import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import java.util.Map;
 
 public record FunctionalProviderSmokeCertificationFixture(
-        ProviderType providerType,
+        String providerType,
         String protocol,
         String resourceFamily,
         String status,

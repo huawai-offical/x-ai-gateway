@@ -7,11 +7,13 @@ public record ObservabilityTraceResponse(
         RouteDecisionLogResponse routeDecision,
         List<CacheHitLogResponse> cacheHits,
         List<UpstreamCacheReferenceResponse> upstreamCacheReferences,
+        List<RequestTraceDetailResponse> traceDetails,
         AsyncResourceSummaryResponse asyncResourceSummary,
         AsyncResourceDetailResponse asyncResourceDetail
 ) {
     public ObservabilityTraceResponse {
         cacheHits = cacheHits == null ? List.of() : List.copyOf(cacheHits);
         upstreamCacheReferences = upstreamCacheReferences == null ? List.of() : List.copyOf(upstreamCacheReferences);
+        traceDetails = traceDetails == null ? List.of() : List.copyOf(traceDetails);
     }
 }

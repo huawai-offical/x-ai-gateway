@@ -132,6 +132,8 @@ export function CredentialsPage() {
   const [editingCredentialId, setEditingCredentialId] = useState<number | null>(null)
   const [editingForm, setEditingForm] = useState<CredentialFormState>(createEmptyCredentialForm())
   const [editingError, setEditingError] = useState<string | null>(null)
+  const [editingInventoryRow, setEditingInventoryRow] = useState<UpstreamCredentialInventoryResponse | null>(null)
+  const [editingConnectivityFeedback, setEditingConnectivityFeedback] = useState<string | null>(null)
   const [selectedInventoryRow, setSelectedInventoryRow] = useState<UpstreamCredentialInventoryResponse | null>(null)
   const [modelKeyword, setModelKeyword] = useState('')
   const [editingModelKeyword, setEditingModelKeyword] = useState('')
@@ -306,6 +308,23 @@ export function CredentialsPage() {
       setEditingCredentialId(null)
       setEditingForm(createEmptyCredentialForm())
       setEditingError(null)
+      setEditingInventoryRow(null)
+      setEditingConnectivityFeedback(null)
+      invalidateCredentialData(queryClient)
+    },
+  })
+
+  const savedConnectivityMutation = useTypedMutation<CredentialConnectivityResponse, number>({
+    mutationFn: (credentialId) =>
+      apiRequest<CredentialConnectivityResponse>(`/admin/credentials/${credentialId}/connectivity-test`, {
+        method: 'POST',
+      }),
+    onSuccess: (data) => {
+      setEditingConnectivityFeedback(connectivityFeedbackMessage(data))
+      invalidateCredentialData(queryClient)
+    },
+    onError: (error) => {
+      setEditingConnectivityFeedback(resolveErrorMessage(error))
       invalidateCredentialData(queryClient)
     },
   })
@@ -357,6 +376,8 @@ export function CredentialsPage() {
       }),
     onSuccess: () => {
       setSelectedInventoryRow(null)
+      setEditingCredentialId(null)
+      setEditingInventoryRow(null)
       invalidateCredentialData(queryClient)
     },
   })
@@ -423,18 +444,26 @@ export function CredentialsPage() {
     }
   }
 
-  const handleOpenEditCredential = (credential: CredentialResponse) => {
-    setEditingCredentialId(credential.id)
-    setEditingForm(credentialToFormState(credential))
-    setEditingError(null)
-  }
-
   const handleOpenEditInventoryRow = (row: UpstreamCredentialInventoryResponse) => {
     if (row.sourceType !== 'API_KEY') {
       return
     }
-    handleOpenEditCredential(inventoryRowToCredential(row, providerSiteOptions))
+    savedConnectivityMutation.reset()
+    const credential = inventoryRowToCredential(row, providerSiteOptions)
+    setEditingCredentialId(credential.id)
+    setEditingForm(credentialToFormState(credential))
+    setEditingError(null)
+    setEditingInventoryRow(row)
+    setEditingConnectivityFeedback(null)
     setEditingModelKeyword('')
+  }
+
+  const handleOpenInventoryRow = (row: UpstreamCredentialInventoryResponse) => {
+    if (row.sourceType === 'API_KEY') {
+      handleOpenEditInventoryRow(row)
+      return
+    }
+    setSelectedInventoryRow(row)
   }
 
   const handleUpdateCredential = (event: FormEvent) => {
@@ -452,6 +481,14 @@ export function CredentialsPage() {
     } catch (error) {
       setEditingError(error instanceof Error ? error.message : '无法保存凭证。')
     }
+  }
+
+  const handleSavedConnectivityTest = () => {
+    if (editingCredentialId == null) {
+      return
+    }
+    setEditingConnectivityFeedback(null)
+    savedConnectivityMutation.mutate(editingCredentialId)
   }
 
   const handleBulkSecretFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -566,9 +603,9 @@ export function CredentialsPage() {
           </div>
         )}
       >
-        {(refreshCredentialMutation.error || deleteCredentialMutation.error || toggleCredentialMutation.error || updateCredentialMutation.error) ? (
+        {(refreshCredentialMutation.error || deleteCredentialMutation.error || toggleCredentialMutation.error || updateCredentialMutation.error || savedConnectivityMutation.error) ? (
           <InlineError
-            error={refreshCredentialMutation.error ?? deleteCredentialMutation.error ?? toggleCredentialMutation.error ?? updateCredentialMutation.error}
+            error={refreshCredentialMutation.error ?? deleteCredentialMutation.error ?? toggleCredentialMutation.error ?? updateCredentialMutation.error ?? savedConnectivityMutation.error}
             title="凭证操作失败"
           />
         ) : null}
@@ -601,7 +638,15 @@ export function CredentialsPage() {
                   <tbody>
                     {pageItems.map((row) => (
                       <tr key={row.rowKey} className="border-b border-border/40 align-middle">
-                        <td className="truncate px-4 py-3 font-medium text-foreground" title={row.displayName}>{row.displayName}</td>
+                        <td className="truncate px-4 py-3 font-medium text-foreground" title={row.displayName}>
+                          <button
+                            type="button"
+                            className="max-w-full truncate text-left font-medium text-primary hover:underline"
+                            onClick={() => handleOpenInventoryRow(row)}
+                          >
+                            {row.displayName}
+                          </button>
+                        </td>
                         <td className="px-4 py-3">
                           <StatusBadge tone={row.sourceType === 'AUTH_JSON_ACCOUNT' ? 'info' : 'neutral'}>
                             {sourceTypeLabel(row.sourceType)}
@@ -618,14 +663,14 @@ export function CredentialsPage() {
                             type="button"
                             className="max-w-full text-left font-medium text-primary [overflow-wrap:anywhere] hover:underline"
                             title={row.groupName ?? '未归组'}
-                            onClick={() => setSelectedInventoryRow(row)}
+                            onClick={() => handleOpenInventoryRow(row)}
                           >
                             {row.groupName ?? '未归组'}
                           </button>
                         </td>
                         <td className="truncate px-4 py-3 text-muted-foreground">{formatInstant(row.lastUsedAt)}</td>
                         <td className="px-4 py-3">
-                          <Button type="button" variant="outline" size="sm" onClick={() => setSelectedInventoryRow(row)}>
+                          <Button type="button" variant="outline" size="sm" onClick={() => handleOpenInventoryRow(row)}>
                             查看
                           </Button>
                         </td>
@@ -1088,17 +1133,66 @@ export function CredentialsPage() {
         open={editingCredentialId != null}
         onOpenChange={(open) => {
           if (!open) {
+            savedConnectivityMutation.reset()
             setEditingCredentialId(null)
             setEditingError(null)
+            setEditingInventoryRow(null)
+            setEditingConnectivityFeedback(null)
           }
         }}
       >
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-5xl">
           <DialogHeader>
-            <DialogTitle>编辑上游凭证</DialogTitle>
-            <DialogDescription className="sr-only">更新凭证信息。</DialogDescription>
+            <DialogTitle>{editingForm.credentialName || '上游凭证详情'}</DialogTitle>
+            <DialogDescription className="sr-only">查看详情并更新可编辑字段。</DialogDescription>
           </DialogHeader>
           <form className="flex flex-col gap-4" onSubmit={handleUpdateCredential}>
+            {editingInventoryRow ? (
+              <div className="grid gap-3 text-sm md:grid-cols-3">
+                {credentialOverviewItems(editingInventoryRow, proxyOptions, tlsProfileOptions).map((item) => (
+                  <DetailTile key={item.label} label={item.label} value={item.value} />
+                ))}
+              </div>
+            ) : null}
+
+            {editingInventoryRow ? (
+              <div className="grid gap-3 md:grid-cols-2">
+                <section className="rounded-2xl border border-border/60 bg-muted/10 p-4">
+                  <div className="mb-3 text-sm font-medium text-foreground">用量摘要</div>
+                  <div className="grid gap-3 text-sm sm:grid-cols-2">
+                    {credentialUsageItems(editingInventoryRow).map((item) => (
+                      <DetailTile key={item.label} label={item.label} value={item.value} />
+                    ))}
+                  </div>
+                </section>
+                <section className="rounded-2xl border border-border/60 bg-muted/10 p-4">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-sm font-medium text-foreground">最近联通性探测</span>
+                    <StatusBadge tone={connectivityStatusTone(editingInventoryRow.connectivityStatus)}>
+                      {editingInventoryRow.connectivityStatus ?? '未探测'}
+                    </StatusBadge>
+                  </div>
+                  <div className="grid gap-3 text-sm sm:grid-cols-2">
+                    {credentialConnectivityItems(editingInventoryRow).map((item) => (
+                      <DetailTile key={item.label} label={item.label} value={item.value} />
+                    ))}
+                  </div>
+                </section>
+              </div>
+            ) : null}
+
+            {editingInventoryRow?.lastErrorMessage ? (
+              <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {editingInventoryRow.lastErrorCode ? `${editingInventoryRow.lastErrorCode}: ` : ''}{editingInventoryRow.lastErrorMessage}
+              </div>
+            ) : null}
+
+            {editingConnectivityFeedback ? (
+              <div className="rounded-2xl border border-border/60 bg-card/80 px-4 py-3 text-sm text-foreground">
+                {editingConnectivityFeedback}
+              </div>
+            ) : null}
+
             <div className="grid gap-4 md:grid-cols-2">
               <label className="flex flex-col gap-2">
                 <span className="text-sm font-medium text-foreground">凭证名称</span>
@@ -1213,15 +1307,33 @@ export function CredentialsPage() {
                 />
               </label>
             </div>
-            {editingError || updateCredentialMutation.error ? (
+            {editingError || updateCredentialMutation.error || savedConnectivityMutation.error ? (
               <InlineError
-                error={updateCredentialMutation.error ?? new Error(editingError ?? '保存凭证失败')}
-                title="保存凭证失败"
+                error={updateCredentialMutation.error ?? savedConnectivityMutation.error ?? new Error(editingError ?? '保存凭证失败')}
+                title={savedConnectivityMutation.error ? '联通性测试失败' : '保存凭证失败'}
               />
             ) : null}
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setEditingCredentialId(null)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  savedConnectivityMutation.reset()
+                  setEditingCredentialId(null)
+                  setEditingError(null)
+                  setEditingInventoryRow(null)
+                  setEditingConnectivityFeedback(null)
+                }}
+              >
                 取消
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleSavedConnectivityTest}
+                disabled={savedConnectivityMutation.isPending || editingCredentialId == null}
+              >
+                联通性测试
               </Button>
               <Button type="submit" disabled={updateCredentialMutation.isPending}>
                 保存修改
@@ -1427,6 +1539,15 @@ function ModelSelector({
         <div className="text-sm text-muted-foreground">模型库暂无可选项，提交时将由后端按账号分组或提供方自动匹配。</div>
       )}
     </>
+  )
+}
+
+function DetailTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-xl border border-border/60 bg-background/80 px-3 py-2">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="mt-1 truncate font-medium text-foreground" title={value}>{value}</div>
+    </div>
   )
 }
 
@@ -1851,6 +1972,13 @@ function inventoryRowToCredential(row: UpstreamCredentialInventoryResponse, prov
     lastFirstTokenMs: row.lastFirstTokenMs,
     minFirstTokenMs: row.minFirstTokenMs,
     maxFirstTokenMs: row.maxFirstTokenMs,
+    connectivityStatus: row.connectivityStatus,
+    lastConnectivityTestAt: row.lastConnectivityTestAt,
+    lastConnectivityLatencyMs: row.lastConnectivityLatencyMs,
+    lastConnectivityErrorMessage: row.lastConnectivityErrorMessage,
+    lastConnectivityResponseSummary: row.lastConnectivityResponseSummary,
+    lastConnectivityUpstreamRequestId: row.lastConnectivityUpstreamRequestId,
+    lastConnectivityModel: row.lastConnectivityModel,
     proxyId: row.proxyId,
     tlsFingerprintProfileId: row.tlsFingerprintProfileId,
     siteProfileId: row.siteProfileId,
@@ -1900,6 +2028,117 @@ function resolveTlsProfileLabel(options: TlsProfileOption[], id?: number | null)
   }
   const option = options.find((item) => item.id === id)
   return option ? `${option.profileName} (#${option.id})` : `#${id}`
+}
+
+function credentialOverviewItems(
+  row: UpstreamCredentialInventoryResponse,
+  proxyOptions: ProxyOption[],
+  tlsProfileOptions: TlsProfileOption[],
+) {
+  return [
+    { label: '类型', value: sourceTypeLabel(row.sourceType) },
+    { label: '提供方', value: row.providerType },
+    { label: '账号分组', value: row.groupName ?? '未归组' },
+    { label: '认证类型', value: row.authKind ?? '-' },
+    { label: '状态', value: rowStatusLabel(row) },
+    { label: 'Base URL', value: row.baseUrl ?? '-' },
+    { label: '协议入口', value: row.protocolEndpointId == null ? '未绑定' : `#${row.protocolEndpointId}` },
+    { label: '代理', value: resolveProxyLabel(proxyOptions, row.proxyId) },
+    { label: 'TLS 指纹', value: resolveTlsProfileLabel(tlsProfileOptions, row.tlsFingerprintProfileId) },
+    { label: '密钥指纹', value: row.secretFingerprint ?? '-' },
+    { label: '最近使用', value: formatInstant(row.lastUsedAt) },
+    { label: '最近刷新', value: formatInstant(row.lastRefreshAt) },
+    { label: '支持模型', value: row.supportedModels?.length ? row.supportedModels.join(', ') : '由分组自动匹配' },
+    { label: '创建时间', value: formatInstant(row.createdAt) },
+    { label: '更新时间', value: formatInstant(row.updatedAt) },
+  ]
+}
+
+function credentialUsageItems(row: UpstreamCredentialInventoryResponse) {
+  return [
+    { label: '总请求', value: formatOptionalNumber(row.totalRequestCount) },
+    { label: '成功请求', value: formatOptionalNumber(row.successfulRequestCount) },
+    { label: '失败请求', value: formatOptionalNumber(row.failedRequestCount) },
+    { label: '取消请求', value: formatOptionalNumber(row.canceledRequestCount) },
+    { label: '成功率', value: formatOptionalPercent(row.requestSuccessRate) },
+    { label: '总 Token', value: formatOptionalNumber(row.totalTokenCount) },
+    { label: '缓存命中 Token', value: formatOptionalNumber(row.totalCacheHitTokenCount) },
+    { label: '缓存写入 Token', value: formatOptionalNumber(row.totalCacheWriteTokenCount) },
+    { label: '节省输入 Token', value: formatOptionalNumber(row.totalSavedInputTokenCount) },
+    { label: '缓存命中率', value: formatOptionalPercent(row.cacheHitRate) },
+    { label: '平均耗时', value: formatOptionalDuration(row.avgDurationMs) },
+    { label: '平均首 Token', value: formatOptionalDuration(row.avgFirstTokenMs) },
+  ]
+}
+
+function credentialConnectivityItems(row: UpstreamCredentialInventoryResponse) {
+  return [
+    { label: '探测时间', value: formatInstant(row.lastConnectivityTestAt) },
+    { label: '耗时', value: formatOptionalDuration(row.lastConnectivityLatencyMs) },
+    { label: '模型', value: row.lastConnectivityModel ?? '-' },
+    { label: '上游请求 ID', value: row.lastConnectivityUpstreamRequestId ?? '-' },
+    { label: '响应摘要', value: row.lastConnectivityResponseSummary ?? '-' },
+    { label: '错误信息', value: row.lastConnectivityErrorMessage ?? '-' },
+  ]
+}
+
+function connectivityStatusTone(status?: string | null): StatusTone {
+  if (!status) {
+    return 'neutral'
+  }
+  const normalized = status.toUpperCase()
+  if (['AVAILABLE', 'SUCCESS', 'SUCCEEDED', 'OK', 'HEALTHY', 'REACHABLE'].includes(normalized)) {
+    return 'success'
+  }
+  if (['UNAVAILABLE', 'FAILED', 'ERROR', 'UNREACHABLE', 'TIMEOUT'].includes(normalized)) {
+    return 'danger'
+  }
+  if (['PENDING', 'RUNNING', 'UNKNOWN'].includes(normalized)) {
+    return 'warning'
+  }
+  return 'info'
+}
+
+function connectivityFeedbackMessage(data: CredentialConnectivityResponse) {
+  const status = data.status ?? (data.reachable === false ? 'FAILED' : 'SUCCESS')
+  const summary = data.responseSummary ?? data.message ?? data.errorMessage ?? '联通性测试已完成。'
+  const latency = data.latencyMs == null ? '' : `，耗时 ${data.latencyMs}ms`
+  return `联通性测试${statusLabelForFeedback(status)}：${summary}${latency}`
+}
+
+function statusLabelForFeedback(status?: string | null) {
+  if (!status) {
+    return '完成'
+  }
+  const normalized = status.toUpperCase()
+  if (['AVAILABLE', 'SUCCESS', 'SUCCEEDED', 'OK', 'HEALTHY', 'REACHABLE'].includes(normalized)) {
+    return '成功'
+  }
+  if (['UNAVAILABLE', 'FAILED', 'ERROR', 'UNREACHABLE', 'TIMEOUT'].includes(normalized)) {
+    return '失败'
+  }
+  return '完成'
+}
+
+function formatOptionalNumber(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) {
+    return '--'
+  }
+  return value.toLocaleString('zh-CN')
+}
+
+function formatOptionalPercent(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) {
+    return '--'
+  }
+  return `${Math.round(value * 100)}%`
+}
+
+function formatOptionalDuration(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) {
+    return '--'
+  }
+  return `${Math.round(value).toLocaleString('zh-CN')}ms`
 }
 
 function invalidateCredentialData(queryClient: ReturnType<typeof useQueryClient>) {

@@ -554,9 +554,14 @@ public class GatewayProperties {
     public static class Observability {
 
         private final Async async = new Async();
+        private final TraceDetail traceDetail = new TraceDetail();
 
         public Async getAsync() {
             return async;
+        }
+
+        public TraceDetail getTraceDetail() {
+            return traceDetail;
         }
 
         public static class Async {
@@ -604,6 +609,81 @@ public class GatewayProperties {
 
             public void setRedisFailureBackoff(Duration redisFailureBackoff) {
                 this.redisFailureBackoff = redisFailureBackoff;
+            }
+        }
+
+        public static class TraceDetail {
+            private boolean enabled = true;
+            private double samplingRate = 1.0d;
+            private Duration retentionTtl = Duration.ofDays(7);
+            private int maxPayloadLength = 12_000;
+            private int maxMetadataLength = 4_000;
+            private boolean cleanupEnabled = true;
+            private Duration cleanupInterval = Duration.ofHours(1);
+            private int cleanupBatchSize = 1_000;
+
+            public boolean isEnabled() {
+                return enabled;
+            }
+
+            public void setEnabled(boolean enabled) {
+                this.enabled = enabled;
+            }
+
+            public double getSamplingRate() {
+                return samplingRate;
+            }
+
+            public void setSamplingRate(double samplingRate) {
+                this.samplingRate = samplingRate;
+            }
+
+            public Duration getRetentionTtl() {
+                return retentionTtl;
+            }
+
+            public void setRetentionTtl(Duration retentionTtl) {
+                this.retentionTtl = retentionTtl;
+            }
+
+            public int getMaxPayloadLength() {
+                return maxPayloadLength;
+            }
+
+            public void setMaxPayloadLength(int maxPayloadLength) {
+                this.maxPayloadLength = maxPayloadLength;
+            }
+
+            public int getMaxMetadataLength() {
+                return maxMetadataLength;
+            }
+
+            public void setMaxMetadataLength(int maxMetadataLength) {
+                this.maxMetadataLength = maxMetadataLength;
+            }
+
+            public boolean isCleanupEnabled() {
+                return cleanupEnabled;
+            }
+
+            public void setCleanupEnabled(boolean cleanupEnabled) {
+                this.cleanupEnabled = cleanupEnabled;
+            }
+
+            public Duration getCleanupInterval() {
+                return cleanupInterval;
+            }
+
+            public void setCleanupInterval(Duration cleanupInterval) {
+                this.cleanupInterval = cleanupInterval;
+            }
+
+            public int getCleanupBatchSize() {
+                return cleanupBatchSize;
+            }
+
+            public void setCleanupBatchSize(int cleanupBatchSize) {
+                this.cleanupBatchSize = cleanupBatchSize;
             }
         }
     }

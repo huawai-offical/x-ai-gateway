@@ -98,6 +98,7 @@ public class PortalAuthService {
     private final PasswordEncoder passwordEncoder;
     private final AccessGroupEntitlementService accessGroupEntitlementService;
     private final ObjectProvider<PortalSecurityService> portalSecurityServiceProvider;
+    private final ObjectProvider<InvitationCodeRedemptionService> invitationCodeRedemptionServiceProvider;
 
     @Autowired
     public PortalAuthService(
@@ -118,7 +119,8 @@ public class PortalAuthService {
             DistributedKeySecretService distributedKeySecretService,
             PasswordEncoder passwordEncoder,
             AccessGroupEntitlementService accessGroupEntitlementService,
-            ObjectProvider<PortalSecurityService> portalSecurityServiceProvider) {
+            ObjectProvider<PortalSecurityService> portalSecurityServiceProvider,
+            ObjectProvider<InvitationCodeRedemptionService> invitationCodeRedemptionServiceProvider) {
         this.gatewayUserRepository = gatewayUserRepository;
         this.userSubscriptionRepository = userSubscriptionRepository;
         this.distributedKeyRepository = distributedKeyRepository;
@@ -137,6 +139,7 @@ public class PortalAuthService {
         this.passwordEncoder = passwordEncoder;
         this.accessGroupEntitlementService = accessGroupEntitlementService;
         this.portalSecurityServiceProvider = portalSecurityServiceProvider;
+        this.invitationCodeRedemptionServiceProvider = invitationCodeRedemptionServiceProvider;
     }
 
     public PortalAuthService(
@@ -171,6 +174,7 @@ public class PortalAuthService {
                 distributedKeySecretService,
                 passwordEncoder,
                 accessGroupEntitlementService,
+                null,
                 null
         );
     }
@@ -208,7 +212,89 @@ public class PortalAuthService {
                 distributedKeySecretService,
                 passwordEncoder,
                 accessGroupEntitlementService,
-                portalSecurityServiceProvider
+                portalSecurityServiceProvider,
+                null
+        );
+    }
+
+    public PortalAuthService(
+            GatewayUserRepository gatewayUserRepository,
+            UserSubscriptionRepository userSubscriptionRepository,
+            DistributedKeyRepository distributedKeyRepository,
+            AnnouncementRepository announcementRepository,
+            AnnouncementReadStateRepository announcementReadStateRepository,
+            RedeemCodeRepository redeemCodeRepository,
+            RedeemCodeUsageRepository redeemCodeUsageRepository,
+            GatewayUserBalanceLedgerRepository balanceLedgerRepository,
+            PaymentOrderRepository paymentOrderRepository,
+            UsageRecordRepository usageRecordRepository,
+            UpstreamSiteProfileRepository upstreamSiteProfileRepository,
+            SiteCapabilitySnapshotRepository siteCapabilitySnapshotRepository,
+            UpstreamAccountGroupRepository accountGroupRepository,
+            DistributedKeyAccountGroupBindingRepository keyGroupBindingRepository,
+            DistributedKeySecretService distributedKeySecretService,
+            PasswordEncoder passwordEncoder,
+            AccessGroupEntitlementService accessGroupEntitlementService,
+            ObjectProvider<PortalSecurityService> portalSecurityServiceProvider) {
+        this(
+                gatewayUserRepository,
+                userSubscriptionRepository,
+                distributedKeyRepository,
+                announcementRepository,
+                announcementReadStateRepository,
+                redeemCodeRepository,
+                redeemCodeUsageRepository,
+                balanceLedgerRepository,
+                paymentOrderRepository,
+                usageRecordRepository,
+                upstreamSiteProfileRepository,
+                siteCapabilitySnapshotRepository,
+                accountGroupRepository,
+                keyGroupBindingRepository,
+                distributedKeySecretService,
+                passwordEncoder,
+                accessGroupEntitlementService,
+                portalSecurityServiceProvider,
+                null
+        );
+    }
+
+    public PortalAuthService(
+            GatewayUserRepository gatewayUserRepository,
+            UserSubscriptionRepository userSubscriptionRepository,
+            DistributedKeyRepository distributedKeyRepository,
+            AnnouncementRepository announcementRepository,
+            AnnouncementReadStateRepository announcementReadStateRepository,
+            RedeemCodeRepository redeemCodeRepository,
+            RedeemCodeUsageRepository redeemCodeUsageRepository,
+            GatewayUserBalanceLedgerRepository balanceLedgerRepository,
+            UpstreamAccountGroupRepository accountGroupRepository,
+            DistributedKeyAccountGroupBindingRepository keyGroupBindingRepository,
+            DistributedKeySecretService distributedKeySecretService,
+            PasswordEncoder passwordEncoder,
+            AccessGroupEntitlementService accessGroupEntitlementService,
+            ObjectProvider<PortalSecurityService> portalSecurityServiceProvider,
+            ObjectProvider<InvitationCodeRedemptionService> invitationCodeRedemptionServiceProvider) {
+        this(
+                gatewayUserRepository,
+                userSubscriptionRepository,
+                distributedKeyRepository,
+                announcementRepository,
+                announcementReadStateRepository,
+                redeemCodeRepository,
+                redeemCodeUsageRepository,
+                balanceLedgerRepository,
+                null,
+                null,
+                null,
+                null,
+                accountGroupRepository,
+                keyGroupBindingRepository,
+                distributedKeySecretService,
+                passwordEncoder,
+                accessGroupEntitlementService,
+                portalSecurityServiceProvider,
+                invitationCodeRedemptionServiceProvider
         );
     }
 
@@ -229,7 +315,13 @@ public class PortalAuthService {
     public Mono<PortalSessionResponse> register(PortalRegisterRequest request, ServerWebExchange exchange) {
         portalSecurityService().ifPresent(service -> service.verifyCaptcha(request.captchaChallengeId(), request.captchaAnswer()));
         String email = normalizeEmail(request.email());
-        portalSecurityService().ifPresent(service -> service.verifyRegistrationPolicy(email, request.inviteCode()));
+        portalSecurityService().ifPresent(service -> service.verifyRegistrationPolicy(
+                email,
+                request.inviteCode(),
+                request.inviteCode() == null || request.inviteCode().isBlank()
+                        ? PortalSecurityService.REGISTRATION_CHANNEL_PASSWORD
+                        : PortalSecurityService.REGISTRATION_CHANNEL_INVITE_CODE
+        ));
         if (gatewayUserRepository.existsByEmailIgnoreCase(email)) {
             throw new IllegalArgumentException("该邮箱已经注册。");
         }
@@ -241,6 +333,7 @@ public class PortalAuthService {
         user.setActive(true);
         user.setLastLoginAt(Instant.now());
         GatewayUserEntity saved = gatewayUserRepository.save(user);
+        redeemInvitationCodeIfPresent(request.inviteCode(), saved, email);
         return exchange.getSession().map(session -> authenticateSession(saved, session));
     }
 
@@ -882,5 +975,26 @@ public class PortalAuthService {
 
     private Optional<PortalSecurityService> portalSecurityService() {
         return portalSecurityServiceProvider == null ? Optional.empty() : Optional.ofNullable(portalSecurityServiceProvider.getIfAvailable());
+    }
+
+    private Optional<InvitationCodeRedemptionService> invitationCodeRedemptionService() {
+        return invitationCodeRedemptionServiceProvider == null
+                ? Optional.empty()
+                : Optional.ofNullable(invitationCodeRedemptionServiceProvider.getIfAvailable());
+    }
+
+    private void redeemInvitationCodeIfPresent(String inviteCode, GatewayUserEntity user, String email) {
+        if (inviteCode == null || inviteCode.isBlank()) {
+            return;
+        }
+        InvitationCodeRedemptionService service = invitationCodeRedemptionService()
+                .orElseThrow(() -> new IllegalStateException("邀请码系统未配置，无法完成邀请码注册。"));
+        service.redeemForRegistration(
+                inviteCode,
+                user,
+                email,
+                PortalSecurityService.REGISTRATION_CHANNEL_INVITE_CODE,
+                "PORTAL_REGISTER"
+        );
     }
 }

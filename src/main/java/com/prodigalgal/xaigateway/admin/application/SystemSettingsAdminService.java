@@ -7,10 +7,13 @@ import com.prodigalgal.xaigateway.admin.api.SystemSettingsResponse;
 import com.prodigalgal.xaigateway.infra.config.GatewayProperties;
 import com.prodigalgal.xaigateway.infra.persistence.entity.SystemSettingEntity;
 import com.prodigalgal.xaigateway.infra.persistence.repository.SystemSettingRepository;
+import com.prodigalgal.xaigateway.portal.application.PortalSocialOAuthConfigService;
+import com.prodigalgal.xaigateway.portal.application.PortalSocialOAuthSettingsView;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,14 +28,25 @@ public class SystemSettingsAdminService {
     private final SystemSettingRepository systemSettingRepository;
     private final GatewayProperties gatewayProperties;
     private final ObjectMapper objectMapper;
+    private final PortalSocialOAuthConfigService portalSocialOAuthConfigService;
+
+    @Autowired
+    public SystemSettingsAdminService(
+            SystemSettingRepository systemSettingRepository,
+            GatewayProperties gatewayProperties,
+            ObjectMapper objectMapper,
+            PortalSocialOAuthConfigService portalSocialOAuthConfigService) {
+        this.systemSettingRepository = systemSettingRepository;
+        this.gatewayProperties = gatewayProperties;
+        this.objectMapper = objectMapper;
+        this.portalSocialOAuthConfigService = portalSocialOAuthConfigService;
+    }
 
     public SystemSettingsAdminService(
             SystemSettingRepository systemSettingRepository,
             GatewayProperties gatewayProperties,
             ObjectMapper objectMapper) {
-        this.systemSettingRepository = systemSettingRepository;
-        this.gatewayProperties = gatewayProperties;
-        this.objectMapper = objectMapper;
+        this(systemSettingRepository, gatewayProperties, objectMapper, null);
     }
 
     @Transactional(readOnly = true)
@@ -69,8 +83,12 @@ public class SystemSettingsAdminService {
                                 List.of()
                         ));
 
+        PortalSocialOAuthSettingsView socialOAuth = portalSocialOAuthConfigService == null
+                ? new PortalSocialOAuthSettingsView(false, List.of(), null)
+                : portalSocialOAuthConfigService.getSettingsView();
+
         Instant updatedAt = latestUpdatedAt();
-        return new SystemSettingsResponse(upstreamCache, upstream, security, updatedAt);
+        return new SystemSettingsResponse(upstreamCache, upstream, security, socialOAuth, updatedAt);
     }
 
     public SystemSettingsResponse save(SystemSettingsRequest request) {
@@ -109,14 +127,20 @@ public class SystemSettingsAdminService {
         write(UPSTREAM_CACHE_KEY, upstreamCache, "json", "上游缓存运行时设置。");
         write(UPSTREAM_RUNTIME_KEY, upstream, "json", "上游超时运行时设置。");
         write(SECURITY_KEY, security, "json", "安全策略设置。");
+        PortalSocialOAuthSettingsView socialOAuth = request.socialOAuth() == null || portalSocialOAuthConfigService == null
+                ? current.socialOAuth()
+                : portalSocialOAuthConfigService.saveSettings(request.socialOAuth());
 
-        return new SystemSettingsResponse(upstreamCache, upstream, security, latestUpdatedAt());
+        return new SystemSettingsResponse(upstreamCache, upstream, security, socialOAuth, latestUpdatedAt());
     }
 
     public SystemSettingsResponse reset() {
         systemSettingRepository.findBySettingKey(UPSTREAM_CACHE_KEY).ifPresent(systemSettingRepository::delete);
         systemSettingRepository.findBySettingKey(UPSTREAM_RUNTIME_KEY).ifPresent(systemSettingRepository::delete);
         systemSettingRepository.findBySettingKey(SECURITY_KEY).ifPresent(systemSettingRepository::delete);
+        if (portalSocialOAuthConfigService != null) {
+            portalSocialOAuthConfigService.resetSettings();
+        }
         return get();
     }
 

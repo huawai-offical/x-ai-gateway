@@ -1,18 +1,18 @@
 {
   "schemaVersion": "2026-05-19.functional-provider-smoke-record-replay.v1",
   "replayMode": "record_replay",
-  "providerType": "OPENAI_COMPATIBLE",
-  "protocol": "OPENAI_COMPATIBLE",
-  "baseUrl": "https://api.mimo-v2.com",
-  "baseUrlHost": "api.mimo-v2.com",
-  "certificationStatus": "PARTIAL_CERTIFIED",
+  "providerType": "XIAOMI_MIMO",
+  "protocol": "XIAOMI_MIMO_OPENAI_COMPATIBLE",
+  "baseUrl": "https://token-plan-sgp.xiaomimimo.com/v1",
+  "baseUrlHost": "token-plan-sgp.xiaomimimo.com",
+  "certificationStatus": "FAILED",
   "dryRun": false,
   "recordedAt": "2026-05-19T01:00:00Z",
   "summary": {
     "PASS": 1,
-    "FAIL": 0,
+    "FAIL": 1,
     "SKIPPED": 0,
-    "UNSUPPORTED": 0,
+    "UNSUPPORTED": 1,
     "NO_PERMISSION": 0,
     "BUDGET_BLOCKED": 1
   },
@@ -28,8 +28,8 @@
   },
   "fixtures": [
     {
-      "providerType": "OPENAI_COMPATIBLE",
-      "protocol": "OPENAI_COMPATIBLE",
+      "providerType": "XIAOMI_MIMO",
+      "protocol": "XIAOMI_MIMO_OPENAI_COMPATIBLE",
       "resourceFamily": "CHAT_COMPLETIONS",
       "status": "LIVE_SMOKE_OK",
       "classification": "PASS",
@@ -50,16 +50,16 @@
         ]
       },
       "requestPreview": {
-        "providerType": "OPENAI_COMPATIBLE",
-        "protocol": "OPENAI_COMPATIBLE",
+        "providerType": "XIAOMI_MIMO",
+        "protocol": "XIAOMI_MIMO_OPENAI_COMPATIBLE",
         "method": "POST",
-        "baseUrl": "https://api.mimo-v2.com",
+        "baseUrl": "https://token-plan-sgp.xiaomimimo.com/v1",
         "path": "/v1/chat/completions",
         "model": "mimo-v2-pro",
         "headers": {
           "accept": "application/json",
           "content-type": "application/json",
-          "api-key": "***"
+          "authorization": "Bearer ***"
         },
         "body": {
           "model": "mimo-v2-pro",
@@ -69,8 +69,84 @@
       }
     },
     {
-      "providerType": "OPENAI_COMPATIBLE",
-      "protocol": "OPENAI_COMPATIBLE",
+      "providerType": "XIAOMI_MIMO",
+      "protocol": "XIAOMI_MIMO_OPENAI_COMPATIBLE",
+      "resourceFamily": "CHAT_STREAMING",
+      "status": "LIVE_SMOKE_FAILED",
+      "classification": "FAIL",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "model": "mimo-v2-pro",
+      "billable": true,
+      "writeOperation": false,
+      "httpStatus": 500,
+      "upstreamRequestId": "req_mimo_stream_failure",
+      "durationMs": 24,
+      "failureType": "HTTP_500",
+      "failureMessage": "upstream returned invalid stream chunk for functional provider smoke",
+      "evidence": {
+        "probeKind": "openai_compatible_chat_streaming",
+        "rawTextSeen": true
+      },
+      "requestPreview": {
+        "providerType": "XIAOMI_MIMO",
+        "protocol": "XIAOMI_MIMO_OPENAI_COMPATIBLE",
+        "method": "POST",
+        "baseUrl": "https://token-plan-sgp.xiaomimimo.com/v1",
+        "path": "/v1/chat/completions",
+        "model": "mimo-v2-pro",
+        "headers": {
+          "accept": "application/json",
+          "content-type": "application/json",
+          "authorization": "Bearer ***"
+        },
+        "body": {
+          "model": "mimo-v2-pro",
+          "max_tokens": 1,
+          "stream": true
+        }
+      }
+    },
+    {
+      "providerType": "XIAOMI_MIMO",
+      "protocol": "XIAOMI_MIMO_OPENAI_COMPATIBLE",
+      "resourceFamily": "RESPONSES",
+      "status": "OUT_OF_SCOPE",
+      "classification": "UNSUPPORTED",
+      "skippedReason": "OUT_OF_FUNCTIONAL_API_SCOPE",
+      "method": "POST",
+      "path": "/v1/chat/completions",
+      "model": "mimo-v2-pro",
+      "billable": false,
+      "writeOperation": false,
+      "evidence": {
+        "reason": "UNSUPPORTED_FAMILY",
+        "supportedFamilies": [
+          "CHAT_COMPLETIONS",
+          "CHAT_STREAMING",
+          "CHAT_TOOLS"
+        ]
+      },
+      "requestPreview": {
+        "providerType": "XIAOMI_MIMO",
+        "protocol": "XIAOMI_MIMO_OPENAI_COMPATIBLE",
+        "method": "POST",
+        "baseUrl": "https://token-plan-sgp.xiaomimimo.com/v1",
+        "path": "/v1/chat/completions",
+        "model": "mimo-v2-pro",
+        "headers": {
+          "accept": "application/json",
+          "content-type": "application/json",
+          "authorization": "Bearer ***"
+        },
+        "body": {
+          "unsupportedFamily": "RESPONSES"
+        }
+      }
+    },
+    {
+      "providerType": "XIAOMI_MIMO",
+      "protocol": "XIAOMI_MIMO_OPENAI_COMPATIBLE",
       "resourceFamily": "CHAT_TOOLS",
       "status": "BUDGET_GUARD_BLOCKED",
       "classification": "BUDGET_BLOCKED",
@@ -80,22 +156,22 @@
       "model": "mimo-v2-pro",
       "billable": true,
       "writeOperation": false,
-      "failureMessage": "blocked api-key=*** for functional provider smoke",
+      "failureMessage": "blocked Bearer *** for functional provider smoke",
       "evidence": {
         "probeKind": "openai_compatible_chat_tools",
         "guard": "BILLABLE_PROBE_BLOCKED"
       },
       "requestPreview": {
-        "providerType": "OPENAI_COMPATIBLE",
-        "protocol": "OPENAI_COMPATIBLE",
+        "providerType": "XIAOMI_MIMO",
+        "protocol": "XIAOMI_MIMO_OPENAI_COMPATIBLE",
         "method": "POST",
-        "baseUrl": "https://api.mimo-v2.com",
+        "baseUrl": "https://token-plan-sgp.xiaomimimo.com/v1",
         "path": "/v1/chat/completions",
         "model": "mimo-v2-pro",
         "headers": {
           "accept": "application/json",
           "content-type": "application/json",
-          "api-key": "***"
+          "authorization": "Bearer ***"
         },
         "body": {
           "model": "mimo-v2-pro",

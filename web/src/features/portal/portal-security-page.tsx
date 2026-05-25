@@ -21,6 +21,7 @@ import {
   listPortalOAuthProviders,
   listPortalPasskeys,
   setupPortalTotp,
+  startPortalOAuth,
   startPortalEmailVerification,
   unlinkPortalOAuthIdentity,
 } from './api'
@@ -30,6 +31,7 @@ import type {
   PortalPasskeyCredential,
   PortalSocialOAuthIdentity,
   PortalSocialOAuthProvider,
+  PortalSocialOAuthStartResponse,
 } from './types'
 
 export function PortalSecurityPage() {
@@ -101,6 +103,12 @@ export function PortalSecurityPage() {
     mutationFn: unlinkPortalOAuthIdentity,
     onSuccess: () => invalidateSecurity(queryClient),
   })
+  const startOAuthMutation = useMutation({
+    mutationFn: (provider: PortalSocialOAuthProvider) => startPortalOAuth(provider.provider, '/portal/security'),
+    onSuccess: (response: PortalSocialOAuthStartResponse) => {
+      window.location.assign(response.authorizationUrl)
+    },
+  })
 
   const handleConfirmEmail = (event: FormEvent) => {
     event.preventDefault()
@@ -138,6 +146,7 @@ export function PortalSecurityPage() {
     ?? enableTotpMutation.error
     ?? disableTotpMutation.error
     ?? deletePasskeyMutation.error
+    ?? startOAuthMutation.error
     ?? unlinkIdentityMutation.error
 
   return (
@@ -278,9 +287,16 @@ export function PortalSecurityPage() {
           <CardContent className="space-y-4">
             <div className="flex flex-wrap gap-2">
               {providers.map((provider: PortalSocialOAuthProvider) => (
-                <span key={provider.provider} className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-                  {provider.displayName}
-                </span>
+                <Button
+                  key={provider.provider}
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => startOAuthMutation.mutate(provider)}
+                  disabled={startOAuthMutation.isPending}
+                >
+                  绑定 {provider.displayName}
+                </Button>
               ))}
             </div>
             {identitiesQuery.isPending ? (

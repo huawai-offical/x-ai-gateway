@@ -98,9 +98,9 @@ public class SiteCapabilityTruthService {
                 }
             }
         } else if (effectiveLevel == InteropCapabilityLevel.EMULATED) {
-            lossReasons.add(feature.wireName() + " 以 emulated 执行。");
+            lossReasons.add(feature.wireName() + " 当前为非 native 兼容展示，只能观测，不能作为执行成功条件。");
         } else if (effectiveLevel == InteropCapabilityLevel.LOSSY) {
-            lossReasons.add(feature.wireName() + " 以 lossy 执行。");
+            lossReasons.add(feature.wireName() + " 当前不可无损表达，只能观测，不能作为执行成功条件。");
         }
 
         return new CapabilityResolution(
@@ -295,9 +295,9 @@ public class SiteCapabilityTruthService {
                 }
             }
         } else if (effectiveLevel == InteropCapabilityLevel.EMULATED) {
-            lossReasons.add(feature.wireName() + " 以 emulated 执行。");
+            lossReasons.add(feature.wireName() + " 当前为非 native 兼容展示，只能观测，不能作为执行成功条件。");
         } else if (effectiveLevel == InteropCapabilityLevel.LOSSY) {
-            lossReasons.add(feature.wireName() + " 以 lossy 执行。");
+            lossReasons.add(feature.wireName() + " 当前不可无损表达，只能观测，不能作为执行成功条件。");
         }
 
         return new CapabilityResolution(
@@ -391,8 +391,9 @@ public class SiteCapabilityTruthService {
     private ProviderType providerTypeFor(UpstreamSiteKind siteKind) {
         return switch (siteKind) {
             case OPENAI_DIRECT, AZURE_OPENAI -> ProviderType.OPENAI_DIRECT;
-            case DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE, MINIMAX, DIFY, GROK, MISTRAL, COHERE, JINA,
-                    TOGETHER, FIREWORKS, OPENROUTER, PERPLEXITY, OPENAI_COMPATIBLE_GENERIC -> ProviderType.OPENAI_COMPATIBLE;
+            case XIAOMI_MIMO, DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE, MINIMAX, DIFY, GROK, MISTRAL,
+                    COHERE, JINA, TOGETHER, FIREWORKS, OPENROUTER, PERPLEXITY, OPENAI_COMPATIBLE_GENERIC ->
+                    ProviderType.OPENAI_COMPATIBLE;
             case ANTHROPIC_DIRECT -> ProviderType.ANTHROPIC_DIRECT;
             case GEMINI_DIRECT, VERTEX_AI -> ProviderType.GEMINI_DIRECT;
             case OLLAMA_DIRECT -> ProviderType.OLLAMA_DIRECT;
@@ -418,14 +419,14 @@ public class SiteCapabilityTruthService {
             case TOOLS -> supportsTools ? InteropCapabilityLevel.NATIVE : InteropCapabilityLevel.UNSUPPORTED;
             case IMAGE_INPUT -> switch (siteKind) {
                 case OLLAMA_DIRECT -> supportsImageInput ? InteropCapabilityLevel.NATIVE : InteropCapabilityLevel.UNSUPPORTED;
-                case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE,
+                case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, XIAOMI_MIMO, DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE,
                         MINIMAX, GROK, MISTRAL, TOGETHER, FIREWORKS,
                         OPENROUTER, ANTHROPIC_DIRECT, GEMINI_DIRECT, VERTEX_AI -> InteropCapabilityLevel.NATIVE;
                 case AZURE_OPENAI -> InteropCapabilityLevel.LOSSY;
                 default -> InteropCapabilityLevel.UNSUPPORTED;
             };
             case FILE_INPUT -> switch (siteKind) {
-                case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE,
+                case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, XIAOMI_MIMO, DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE,
                         MINIMAX, GROK, MISTRAL, TOGETHER, FIREWORKS,
                         OPENROUTER, GEMINI_DIRECT, VERTEX_AI -> InteropCapabilityLevel.NATIVE;
                 case ANTHROPIC_DIRECT -> InteropCapabilityLevel.EMULATED;
@@ -437,7 +438,7 @@ public class SiteCapabilityTruthService {
                     : InteropCapabilityLevel.UNSUPPORTED;
             case REASONING -> supportsThinking ? InteropCapabilityLevel.NATIVE : InteropCapabilityLevel.UNSUPPORTED;
             case RESPONSE_OBJECT -> policy.supportedProtocols().contains("responses")
-                    ? InteropCapabilityLevel.EMULATED
+                    ? InteropCapabilityLevel.NATIVE
                     : InteropCapabilityLevel.UNSUPPORTED;
             case EMBEDDINGS -> supportsEmbeddings
                     && hasSnapshotCapability(snapshot, SiteCapabilitySnapshotEntity::isSupportsEmbeddings)
@@ -497,7 +498,7 @@ public class SiteCapabilityTruthService {
 
     private boolean supportsUpstreamEmbeddings(UpstreamSiteKind siteKind) {
         return switch (siteKind) {
-            case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE,
+            case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, XIAOMI_MIMO, DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE,
                     MINIMAX, GROK, MISTRAL, TOGETHER, FIREWORKS, OPENROUTER, COHERE, JINA,
                     GEMINI_DIRECT, VERTEX_AI, AZURE_OPENAI -> true;
             default -> false;
@@ -522,7 +523,7 @@ public class SiteCapabilityTruthService {
 
     private boolean supportsOpenAiStyleResources(UpstreamSiteKind siteKind) {
         return switch (siteKind) {
-            case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE,
+            case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, XIAOMI_MIMO, DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE,
                     MINIMAX, GROK, MISTRAL, COHERE, TOGETHER, FIREWORKS, OPENROUTER -> true;
             default -> false;
         };
@@ -563,7 +564,7 @@ public class SiteCapabilityTruthService {
 
     private boolean siteSupportsChat(UpstreamSiteKind siteKind) {
         return switch (siteKind) {
-            case JINA -> false;
+            case COHERE, JINA -> false;
             default -> true;
         };
     }
@@ -644,8 +645,8 @@ public class SiteCapabilityTruthService {
                         "Dify 当前在本仓库仅作为 workflow/chat compatible preset，不把 rerank 标记为稳定 native 能力。";
                 default -> null;
             };
-            case OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE, MINIMAX, MISTRAL,
-                    TOGETHER, FIREWORKS, OPENROUTER -> switch (feature) {
+            case OPENAI_COMPATIBLE_GENERIC, XIAOMI_MIMO, DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE,
+                    MINIMAX, MISTRAL, TOGETHER, FIREWORKS, OPENROUTER -> switch (feature) {
                 case FILE_OBJECT ->
                         "OpenAI-compatible 站点只有在 capability snapshot 声明 supports_files=true 时才开放 files 编排；当前站点未声明可用。";
                 case UPLOAD_CREATE ->

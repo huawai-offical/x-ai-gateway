@@ -2,11 +2,11 @@
 
 日期：2026-05-24  
 关联需求：[REQ-20260524-001](../requirements/REQ-20260524-001-head-provider-native-lossless-gateway-scope.md)  
-关联任务：[TASK-20260524-001-03](../../tasks/in-progress/TASK-20260524-001-03-lossless-translation-matrix.md)
+关联任务：[TASK-20260524-001-03](../../tasks/done/TASK-20260524-001-03-lossless-translation-matrix.md)
 
 ## 背景
 
-用户明确要求：支持范围内的厂商 API 必须具备 native 能力；相似资源属性只有在可以无损表达时才能翻译；不可对应能力必须直接失败，不能用 local emulation、lossy fallback、header、metadata 或 warning 让客户端误以为返回可用。
+用户明确要求：支持范围内的厂商 API 必须具备 native 能力或可证明等价的 provider-specific native profile；相似资源属性只有在可以无损表达时才能翻译；不可对应能力必须直接失败，不能用 local emulation、lossy fallback、degraded、header、metadata、warning 或 local fake 让客户端误以为返回可用。
 
 本报告记录第一阶段矩阵事实源。代码事实源位于 `LosslessTranslationMatrixService`，只使用三种状态：
 
@@ -33,7 +33,7 @@
 | `usage.cache_tokens` | `NATIVE_REQUIRED` | cache token、prompt cache 和计费细节只允许 native 暴露。 |
 | `reasoning.thinking_budget` | `NATIVE_REQUIRED` | reasoning/thinking 配置只允许目标厂商 native profile 执行。 |
 | `reasoning.encrypted_content` | `NATIVE_REQUIRED` | encrypted reasoning 是 opaque provider state，不能本地重建或翻译。 |
-| `response.compaction` | `NATIVE_REQUIRED` | `/v1/responses/compact` 必须走 OpenAI Direct native route，失败码 `native_compaction_required`。 |
+| `response.compaction` | `NATIVE_REQUIRED` | `/v1/responses/compact` 必须走 OpenAI Direct 或目标上游 native 等价能力；否则返回 `unsupported` / `native_compaction_required`，不得使用 emulation。 |
 | `response.hosted_tool.file_search` | `NATIVE_REQUIRED` | hosted tool lifecycle 不跨厂商翻译。 |
 | `file.object_lifecycle` | `NATIVE_REQUIRED` | file object id、状态机和内容读取必须由原厂 native lifecycle 承担。 |
 | `upload.multipart_lifecycle` | `NATIVE_REQUIRED` | multipart upload 状态机不跨厂商翻译。 |
@@ -53,7 +53,7 @@
 ## 执行计划接入
 
 - `TranslationExecutionPlanCompiler` 已读取矩阵结果，把 `NATIVE_REQUIRED` / `UNSUPPORTED` 转成 `blockerReasons`、`ExecutionKind.BLOCKED`、`SupportStatus.BLOCKED` 与 `degradationLevel=UNSUPPORTED`。
-- `targetProtocol` 会区分同协议 native route 与真正跨协议翻译；OpenAI-compatible/head provider 如果支持当前 ingress protocol，不会被误判为跨协议转换。
+- `targetProtocol` 会区分同协议 native route 与真正跨协议翻译；provider-specific OpenAI-style/head provider 如果支持当前 ingress protocol，不会被误判为跨协议转换，也不会因此获得 generic fallback 成功语义。
 - 请求体属性采集只在会话资源上递归读取 message/content/tool/reasoning 等属性；image/audio/file 等非会话资源只按 operation 级属性判断，避免把 `model` 或 `prompt` 错归为 `content.text`。
 - `GatewayResourceExecutionService` 已在 JSON、binary、multipart 资源执行入口统一执行 `ensureExecutable`；如果 planner 产出 `BLOCKED` plan，会在调用上游 credential/executor 前失败，并记录 lifecycle failure，不把该逻辑阻断计入上游凭证 cooldown。
 - conformance baseline 已覆盖 OpenAI surface 到 Gemini native 的图片编辑、图片变体、音频翻译硬失败，以及 OpenAI surface 到 Anthropic file object lifecycle 的硬失败；Google native 自身资源路径保持 native/orchestration。
@@ -62,6 +62,9 @@
 
 - 在 OpenAI/Anthropic/Gemini request mapper 中对 provider file id、encrypted reasoning、tool call delta 等属性补 negative tests。
 - public docs/OpenAPI 第一阶段已引用矩阵分类，不再使用模糊的 degraded 或 emulated 口径；后续继续补 SDK 示例与 smoke harness 范围。
+- `GatewayChatExecutionServiceTests` 已补真实 mapper + 真实 `TranslationExecutionPlanCompiler` 的 provider file id 负例：OpenAI `input_file.file_id` 目标 Anthropic、Gemini `fileData.fileId` 目标 OpenAI 都会在 credential/runtime 前阻断，错误包含 `content.file.provider_file_id` 与 `native_route_required`。
+- `FunctionalProviderSmokeRecordReplayFixtureVerifier` 已把 official smoke fixture 收口为 provider-specific protocol 证据，并要求样本至少覆盖 `PASS`、`FAIL`、`UNSUPPORTED` 分类；sample fixture 当前固定 `XIAOMI_MIMO` / `XIAOMI_MIMO_OPENAI_COMPATIBLE`，同时保留 `BUDGET_BLOCKED` 成本防护样本。generic `OPENAI_COMPATIBLE`、Dify/OpenRouter/Together/Fireworks/SiliconFlow 不允许作为 official smoke provider/protocol。
+- `site-conformance-fixtures.json` 已把 `cohere-openai-chat` 从旧的 native chat 成功期望改为 `BLOCKED` / `UNSUPPORTED`，与 Cohere/Jina 仅承接 native embed/rerank 的范围一致；模型可见性保留给 embedding-capable 场景，不代表 chat surface 可执行。
 
 ## 验证
 
@@ -83,4 +86,13 @@
 .\gradlew.bat test --tests "com.prodigalgal.xaigateway.gateway.core.interop.LosslessTranslationMatrixServiceTests" --tests "com.prodigalgal.xaigateway.gateway.core.interop.GatewayRequestFeatureServiceTests" --tests "com.prodigalgal.xaigateway.gateway.core.interop.ExecutionSupportMatrixServiceTests"
 .\gradlew.bat test --tests "com.prodigalgal.xaigateway.gateway.core.interop.EndpointConformanceMatrixTests" --tests "com.prodigalgal.xaigateway.gateway.core.interop.SiteConformanceHarnessTests" --tests "com.prodigalgal.xaigateway.gateway.core.interop.NonChatDegradationPolicyServiceTests" --tests "com.prodigalgal.xaigateway.gateway.core.interop.GatewayInteropPlanServiceTests"
 .\gradlew.bat test --tests "com.prodigalgal.xaigateway.gateway.core.execution.GatewayResourceExecutionServiceTests" --tests "com.prodigalgal.xaigateway.gateway.core.interop.LosslessTranslationMatrixServiceTests" --tests "com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlanCompilerLosslessMatrixTests" --tests "com.prodigalgal.xaigateway.gateway.core.interop.EndpointConformanceMatrixTests" --tests "com.prodigalgal.xaigateway.gateway.core.interop.SiteConformanceHarnessTests"
+.\gradlew.bat test --tests "com.prodigalgal.xaigateway.admin.application.GatewayChatExecutionServiceTests"
+.\gradlew.bat test --tests "com.prodigalgal.xaigateway.gateway.core.interop.LosslessTranslationMatrixServiceTests" --tests "com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlanCompilerLosslessMatrixTests" --tests "com.prodigalgal.xaigateway.admin.application.GatewayChatExecutionServiceTests" --tests "com.prodigalgal.xaigateway.gateway.core.resource.GatewayAsyncResourceServiceTests"
+.\gradlew.bat test --tests "com.prodigalgal.xaigateway.admin.application.FunctionalProviderSmokeRecordReplayFixtureVerifierTests" --tests "com.prodigalgal.xaigateway.admin.application.FunctionalProviderSmokeCertificationServiceTests" --tests "com.prodigalgal.xaigateway.admin.application.GatewayChatExecutionServiceTests"
+.\gradlew.bat test --tests "com.prodigalgal.xaigateway.gateway.core.interop.SiteConformanceHarnessTests"
+.\gradlew.bat test --tests "com.prodigalgal.xaigateway.gateway.core.interop.LosslessTranslationMatrixServiceTests" --tests "com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlanCompilerLosslessMatrixTests" --tests "com.prodigalgal.xaigateway.gateway.core.interop.EndpointConformanceMatrixTests" --tests "com.prodigalgal.xaigateway.gateway.core.interop.SiteConformanceHarnessTests" --tests "com.prodigalgal.xaigateway.gateway.core.interop.NonChatDegradationPolicyServiceTests" --tests "com.prodigalgal.xaigateway.gateway.core.interop.GatewayInteropPlanServiceTests" --tests "com.prodigalgal.xaigateway.gateway.core.resource.GatewayAsyncResourceServiceTests" --tests "com.prodigalgal.xaigateway.admin.application.GatewayChatExecutionServiceTests" --tests "com.prodigalgal.xaigateway.admin.application.FunctionalProviderSmokeRecordReplayFixtureVerifierTests" --tests "com.prodigalgal.xaigateway.admin.application.FunctionalProviderSmokeCertificationServiceTests" --tests "com.prodigalgal.xaigateway.protocol.ingress.publicapi.PublicDocsBundleServiceTests" --tests "com.prodigalgal.xaigateway.docs.PublicOpenApiSnapshotTests"
 ```
+
+## 归档结论
+
+2026-05-24：`TASK-20260524-001-03` 已完成归档。矩阵事实源、执行计划阻断、runtime 前 hard-fail、mapper negative tests、smoke fixture 分类、public docs/OpenAPI 引用和 conformance 主线验证均已闭环；剩余 Cohere/Jina 真实 key live smoke 与 fixture 样本固化继续由 `TASK-20260524-001-07` 承接。

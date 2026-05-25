@@ -146,6 +146,15 @@ public class ObservabilityAdminController {
         return observabilityQueryService.summary(distributedKeyId, providerType, from, to);
     }
 
+    @GetMapping("/health")
+    public ObservabilityHealthResponse health(
+            @RequestParam(required = false) ProviderType providerType,
+            @RequestParam(required = false) Long credentialId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to) {
+        return observabilityQueryService.health(providerType, credentialId, from, to);
+    }
+
     @GetMapping("/billing-rollup")
     public MonitoringBillingRollupResponse billingRollup(
             @RequestParam(defaultValue = "day") String period,

@@ -18,6 +18,7 @@ import com.prodigalgal.xaigateway.admin.api.OpenAiDirectSmokeResponse;
 import com.prodigalgal.xaigateway.gateway.core.catalog.CredentialModelDiscoveryService;
 import com.prodigalgal.xaigateway.gateway.core.execution.ExecutionBackendPolicyService;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
+import com.prodigalgal.xaigateway.gateway.core.shared.ProtocolSuite;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 import com.prodigalgal.xaigateway.infra.persistence.entity.ProviderProtocolEndpointEntity;
@@ -201,13 +202,105 @@ public class CredentialAdminService {
                 .limit(10)
                 .toList();
         return new CredentialConnectivityResponse(
+                null,
                 probe.providerType(),
                 probe.baseUrl(),
                 true,
+                "AVAILABLE",
                 probe.latencyMs(),
                 probe.models().size(),
                 sampleModels,
+                sampleModels.isEmpty() ? null : sampleModels.getFirst(),
+                null,
+                sampleModels.isEmpty() ? "模型列表可访问。" : "模型列表可访问：" + sampleModels.getFirst(),
+                null,
+                Instant.now(),
                 "联通性测试成功。"
+        );
+    }
+
+    public CredentialConnectivityResponse testSavedCredentialConnectivity(Long credentialId) {
+        UpstreamCredentialEntity entity = getRequired(credentialId);
+        Instant testedAt = Instant.now();
+        String requestedBaseUrl = entity.getBaseUrl();
+        ProviderProtocolEndpointEntity endpoint = entity.getProtocolEndpointId() == null || providerProtocolEndpointRepository == null
+                ? null
+                : providerProtocolEndpointRepository.findById(entity.getProtocolEndpointId()).orElse(null);
+        if (endpoint != null && !isBlank(endpoint.getBaseUrl())) {
+            requestedBaseUrl = endpoint.getBaseUrl();
+        }
+        String protocol = resolveConnectivityProtocol(entity, endpoint, requestedBaseUrl);
+        String family = resolveConnectivityFamily(entity, protocol);
+        String model = resolveConnectivityModel(entity, protocol);
+        FunctionalProviderSmokeItemResponse item;
+        if (family == null) {
+            item = null;
+            entity.setConnectivityStatus("UNSUPPORTED");
+            entity.setLastConnectivityTestAt(testedAt);
+            entity.setLastConnectivityLatencyMs(null);
+            entity.setLastConnectivityModel(model);
+            entity.setLastConnectivityUpstreamRequestId(null);
+            entity.setLastConnectivityResponseSummary(null);
+            entity.setLastConnectivityErrorMessage("当前凭证类型暂不支持 chat 类联通性探测。");
+            upstreamCredentialRepository.save(entity);
+            return new CredentialConnectivityResponse(
+                    entity.getId(),
+                    entity.getProviderType(),
+                    requestedBaseUrl,
+                    false,
+                    "UNSUPPORTED",
+                    0L,
+                    0,
+                    List.of(),
+                    model,
+                    null,
+                    null,
+                    entity.getLastConnectivityErrorMessage(),
+                    testedAt,
+                    "当前凭证类型暂不支持 chat 类联通性探测。"
+            );
+        }
+        String secret = credentialCryptoService.decrypt(entity.getApiKeyCiphertext());
+        item = functionalProviderSmokeHttpClient.executeProbe(
+                entity.getProviderType(),
+                protocol,
+                family,
+                secret,
+                requestedBaseUrl,
+                model,
+                10,
+                true
+        );
+        boolean reachable = "PASS".equals(item.classification());
+        String status = reachable ? "AVAILABLE" : "UNAVAILABLE";
+        String errorMessage = reachable ? null : truncate(firstNonBlank(item.failureMessage(), item.failureType(), item.skippedReason(), item.status()), 512);
+        String responseSummary = reachable ? connectivityResponseSummary(item) : null;
+        long latencyMs = item.durationMs() == null ? 0L : item.durationMs();
+
+        entity.setConnectivityStatus(status);
+        entity.setLastConnectivityTestAt(testedAt);
+        entity.setLastConnectivityLatencyMs(latencyMs);
+        entity.setLastConnectivityModel(item.model());
+        entity.setLastConnectivityUpstreamRequestId(truncate(item.upstreamRequestId(), 128));
+        entity.setLastConnectivityResponseSummary(truncate(responseSummary, 512));
+        entity.setLastConnectivityErrorMessage(errorMessage);
+        upstreamCredentialRepository.save(entity);
+
+        return new CredentialConnectivityResponse(
+                entity.getId(),
+                entity.getProviderType(),
+                requestedBaseUrl,
+                reachable,
+                status,
+                latencyMs,
+                reachable ? 1 : 0,
+                item.model() == null ? List.of() : List.of(item.model()),
+                item.model(),
+                item.upstreamRequestId(),
+                responseSummary,
+                errorMessage,
+                testedAt,
+                reachable ? "联通性测试成功，凭证可用。" : "联通性测试失败，凭证暂不可用。"
         );
     }
 
@@ -528,6 +621,121 @@ public class CredentialAdminService {
                 result.models().size(),
                 result.models().stream().map(model -> model.modelName()).limit(10).toList(),
                 result.refreshedAt()
+        );
+    }
+
+    private String resolveConnectivityProtocol(
+            UpstreamCredentialEntity entity,
+            ProviderProtocolEndpointEntity endpoint,
+            String requestedBaseUrl) {
+        String protocol = endpoint == null ? null : normalizeConnectivityProtocolSuite(endpoint.getProtocolSuite());
+        if (entity.getProviderType() == ProviderType.OPENAI_DIRECT && isBlank(protocol)) {
+            protocol = "OPENAI_COMPATIBLE";
+        }
+        return functionalProviderSmokeHttpClient.resolveProtocol(
+                entity.getProviderType(),
+                protocol,
+                requestedBaseUrl
+        );
+    }
+
+    private String normalizeConnectivityProtocolSuite(String protocolSuite) {
+        String normalized = ProtocolSuite.normalize(protocolSuite);
+        if (normalized == null) {
+            return null;
+        }
+        return switch (normalized) {
+            case ProtocolSuite.OPENAI_NATIVE, ProtocolSuite.OPENAI_COMPATIBLE_GENERIC, ProtocolSuite.AZURE_OPENAI_COMPATIBLE -> "OPENAI_COMPATIBLE";
+            case ProtocolSuite.XIAOMI_MIMO_OPENAI_COMPATIBLE -> "XIAOMI_MIMO_OPENAI_COMPATIBLE";
+            case ProtocolSuite.DEEPSEEK_OPENAI_COMPATIBLE -> "DEEPSEEK_OPENAI_COMPATIBLE";
+            case ProtocolSuite.GROK_OPENAI_COMPATIBLE -> "XAI_OPENAI_COMPATIBLE";
+            case ProtocolSuite.QWEN_OPENAI_COMPATIBLE -> "QWEN_OPENAI_COMPATIBLE";
+            case ProtocolSuite.MOONSHOT_OPENAI_COMPATIBLE -> "MOONSHOT_OPENAI_COMPATIBLE";
+            case ProtocolSuite.VOLCENGINE_OPENAI_COMPATIBLE -> "VOLCENGINE_OPENAI_COMPATIBLE";
+            case ProtocolSuite.MINIMAX_OPENAI_COMPATIBLE -> "MINIMAX_OPENAI_COMPATIBLE";
+            case ProtocolSuite.MISTRAL_OPENAI_COMPATIBLE -> "MISTRAL_OPENAI_COMPATIBLE";
+            case ProtocolSuite.PERPLEXITY_OPENAI_COMPATIBLE -> "PERPLEXITY_OPENAI_COMPATIBLE";
+            case ProtocolSuite.XIAOMI_MIMO_ANTHROPIC_COMPATIBLE -> "XIAOMI_MIMO_ANTHROPIC_COMPATIBLE";
+            case ProtocolSuite.DEEPSEEK_ANTHROPIC_COMPATIBLE, ProtocolSuite.ANTHROPIC_NATIVE -> "ANTHROPIC_COMPATIBLE";
+            case ProtocolSuite.GEMINI_NATIVE, ProtocolSuite.VERTEX_AI_GEMINI_NATIVE -> "GEMINI_NATIVE";
+            default -> protocolSuite;
+        };
+    }
+
+    private String resolveConnectivityFamily(UpstreamCredentialEntity entity, String protocol) {
+        List<String> families = functionalProviderSmokeHttpClient.normalizeFamilies(
+                entity.getProviderType(),
+                protocol,
+                null
+        );
+        if (families.contains(FunctionalProviderSmokeHttpClient.GENERATE_CONTENT)) {
+            return FunctionalProviderSmokeHttpClient.GENERATE_CONTENT;
+        }
+        if (families.contains(FunctionalProviderSmokeHttpClient.CHAT_COMPLETIONS)) {
+            return FunctionalProviderSmokeHttpClient.CHAT_COMPLETIONS;
+        }
+        if (families.contains(FunctionalProviderSmokeHttpClient.MESSAGES)) {
+            return FunctionalProviderSmokeHttpClient.MESSAGES;
+        }
+        return null;
+    }
+
+    private String resolveConnectivityModel(UpstreamCredentialEntity entity, String protocol) {
+        List<String> models = supportedModelCatalogService.normalize(entity.getSupportedModels());
+        if (!models.isEmpty()) {
+            return models.getFirst();
+        }
+        if (entity.getProviderType() == ProviderType.OPENAI_DIRECT) {
+            return "gpt-4o-mini";
+        }
+        String protocolKey = protocol == null ? "" : protocol.toUpperCase(java.util.Locale.ROOT);
+        if (protocolKey.contains("GEMINI")) {
+            return "gemini-2.5-flash";
+        }
+        if (protocolKey.contains("DEEPSEEK")) {
+            return "deepseek-chat";
+        }
+        if (protocolKey.contains("XAI")) {
+            return "grok-4.3";
+        }
+        if (protocolKey.contains("ANTHROPIC")) {
+            return "claude-3-5-haiku-latest";
+        }
+        if (protocolKey.contains("QWEN")) {
+            return "qwen-plus";
+        }
+        if (protocolKey.contains("MOONSHOT")) {
+            return "moonshot-v1-8k";
+        }
+        if (protocolKey.contains("VOLCENGINE")) {
+            return "doubao-seed-1-6";
+        }
+        if (protocolKey.contains("MINIMAX")) {
+            return "abab6.5s-chat";
+        }
+        if (protocolKey.contains("MISTRAL")) {
+            return "mistral-large-latest";
+        }
+        if (protocolKey.contains("PERPLEXITY")) {
+            return "sonar";
+        }
+        return "mimo-v2-pro";
+    }
+
+    private String connectivityResponseSummary(FunctionalProviderSmokeItemResponse item) {
+        if (item.evidence() == null) {
+            return "上游已返回成功响应。";
+        }
+        String responseSummary = text(item.evidence().get("responseSummary"));
+        if (!isBlank(responseSummary)) {
+            return responseSummary;
+        }
+        String object = text(item.evidence().get("object"));
+        String id = text(item.evidence().get("id"));
+        return firstNonBlank(
+                object == null ? null : "上游返回对象：" + object,
+                id == null ? null : "上游返回 ID：" + id,
+                "上游已返回成功响应。"
         );
     }
 
@@ -1257,6 +1465,13 @@ public class CredentialAdminService {
                 entity.getLastErrorMessage(),
                 entity.getLastErrorAt(),
                 entity.getLastUsedAt(),
+                entity.getConnectivityStatus(),
+                entity.getLastConnectivityTestAt(),
+                entity.getLastConnectivityLatencyMs(),
+                entity.getLastConnectivityErrorMessage(),
+                entity.getLastConnectivityResponseSummary(),
+                entity.getLastConnectivityUpstreamRequestId(),
+                entity.getLastConnectivityModel(),
                 totalRequests,
                 successRequests,
                 entity.getFailedRequestCount(),

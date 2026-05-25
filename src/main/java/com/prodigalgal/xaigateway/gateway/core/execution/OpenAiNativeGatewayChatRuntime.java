@@ -535,7 +535,7 @@ public class OpenAiNativeGatewayChatRuntime implements GatewayChatRuntime {
         String responsesMode = profile.path("responsesCompatibility").asText(profile.path("responsesMode").asText(""));
         return "chat_completions".equalsIgnoreCase(upstreamSurface)
                 || "openai_chat_completions".equalsIgnoreCase(upstreamSurface)
-                || "emulate_with_chat_completions".equalsIgnoreCase(responsesMode)
+                || "lossless_to_chat_completions".equalsIgnoreCase(responsesMode)
                 || context.canonicalRequest().ingressProtocol() == com.prodigalgal.xaigateway.gateway.core.canonical.CanonicalIngressProtocol.RESPONSES;
     }
 

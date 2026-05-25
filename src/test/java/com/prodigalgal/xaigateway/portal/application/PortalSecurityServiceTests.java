@@ -181,12 +181,84 @@ class PortalSecurityServiceTests {
         ));
 
         assertTrue(policy.inviteCodeRequired());
+        assertTrue(policy.allowedRegistrationChannels().contains(PortalSecurityService.REGISTRATION_CHANNEL_PASSWORD));
         assertThrows(IllegalArgumentException.class, () -> service.verifyRegistrationPolicy("bad@test.com", "INVITE-1"));
-        assertThrows(IllegalArgumentException.class, () -> service.verifyRegistrationPolicy("security@example.com", "bad"));
+        assertThrows(IllegalArgumentException.class, () -> service.verifyRegistrationPolicy("security@example.com", null));
         service.verifyRegistrationPolicy("security@example.com", "invite-1");
         assertThrows(GatewayUnauthorizedException.class, () -> service.assertKeyCreationAllowed(user));
         user.setEmailVerifiedAt(Instant.now());
         service.assertKeyCreationAllowed(user);
+    }
+
+    @Test
+    void shouldEnforceRegistrationChannelsAndInviteChannel() {
+        PortalSecurityService service = new PortalSecurityService(
+                Mockito.mock(GatewayUserRepository.class),
+                Mockito.mock(CredentialCryptoService.class),
+                Mockito.mock(GatewayUserPasskeyCredentialRepository.class),
+                Mockito.mock(AuditLogRepository.class)
+        );
+
+        service.updateRegistrationPolicy(new PortalRegistrationPolicyRequest(
+                List.of(),
+                List.of(PortalSecurityService.REGISTRATION_CHANNEL_INVITE_CODE),
+                false,
+                List.of("INVITE-2"),
+                false
+        ));
+
+        assertThrows(IllegalArgumentException.class, () -> service.verifyRegistrationPolicy(
+                "security@example.com",
+                null,
+                PortalSecurityService.REGISTRATION_CHANNEL_PASSWORD
+        ));
+        assertThrows(IllegalArgumentException.class, () -> service.verifyRegistrationPolicy(
+                "security@example.com",
+                null,
+                PortalSecurityService.REGISTRATION_CHANNEL_INVITE_CODE
+        ));
+        service.verifyRegistrationPolicy(
+                "security@example.com",
+                "invite-2",
+                PortalSecurityService.REGISTRATION_CHANNEL_INVITE_CODE
+        );
+        assertThrows(IllegalArgumentException.class, () -> service.verifyRegistrationPolicy(
+                "security@example.com",
+                null,
+                PortalSecurityService.REGISTRATION_CHANNEL_SOCIAL_OAUTH
+        ));
+        assertThrows(IllegalArgumentException.class, () -> {
+            service.updateRegistrationPolicy(new PortalRegistrationPolicyRequest(
+                    List.of(),
+                    List.of(PortalSecurityService.REGISTRATION_CHANNEL_SOCIAL_OAUTH),
+                    true,
+                    null,
+                    false
+            ));
+            service.verifyRegistrationPolicy(
+                    "security@example.com",
+                    null,
+                    PortalSecurityService.REGISTRATION_CHANNEL_SOCIAL_OAUTH
+            );
+        });
+        service.verifyRegistrationPolicy(
+                "security@example.com",
+                "invite-social",
+                PortalSecurityService.REGISTRATION_CHANNEL_SOCIAL_OAUTH
+        );
+
+        service.updateRegistrationPolicy(new PortalRegistrationPolicyRequest(
+                List.of(),
+                List.of(PortalSecurityService.REGISTRATION_CHANNEL_SOCIAL_OAUTH),
+                false,
+                null,
+                false
+        ));
+        service.verifyRegistrationPolicy(
+                "security@example.com",
+                null,
+                PortalSecurityService.REGISTRATION_CHANNEL_SOCIAL_OAUTH
+        );
     }
 
     private PortalSecurityService service(

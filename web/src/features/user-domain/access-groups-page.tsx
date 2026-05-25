@@ -175,14 +175,14 @@ export function AccessGroupsPage() {
   })
   const removePlanMutation = useMutation({
     mutationFn: (removePlanId: number) => {
-      if (detailId == null) throw new Error('请选择访问组。')
+      if (detailId == null) throw new Error('请选择权益/授权组。')
       return apiRequest<AccessGroup>(`/admin/access-groups/${detailId}/plans/${removePlanId}`, { method: 'DELETE' })
     },
     onSuccess: () => invalidateGroups(queryClient),
   })
   const removeKeyGrantMutation = useMutation({
     mutationFn: (distributedKeyId: number) => {
-      if (detailId == null) throw new Error('请选择访问组。')
+      if (detailId == null) throw new Error('请选择权益/授权组。')
       return apiRequest<AccessGroup>(`/admin/access-groups/${detailId}/distributed-keys/${distributedKeyId}`, { method: 'DELETE' })
     },
     onSuccess: () => invalidateGroups(queryClient),
@@ -225,10 +225,10 @@ export function AccessGroupsPage() {
     <div className="flex flex-col gap-6">
       <PageSection
         kicker="用户域"
-        title="访问组与权益"
-        actions={<Button type="button" onClick={openCreate}>创建访问组</Button>}
+        title="权益/授权组"
+        actions={<Button type="button" onClick={openCreate}>创建权益/授权组</Button>}
       >
-        {mutationError ? <InlineError error={mutationError} title="访问组操作失败" /> : null}
+        {mutationError ? <InlineError error={mutationError} title="权益/授权组操作失败" /> : null}
 
         <div className="mb-4 max-w-xl">
           <Input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="按名称 / 描述筛选" />
@@ -237,7 +237,7 @@ export function AccessGroupsPage() {
         {groupsQuery.isPending ? (
           <PageSkeleton count={1} />
         ) : groupsQuery.error ? (
-          <InlineError error={groupsQuery.error} title="访问组列表加载失败" />
+          <InlineError error={groupsQuery.error} title="权益/授权组列表加载失败" />
         ) : groups.length ? (
           <PaginatedRows items={groups}>
             {({ pageItems }) => (
@@ -245,7 +245,7 @@ export function AccessGroupsPage() {
                 <table className="w-full table-fixed text-sm">
               <thead className="bg-muted/30">
                 <tr>
-                  <th className="w-[26%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">访问组</th>
+                  <th className="w-[26%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">权益/授权组</th>
                   <th className="w-[12%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">状态</th>
                   <th className="w-[20%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">协议 / 模型</th>
                   <th className="w-[18%] border-b border-border/60 px-4 py-3 text-left font-medium text-muted-foreground">绑定</th>
@@ -283,7 +283,7 @@ export function AccessGroupsPage() {
             )}
           </PaginatedRows>
         ) : (
-          <EmptyState title="还没有访问组" />
+          <EmptyState title="还没有权益/授权组" />
         )}
       </PageSection>
 
@@ -298,13 +298,13 @@ export function AccessGroupsPage() {
       >
         <DialogContent className="max-w-5xl">
           <DialogHeader>
-            <DialogTitle>访问组详情</DialogTitle>
-            <DialogDescription>查看访问组详情。</DialogDescription>
+            <DialogTitle>权益/授权组详情</DialogTitle>
+            <DialogDescription>查看面向用户和 Key 的权益授权策略。</DialogDescription>
           </DialogHeader>
           {detailQuery.isPending ? (
             <PageSkeleton count={1} />
           ) : detailQuery.error ? (
-            <InlineError error={detailQuery.error} title="访问组详情加载失败" />
+            <InlineError error={detailQuery.error} title="权益/授权组详情加载失败" />
           ) : selectedGroup ? (
             <div className="grid gap-5">
               <InfoGrid
@@ -394,7 +394,7 @@ export function AccessGroupsPage() {
                     <InfoGrid
                       columnsClassName="md:grid-cols-2"
                       items={[
-                        { key: 'source', label: '来源访问组', value: formatList(resolvedPolicyQuery.data.sourceAccessGroups) || '无' },
+                        { key: 'source', label: '来源权益/授权组', value: formatList(resolvedPolicyQuery.data.sourceAccessGroups) || '无' },
                         { key: 'protocols', label: '协议簇', value: formatList(resolvedPolicyQuery.data.allowedProtocolSuites) || '不限' },
                         { key: 'models', label: '模型', value: formatList(resolvedPolicyQuery.data.allowedModels) || '不限' },
                         { key: 'providers', label: '提供方', value: formatList(resolvedPolicyQuery.data.allowedProviderTypes) || '不限' },
@@ -410,7 +410,7 @@ export function AccessGroupsPage() {
               ) : null}
             </div>
           ) : (
-            <EmptyState title="未找到访问组详情" />
+            <EmptyState title="未找到权益/授权组详情" />
           )}
         </DialogContent>
       </Dialog>
@@ -418,8 +418,8 @@ export function AccessGroupsPage() {
       <Dialog open={editorOpen} onOpenChange={(open) => (open ? setEditorOpen(true) : closeEditor())}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle>{editingId == null ? '创建访问组' : '编辑访问组'}</DialogTitle>
-            <DialogDescription>填写访问组信息。</DialogDescription>
+            <DialogTitle>{editingId == null ? '创建权益/授权组' : '编辑权益/授权组'}</DialogTitle>
+            <DialogDescription>填写用户权益和 Key 授权策略。</DialogDescription>
           </DialogHeader>
           <form className="grid gap-4" onSubmit={save}>
             <Tabs value={editorStep} onValueChange={(value) => setEditorStep(value as EditorStep)}>
@@ -430,12 +430,12 @@ export function AccessGroupsPage() {
               </TabsList>
               <TabsContent value="basic" className="pt-3">
                 <div className="grid gap-4">
-                  <Input value={form.groupName} onChange={(event) => setForm((current) => ({ ...current, groupName: event.target.value }))} placeholder="访问组名称，例如：default" />
-                  <Textarea rows={3} value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} placeholder="访问组说明" />
+                  <Input value={form.groupName} onChange={(event) => setForm((current) => ({ ...current, groupName: event.target.value }))} placeholder="权益/授权组名称，例如：default" />
+                  <Textarea rows={3} value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} placeholder="权益/授权组说明" />
                   <div className="grid gap-4 md:grid-cols-2">
                     <label className="flex items-center gap-3 rounded-2xl border border-border/60 bg-muted/20 px-4 py-3 text-sm">
                       <input type="checkbox" checked={form.active} onChange={(event) => setForm((current) => ({ ...current, active: event.target.checked }))} />
-                      启用访问组
+                      启用权益/授权组
                     </label>
                     <Input type="number" min={0} value={form.priority} onChange={(event) => setForm((current) => ({ ...current, priority: event.target.value }))} placeholder="优先级" />
                   </div>
@@ -469,11 +469,11 @@ export function AccessGroupsPage() {
                 />
               </TabsContent>
             </Tabs>
-            {formError || saveMutation.error ? <InlineError error={saveMutation.error ?? new Error(formError ?? '保存失败')} title="访问组保存失败" /> : null}
+            {formError || saveMutation.error ? <InlineError error={saveMutation.error ?? new Error(formError ?? '保存失败')} title="权益/授权组保存失败" /> : null}
             <DialogFooter>
               <Button type="button" variant="outline" disabled={stepIndex === 0} onClick={() => setEditorStep(EDITOR_STEPS[Math.max(0, stepIndex - 1)])}>上一步</Button>
               <Button type="button" variant="outline" disabled={stepIndex === EDITOR_STEPS.length - 1} onClick={() => setEditorStep(EDITOR_STEPS[Math.min(EDITOR_STEPS.length - 1, stepIndex + 1)])}>下一步</Button>
-              <Button type="submit" disabled={saveMutation.isPending}>{editingId == null ? '创建访问组' : '保存变更'}</Button>
+              <Button type="submit" disabled={saveMutation.isPending}>{editingId == null ? '创建权益/授权组' : '保存变更'}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -525,7 +525,7 @@ function formFromGroup(group: AccessGroup): GroupForm {
 }
 
 function buildPayload(form: GroupForm) {
-  if (!form.groupName.trim()) throw new Error('访问组名称不能为空。')
+  if (!form.groupName.trim()) throw new Error('权益/授权组名称不能为空。')
   return {
     groupName: form.groupName.trim(),
     description: form.description.trim() || null,

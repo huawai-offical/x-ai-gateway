@@ -44,9 +44,22 @@ const { apiRequestMock } = vi.hoisted(() => ({
           metadata: {},
           active: true,
           siteProfileId: 20,
+          protocolEndpointId: 201,
           groupId: 3,
           groupName: 'Gemini AI Studio',
           lastUsedAt: null,
+          totalRequestCount: index === 0 ? 12 : 0,
+          successfulRequestCount: index === 0 ? 10 : 0,
+          failedRequestCount: index === 0 ? 2 : 0,
+          totalTokenCount: index === 0 ? 4096 : 0,
+          requestSuccessRate: index === 0 ? 0.83 : 0,
+          avgDurationMs: index === 0 ? 456 : null,
+          connectivityStatus: index === 0 ? 'AVAILABLE' : null,
+          lastConnectivityTestAt: index === 0 ? '2026-05-25T10:30:00Z' : null,
+          lastConnectivityLatencyMs: index === 0 ? 123 : null,
+          lastConnectivityResponseSummary: index === 0 ? '200 OK from Gemini' : null,
+          lastConnectivityUpstreamRequestId: index === 0 ? 'req-gemini-1' : null,
+          lastConnectivityModel: index === 0 ? 'gemini-2.5-pro' : null,
         })),
         ...Array.from({ length: 15 }, (_, index) => ({
           sourceType: 'AUTH_JSON_ACCOUNT',
@@ -194,6 +207,17 @@ const { apiRequestMock } = vi.hoisted(() => ({
     if (typeof url === 'string' && url.startsWith('/admin/account-groups/model-catalog')) {
       return ['gpt-5.4', 'gpt-5.3-codex']
     }
+    if (url === '/admin/credentials/1/connectivity-test' && init?.method === 'POST') {
+      return {
+        credentialId: 1,
+        status: 'AVAILABLE',
+        model: 'gemini-2.5-pro',
+        upstreamRequestId: 'req-after-test',
+        responseSummary: 'probe ok',
+        latencyMs: 321,
+        testedAt: '2026-05-25T11:00:00Z',
+      }
+    }
     if (url === '/admin/credentials/multi-endpoint' && init?.method === 'POST') {
       const payload = init.body ? JSON.parse(String(init.body)) : {}
       return (payload.protocolEndpointIds ?? [payload.protocolEndpointId]).map((protocolEndpointId: number, index: number) => ({
@@ -299,6 +323,41 @@ describe('CredentialsPage', () => {
         tlsFingerprintProfileId: 8,
         supportedModels: ['gpt-5.4'],
       })
+    })
+  })
+
+  it('opens API Key row as merged detail edit dialog and runs saved connectivity test', async () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ConfirmProvider>
+          <MemoryRouter>
+            <CredentialsPage />
+          </MemoryRouter>
+        </ConfirmProvider>
+      </QueryClientProvider>,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Gemini AI Studio 01' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Gemini AI Studio 01' })
+
+    expect(within(dialog).getByText('用量摘要')).toBeInTheDocument()
+    expect(within(dialog).getByText('最近联通性探测')).toBeInTheDocument()
+    expect(within(dialog).getByDisplayValue('Gemini AI Studio 01')).toBeInTheDocument()
+    expect(within(dialog).getByText('4,096')).toBeInTheDocument()
+    expect(within(dialog).getByText('200 OK from Gemini')).toBeInTheDocument()
+    expect(within(dialog).getByText('req-gemini-1')).toBeInTheDocument()
+
+    const inventoryCallsBefore = apiRequestMock.mock.calls.filter(([url, init]) => url === '/admin/credentials/inventory' && !init?.method).length
+    fireEvent.click(within(dialog).getByRole('button', { name: '联通性测试' }))
+
+    await waitFor(() => {
+      expect(apiRequestMock).toHaveBeenCalledWith('/admin/credentials/1/connectivity-test', { method: 'POST' })
+    })
+    expect(await within(dialog).findByText(/联通性测试成功：probe ok/)).toBeInTheDocument()
+
+    await waitFor(() => {
+      const inventoryCallsAfter = apiRequestMock.mock.calls.filter(([url, init]) => url === '/admin/credentials/inventory' && !init?.method).length
+      expect(inventoryCallsAfter).toBeGreaterThan(inventoryCallsBefore)
     })
   })
 

@@ -30,6 +30,10 @@ import com.prodigalgal.xaigateway.gateway.core.interop.TranslationResourceType;
 import com.prodigalgal.xaigateway.gateway.core.interop.TranslationExecutionPlanCompiler;
 import com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityService;
 import com.prodigalgal.xaigateway.gateway.core.observability.GatewayRequestLifecycleService;
+import com.prodigalgal.xaigateway.gateway.core.observability.GatewayRequestTraceDetailService;
+import com.prodigalgal.xaigateway.gateway.core.observability.RequestTraceContentKind;
+import com.prodigalgal.xaigateway.gateway.core.observability.RequestTraceDirection;
+import com.prodigalgal.xaigateway.gateway.core.observability.RequestTraceStage;
 import com.prodigalgal.xaigateway.gateway.core.response.GatewayUsageView;
 import com.prodigalgal.xaigateway.gateway.core.routing.GatewayRouteSelectionService;
 import com.prodigalgal.xaigateway.gateway.core.routing.RouteCandidateEvaluation;
@@ -43,6 +47,7 @@ import com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEnt
 import com.prodigalgal.xaigateway.infra.persistence.repository.UpstreamCredentialRepository;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -73,6 +78,7 @@ public class GatewayResourceExecutionService {
     private final CanonicalResourceMapper canonicalResourceMapper;
     private final ObjectMapper objectMapper;
     private final GatewayProperties gatewayProperties;
+    private final GatewayRequestTraceDetailService gatewayRequestTraceDetailService;
 
     @Autowired
     public GatewayResourceExecutionService(
@@ -91,7 +97,8 @@ public class GatewayResourceExecutionService {
             GatewayFileService gatewayFileService,
             CanonicalResourceMapper canonicalResourceMapper,
             ObjectMapper objectMapper,
-            GatewayProperties gatewayProperties) {
+            GatewayProperties gatewayProperties,
+            GatewayRequestTraceDetailService gatewayRequestTraceDetailService) {
         this.gatewayRouteSelectionService = gatewayRouteSelectionService;
         this.upstreamCredentialRepository = upstreamCredentialRepository;
         this.credentialCryptoService = credentialCryptoService;
@@ -108,6 +115,45 @@ public class GatewayResourceExecutionService {
         this.canonicalResourceMapper = canonicalResourceMapper;
         this.objectMapper = objectMapper;
         this.gatewayProperties = gatewayProperties;
+        this.gatewayRequestTraceDetailService = gatewayRequestTraceDetailService;
+    }
+
+    public GatewayResourceExecutionService(
+            GatewayRouteSelectionService gatewayRouteSelectionService,
+            UpstreamCredentialRepository upstreamCredentialRepository,
+            CredentialCryptoService credentialCryptoService,
+            DistributedKeyGovernanceService distributedKeyGovernanceService,
+            DistributedKeyQueryService distributedKeyQueryService,
+            AccountSelectionService accountSelectionService,
+            CredentialMaterialResolver credentialMaterialResolver,
+            GatewayRequestFeatureService gatewayRequestFeatureService,
+            TranslationExecutionPlanCompiler translationExecutionPlanCompiler,
+            List<GatewayResourceExecutor> gatewayResourceExecutors,
+            GatewayObservabilityService gatewayObservabilityService,
+            GatewayRequestLifecycleService gatewayRequestLifecycleService,
+            GatewayFileService gatewayFileService,
+            CanonicalResourceMapper canonicalResourceMapper,
+            ObjectMapper objectMapper,
+            GatewayProperties gatewayProperties) {
+        this(
+                gatewayRouteSelectionService,
+                upstreamCredentialRepository,
+                credentialCryptoService,
+                distributedKeyGovernanceService,
+                distributedKeyQueryService,
+                accountSelectionService,
+                credentialMaterialResolver,
+                gatewayRequestFeatureService,
+                translationExecutionPlanCompiler,
+                gatewayResourceExecutors,
+                gatewayObservabilityService,
+                gatewayRequestLifecycleService,
+                gatewayFileService,
+                canonicalResourceMapper,
+                objectMapper,
+                gatewayProperties,
+                null
+        );
     }
 
     public GatewayResourceExecutionService(
@@ -141,7 +187,8 @@ public class GatewayResourceExecutionService {
                 gatewayFileService,
                 new DefaultCanonicalResourceMapper(),
                 objectMapper,
-                gatewayProperties
+                gatewayProperties,
+                null
         );
     }
 
@@ -337,6 +384,8 @@ public class GatewayResourceExecutionService {
             String requestId = gatewayObservabilityService.nextRequestId();
             Instant startedAt = Instant.now();
             startNoRouteRequest(requestId, distributedKeyId, request, context.executionPlan(), false, startedAt);
+            recordResourceStartTrace(requestId, request, payload, context.executionPlan(), null, false);
+            recordResourceAttemptTrace(requestId, request, payload, context.executionPlan(), null, false);
             try {
                 GatewayResourceExecutionResult result = jsonResult(
                         requestId,
@@ -344,9 +393,16 @@ public class GatewayResourceExecutionService {
                         context.executionPlan(),
                         resolveExecutor(context).executeJson(context, payload, defaultModel)
                 );
+                recordResourceResultTrace(requestId, result, false, true);
                 completeNoRouteRequest(requestId, distributedKeyId, request, context.executionPlan(), false, result.canonicalResponse(), startedAt);
                 return result;
             } catch (RuntimeException exception) {
+                recordTraceError(
+                        requestId,
+                        RequestTraceDirection.INTERNAL,
+                        exception,
+                        traceMetadata(RequestTraceStage.ERROR, "stream", false, "routeSelectionMode", "NO_ROUTE")
+                );
                 failNoRouteRequest(requestId, distributedKeyId, request, context.executionPlan(), false, exception, startedAt);
                 throw exception;
             }
@@ -357,6 +413,7 @@ public class GatewayResourceExecutionService {
         Instant startedAt = Instant.now();
         var initialPlan = translationExecutionPlanCompiler.compileSelected(selectionResult, request, semantics, payload).canonicalPlan();
         gatewayRequestLifecycleService.startRequest(requestId, selectionResult, request, initialPlan, false, startedAt);
+        recordResourceStartTrace(requestId, request, payload, initialPlan, selectionResult, false);
         try {
             List<RouteExecutionAttempt> attempts = new ArrayList<>();
             int maxAttempts = Math.min(selectionResult.candidates().size(), gatewayProperties.getRouting().getMaxFallbackAttempts());
@@ -366,8 +423,10 @@ public class GatewayResourceExecutionService {
                 GatewayResourceExecutionContext context = null;
                 try {
                     context = prepareContext(candidateSelection, request, payload);
+                    recordResourceAttemptTrace(requestId, request, payload, context.executionPlan(), candidateSelection, false);
                     ResponseEntity<JsonNode> response = resolveExecutor(context).executeJson(context, payload, defaultModel);
                     GatewayResourceExecutionResult result = jsonResult(requestId, request, context.executionPlan(), response);
+                    recordResourceResultTrace(requestId, result, false, !shouldFallback(response.getStatusCode().value(), response.getBody()));
                     if (shouldFallback(response.getStatusCode().value(), response.getBody())) {
                         attempts.add(new RouteExecutionAttempt(
                                 index + 1,
@@ -418,6 +477,7 @@ public class GatewayResourceExecutionService {
                             exception.getMessage()
                     ));
                     recordCandidateFailure(candidateSelection, exception);
+                    recordResourceAttemptErrorTrace(requestId, candidateSelection, failedPlan, exception, false, false, index + 1);
                     lastException = exception;
                     if (!shouldFallback(exception) || index == maxAttempts - 1) {
                         RouteSelectionResult failedSelection = candidateSelection.withAttempts(List.copyOf(attempts));
@@ -502,6 +562,8 @@ public class GatewayResourceExecutionService {
             String requestId = gatewayObservabilityService.nextRequestId();
             Instant startedAt = Instant.now();
             startNoRouteRequest(requestId, distributedKeyId, request, context.executionPlan(), false, startedAt);
+            recordResourceStartTrace(requestId, request, payload, context.executionPlan(), null, false);
+            recordResourceAttemptTrace(requestId, request, payload, context.executionPlan(), null, false);
             try {
                 GatewayResourceExecutionResult result = binaryResult(
                         requestId,
@@ -509,9 +571,16 @@ public class GatewayResourceExecutionService {
                         context.executionPlan(),
                         resolveExecutor(context).executeBinary(context, payload, defaultModel)
                 );
+                recordResourceResultTrace(requestId, result, false, true);
                 completeNoRouteRequest(requestId, distributedKeyId, request, context.executionPlan(), false, result.canonicalResponse(), startedAt);
                 return result;
             } catch (RuntimeException exception) {
+                recordTraceError(
+                        requestId,
+                        RequestTraceDirection.INTERNAL,
+                        exception,
+                        traceMetadata(RequestTraceStage.ERROR, "stream", false, "routeSelectionMode", "NO_ROUTE", "expectsBinary", true)
+                );
                 failNoRouteRequest(requestId, distributedKeyId, request, context.executionPlan(), false, exception, startedAt);
                 throw exception;
             }
@@ -522,6 +591,7 @@ public class GatewayResourceExecutionService {
         Instant startedAt = Instant.now();
         var initialPlan = translationExecutionPlanCompiler.compileSelected(selectionResult, request, semantics, payload).canonicalPlan();
         gatewayRequestLifecycleService.startRequest(requestId, selectionResult, request, initialPlan, false, startedAt);
+        recordResourceStartTrace(requestId, request, payload, initialPlan, selectionResult, false);
         try {
             List<RouteExecutionAttempt> attempts = new ArrayList<>();
             int maxAttempts = Math.min(selectionResult.candidates().size(), gatewayProperties.getRouting().getMaxFallbackAttempts());
@@ -531,8 +601,10 @@ public class GatewayResourceExecutionService {
                 GatewayResourceExecutionContext context = null;
                 try {
                     context = prepareContext(candidateSelection, request, payload);
+                    recordResourceAttemptTrace(requestId, request, payload, context.executionPlan(), candidateSelection, false);
                     ResponseEntity<byte[]> response = resolveExecutor(context).executeBinary(context, payload, defaultModel);
                     GatewayResourceExecutionResult result = binaryResult(requestId, request, context.executionPlan(), response);
+                    recordResourceResultTrace(requestId, result, false, !shouldFallback(response.getStatusCode().value(), response.getBody()));
                     if (shouldFallback(response.getStatusCode().value(), response.getBody())) {
                         attempts.add(new RouteExecutionAttempt(
                                 index + 1,
@@ -583,6 +655,7 @@ public class GatewayResourceExecutionService {
                             exception.getMessage()
                     ));
                     recordCandidateFailure(candidateSelection, exception);
+                    recordResourceAttemptErrorTrace(requestId, candidateSelection, failedPlan, exception, false, true, index + 1);
                     lastException = exception;
                     if (!shouldFallback(exception) || index == maxAttempts - 1) {
                         RouteSelectionResult failedSelection = candidateSelection.withAttempts(List.copyOf(attempts));
@@ -667,13 +740,22 @@ public class GatewayResourceExecutionService {
             String requestId = gatewayObservabilityService.nextRequestId();
             Instant startedAt = Instant.now();
             startNoRouteRequest(requestId, distributedKeyId, request, context.executionPlan(), false, startedAt);
+            recordResourceStartTrace(requestId, request, routePayload, context.executionPlan(), null, true);
+            recordResourceAttemptTrace(requestId, request, routePayload, context.executionPlan(), null, true);
             return resolveExecutor(context).executeMultipart(context, requestedModel, request.formFields(), files)
                     .map(response -> {
                         GatewayResourceExecutionResult result = jsonResult(requestId, request, context.executionPlan(), response);
+                        recordResourceResultTrace(requestId, result, true, true);
                         completeNoRouteRequest(requestId, distributedKeyId, request, context.executionPlan(), false, result.canonicalResponse(), startedAt);
                         return result;
                     })
                     .onErrorResume(error -> {
+                        recordTraceError(
+                                requestId,
+                                RequestTraceDirection.INTERNAL,
+                                error,
+                                traceMetadata(RequestTraceStage.ERROR, "stream", true, "routeSelectionMode", "NO_ROUTE", "multipart", true)
+                        );
                         failNoRouteRequest(requestId, distributedKeyId, request, context.executionPlan(), false, error, startedAt);
                         return Mono.error(error);
                     });
@@ -683,6 +765,7 @@ public class GatewayResourceExecutionService {
         Instant startedAt = Instant.now();
         var initialPlan = translationExecutionPlanCompiler.compileSelected(selectionResult, request, semantics, routePayload).canonicalPlan();
         gatewayRequestLifecycleService.startRequest(requestId, selectionResult, request, initialPlan, true, startedAt);
+        recordResourceStartTrace(requestId, request, routePayload, initialPlan, selectionResult, true);
         List<RouteExecutionAttempt> attempts = new java.util.concurrent.CopyOnWriteArrayList<>();
         int maxAttempts = Math.min(selectionResult.candidates().size(), gatewayProperties.getRouting().getMaxFallbackAttempts());
         return Mono.defer(() -> executeMultipartAttempt(
@@ -734,6 +817,7 @@ public class GatewayResourceExecutionService {
         GatewayResourceExecutionContext context;
         try {
             context = prepareContext(candidateSelection, request, routePayload);
+            recordResourceAttemptTrace(requestId, request, routePayload, context.executionPlan(), candidateSelection, true);
         } catch (RuntimeException exception) {
             CanonicalExecutionPlan failedPlan = failedPlan(null, exception);
             attempts.add(new RouteExecutionAttempt(
@@ -745,6 +829,7 @@ public class GatewayResourceExecutionService {
             ));
             RouteSelectionResult failedSelection = candidateSelection.withAttempts(List.copyOf(attempts));
             recordStructuredRouteDecision(requestId, failedSelection, request, failedPlan);
+            recordResourceAttemptErrorTrace(requestId, candidateSelection, failedPlan, exception, true, false, candidateIndex + 1);
             gatewayRequestLifecycleService.failRequest(
                     requestId,
                     failedSelection,
@@ -762,6 +847,7 @@ public class GatewayResourceExecutionService {
         return resolveExecutor(context).executeMultipart(context, requestedModel, formFields, files)
                 .flatMap(response -> {
                     GatewayResourceExecutionResult result = jsonResult(requestId, request, context.executionPlan(), response);
+                    recordResourceResultTrace(requestId, result, true, !shouldFallback(response.getStatusCode().value(), response.getBody()));
                     if (shouldFallback(response.getStatusCode().value(), response.getBody())) {
                         attempts.add(new RouteExecutionAttempt(
                                 candidateIndex + 1,
@@ -824,6 +910,7 @@ public class GatewayResourceExecutionService {
                             error.getMessage()
                     ));
                     recordCandidateFailure(candidateSelection, error);
+                    recordResourceAttemptErrorTrace(requestId, candidateSelection, context.executionPlan(), error, true, false, candidateIndex + 1);
                     if (shouldFallback(error)
                             && candidateIndex + 1 < maxAttempts
                             && candidateIndex + 1 < baseSelection.candidates().size()) {
@@ -899,7 +986,7 @@ public class GatewayResourceExecutionService {
                 request.httpMethod(),
                 request.requestPath(),
                 request.requestedModel(),
-                GatewayDegradationPolicy.ALLOW_LOSSY,
+                GatewayDegradationPolicy.STRICT,
                 GatewayClientFamily.GENERIC_OPENAI,
                 request.jsonBody()
         );
@@ -1200,6 +1287,420 @@ public class GatewayResourceExecutionService {
         }
         return resourceType == TranslationResourceType.RESPONSE
                 || resourceType == TranslationResourceType.UPLOAD;
+    }
+
+    private void recordResourceStartTrace(
+            String requestId,
+            CanonicalResourceRequest request,
+            JsonNode payload,
+            CanonicalExecutionPlan plan,
+            RouteSelectionResult selectionResult,
+            boolean stream) {
+        recordTrace(
+                requestId,
+                RequestTraceStage.DOWNSTREAM_REQUEST,
+                RequestTraceDirection.DOWNSTREAM,
+                RequestTraceContentKind.JSON,
+                payload == null ? resourceRequestSnapshot(request, stream) : payload,
+                resourceTraceMetadata(RequestTraceStage.DOWNSTREAM_REQUEST, request, plan, selectionResult, stream)
+        );
+        recordTrace(
+                requestId,
+                RequestTraceStage.CANONICAL_REQUEST,
+                RequestTraceDirection.INTERNAL,
+                RequestTraceContentKind.JSON,
+                resourceRequestSnapshot(request, stream),
+                resourceTraceMetadata(RequestTraceStage.CANONICAL_REQUEST, request, plan, selectionResult, stream)
+        );
+        recordTrace(
+                requestId,
+                RequestTraceStage.TRANSLATION_PLAN,
+                RequestTraceDirection.INTERNAL,
+                RequestTraceContentKind.JSON,
+                translationPlanSnapshot(plan),
+                resourceTraceMetadata(RequestTraceStage.TRANSLATION_PLAN, request, plan, selectionResult, stream)
+        );
+    }
+
+    private void recordResourceAttemptTrace(
+            String requestId,
+            CanonicalResourceRequest request,
+            JsonNode payload,
+            CanonicalExecutionPlan plan,
+            RouteSelectionResult selectionResult,
+            boolean stream) {
+        recordTrace(
+                requestId,
+                RequestTraceStage.UPSTREAM_REQUEST,
+                RequestTraceDirection.UPSTREAM,
+                RequestTraceContentKind.JSON,
+                upstreamResourceRequestSnapshot(selectionResult, request, plan, payload, stream),
+                resourceTraceMetadata(RequestTraceStage.UPSTREAM_REQUEST, request, plan, selectionResult, stream)
+        );
+    }
+
+    private void recordResourceResultTrace(
+            String requestId,
+            GatewayResourceExecutionResult result,
+            boolean stream,
+            boolean downstreamVisible) {
+        RequestTraceContentKind kind = result.binary() ? RequestTraceContentKind.BINARY_REFERENCE : RequestTraceContentKind.JSON;
+        Map<String, Object> payload = downstreamResourceResponseSnapshot(result, stream);
+        recordTrace(
+                requestId,
+                RequestTraceStage.UPSTREAM_RESPONSE,
+                RequestTraceDirection.UPSTREAM,
+                kind,
+                payload,
+                traceMetadata(
+                        RequestTraceStage.UPSTREAM_RESPONSE,
+                        "stream", stream,
+                        "statusCode", result.statusCode(),
+                        "contentType", result.contentType(),
+                        "binary", result.binary()
+                )
+        );
+        if (!downstreamVisible) {
+            return;
+        }
+        recordTrace(
+                requestId,
+                RequestTraceStage.DOWNSTREAM_RESPONSE,
+                RequestTraceDirection.DOWNSTREAM,
+                kind,
+                payload,
+                traceMetadata(
+                        RequestTraceStage.DOWNSTREAM_RESPONSE,
+                        "stream", stream,
+                        "statusCode", result.statusCode(),
+                        "contentType", result.contentType(),
+                        "binary", result.binary()
+                )
+        );
+    }
+
+    private void recordResourceAttemptErrorTrace(
+            String requestId,
+            RouteSelectionResult selectionResult,
+            CanonicalExecutionPlan plan,
+            Throwable error,
+            boolean stream,
+            boolean expectsBinary,
+            int attempt) {
+        recordTraceError(
+                requestId,
+                RequestTraceDirection.UPSTREAM,
+                error,
+                traceMetadata(
+                        RequestTraceStage.ERROR,
+                        "stream", stream,
+                        "attempt", attempt,
+                        "providerType", providerTypeName(selectionResult),
+                        "credentialId", credentialId(selectionResult),
+                        "backend", backendName(plan),
+                        "expectsBinary", expectsBinary
+                )
+        );
+    }
+
+    private Map<String, Object> resourceRequestSnapshot(CanonicalResourceRequest request, boolean stream) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        if (request == null) {
+            return snapshot;
+        }
+        putIfPresent(snapshot, "ingressProtocol", request.ingressProtocol() == null ? null : request.ingressProtocol().name());
+        putIfPresent(snapshot, "httpMethod", request.httpMethod());
+        putIfPresent(snapshot, "requestPath", request.requestPath());
+        putIfPresent(snapshot, "normalizedPath", request.normalizedPath());
+        putIfPresent(snapshot, "requestedModel", request.requestedModel());
+        putIfPresent(snapshot, "resourceType", request.resourceType() == null ? null : request.resourceType().wireName());
+        putIfPresent(snapshot, "operation", request.operation() == null ? null : request.operation().wireName());
+        snapshot.put("expectsBinary", request.expectsBinary());
+        snapshot.put("stream", stream || request.stream());
+        if (!request.pathParams().isEmpty()) {
+            snapshot.put("pathParams", request.pathParams());
+        }
+        if (!request.formFields().isEmpty()) {
+            snapshot.put("formFieldNames", request.formFields().keySet());
+        }
+        if (!request.fileRefs().isEmpty()) {
+            snapshot.put("fileRefs", fileRefSnapshots(request.fileRefs()));
+        }
+        return snapshot;
+    }
+
+    private Map<String, Object> translationPlanSnapshot(CanonicalExecutionPlan plan) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        if (plan == null) {
+            return snapshot;
+        }
+        snapshot.put("executable", plan.executable());
+        putIfPresent(snapshot, "requestPath", plan.requestPath());
+        putIfPresent(snapshot, "normalizedPath", plan.normalizedPath());
+        putIfPresent(snapshot, "surface", plan.surface());
+        putIfPresent(snapshot, "requestedModel", plan.requestedModel());
+        putIfPresent(snapshot, "publicModel", plan.publicModel());
+        putIfPresent(snapshot, "resolvedModel", plan.resolvedModel());
+        putIfPresent(snapshot, "resourceType", plan.resourceType() == null ? null : plan.resourceType().wireName());
+        putIfPresent(snapshot, "operation", plan.operation() == null ? null : plan.operation().wireName());
+        putIfPresent(snapshot, "executionKind", plan.executionKind() == null ? null : plan.executionKind().name());
+        putIfPresent(snapshot, "executionBackend", backendName(plan));
+        putIfPresent(snapshot, "supportStatus", plan.supportStatus() == null ? null : plan.supportStatus().name());
+        putIfPresent(snapshot, "objectMode", plan.objectMode());
+        putIfPresent(snapshot, "backendReason", plan.backendReason());
+        putIfPresent(snapshot, "degradationLevel", plan.degradationLevel() == null ? null : plan.degradationLevel().name());
+        putIfPresent(snapshot, "executionCapabilityLevel", plan.executionCapabilityLevel() == null ? null : plan.executionCapabilityLevel().name());
+        putIfPresent(snapshot, "renderCapabilityLevel", plan.renderCapabilityLevel() == null ? null : plan.renderCapabilityLevel().name());
+        putIfPresent(snapshot, "overallCapabilityLevel", plan.overallCapabilityLevel() == null ? null : plan.overallCapabilityLevel().name());
+        if (!plan.requiredFeatures().isEmpty()) {
+            snapshot.put("requiredFeatures", plan.requiredFeatures());
+        }
+        if (!plan.featureLevels().isEmpty()) {
+            snapshot.put("featureLevels", plan.featureLevels());
+        }
+        if (!plan.degradations().isEmpty()) {
+            snapshot.put("degradations", plan.degradations());
+        }
+        if (!plan.blockerReasons().isEmpty()) {
+            snapshot.put("blockerReasons", plan.blockerReasons());
+        }
+        putIfPresent(snapshot, "routeSelectionMode", plan.routeSelectionMode() == null ? null : plan.routeSelectionMode().name());
+        putIfPresent(snapshot, "routePolicyReason", plan.routePolicyReason());
+        putIfPresent(snapshot, "renderPolicyReason", plan.renderPolicyReason());
+        putIfPresent(snapshot, "fallbackPolicyReason", plan.fallbackPolicyReason());
+        return snapshot;
+    }
+
+    private Map<String, Object> upstreamResourceRequestSnapshot(
+            RouteSelectionResult selectionResult,
+            CanonicalResourceRequest request,
+            CanonicalExecutionPlan plan,
+            JsonNode payload,
+            boolean stream) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        putIfPresent(snapshot, "providerType", providerTypeName(selectionResult));
+        putIfPresent(snapshot, "credentialId", credentialId(selectionResult));
+        putIfPresent(snapshot, "credentialName", credentialName(selectionResult));
+        putIfPresent(snapshot, "baseUrl", baseUrl(selectionResult));
+        putIfPresent(snapshot, "model", modelName(selectionResult, request, plan));
+        putIfPresent(snapshot, "httpMethod", request == null ? null : request.httpMethod());
+        putIfPresent(snapshot, "requestPath", request == null ? null : request.requestPath());
+        putIfPresent(snapshot, "normalizedPath", request == null ? null : request.normalizedPath());
+        putIfPresent(snapshot, "resourceType", plan == null || plan.resourceType() == null ? null : plan.resourceType().wireName());
+        putIfPresent(snapshot, "operation", plan == null || plan.operation() == null ? null : plan.operation().wireName());
+        putIfPresent(snapshot, "executionBackend", backendName(plan));
+        putIfPresent(snapshot, "supportStatus", plan == null || plan.supportStatus() == null ? null : plan.supportStatus().name());
+        putIfPresent(snapshot, "degradationLevel", plan == null || plan.degradationLevel() == null ? null : plan.degradationLevel().name());
+        snapshot.put("expectsBinary", request != null && request.expectsBinary());
+        snapshot.put("stream", stream || (request != null && request.stream()));
+        if (request != null && !request.formFields().isEmpty()) {
+            snapshot.put("formFieldNames", request.formFields().keySet());
+        }
+        if (request != null && !request.fileRefs().isEmpty()) {
+            snapshot.put("fileRefs", fileRefSnapshots(request.fileRefs()));
+        }
+        putIfPresent(snapshot, "payload", payload);
+        return snapshot;
+    }
+
+    private Map<String, Object> downstreamResourceResponseSnapshot(GatewayResourceExecutionResult result, boolean stream) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("statusCode", result.statusCode());
+        putIfPresent(snapshot, "contentType", result.contentType());
+        snapshot.put("binary", result.binary());
+        snapshot.put("stream", stream);
+        putIfPresent(snapshot, "binaryLength", result.binaryLength());
+        CanonicalResourceResponse canonicalResponse = result.canonicalResponse();
+        if (canonicalResponse != null) {
+            putIfPresent(snapshot, "resourceType", canonicalResponse.resourceType() == null ? null : canonicalResponse.resourceType().wireName());
+            putIfPresent(snapshot, "operation", canonicalResponse.operation() == null ? null : canonicalResponse.operation().wireName());
+            putIfPresent(snapshot, "responseKind", canonicalResponse.responseKind());
+            putIfPresent(snapshot, "objectType", canonicalResponse.objectType());
+            putIfPresent(snapshot, "objectId", canonicalResponse.objectId());
+            putIfPresent(snapshot, "status", canonicalResponse.status());
+            if (!canonicalResponse.events().isEmpty()) {
+                snapshot.put("events", canonicalResponse.events());
+            }
+            if (!canonicalResponse.degradations().isEmpty()) {
+                snapshot.put("degradations", canonicalResponse.degradations());
+            }
+            if (!canonicalResponse.metadata().isEmpty()) {
+                snapshot.put("metadata", canonicalResponse.metadata());
+            }
+            if (canonicalResponse.body() != null && !result.binary()) {
+                snapshot.put("body", canonicalResponse.body());
+            }
+        } else if (!result.binary()) {
+            putIfPresent(snapshot, "body", result.responseJson());
+        }
+        return snapshot;
+    }
+
+    private List<Map<String, Object>> fileRefSnapshots(List<CanonicalFileRef> fileRefs) {
+        return fileRefs.stream()
+                .map(fileRef -> {
+                    Map<String, Object> snapshot = new LinkedHashMap<>();
+                    putIfPresent(snapshot, "fieldName", fileRef.fieldName());
+                    putIfPresent(snapshot, "fileKey", fileRef.fileKey());
+                    putIfPresent(snapshot, "filename", fileRef.filename());
+                    putIfPresent(snapshot, "mimeType", fileRef.mimeType());
+                    return snapshot;
+                })
+                .toList();
+    }
+
+    private Map<String, Object> resourceTraceMetadata(
+            RequestTraceStage stage,
+            CanonicalResourceRequest request,
+            CanonicalExecutionPlan plan,
+            RouteSelectionResult selectionResult,
+            boolean stream) {
+        return traceMetadata(
+                stage,
+                "httpMethod", request == null ? null : request.httpMethod(),
+                "requestPath", request == null ? null : request.requestPath(),
+                "normalizedPath", request == null ? null : request.normalizedPath(),
+                "resourceType", resourceTypeName(request, plan),
+                "operation", operationName(request, plan),
+                "providerType", providerTypeName(selectionResult),
+                "credentialId", credentialId(selectionResult),
+                "backend", backendName(plan),
+                "stream", stream || (request != null && request.stream()),
+                "expectsBinary", request == null ? null : request.expectsBinary()
+        );
+    }
+
+    private void recordTrace(
+            String requestId,
+            RequestTraceStage stage,
+            RequestTraceDirection direction,
+            RequestTraceContentKind contentKind,
+            Object payload,
+            Map<String, ?> metadata) {
+        if (gatewayRequestTraceDetailService == null) {
+            return;
+        }
+        gatewayRequestTraceDetailService.record(requestId, stage, direction, contentKind, payload, metadata);
+    }
+
+    private void recordTraceError(
+            String requestId,
+            RequestTraceDirection direction,
+            Throwable error,
+            Map<String, ?> metadata) {
+        if (gatewayRequestTraceDetailService == null) {
+            return;
+        }
+        gatewayRequestTraceDetailService.recordError(requestId, RequestTraceStage.ERROR, direction, error, metadata);
+    }
+
+    private Map<String, Object> traceMetadata(RequestTraceStage stage, Object... entries) {
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("payloadSource", payloadSource(stage));
+        metadata.put("wireBody", stage == RequestTraceStage.DOWNSTREAM_REQUEST);
+        metadata.put("wireBodyLimitation", wireBodyLimitation(stage));
+        if (entries == null) {
+            return metadata;
+        }
+        for (int index = 0; index + 1 < entries.length; index += 2) {
+            Object key = entries[index];
+            Object value = entries[index + 1];
+            if (key != null && value != null) {
+                metadata.put(String.valueOf(key), value);
+            }
+        }
+        return metadata;
+    }
+
+    private String payloadSource(RequestTraceStage stage) {
+        if (stage == null) {
+            return "gateway_resource_trace_snapshot";
+        }
+        return switch (stage) {
+            case DOWNSTREAM_REQUEST -> "downstream_parsed_resource_request_body";
+            case CANONICAL_REQUEST -> "gateway_canonical_resource_request_model";
+            case TRANSLATION_PLAN -> "gateway_resource_translation_execution_plan";
+            case UPSTREAM_REQUEST -> "gateway_constructed_upstream_resource_request_summary";
+            case UPSTREAM_RESPONSE -> "gateway_resource_executor_response_summary";
+            case DOWNSTREAM_RESPONSE -> "gateway_downstream_resource_response_summary";
+            case ERROR -> "gateway_resource_error_summary";
+            case CUSTOM -> "gateway_resource_custom_trace_snapshot";
+        };
+    }
+
+    private String wireBodyLimitation(RequestTraceStage stage) {
+        if (stage == RequestTraceStage.DOWNSTREAM_REQUEST) {
+            return "parsed downstream resource body after gateway ingress handling; binary content is stored as references only";
+        }
+        if (stage == RequestTraceStage.UPSTREAM_REQUEST || stage == RequestTraceStage.UPSTREAM_RESPONSE) {
+            return "structured gateway/executor summary, not raw upstream HTTP wire body";
+        }
+        return "structured gateway resource snapshot, not raw HTTP wire body";
+    }
+
+    private void putIfPresent(Map<String, Object> target, String key, Object value) {
+        if (target != null && key != null && value != null) {
+            target.put(key, value);
+        }
+    }
+
+    private String resourceTypeName(CanonicalResourceRequest request, CanonicalExecutionPlan plan) {
+        if (plan != null && plan.resourceType() != null) {
+            return plan.resourceType().wireName();
+        }
+        return request == null || request.resourceType() == null ? null : request.resourceType().wireName();
+    }
+
+    private String operationName(CanonicalResourceRequest request, CanonicalExecutionPlan plan) {
+        if (plan != null && plan.operation() != null) {
+            return plan.operation().wireName();
+        }
+        return request == null || request.operation() == null ? null : request.operation().wireName();
+    }
+
+    private String backendName(CanonicalExecutionPlan plan) {
+        return plan == null || plan.executionBackend() == null ? null : plan.executionBackend().name();
+    }
+
+    private CatalogCandidateView selectedCandidate(RouteSelectionResult selectionResult) {
+        if (selectionResult == null || selectionResult.selectedCandidate() == null) {
+            return null;
+        }
+        return selectionResult.selectedCandidate().candidate();
+    }
+
+    private Long credentialId(RouteSelectionResult selectionResult) {
+        CatalogCandidateView candidate = selectedCandidate(selectionResult);
+        return candidate == null ? null : candidate.credentialId();
+    }
+
+    private String credentialName(RouteSelectionResult selectionResult) {
+        CatalogCandidateView candidate = selectedCandidate(selectionResult);
+        return candidate == null ? null : candidate.credentialName();
+    }
+
+    private String providerTypeName(RouteSelectionResult selectionResult) {
+        CatalogCandidateView candidate = selectedCandidate(selectionResult);
+        return candidate == null || candidate.providerType() == null ? null : candidate.providerType().name();
+    }
+
+    private String baseUrl(RouteSelectionResult selectionResult) {
+        CatalogCandidateView candidate = selectedCandidate(selectionResult);
+        return candidate == null ? null : candidate.baseUrl();
+    }
+
+    private String modelName(
+            RouteSelectionResult selectionResult,
+            CanonicalResourceRequest request,
+            CanonicalExecutionPlan plan) {
+        CatalogCandidateView candidate = selectedCandidate(selectionResult);
+        if (candidate != null && candidate.modelName() != null) {
+            return candidate.modelName();
+        }
+        if (plan != null && plan.resolvedModel() != null) {
+            return plan.resolvedModel();
+        }
+        return request == null ? null : request.requestedModel();
     }
 
     private void recordStructuredRouteDecision(

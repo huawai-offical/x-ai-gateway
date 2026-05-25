@@ -32,6 +32,13 @@ export type CredentialResponse = {
   lastFirstTokenMs?: number | null
   minFirstTokenMs?: number | null
   maxFirstTokenMs?: number | null
+  connectivityStatus?: string | null
+  lastConnectivityTestAt?: string | null
+  lastConnectivityLatencyMs?: number | null
+  lastConnectivityErrorMessage?: string | null
+  lastConnectivityResponseSummary?: string | null
+  lastConnectivityUpstreamRequestId?: string | null
+  lastConnectivityModel?: string | null
   proxyId?: number | null
   tlsFingerprintProfileId?: number | null
   siteProfileId?: number | null
@@ -92,18 +99,32 @@ export type UpstreamCredentialInventoryResponse = {
   lastFirstTokenMs?: number | null
   minFirstTokenMs?: number | null
   maxFirstTokenMs?: number | null
+  connectivityStatus?: string | null
+  lastConnectivityTestAt?: string | null
+  lastConnectivityLatencyMs?: number | null
+  lastConnectivityErrorMessage?: string | null
+  lastConnectivityResponseSummary?: string | null
+  lastConnectivityUpstreamRequestId?: string | null
+  lastConnectivityModel?: string | null
   createdAt?: string | null
   updatedAt?: string | null
 }
 
 export type CredentialConnectivityResponse = {
-  providerType: string
-  baseUrl: string
-  reachable: boolean
-  latencyMs: number
-  discoveredModelCount: number
-  sampleModels: string[]
-  message: string
+  credentialId?: number
+  providerType?: string
+  baseUrl?: string
+  reachable?: boolean
+  status?: string | null
+  latencyMs?: number | null
+  discoveredModelCount?: number
+  sampleModels?: string[]
+  message?: string | null
+  model?: string | null
+  upstreamRequestId?: string | null
+  responseSummary?: string | null
+  errorMessage?: string | null
+  testedAt?: string | null
 }
 
 export type CredentialModelRefreshResponse = {

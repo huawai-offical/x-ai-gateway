@@ -28,9 +28,7 @@ public class GitHubSocialOAuthProfileClient implements SocialOAuthProfileClient 
 
     @Override
     public boolean supports(SocialOAuthProvider provider) {
-        return provider == SocialOAuthProvider.GITHUB
-                && configured(gatewayProperties.getOauth().getGithubSocialClientId())
-                && configured(gatewayProperties.getOauth().getGithubSocialClientSecret());
+        return provider == SocialOAuthProvider.GITHUB;
     }
 
     @Override
@@ -41,12 +39,12 @@ public class GitHubSocialOAuthProfileClient implements SocialOAuthProfileClient 
     @Override
     public SocialOAuthProfile exchange(SocialOAuthTokenExchangeRequest request) {
         JsonNode token = webClient.post()
-                .uri(URI.create(gatewayProperties.getOauth().getGithubSocialTokenEndpoint()))
+                .uri(URI.create(firstConfigured(request.tokenEndpoint(), gatewayProperties.getOauth().getGithubSocialTokenEndpoint())))
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                 .accept(MediaType.APPLICATION_JSON)
                 .body(BodyInserters
-                        .fromFormData("client_id", gatewayProperties.getOauth().getGithubSocialClientId())
-                        .with("client_secret", gatewayProperties.getOauth().getGithubSocialClientSecret())
+                        .fromFormData("client_id", firstConfigured(request.clientId(), gatewayProperties.getOauth().getGithubSocialClientId()))
+                        .with("client_secret", firstConfigured(request.clientSecret(), gatewayProperties.getOauth().getGithubSocialClientSecret()))
                         .with("code", request.code())
                         .with("redirect_uri", request.redirectUri())
                         .with("code_verifier", request.codeVerifier() == null ? "" : request.codeVerifier()))
@@ -55,7 +53,7 @@ public class GitHubSocialOAuthProfileClient implements SocialOAuthProfileClient 
                 .block();
         String accessToken = required(text(token, "access_token"), "GitHub access_token");
         JsonNode user = webClient.get()
-                .uri(URI.create(gatewayProperties.getOauth().getGithubSocialUserEndpoint()))
+                .uri(URI.create(firstConfigured(request.userInfoEndpoint(), gatewayProperties.getOauth().getGithubSocialUserEndpoint())))
                 .headers(headers -> headers.setBearerAuth(accessToken))
                 .accept(MediaType.APPLICATION_JSON)
                 .retrieve()
@@ -136,5 +134,9 @@ public class GitHubSocialOAuthProfileClient implements SocialOAuthProfileClient 
 
     private boolean configured(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private String firstConfigured(String primary, String fallback) {
+        return configured(primary) ? primary.trim() : fallback;
     }
 }

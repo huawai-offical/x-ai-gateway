@@ -19,10 +19,16 @@ public class ExecutionSupportMatrixService {
 
         return switch (feature) {
             case CHAT_TEXT -> switch (providerType) {
-                case OPENAI_DIRECT, OPENAI_COMPATIBLE, ANTHROPIC_DIRECT, GEMINI_DIRECT, OLLAMA_DIRECT -> InteropCapabilityLevel.NATIVE;
+                case OPENAI_DIRECT, ANTHROPIC_DIRECT, GEMINI_DIRECT, OLLAMA_DIRECT -> InteropCapabilityLevel.NATIVE;
+                case OPENAI_COMPATIBLE -> (siteKind == UpstreamSiteKind.COHERE || siteKind == UpstreamSiteKind.JINA)
+                        ? InteropCapabilityLevel.UNSUPPORTED
+                        : InteropCapabilityLevel.NATIVE;
             };
             case TOOLS -> switch (providerType) {
-                case OPENAI_DIRECT, OPENAI_COMPATIBLE, ANTHROPIC_DIRECT, GEMINI_DIRECT, OLLAMA_DIRECT -> InteropCapabilityLevel.NATIVE;
+                case OPENAI_DIRECT, ANTHROPIC_DIRECT, GEMINI_DIRECT, OLLAMA_DIRECT -> InteropCapabilityLevel.NATIVE;
+                case OPENAI_COMPATIBLE -> (siteKind == UpstreamSiteKind.COHERE || siteKind == UpstreamSiteKind.JINA)
+                        ? InteropCapabilityLevel.UNSUPPORTED
+                        : InteropCapabilityLevel.NATIVE;
             };
             case IMAGE_INPUT -> providerType == ProviderType.OLLAMA_DIRECT
                     ? InteropCapabilityLevel.NATIVE
@@ -35,10 +41,16 @@ public class ExecutionSupportMatrixService {
                 default -> InteropCapabilityLevel.UNSUPPORTED;
             };
             case REASONING -> switch (providerType) {
-                case OPENAI_DIRECT, OPENAI_COMPATIBLE, ANTHROPIC_DIRECT, GEMINI_DIRECT, OLLAMA_DIRECT -> InteropCapabilityLevel.NATIVE;
+                case OPENAI_DIRECT, ANTHROPIC_DIRECT, GEMINI_DIRECT, OLLAMA_DIRECT -> InteropCapabilityLevel.NATIVE;
+                case OPENAI_COMPATIBLE -> (siteKind == UpstreamSiteKind.COHERE || siteKind == UpstreamSiteKind.JINA)
+                        ? InteropCapabilityLevel.UNSUPPORTED
+                        : InteropCapabilityLevel.NATIVE;
             };
             case RESPONSE_OBJECT -> switch (providerType) {
-                case OPENAI_DIRECT, OPENAI_COMPATIBLE, ANTHROPIC_DIRECT, GEMINI_DIRECT, OLLAMA_DIRECT -> InteropCapabilityLevel.EMULATED;
+                case OPENAI_DIRECT, ANTHROPIC_DIRECT, GEMINI_DIRECT, OLLAMA_DIRECT -> InteropCapabilityLevel.NATIVE;
+                case OPENAI_COMPATIBLE -> (siteKind == UpstreamSiteKind.COHERE || siteKind == UpstreamSiteKind.JINA)
+                        ? InteropCapabilityLevel.UNSUPPORTED
+                        : InteropCapabilityLevel.NATIVE;
             };
             case EMBEDDINGS -> switch (providerType) {
                 case OPENAI_DIRECT, OPENAI_COMPATIBLE -> InteropCapabilityLevel.NATIVE;
@@ -111,7 +123,7 @@ public class ExecutionSupportMatrixService {
 
     private boolean supportsOpenAiStyleSite(UpstreamSiteKind siteKind) {
         return switch (siteKind) {
-            case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE,
+            case OPENAI_DIRECT, OPENAI_COMPATIBLE_GENERIC, XIAOMI_MIMO, DEEPSEEK, QWEN, MOONSHOT, SILICONFLOW, VOLCENGINE,
                     MINIMAX, GROK, MISTRAL, COHERE, JINA, TOGETHER, FIREWORKS, OPENROUTER -> true;
             default -> false;
         };

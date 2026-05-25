@@ -242,7 +242,8 @@ samp {
   }
 
   ::selection {
-    background: color-mix(in oklab, var(--primary) 22%, white);
+    background: color-mix(in oklab, var(--primary) 72%, var(--background));
+    color: var(--primary-foreground);
   }
 }
 

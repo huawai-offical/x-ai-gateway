@@ -441,8 +441,8 @@
         "supportedProtocols":  [
                                    "openai"
                                ],
-        "supportsChat":  true,
-        "supportsTools":  true,
+        "supportsChat":  false,
+        "supportsTools":  false,
         "supportsImageInput":  false,
         "supportsEmbeddings":  true,
         "supportsThinking":  false,
@@ -455,10 +455,15 @@
         "snapshotFiles":  false,
         "snapshotUploads":  false,
         "snapshotRealtime":  false,
-        "expectedExecutable":  true,
-        "expectedEffectiveLevel":  "NATIVE",
-        "expectedExecutionKind":  "NATIVE",
-        "expectedModelVisible":  true
+        "expectedExecutable":  false,
+        "expectedEffectiveLevel":  "UNSUPPORTED",
+        "expectedExecutionKind":  "BLOCKED",
+        "expectedModelVisible":  true,
+        "expectedSupportStatus":  "BLOCKED",
+        "expectedRenderCapability":  "NATIVE",
+        "expectedRouteSelectionMode":  "CATALOG_SELECTION",
+        "expectedCapabilityExecutionKind":  "BLOCKED",
+        "expectedCapabilityLevel":  "UNSUPPORTED"
     },
     {
         "name":  "together-openai-chat",
@@ -609,10 +614,15 @@
         "snapshotFiles":  false,
         "snapshotUploads":  false,
         "snapshotRealtime":  false,
-        "expectedExecutable":  true,
+        "expectedExecutable":  false,
         "expectedEffectiveLevel":  "LOSSY",
-        "expectedExecutionKind":  "TRANSLATED",
-        "expectedModelVisible":  true
+        "expectedExecutionKind":  "BLOCKED",
+        "expectedModelVisible":  true,
+        "expectedSupportStatus":  "BLOCKED",
+        "expectedRenderCapability":  "NATIVE",
+        "expectedRouteSelectionMode":  "CATALOG_SELECTION",
+        "expectedCapabilityExecutionKind":  "TRANSLATED",
+        "expectedCapabilityLevel":  "LOSSY"
     },
     {
         "name":  "cohere-moderation-blocked",
@@ -1169,7 +1179,7 @@
         "name":  "xiaomi-mimo-openai-compatible-chat",
         "providerType":  "OPENAI_COMPATIBLE",
         "providerFamily":  "OPENAI",
-        "siteKind":  "OPENAI_COMPATIBLE_GENERIC",
+        "siteKind":  "XIAOMI_MIMO",
         "protocol":  "responses",
         "requestPath":  "/v1/responses",
         "requestedModel":  "mimo-v2.5-pro",
@@ -1191,9 +1201,14 @@
         "snapshotFiles":  false,
         "snapshotUploads":  false,
         "snapshotRealtime":  false,
-        "expectedExecutable":  true,
-        "expectedEffectiveLevel":  "EMULATED",
-        "expectedExecutionKind":  "EMULATED",
-        "expectedModelVisible":  true
+        "expectedExecutable":  false,
+        "expectedEffectiveLevel":  "NATIVE",
+        "expectedExecutionKind":  "BLOCKED",
+        "expectedModelVisible":  true,
+        "expectedSupportStatus":  "BLOCKED",
+        "expectedRenderCapability":  "NATIVE",
+        "expectedRouteSelectionMode":  "CATALOG_SELECTION",
+        "expectedCapabilityExecutionKind":  "NATIVE",
+        "expectedCapabilityLevel":  "NATIVE"
     }
 ]

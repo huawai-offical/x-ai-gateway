@@ -103,6 +103,34 @@ public class UpstreamCredentialEntity {
     @Comment("最后一次被选中调用的时间（UTC）。")
     private Instant lastUsedAt;
 
+    @Column(name = "connectivity_status", length = 32)
+    @Comment("最近一次凭证联通性探测状态，例如 AVAILABLE、UNAVAILABLE、UNSUPPORTED。")
+    private String connectivityStatus;
+
+    @Column(name = "last_connectivity_test_at", columnDefinition = "timestamp with time zone")
+    @Comment("最近一次凭证联通性探测时间（UTC）。")
+    private Instant lastConnectivityTestAt;
+
+    @Column(name = "last_connectivity_latency_ms")
+    @Comment("最近一次凭证联通性探测耗时（毫秒）。")
+    private Long lastConnectivityLatencyMs;
+
+    @Column(name = "last_connectivity_error_message", length = 512)
+    @Comment("最近一次凭证联通性探测错误摘要。")
+    private String lastConnectivityErrorMessage;
+
+    @Column(name = "last_connectivity_response_summary", length = 512)
+    @Comment("最近一次凭证联通性探测上游返回摘要。")
+    private String lastConnectivityResponseSummary;
+
+    @Column(name = "last_connectivity_upstream_request_id", length = 128)
+    @Comment("最近一次凭证联通性探测上游请求 ID。")
+    private String lastConnectivityUpstreamRequestId;
+
+    @Column(name = "last_connectivity_model", length = 128)
+    @Comment("最近一次凭证联通性探测使用的模型。")
+    private String lastConnectivityModel;
+
     @Column(name = "total_request_count", nullable = false)
     @Comment("累计请求数。")
     private long totalRequestCount = 0;
@@ -311,6 +339,62 @@ public class UpstreamCredentialEntity {
 
     public void setLastUsedAt(Instant lastUsedAt) {
         this.lastUsedAt = lastUsedAt;
+    }
+
+    public String getConnectivityStatus() {
+        return connectivityStatus;
+    }
+
+    public void setConnectivityStatus(String connectivityStatus) {
+        this.connectivityStatus = connectivityStatus;
+    }
+
+    public Instant getLastConnectivityTestAt() {
+        return lastConnectivityTestAt;
+    }
+
+    public void setLastConnectivityTestAt(Instant lastConnectivityTestAt) {
+        this.lastConnectivityTestAt = lastConnectivityTestAt;
+    }
+
+    public Long getLastConnectivityLatencyMs() {
+        return lastConnectivityLatencyMs;
+    }
+
+    public void setLastConnectivityLatencyMs(Long lastConnectivityLatencyMs) {
+        this.lastConnectivityLatencyMs = lastConnectivityLatencyMs;
+    }
+
+    public String getLastConnectivityErrorMessage() {
+        return lastConnectivityErrorMessage;
+    }
+
+    public void setLastConnectivityErrorMessage(String lastConnectivityErrorMessage) {
+        this.lastConnectivityErrorMessage = lastConnectivityErrorMessage;
+    }
+
+    public String getLastConnectivityResponseSummary() {
+        return lastConnectivityResponseSummary;
+    }
+
+    public void setLastConnectivityResponseSummary(String lastConnectivityResponseSummary) {
+        this.lastConnectivityResponseSummary = lastConnectivityResponseSummary;
+    }
+
+    public String getLastConnectivityUpstreamRequestId() {
+        return lastConnectivityUpstreamRequestId;
+    }
+
+    public void setLastConnectivityUpstreamRequestId(String lastConnectivityUpstreamRequestId) {
+        this.lastConnectivityUpstreamRequestId = lastConnectivityUpstreamRequestId;
+    }
+
+    public String getLastConnectivityModel() {
+        return lastConnectivityModel;
+    }
+
+    public void setLastConnectivityModel(String lastConnectivityModel) {
+        this.lastConnectivityModel = lastConnectivityModel;
     }
 
     public long getTotalRequestCount() {

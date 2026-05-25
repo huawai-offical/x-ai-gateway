@@ -24,7 +24,7 @@ public final class CanonicalRenderCapabilitySupport {
             case "openai" -> renderOpenAiLevel(normalizedRequestPath, resourceType);
             case "responses" -> resourceType == TranslationResourceType.RESPONSE
                     || operation == TranslationOperation.RESPONSE_CREATE
-                    ? InteropCapabilityLevel.EMULATED
+                    ? InteropCapabilityLevel.NATIVE
                     : InteropCapabilityLevel.UNSUPPORTED;
             case "anthropic_native" -> isAnthropicNativePath(normalizedRequestPath, resourceType)
                     ? InteropCapabilityLevel.NATIVE
@@ -58,7 +58,7 @@ public final class CanonicalRenderCapabilitySupport {
 
     private static InteropCapabilityLevel renderOpenAiLevel(String requestPath, TranslationResourceType resourceType) {
         if ("/v1/responses".equals(requestPath) || resourceType == TranslationResourceType.RESPONSE) {
-            return InteropCapabilityLevel.EMULATED;
+            return InteropCapabilityLevel.NATIVE;
         }
         if (requestPath == null || requestPath.isBlank()) {
             return InteropCapabilityLevel.NATIVE;

@@ -1,5 +1,6 @@
 package com.prodigalgal.xaigateway.admin.api;
 
+import com.prodigalgal.xaigateway.portal.application.PortalSocialOAuthSettingsView;
 import java.time.Instant;
 import java.util.List;
 
@@ -7,8 +8,16 @@ public record SystemSettingsResponse(
         UpstreamCacheSettingsResponse upstreamCache,
         UpstreamRuntimeSettingsResponse upstream,
         SecuritySettingsResponse security,
+        PortalSocialOAuthSettingsView socialOAuth,
         Instant updatedAt
 ) {
+    public SystemSettingsResponse(
+            UpstreamCacheSettingsResponse upstreamCache,
+            UpstreamRuntimeSettingsResponse upstream,
+            SecuritySettingsResponse security,
+            Instant updatedAt) {
+        this(upstreamCache, upstream, security, null, updatedAt);
+    }
 
     public record UpstreamCacheSettingsResponse(
             boolean enabled,

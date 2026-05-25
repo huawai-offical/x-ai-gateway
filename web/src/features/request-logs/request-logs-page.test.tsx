@@ -137,4 +137,22 @@ describe('RequestLogsPage Codex observability', () => {
     expect(screen.getByText('选路决策详情')).toBeInTheDocument()
     expect(screen.getByText(/selectedCredentialId/)).toBeInTheDocument()
   })
+
+  it('links request log details to trace detail lookup by requestId', async () => {
+    renderPage()
+
+    const requestLogTable = await screen.findByRole('table', { name: '请求日志表' })
+    const firstRow = within(requestLogTable).getByText('req-codex-1').closest('tr')
+    expect(firstRow).not.toBeNull()
+
+    fireEvent.click(within(firstRow as HTMLTableRowElement).getByRole('button', { name: '详情' }))
+
+    expect(screen.getByText('请求日志详情')).toBeInTheDocument()
+    expect(screen.getByText('这里展示当前观测行的原始字段；完整请求与上游载荷阶段请跳转到链路追踪按 requestId 联查。')).toBeInTheDocument()
+    expect(screen.getByText('requestId：req-codex-1')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '去链路追踪查看完整请求详情' })).toHaveAttribute(
+      'href',
+      '/console/traces?requestId=req-codex-1',
+    )
+  })
 })

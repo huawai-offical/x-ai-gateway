@@ -902,6 +902,7 @@ public class GatewayRequestLifecycleService {
                 "protocol", selectionResult.protocol(),
                 "request_path", requestPath,
                 "provider_type", selectionResult.selectedCandidate().candidate().providerType().name(),
+                "runtime_provider", selectionResult.selectedCandidate().candidate().runtimeProviderKey(),
                 "model_group", selectionResult.modelGroup(),
                 "selection_source", selectionResult.selectionSource().name(),
                 "stream", Boolean.toString(stream),

@@ -55,7 +55,7 @@ class TranslationExplainServiceTests {
                         Mockito.isNull(),
                         Mockito.eq("/v1/chat/completions"),
                         Mockito.eq("gpt-4o"),
-                        Mockito.eq(GatewayDegradationPolicy.ALLOW_LOSSY),
+                        Mockito.eq(GatewayDegradationPolicy.STRICT),
                         Mockito.eq(GatewayClientFamily.GENERIC_OPENAI),
                         Mockito.any()
                 ))

@@ -5,6 +5,7 @@ import com.prodigalgal.xaigateway.gateway.core.shared.AuthStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ErrorSchemaStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.PathStrategy;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderFamily;
+import com.prodigalgal.xaigateway.gateway.core.shared.ProviderRuntimeProfile;
 import com.prodigalgal.xaigateway.gateway.core.shared.ProviderType;
 import com.prodigalgal.xaigateway.gateway.core.shared.ReasoningTransport;
 import com.prodigalgal.xaigateway.gateway.core.shared.UpstreamSiteKind;
@@ -281,11 +282,14 @@ public record CatalogCandidateView(
             return null;
         }
         String normalizedBaseUrl = baseUrl.toLowerCase(java.util.Locale.ROOT);
-        if (normalizedBaseUrl.contains("xiaomimimo.com")) {
+        if (normalizedBaseUrl.contains("xiaomimimo.com") || normalizedBaseUrl.contains("api.mimo-v2.com")) {
             return "xiaomi_mimo";
         }
         if (normalizedBaseUrl.contains("deepseek.com")) {
             return "deepseek";
+        }
+        if (normalizedBaseUrl.contains("api.x.ai")) {
+            return "xai";
         }
         return null;
     }
@@ -304,13 +308,14 @@ public record CatalogCandidateView(
     }
 
     private static UpstreamSiteKind inferOpenAiCompatibleSiteKind(String baseUrl) {
-        if (baseUrl == null) {
-            return UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC;
-        }
-        String normalizedBaseUrl = baseUrl.toLowerCase(java.util.Locale.ROOT);
-        if (normalizedBaseUrl.contains("deepseek.com")) {
-            return UpstreamSiteKind.DEEPSEEK;
-        }
-        return UpstreamSiteKind.OPENAI_COMPATIBLE_GENERIC;
+        return ProviderRuntimeProfile.inferOpenAiCompatibleSiteKind(null, baseUrl);
+    }
+
+    public ProviderRuntimeProfile runtimeProfile() {
+        return ProviderRuntimeProfile.of(providerType, siteKind, vendorCode, baseUrl);
+    }
+
+    public String runtimeProviderKey() {
+        return runtimeProfile().key();
     }
 }

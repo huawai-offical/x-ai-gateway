@@ -74,6 +74,7 @@ class PortalAuthServiceTests {
     private final DistributedKeySecretService distributedKeySecretService = new DistributedKeySecretService();
     private final PasswordEncoder passwordEncoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
     private final AccessGroupEntitlementService accessGroupEntitlementService = Mockito.mock(AccessGroupEntitlementService.class);
+    private final InvitationCodeRedemptionService invitationCodeRedemptionService = Mockito.mock(InvitationCodeRedemptionService.class);
     private final PortalAuthService service = new PortalAuthService(
             userRepository,
             subscriptionRepository,
@@ -176,6 +177,61 @@ class PortalAuthServiceTests {
 
         Mockito.verify(securityService).verifyCaptcha("cap-1", "7");
         Mockito.verify(securityService).verifyLoginTotpIfRequired(user, "123456");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void shouldRedeemInvitationCodeAfterRegisteringUser() {
+        ObjectProvider<PortalSecurityService> securityProvider = Mockito.mock(ObjectProvider.class);
+        ObjectProvider<InvitationCodeRedemptionService> invitationProvider = Mockito.mock(ObjectProvider.class);
+        PortalSecurityService securityService = Mockito.mock(PortalSecurityService.class);
+        Mockito.when(securityProvider.getIfAvailable()).thenReturn(securityService);
+        Mockito.when(invitationProvider.getIfAvailable()).thenReturn(invitationCodeRedemptionService);
+        PortalAuthService secureService = new PortalAuthService(
+                userRepository,
+                subscriptionRepository,
+                keyRepository,
+                announcementRepository,
+                announcementReadStateRepository,
+                redeemCodeRepository,
+                redeemCodeUsageRepository,
+                balanceLedgerRepository,
+                accountGroupRepository,
+                keyGroupBindingRepository,
+                distributedKeySecretService,
+                passwordEncoder,
+                accessGroupEntitlementService,
+                securityProvider,
+                invitationProvider
+        );
+        Mockito.when(userRepository.existsByEmailIgnoreCase("invite@example.com")).thenReturn(false);
+        Mockito.when(userRepository.save(Mockito.any())).thenAnswer(invocation -> {
+            GatewayUserEntity entity = invocation.getArgument(0);
+            ReflectionTestUtils.setField(entity, "id", 66L);
+            return entity;
+        });
+
+        secureService.register(new PortalRegisterRequest(
+                "invite@example.com",
+                "Invite",
+                "password-123",
+                null,
+                null,
+                "INVITE-1"
+        ), exchange()).block();
+
+        Mockito.verify(securityService).verifyRegistrationPolicy(
+                "invite@example.com",
+                "INVITE-1",
+                PortalSecurityService.REGISTRATION_CHANNEL_INVITE_CODE
+        );
+        Mockito.verify(invitationCodeRedemptionService).redeemForRegistration(
+                Mockito.eq("INVITE-1"),
+                Mockito.argThat(user -> user.getId().equals(66L)),
+                Mockito.eq("invite@example.com"),
+                Mockito.eq(PortalSecurityService.REGISTRATION_CHANNEL_INVITE_CODE),
+                Mockito.eq("PORTAL_REGISTER")
+        );
     }
 
     @Test
@@ -451,7 +507,7 @@ class PortalAuthServiceTests {
         subscription.setPlan(plan);
         subscription.setStatus("ACTIVE");
         subscription.setStartsAt(Instant.parse("2026-04-24T00:00:00Z"));
-        subscription.setExpiresAt(Instant.parse("2026-05-24T00:00:00Z"));
+        subscription.setExpiresAt(Instant.parse("2026-06-24T00:00:00Z"));
         return subscription;
     }
 

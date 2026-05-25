@@ -7,16 +7,19 @@ import type {
   PortalKey,
   PortalKeyCreatePayload,
   PortalKeyCreateResponse,
+  PortalInvitationSummary,
   PortalPasskeyCredential,
   PortalPaymentOrder,
   PortalPaymentOrderCreatePayload,
   PortalProfile,
   PortalRedeemResponse,
   PortalRedeemStatus,
+  PortalRegistrationPolicy,
   PortalSecurityStatus,
   PortalSession,
   PortalSocialOAuthIdentity,
   PortalSocialOAuthProvider,
+  PortalSocialOAuthStartResponse,
   PortalSubscription,
   PortalTotpSetupResponse,
   PortalUsageSummary,
@@ -29,6 +32,7 @@ export type PortalLoginPayload = {
 
 export type PortalRegisterPayload = PortalLoginPayload & {
   displayName?: string | null
+  inviteCode?: string | null
 }
 
 export function getPortalSession() {
@@ -45,6 +49,10 @@ export function registerPortal(payload: PortalRegisterPayload) {
   return apiClient.post<PortalSession>('/portal/auth/register', {
     body: payload,
   })
+}
+
+export function getPortalRegistrationPolicy() {
+  return apiClient.get<PortalRegistrationPolicy>('/portal/auth/registration-policy')
 }
 
 export function logoutPortal() {
@@ -97,6 +105,15 @@ export function disablePortalTotp(code: string) {
 
 export function listPortalOAuthProviders() {
   return apiClient.get<PortalSocialOAuthProvider[]>('/portal/auth/oauth/providers')
+}
+
+export function startPortalOAuth(provider: string, redirectPath = '/portal/security', inviteCode?: string | null) {
+  return apiClient.post<PortalSocialOAuthStartResponse>(`/portal/auth/oauth/${provider}/start`, {
+    body: {
+      redirectPath,
+      inviteCode: inviteCode?.trim() || null,
+    },
+  })
 }
 
 export function listPortalOAuthIdentities() {
@@ -172,4 +189,8 @@ export function getPortalUsageSummary() {
 
 export function listPortalChannelStatuses() {
   return apiClient.get<PortalChannelStatus[]>('/portal/channels/status')
+}
+
+export function getPortalInvitationSummary() {
+  return apiClient.get<PortalInvitationSummary>('/portal/invitations/summary')
 }

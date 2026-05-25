@@ -7,7 +7,7 @@ describe('navigation route meta', () => {
 
     expect(codexConnect.groupLabel).toBe('接入与模型')
     expect(codexConnect.navTo).toBe('/console/account-groups')
-    expect(codexConnect.navLabel).toBe('账号分组')
+    expect(codexConnect.navLabel).toBe('上游账号组/凭证池')
   })
 
   it('maps retained console routes to the updated information architecture', () => {

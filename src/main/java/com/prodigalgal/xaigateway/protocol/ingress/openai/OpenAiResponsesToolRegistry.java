@@ -10,7 +10,7 @@ import java.util.stream.Collectors;
 public final class OpenAiResponsesToolRegistry {
 
     public static final String SUPPORTED = "SUPPORTED";
-    public static final String LOCAL_BOUND = "LOCAL_BOUND";
+    public static final String NATIVE_REQUIRED = "NATIVE_REQUIRED";
     public static final String BLOCKED = "BLOCKED";
 
     private static final String FUNCTION = "function";
@@ -41,9 +41,9 @@ public final class OpenAiResponsesToolRegistry {
             new ToolCompatibility(
                     "file_search",
                     "hosted",
-                    LOCAL_BOUND,
-                    "Controller 会先校验本地 vector_store_ids 并注入本地 search context；canonical mapper 不直接执行 hosted file_search_call。",
-                    "TASK-20260518-003"
+                    NATIVE_REQUIRED,
+                    "OpenAI hosted file_search 需要 OpenAI Direct native route 与 hosted file_search_call 生命周期；当前 canonical execution 不用本地 RAG 伪装该 hosted tool 成功。",
+                    "TASK-20260524-001-04"
             ),
             new ToolCompatibility(
                     "computer_use_preview",
@@ -116,7 +116,7 @@ public final class OpenAiResponsesToolRegistry {
     public static void requireSupportedToolDefinition(JsonNode tool, int index) {
         String type = normalize(tool == null ? null : tool.path("type").asText(null), FUNCTION);
         ToolCompatibility compatibility = supportFor(type);
-        if (!SUPPORTED.equals(compatibility.supportStatus())) {
+        if (!isAcceptedByMapper(compatibility)) {
             throw unsupported("Responses tool", type, compatibility, "tools[" + index + "]");
         }
     }
@@ -145,9 +145,14 @@ public final class OpenAiResponsesToolRegistry {
             return;
         }
         ToolCompatibility compatibility = supportFor(type);
-        if (!SUPPORTED.equals(compatibility.supportStatus())) {
+        if (!isAcceptedByMapper(compatibility)) {
             throw unsupported("Responses tool_choice", type, compatibility, "tool_choice");
         }
+    }
+
+    private static boolean isAcceptedByMapper(ToolCompatibility compatibility) {
+        return SUPPORTED.equals(compatibility.supportStatus())
+                || NATIVE_REQUIRED.equals(compatibility.supportStatus());
     }
 
     private static ToolCompatibility supportFor(String type) {

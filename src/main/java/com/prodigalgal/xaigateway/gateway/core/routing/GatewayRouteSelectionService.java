@@ -411,23 +411,24 @@ public class GatewayRouteSelectionService {
             modelPolicyResolver.recordSuccess(selectionResult);
         }
         healthStateStore.clear(selected.candidate().credentialId());
+        String provider = selected.candidate().runtimeProviderKey();
         affinityCacheService.bindPrefixAffinity(
                 selectionResult.distributedKeyId(),
-                selected.candidate().providerType().name(),
+                provider,
                 selectionResult.modelGroup(),
                 selectionResult.prefixHash(),
                 selected.candidate().credentialId()
         );
         affinityCacheService.bindFingerprintAffinity(
                 selectionResult.distributedKeyId(),
-                selected.candidate().providerType().name(),
+                provider,
                 selectionResult.modelGroup(),
                 selectionResult.fingerprint(),
                 selected.candidate().credentialId()
         );
         affinityCacheService.bindModelAffinity(
                 selectionResult.distributedKeyId(),
-                selected.candidate().providerType().name(),
+                provider,
                 selectionResult.modelGroup(),
                 selected.candidate().credentialId()
         );
@@ -435,7 +436,7 @@ public class GatewayRouteSelectionService {
 
     public void invalidateSelection(RouteSelectionResult selectionResult) {
         RouteCandidateView selected = selectionResult.selectedCandidate();
-        String provider = selected.candidate().providerType().name();
+        String provider = selected.candidate().runtimeProviderKey();
         Long credentialId = selected.candidate().credentialId();
 
         affinityCacheService.invalidateIfMatches(
@@ -905,7 +906,7 @@ public class GatewayRouteSelectionService {
             String prefixHash,
             String fingerprint,
             RouteCandidateView candidate) {
-        String provider = candidate.candidate().providerType().name();
+        String provider = candidate.candidate().runtimeProviderKey();
         String credentialId = String.valueOf(candidate.candidate().credentialId());
 
         if (credentialId.equals(affinityCacheService.getPrefixAffinity(distributedKeyId, provider, modelGroup, prefixHash))) {
@@ -987,7 +988,8 @@ public class GatewayRouteSelectionService {
         if (distributedKey.allowedProviderTypes().isEmpty()) {
             return true;
         }
-        return distributedKey.allowedProviderTypes().contains(candidate.candidate().providerType().name());
+        return distributedKey.allowedProviderTypes().contains(candidate.candidate().providerType().name())
+                || distributedKey.allowedProviderTypes().contains(candidate.candidate().runtimeProviderKey());
     }
 
     private boolean isNetworkHealthy(com.prodigalgal.xaigateway.infra.persistence.entity.UpstreamCredentialEntity credential) {

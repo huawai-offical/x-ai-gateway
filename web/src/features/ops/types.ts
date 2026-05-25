@@ -140,6 +140,38 @@ export type OpsAnalyticsOverview = {
   timeline: OpsAnalyticsTimelineBucket[]
 }
 
+export type HealthMetric = {
+  totalRequests: number
+  successfulRequests: number
+  failedRequests: number
+  canceledRequests: number
+  successRate: number
+  availabilityRate: number
+  errorRate: number
+  avgDurationMs: number
+  lastSuccessfulAt?: string | null
+  lastFailedAt?: string | null
+}
+
+export type CredentialHealthMetric = HealthMetric & {
+  credentialId: number
+  providerType: string
+  credentialLabel?: string | null
+  credentialPrefix?: string | null
+}
+
+export type ProviderHealthMetric = HealthMetric & {
+  providerType: string
+}
+
+export type OpsHealthOverview = {
+  sampledFrom: string
+  sampledTo: string
+  total: HealthMetric
+  credentials: CredentialHealthMetric[]
+  providers: ProviderHealthMetric[]
+}
+
 export type AlertRule = {
   id: number
   ruleName: string
