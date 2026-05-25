@@ -1,0 +1,92 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0009-request-trace-detail
+      author: codex
+      changes:
+        - createTable:
+            tableName: request_trace_detail
+            remarks: 请求详情追踪快照，按 request_id 串联下游请求、转换计划、上游请求响应与下游响应。
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_request_trace_detail
+                    nullable: false
+              - column:
+                  name: request_id
+                  type: VARCHAR(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: stage
+                  type: VARCHAR(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: direction
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: content_kind
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: payload_json
+                  type: TEXT
+              - column:
+                  name: metadata_json
+                  type: TEXT
+              - column:
+                  name: payload_hash
+                  type: VARCHAR(128)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: original_length
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: stored_length
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: truncated
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: redacted
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: request_trace_detail
+            indexName: idx_request_trace_detail_request_created
+            columns:
+              - column:
+                  name: request_id
+              - column:
+                  name: created_at
+        - createIndex:
+            tableName: request_trace_detail
+            indexName: idx_request_trace_detail_stage_created
+            columns:
+              - column:
+                  name: stage
+              - column:
+                  name: created_at

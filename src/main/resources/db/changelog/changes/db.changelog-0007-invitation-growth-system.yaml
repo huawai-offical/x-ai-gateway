@@ -1,0 +1,310 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0007-invitation-growth-system
+      author: codex
+      changes:
+        - addColumn:
+            tableName: invitation_code
+            columns:
+              - column:
+                  name: referrer_reward_token_credits
+                  type: BIGINT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: reward_plan_id
+                  type: BIGINT
+              - column:
+                  name: reward_plan_duration_days
+                  type: INT
+              - column:
+                  name: reward_access_group_id
+                  type: BIGINT
+              - column:
+                  name: reward_access_group_duration_days
+                  type: INT
+        - addColumn:
+            tableName: invitation_code_usage
+            columns:
+              - column:
+                  name: referrer_user_id
+                  type: BIGINT
+              - column:
+                  name: referrer_reward_token_credits
+                  type: BIGINT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: reward_plan_id
+                  type: BIGINT
+              - column:
+                  name: reward_subscription_id
+                  type: BIGINT
+              - column:
+                  name: reward_access_group_id
+                  type: BIGINT
+              - column:
+                  name: reward_access_group_grant_id
+                  type: BIGINT
+        - addColumn:
+            tableName: user_subscription
+            columns:
+              - column:
+                  name: source_type
+                  type: VARCHAR(64)
+              - column:
+                  name: source_id
+                  type: VARCHAR(128)
+        - createTable:
+            tableName: user_access_group_grant
+            remarks: 用户级权益组赠品授权。
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_user_access_group_grant
+                    nullable: false
+              - column:
+                  name: user_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: access_group_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: VARCHAR(24)
+                  defaultValue: ACTIVE
+                  constraints:
+                    nullable: false
+              - column:
+                  name: starts_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints:
+                    nullable: false
+              - column:
+                  name: expires_at
+                  type: TIMESTAMP WITH TIME ZONE
+              - column:
+                  name: source_type
+                  type: VARCHAR(64)
+              - column:
+                  name: source_id
+                  type: VARCHAR(128)
+              - column:
+                  name: notes
+                  type: TEXT
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - createTable:
+            tableName: invitation_relationship
+            remarks: 用户邀请关系表。
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_invitation_relationship
+                    nullable: false
+              - column:
+                  name: invitation_code_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: invitation_usage_id
+                  type: BIGINT
+              - column:
+                  name: referrer_user_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: invited_user_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: depth
+                  type: INT
+                  defaultValueNumeric: 1
+                  constraints:
+                    nullable: false
+              - column:
+                  name: path
+                  type: VARCHAR(1024)
+              - column:
+                  name: source_channel
+                  type: VARCHAR(32)
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: invitation_code
+            baseColumnNames: reward_plan_id
+            referencedTableName: subscription_plan
+            referencedColumnNames: id
+            constraintName: fk_invitation_code_reward_plan_id
+        - addForeignKeyConstraint:
+            baseTableName: invitation_code
+            baseColumnNames: reward_access_group_id
+            referencedTableName: access_group
+            referencedColumnNames: id
+            constraintName: fk_invitation_code_reward_access_group_id
+        - addForeignKeyConstraint:
+            baseTableName: invitation_code_usage
+            baseColumnNames: referrer_user_id
+            referencedTableName: gateway_user
+            referencedColumnNames: id
+            constraintName: fk_invitation_usage_referrer_user_id
+        - addForeignKeyConstraint:
+            baseTableName: invitation_code_usage
+            baseColumnNames: reward_plan_id
+            referencedTableName: subscription_plan
+            referencedColumnNames: id
+            constraintName: fk_invitation_usage_reward_plan_id
+        - addForeignKeyConstraint:
+            baseTableName: invitation_code_usage
+            baseColumnNames: reward_subscription_id
+            referencedTableName: user_subscription
+            referencedColumnNames: id
+            constraintName: fk_invitation_usage_reward_subscription_id
+        - addForeignKeyConstraint:
+            baseTableName: invitation_code_usage
+            baseColumnNames: reward_access_group_id
+            referencedTableName: access_group
+            referencedColumnNames: id
+            constraintName: fk_invitation_usage_reward_access_group_id
+        - addForeignKeyConstraint:
+            baseTableName: invitation_code_usage
+            baseColumnNames: reward_access_group_grant_id
+            referencedTableName: user_access_group_grant
+            referencedColumnNames: id
+            constraintName: fk_invitation_usage_reward_access_group_grant_id
+        - addForeignKeyConstraint:
+            baseTableName: user_access_group_grant
+            baseColumnNames: user_id
+            referencedTableName: gateway_user
+            referencedColumnNames: id
+            constraintName: fk_user_access_group_grant_user_id
+        - addForeignKeyConstraint:
+            baseTableName: user_access_group_grant
+            baseColumnNames: access_group_id
+            referencedTableName: access_group
+            referencedColumnNames: id
+            constraintName: fk_user_access_group_grant_access_group_id
+        - addForeignKeyConstraint:
+            baseTableName: invitation_relationship
+            baseColumnNames: invitation_code_id
+            referencedTableName: invitation_code
+            referencedColumnNames: id
+            constraintName: fk_invitation_relationship_code_id
+        - addForeignKeyConstraint:
+            baseTableName: invitation_relationship
+            baseColumnNames: invitation_usage_id
+            referencedTableName: invitation_code_usage
+            referencedColumnNames: id
+            constraintName: fk_invitation_relationship_usage_id
+        - addForeignKeyConstraint:
+            baseTableName: invitation_relationship
+            baseColumnNames: referrer_user_id
+            referencedTableName: gateway_user
+            referencedColumnNames: id
+            constraintName: fk_invitation_relationship_referrer_user_id
+        - addForeignKeyConstraint:
+            baseTableName: invitation_relationship
+            baseColumnNames: invited_user_id
+            referencedTableName: gateway_user
+            referencedColumnNames: id
+            constraintName: fk_invitation_relationship_invited_user_id
+        - addUniqueConstraint:
+            tableName: user_subscription
+            columnNames: source_type,source_id
+            constraintName: uk_user_subscription_source
+        - addUniqueConstraint:
+            tableName: user_access_group_grant
+            columnNames: source_type,source_id
+            constraintName: uk_user_access_group_grant_source
+        - addUniqueConstraint:
+            tableName: invitation_relationship
+            columnNames: invited_user_id
+            constraintName: uk_invitation_relationship_invited_user
+        - createIndex:
+            tableName: invitation_code
+            indexName: idx_invitation_code_reward_plan
+            columns:
+              - column:
+                  name: reward_plan_id
+        - createIndex:
+            tableName: invitation_code
+            indexName: idx_invitation_code_reward_access_group
+            columns:
+              - column:
+                  name: reward_access_group_id
+        - createIndex:
+            tableName: invitation_code_usage
+            indexName: idx_invitation_usage_referrer
+            columns:
+              - column:
+                  name: referrer_user_id
+              - column:
+                  name: used_at
+        - createIndex:
+            tableName: user_subscription
+            indexName: idx_user_subscription_source
+            columns:
+              - column:
+                  name: source_type
+              - column:
+                  name: source_id
+        - createIndex:
+            tableName: user_access_group_grant
+            indexName: idx_user_access_group_grant_user
+            columns:
+              - column:
+                  name: user_id
+              - column:
+                  name: status
+        - createIndex:
+            tableName: user_access_group_grant
+            indexName: idx_user_access_group_grant_group
+            columns:
+              - column:
+                  name: access_group_id
+        - createIndex:
+            tableName: invitation_relationship
+            indexName: idx_invitation_relationship_referrer
+            columns:
+              - column:
+                  name: referrer_user_id
+              - column:
+                  name: created_at
+        - createIndex:
+            tableName: invitation_relationship
+            indexName: idx_invitation_relationship_code
+            columns:
+              - column:
+                  name: invitation_code_id

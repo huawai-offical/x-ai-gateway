@@ -1,0 +1,16 @@
+false : The term 'false' is not recognized as the name of a cmdlet, function, script file, or operable program. Check t
+he spelling of the name, or if a path was included, verify that the path is correct and try again.
+At line:1 char:65
++ ... VER_PORT=8080; $env:GATEWAY_OBSERVABILITY_ASYNC_ENABLED=false; $env:G ...
++                                                             ~~~~~
+    + CategoryInfo          : ObjectNotFound: (false:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+ 
+-Xmx768m : The term '-Xmx768m' is not recognized as the name of a cmdlet, function, script file, or operable program. C
+heck the spelling of the name, or if a path was included, verify that the path is correct and try again.
+At line:1 char:140
++ ... MIN_CONSOLE_POW_DIFFICULTY=0; $env:JAVA_TOOL_OPTIONS=-Xmx768m; .\grad ...
++                                                          ~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (-Xmx768m:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+ 

@@ -1,0 +1,152 @@
+databaseChangeLog:
+  - changeSet:
+      id: 0005-invitation-codes
+      author: codex
+      changes:
+        - createTable:
+            tableName: invitation_code
+            remarks: 注册邀请码库存表。
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_invitation_code
+                    nullable: false
+              - column:
+                  name: code
+                  type: VARCHAR(128)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: is_active
+                  type: BOOLEAN
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+              - column:
+                  name: max_uses
+                  type: INT
+                  defaultValueNumeric: 1
+                  constraints:
+                    nullable: false
+              - column:
+                  name: used_count
+                  type: INT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: expires_at
+                  type: TIMESTAMP WITH TIME ZONE
+              - column:
+                  name: notes
+                  type: TEXT
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addUniqueConstraint:
+            tableName: invitation_code
+            columnNames: code
+            constraintName: uk_invitation_code_code
+        - createIndex:
+            tableName: invitation_code
+            indexName: idx_invitation_code_active
+            columns:
+              - column:
+                  name: is_active
+        - createIndex:
+            tableName: invitation_code
+            indexName: idx_invitation_code_created_at
+            columns:
+              - column:
+                  name: created_at
+        - createTable:
+            tableName: invitation_code_usage
+            remarks: 注册邀请码核销记录表。
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_invitation_code_usage
+                    nullable: false
+              - column:
+                  name: invitation_code_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: user_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: registration_email
+                  type: VARCHAR(191)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: registration_channel
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: request_source
+                  type: VARCHAR(128)
+              - column:
+                  name: used_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: TIMESTAMP WITH TIME ZONE
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addUniqueConstraint:
+            tableName: invitation_code_usage
+            columnNames: invitation_code_id,user_id
+            constraintName: uk_invitation_usage_code_user
+        - addForeignKeyConstraint:
+            baseTableName: invitation_code_usage
+            baseColumnNames: invitation_code_id
+            referencedTableName: invitation_code
+            referencedColumnNames: id
+            constraintName: fk_invitation_usage_code_id
+        - addForeignKeyConstraint:
+            baseTableName: invitation_code_usage
+            baseColumnNames: user_id
+            referencedTableName: gateway_user
+            referencedColumnNames: id
+            constraintName: fk_invitation_usage_user_id
+        - createIndex:
+            tableName: invitation_code_usage
+            indexName: idx_invitation_usage_code_used
+            columns:
+              - column:
+                  name: invitation_code_id
+              - column:
+                  name: used_at
+        - createIndex:
+            tableName: invitation_code_usage
+            indexName: idx_invitation_usage_user_used
+            columns:
+              - column:
+                  name: user_id
+              - column:
+                  name: used_at

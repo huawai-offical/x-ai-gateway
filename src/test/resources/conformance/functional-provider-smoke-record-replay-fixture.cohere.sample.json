@@ -1,0 +1,159 @@
+{
+  "schemaVersion": "2026-05-19.functional-provider-smoke-record-replay.v1",
+  "replayMode": "record_replay",
+  "providerType": "COHERE",
+  "protocol": "COHERE_NATIVE",
+  "baseUrl": "https://api.cohere.ai",
+  "baseUrlHost": "api.cohere.ai",
+  "certificationStatus": "FAILED",
+  "dryRun": false,
+  "recordedAt": "2026-05-24T00:00:00Z",
+  "summary": {
+    "PASS": 1,
+    "FAIL": 1,
+    "SKIPPED": 0,
+    "UNSUPPORTED": 1,
+    "NO_PERMISSION": 0,
+    "BUDGET_BLOCKED": 0
+  },
+  "replayPolicy": {
+    "network": "disabled_by_default",
+    "billableOperations": "replay_only",
+    "writeOperations": "replay_only",
+    "secretMaterial": "redacted",
+    "dryRunEvidenceAccepted": false,
+    "fixtureSource": "functional_provider_smoke_certification",
+    "liveExecutionRequiresAllowLive": true,
+    "billableExecutionRequiresAllowBillableProbes": true
+  },
+  "fixtures": [
+    {
+      "providerType": "COHERE",
+      "protocol": "COHERE_NATIVE",
+      "resourceFamily": "EMBEDDINGS",
+      "status": "LIVE_SMOKE_OK",
+      "classification": "PASS",
+      "method": "POST",
+      "path": "/v2/embed",
+      "model": "embed-v4.0",
+      "billable": true,
+      "writeOperation": false,
+      "httpStatus": 200,
+      "upstreamRequestId": "req_cohere_embed",
+      "durationMs": 42,
+      "evidence": {
+        "id": "embd_1",
+        "embeddingFields": [
+          "float"
+        ],
+        "embeddingFloatVectorsSeen": 1,
+        "billedUnitFields": [
+          "input_tokens"
+        ]
+      },
+      "requestPreview": {
+        "providerType": "COHERE",
+        "protocol": "COHERE_NATIVE",
+        "method": "POST",
+        "baseUrl": "https://api.cohere.ai",
+        "path": "/v2/embed",
+        "model": "embed-v4.0",
+        "headers": {
+          "accept": "application/json",
+          "content-type": "application/json",
+          "authorization": "Bearer ***"
+        },
+        "body": {
+          "model": "embed-v4.0",
+          "texts": [
+            "functional provider smoke embedding probe"
+          ],
+          "input_type": "search_document",
+          "embedding_types": [
+            "float"
+          ]
+        }
+      }
+    },
+    {
+      "providerType": "COHERE",
+      "protocol": "COHERE_NATIVE",
+      "resourceFamily": "RERANK",
+      "status": "LIVE_SMOKE_FAILED",
+      "classification": "FAIL",
+      "method": "POST",
+      "path": "/v2/rerank",
+      "model": "rerank-v3.5",
+      "billable": true,
+      "writeOperation": false,
+      "httpStatus": 429,
+      "upstreamRequestId": "req_cohere_rerank_failure",
+      "durationMs": 37,
+      "failureType": "HTTP_429",
+      "failureMessage": "native rerank probe returned a non-2xx response during record/replay capture",
+      "evidence": {
+        "probeKind": "cohere_native_rerank",
+        "errorClass": "rate_limit_or_quota"
+      },
+      "requestPreview": {
+        "providerType": "COHERE",
+        "protocol": "COHERE_NATIVE",
+        "method": "POST",
+        "baseUrl": "https://api.cohere.ai",
+        "path": "/v2/rerank",
+        "model": "rerank-v3.5",
+        "headers": {
+          "accept": "application/json",
+          "content-type": "application/json",
+          "authorization": "Bearer ***"
+        },
+        "body": {
+          "model": "rerank-v3.5",
+          "query": "native rerank smoke query",
+          "documents": [
+            "first document",
+            "second document"
+          ],
+          "top_n": 1
+        }
+      }
+    },
+    {
+      "providerType": "COHERE",
+      "protocol": "COHERE_NATIVE",
+      "resourceFamily": "CHAT_COMPLETIONS",
+      "status": "OUT_OF_SCOPE",
+      "classification": "UNSUPPORTED",
+      "skippedReason": "OUT_OF_FUNCTIONAL_API_SCOPE",
+      "method": "POST",
+      "path": "/v2/embed",
+      "model": "embed-v4.0",
+      "billable": false,
+      "writeOperation": false,
+      "evidence": {
+        "reason": "UNSUPPORTED_FAMILY",
+        "unsupportedFamily": "CHAT_COMPLETIONS",
+        "supportedFamilies": [
+          "EMBEDDINGS",
+          "RERANK"
+        ]
+      },
+      "requestPreview": {
+        "providerType": "COHERE",
+        "protocol": "COHERE_NATIVE",
+        "method": "POST",
+        "baseUrl": "https://api.cohere.ai",
+        "path": "/v2/embed",
+        "model": "embed-v4.0",
+        "headers": {
+          "accept": "application/json",
+          "content-type": "application/json",
+          "authorization": "Bearer ***"
+        },
+        "body": {
+          "unsupportedFamily": "CHAT_COMPLETIONS"
+        }
+      }
+    }
+  ]
+}

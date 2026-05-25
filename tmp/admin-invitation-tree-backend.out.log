@@ -1,0 +1,303 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.4.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :compileJava UP-TO-DATE
+> Task :processResources UP-TO-DATE
+> Task :classes UP-TO-DATE
+> Task :resolveMainClassName
+
+> Task :bootRun
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v4.0.5)
+
+2026-05-25T09:43:18.799+08:00  INFO 36140 --- [x-ai-gateway] [           main] c.p.xaigateway.XAiGatewayApplication     : Starting XAiGatewayApplication using Java 25 with PID 36140 (D:\WorkSpace\Project\ai\x-ai-gateway\build\classes\java\main started by zzp84 in D:\WorkSpace\Project\ai\x-ai-gateway)
+2026-05-25T09:43:18.802+08:00  INFO 36140 --- [x-ai-gateway] [           main] c.p.xaigateway.XAiGatewayApplication     : No active profile set, falling back to 1 default profile: "local"
+2026-05-25T09:43:19.890+08:00  INFO 36140 --- [x-ai-gateway] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-05-25T09:43:19.891+08:00  INFO 36140 --- [x-ai-gateway] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-05-25T09:43:20.125+08:00  INFO 36140 --- [x-ai-gateway] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 225 ms. Found 84 JPA repository interfaces.
+2026-05-25T09:43:20.605+08:00  INFO 36140 --- [x-ai-gateway] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-05-25T09:43:20.733+08:00  INFO 36140 --- [x-ai-gateway] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@1f6865ca
+2026-05-25T09:43:20.734+08:00  INFO 36140 --- [x-ai-gateway] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-05-25T09:43:23.275+08:00  INFO 36140 --- [x-ai-gateway] [           main] liquibase.changelog                      : Reading from public.databasechangelog
+2026-05-25T09:43:23.475+08:00  INFO 36140 --- [x-ai-gateway] [           main] liquibase.ui                             : Database is up to date, no changesets to execute
+2026-05-25T09:43:23.477+08:00  INFO 36140 --- [x-ai-gateway] [           main] liquibase.changelog                      : Reading from public.databasechangelog
+2026-05-25T09:43:23.486+08:00  INFO 36140 --- [x-ai-gateway] [           main] liquibase.util                           : UPDATE SUMMARY
+2026-05-25T09:43:23.486+08:00  INFO 36140 --- [x-ai-gateway] [           main] liquibase.util                           : Run:                          0
+2026-05-25T09:43:23.486+08:00  INFO 36140 --- [x-ai-gateway] [           main] liquibase.util                           : Previously run:               9
+2026-05-25T09:43:23.486+08:00  INFO 36140 --- [x-ai-gateway] [           main] liquibase.util                           : Filtered out:                 0
+2026-05-25T09:43:23.487+08:00  INFO 36140 --- [x-ai-gateway] [           main] liquibase.util                           : -------------------------------
+2026-05-25T09:43:23.487+08:00  INFO 36140 --- [x-ai-gateway] [           main] liquibase.util                           : Total change sets:            9
+2026-05-25T09:43:23.487+08:00  INFO 36140 --- [x-ai-gateway] [           main] liquibase.util                           : Update summary generated
+2026-05-25T09:43:23.488+08:00  INFO 36140 --- [x-ai-gateway] [           main] liquibase.command                        : Command execution complete
+2026-05-25T09:43:23.616+08:00  INFO 36140 --- [x-ai-gateway] [           main] org.hibernate.orm.jpa                    : HHH008540: Processing PersistenceUnitInfo [name: default]
+2026-05-25T09:43:23.671+08:00  INFO 36140 --- [x-ai-gateway] [           main] org.hibernate.orm.core                   : HHH000001: Hibernate ORM core version 7.2.7.Final
+2026-05-25T09:43:24.093+08:00  INFO 36140 --- [x-ai-gateway] [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-05-25T09:43:24.160+08:00  INFO 36140 --- [x-ai-gateway] [           main] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
+	Database JDBC URL [jdbc:postgresql://192.168.154.143:5432/x_ai_gateway?connectionTimeZone=UTC]
+	Database driver: PostgreSQL JDBC Driver
+	Database dialect: PostgreSQLDialect
+	Database version: 18.0
+	Default catalog/schema: x_ai_gateway/public
+	Autocommit mode: undefined/unknown
+	Isolation level: READ_COMMITTED [default READ_COMMITTED]
+	JDBC fetch size: none
+	Pool: DataSourceConnectionProvider
+	Minimum pool size: undefined/unknown
+	Maximum pool size: undefined/unknown
+2026-05-25T09:43:25.607+08:00  INFO 36140 --- [x-ai-gateway] [           main] org.hibernate.orm.core                   : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-05-25T09:43:25.675+08:00  INFO 36140 --- [x-ai-gateway] [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-05-25T09:43:25.734+08:00  INFO 36140 --- [x-ai-gateway] [           main] o.s.d.j.r.query.QueryEnhancerFactories   : Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-05-25T09:43:28.576+08:00  INFO 36140 --- [x-ai-gateway] [           main] ctiveUserDetailsServiceAutoConfiguration : 
+
+Using generated security password: f1b0f3d5-432b-4d9a-80ec-182efab5baf9
+
+2026-05-25T09:43:28.970+08:00  INFO 36140 --- [x-ai-gateway] [           main] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 5 endpoints beneath base path '/actuator'
+2026-05-25T09:43:29.697+08:00  INFO 36140 --- [x-ai-gateway] [           main] o.s.boot.reactor.netty.NettyWebServer    : Netty started on port 8080 (http)
+2026-05-25T09:43:29.707+08:00  INFO 36140 --- [x-ai-gateway] [           main] c.p.xaigateway.XAiGatewayApplication     : Started XAiGatewayApplication in 11.222 seconds (process running for 11.491)
+2026-05-25T09:43:30.185+08:00  INFO 36140 --- [x-ai-gateway] [           main] .p.x.a.a.DefaultResourceBootstrapService : 默认资源引导完成：default 账号分组 id=1，TLS 指纹默认画像已校验，默认厂商 API 入口=16 个，回填协议入口凭证=0 个。
+2026-05-25T10:00:33.917+08:00  WARN 36140 --- [x-ai-gateway] [xag-scheduler-1] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@73ee673 (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
+2026-05-25T10:00:33.935+08:00  WARN 36140 --- [x-ai-gateway] [xag-scheduler-1] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@1f6865ca (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
+2026-05-25T10:00:33.770+08:00  WARN 36140 --- [x-ai-gateway] [xag-scheduler-2] ewayObservabilityAsyncPersistenceService : 从 Redis 读取 observability 热路径队列失败，等待下一轮重试。
+
+org.springframework.data.redis.RedisSystemException: Redis exception
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:88) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:44) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.PassThroughExceptionTranslationStrategy.translate(PassThroughExceptionTranslationStrategy.java:39) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.FallbackExceptionTranslationStrategy.translate(FallbackExceptionTranslationStrategy.java:38) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.convertLettuceAccessException(LettuceConnection.java:313) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1015) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.lambda$doInvoke$2(LettuceConnection.java:450) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker$Synchronizer.invoke(LettuceInvoker.java:658) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker.just(LettuceInvoker.java:106) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceListCommands.lPop(LettuceListCommands.java:202) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.DefaultedRedisConnection.lPop(DefaultedRedisConnection.java:806) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.lambda$leftPop$0(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:414) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:381) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.AbstractOperations.execute(AbstractOperations.java:166) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.leftPop(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushBatch(GatewayObservabilityAsyncPersistenceService.java:162) ~[main/:na]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushScheduledBatch(GatewayObservabilityAsyncPersistenceService.java:146) ~[main/:na]
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565) ~[na:na]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.runInternal(ScheduledMethodRunnable.java:128) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.lambda$run$1(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at io.micrometer.observation.Observation.observe(Observation.java:569) ~[micrometer-observation-1.16.4.jar:1.16.4]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.run(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.config.Task$OutcomeTrackingRunnable.run(Task.java:88) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.DelegatingErrorHandlingRunnable.run(DelegatingErrorHandlingRunnable.java:54) ~[spring-context-7.0.6.jar:7.0.6]
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:545) ~[na:na]
+	at java.base/java.util.concurrent.FutureTask.runAndReset(FutureTask.java:369) ~[na:na]
+	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:310) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614) ~[na:na]
+	at java.base/java.lang.Thread.run(Thread.java:1474) ~[na:na]
+Caused by: io.lettuce.core.RedisException: java.net.SocketException: Connection reset
+	at io.lettuce.core.internal.Exceptions.bubble(Exceptions.java:68) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.internal.Futures.awaitOrCancel(Futures.java:237) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.LettuceFutures.awaitOrCancel(LettuceFutures.java:59) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1013) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	... 26 common frames omitted
+Caused by: java.net.SocketException: Connection reset
+	at java.base/sun.nio.ch.SocketChannelImpl.throwConnectionReset(SocketChannelImpl.java:399) ~[na:na]
+	at java.base/sun.nio.ch.SocketChannelImpl.implRead(SocketChannelImpl.java:431) ~[na:na]
+	at java.base/sun.nio.ch.SocketChannelImpl.read(SocketChannelImpl.java:489) ~[na:na]
+	at io.netty.buffer.AdaptivePoolingAllocator$AdaptiveByteBuf.setBytes(AdaptivePoolingAllocator.java:2002) ~[netty-buffer-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.buffer.AbstractByteBuf.writeBytes(AbstractByteBuf.java:1139) ~[netty-buffer-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.socket.nio.NioSocketChannel.doReadBytes(NioSocketChannel.java:350) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.nio.AbstractNioByteChannel$NioByteUnsafe.read(AbstractNioByteChannel.java:161) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.handle(AbstractNioChannel.java:445) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.nio.NioIoHandler$DefaultNioRegistration.handle(NioIoHandler.java:388) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.nio.NioIoHandler.processSelectedKey(NioIoHandler.java:596) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.nio.NioIoHandler.processSelectedKeysPlain(NioIoHandler.java:541) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.nio.NioIoHandler.processSelectedKeys(NioIoHandler.java:514) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.nio.NioIoHandler.run(NioIoHandler.java:484) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.SingleThreadIoEventLoop.runIo(SingleThreadIoEventLoop.java:225) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.SingleThreadIoEventLoop.run(SingleThreadIoEventLoop.java:196) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.util.concurrent.SingleThreadEventExecutor$5.run(SingleThreadEventExecutor.java:1195) ~[netty-common-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74) ~[netty-common-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30) ~[netty-common-4.2.12.Final.jar:4.2.12.Final]
+	... 1 common frames omitted
+
+2026-05-25T10:00:33.937+08:00  WARN 36140 --- [x-ai-gateway] [xag-scheduler-1] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@2c9cfa1c (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
+2026-05-25T10:00:33.944+08:00  WARN 36140 --- [x-ai-gateway] [xag-scheduler-1] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@5c618c82 (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
+2026-05-25T10:00:33.949+08:00  WARN 36140 --- [x-ai-gateway] [xag-scheduler-2] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@3afd4371 (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
+2026-05-25T10:00:33.957+08:00  WARN 36140 --- [x-ai-gateway] [xag-scheduler-1] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@3b0d858d (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
+2026-05-25T10:00:33.963+08:00  WARN 36140 --- [x-ai-gateway] [xag-scheduler-1] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@10fc8e40 (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
+2026-05-25T10:00:33.965+08:00  WARN 36140 --- [x-ai-gateway] [xag-scheduler-2] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@75a9ebb4 (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
+2026-05-25T10:00:33.975+08:00  WARN 36140 --- [x-ai-gateway] [xag-scheduler-2] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@2757758 (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
+2026-05-25T10:00:33.975+08:00  WARN 36140 --- [x-ai-gateway] [xag-scheduler-1] com.zaxxer.hikari.pool.PoolBase          : HikariPool-1 - Failed to validate connection org.postgresql.jdbc.PgConnection@5b7bca59 (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
+2026-05-25T10:00:34.526+08:00  INFO 36140 --- [x-ai-gateway] [xecutorLoop-3-2] i.l.core.protocol.ConnectionWatchdog     : Reconnecting, last destination was /192.168.154.143:6379
+2026-05-25T10:00:34.970+08:00  WARN 36140 --- [x-ai-gateway] [xecutorLoop-3-2] i.l.core.protocol.ConnectionWatchdog     : Cannot reconnect to [192.168.154.143/<unresolved>:6379]: Network is unreachable: getsockopt: /192.168.154.143:6379
+
+io.netty.channel.AbstractChannel$AnnotatedSocketException: Network is unreachable: getsockopt: /192.168.154.143:6379
+Caused by: java.net.SocketException: Network is unreachable: getsockopt
+	at java.base/sun.nio.ch.Net.pollConnect(Native Method) ~[na:na]
+	at java.base/sun.nio.ch.Net.pollConnectNow(Net.java:639) ~[na:na]
+	at java.base/sun.nio.ch.SocketChannelImpl.finishConnect(SocketChannelImpl.java:1046) ~[na:na]
+	at io.netty.channel.socket.nio.NioSocketChannel.doFinishConnect(NioSocketChannel.java:330) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.finishConnect(AbstractNioChannel.java:384) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.handle(AbstractNioChannel.java:432) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.nio.NioIoHandler$DefaultNioRegistration.handle(NioIoHandler.java:388) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.nio.NioIoHandler.processSelectedKey(NioIoHandler.java:596) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.nio.NioIoHandler.processSelectedKeysPlain(NioIoHandler.java:541) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.nio.NioIoHandler.processSelectedKeys(NioIoHandler.java:514) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.nio.NioIoHandler.run(NioIoHandler.java:484) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.SingleThreadIoEventLoop.runIo(SingleThreadIoEventLoop.java:225) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.SingleThreadIoEventLoop.run(SingleThreadIoEventLoop.java:196) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.util.concurrent.SingleThreadEventExecutor$5.run(SingleThreadEventExecutor.java:1195) ~[netty-common-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74) ~[netty-common-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30) ~[netty-common-4.2.12.Final.jar:4.2.12.Final]
+	at java.base/java.lang.Thread.run(Thread.java:1474) ~[na:na]
+
+2026-05-25T10:00:40.098+08:00  INFO 36140 --- [x-ai-gateway] [ecutorLoop-3-14] i.l.core.protocol.ConnectionWatchdog     : Reconnecting, last destination was 192.168.154.143/<unresolved>:6379
+2026-05-25T10:00:40.100+08:00  WARN 36140 --- [x-ai-gateway] [oEventLoop-5-13] i.l.core.protocol.ConnectionWatchdog     : Cannot reconnect to [192.168.154.143/<unresolved>:6379]: Network is unreachable: getsockopt: /192.168.154.143:6379
+
+io.netty.channel.AbstractChannel$AnnotatedSocketException: Network is unreachable: getsockopt: /192.168.154.143:6379
+Caused by: java.net.SocketException: Network is unreachable: getsockopt
+	at java.base/sun.nio.ch.Net.pollConnect(Native Method) ~[na:na]
+	at java.base/sun.nio.ch.Net.pollConnectNow(Net.java:639) ~[na:na]
+	at java.base/sun.nio.ch.SocketChannelImpl.finishConnect(SocketChannelImpl.java:1046) ~[na:na]
+	at io.netty.channel.socket.nio.NioSocketChannel.doFinishConnect(NioSocketChannel.java:330) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.finishConnect(AbstractNioChannel.java:384) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.handle(AbstractNioChannel.java:432) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.nio.NioIoHandler$DefaultNioRegistration.handle(NioIoHandler.java:388) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.nio.NioIoHandler.processSelectedKey(NioIoHandler.java:596) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.nio.NioIoHandler.processSelectedKeysPlain(NioIoHandler.java:541) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.nio.NioIoHandler.processSelectedKeys(NioIoHandler.java:514) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.nio.NioIoHandler.run(NioIoHandler.java:484) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.SingleThreadIoEventLoop.runIo(SingleThreadIoEventLoop.java:225) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.SingleThreadIoEventLoop.run(SingleThreadIoEventLoop.java:196) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.util.concurrent.SingleThreadEventExecutor$5.run(SingleThreadEventExecutor.java:1195) ~[netty-common-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74) ~[netty-common-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30) ~[netty-common-4.2.12.Final.jar:4.2.12.Final]
+	at java.base/java.lang.Thread.run(Thread.java:1474) ~[na:na]
+
+2026-05-25T10:01:15.500+08:00  INFO 36140 --- [x-ai-gateway] [ecutorLoop-3-25] i.l.core.protocol.ConnectionWatchdog     : Reconnecting, last destination was 192.168.154.143/<unresolved>:6379
+2026-05-25T10:01:15.501+08:00  WARN 36140 --- [x-ai-gateway] [oEventLoop-5-14] i.l.core.protocol.ConnectionWatchdog     : Cannot reconnect to [192.168.154.143/<unresolved>:6379]: Network is unreachable: getsockopt: /192.168.154.143:6379
+
+io.netty.channel.AbstractChannel$AnnotatedSocketException: Network is unreachable: getsockopt: /192.168.154.143:6379
+Caused by: java.net.SocketException: Network is unreachable: getsockopt
+	at java.base/sun.nio.ch.Net.pollConnect(Native Method) ~[na:na]
+	at java.base/sun.nio.ch.Net.pollConnectNow(Net.java:639) ~[na:na]
+	at java.base/sun.nio.ch.SocketChannelImpl.finishConnect(SocketChannelImpl.java:1046) ~[na:na]
+	at io.netty.channel.socket.nio.NioSocketChannel.doFinishConnect(NioSocketChannel.java:330) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.finishConnect(AbstractNioChannel.java:384) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.handle(AbstractNioChannel.java:432) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.nio.NioIoHandler$DefaultNioRegistration.handle(NioIoHandler.java:388) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.nio.NioIoHandler.processSelectedKey(NioIoHandler.java:596) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.nio.NioIoHandler.processSelectedKeysPlain(NioIoHandler.java:541) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.nio.NioIoHandler.processSelectedKeys(NioIoHandler.java:514) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.nio.NioIoHandler.run(NioIoHandler.java:484) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.SingleThreadIoEventLoop.runIo(SingleThreadIoEventLoop.java:225) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.channel.SingleThreadIoEventLoop.run(SingleThreadIoEventLoop.java:196) ~[netty-transport-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.util.concurrent.SingleThreadEventExecutor$5.run(SingleThreadEventExecutor.java:1195) ~[netty-common-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74) ~[netty-common-4.2.12.Final.jar:4.2.12.Final]
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30) ~[netty-common-4.2.12.Final.jar:4.2.12.Final]
+	at java.base/java.lang.Thread.run(Thread.java:1474) ~[na:na]
+
+2026-05-25T10:01:23.728+08:00  INFO 36140 --- [x-ai-gateway] [ecutorLoop-3-28] i.l.core.protocol.ConnectionWatchdog     : Reconnecting, last destination was 192.168.154.143/<unresolved>:6379
+2026-05-25T10:01:25.606+08:00  WARN 36140 --- [x-ai-gateway] [l-1:housekeeper] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Thread starvation or clock leap detected (housekeeper delta=1m11s209ms788µs900ns).
+2026-05-25T10:01:26.812+08:00  INFO 36140 --- [x-ai-gateway] [oEventLoop-5-15] i.l.core.protocol.ReconnectionHandler    : Reconnected to 192.168.154.143/<unresolved>:6379
+2026-05-25T10:01:27.451+08:00  WARN 36140 --- [x-ai-gateway] [xag-scheduler-1] org.hibernate.orm.jdbc.error             : HHH000247: ErrorCode: 0, SQLState: null
+2026-05-25T10:01:27.451+08:00  WARN 36140 --- [x-ai-gateway] [xag-scheduler-1] org.hibernate.orm.jdbc.error             : HikariPool-1 - Connection is not available, request timed out after 63753ms (total=1, active=1, idle=0, waiting=0)
+2026-05-25T10:01:27.672+08:00 ERROR 36140 --- [x-ai-gateway] [xag-scheduler-1] o.s.s.s.TaskUtils$LoggingErrorHandler    : Unexpected error occurred in scheduled task
+
+org.springframework.transaction.CannotCreateTransactionException: Could not open JPA EntityManager for transaction
+	at org.springframework.orm.jpa.JpaTransactionManager.doBegin(JpaTransactionManager.java:457) ~[spring-orm-7.0.6.jar:7.0.6]
+	at org.springframework.transaction.support.AbstractPlatformTransactionManager.startTransaction(AbstractPlatformTransactionManager.java:532) ~[spring-tx-7.0.6.jar:7.0.6]
+	at org.springframework.transaction.support.AbstractPlatformTransactionManager.getTransaction(AbstractPlatformTransactionManager.java:405) ~[spring-tx-7.0.6.jar:7.0.6]
+	at org.springframework.transaction.interceptor.TransactionAspectSupport.createTransactionIfNecessary(TransactionAspectSupport.java:628) ~[spring-tx-7.0.6.jar:7.0.6]
+	at org.springframework.transaction.interceptor.TransactionAspectSupport.invokeWithinTransaction(TransactionAspectSupport.java:365) ~[spring-tx-7.0.6.jar:7.0.6]
+	at org.springframework.transaction.interceptor.TransactionInterceptor.invoke(TransactionInterceptor.java:130) ~[spring-tx-7.0.6.jar:7.0.6]
+	at org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(ReflectiveMethodInvocation.java:179) ~[spring-aop-7.0.6.jar:7.0.6]
+	at org.springframework.aop.framework.CglibAopProxy$DynamicAdvisedInterceptor.intercept(CglibAopProxy.java:719) ~[spring-aop-7.0.6.jar:7.0.6]
+	at com.prodigalgal.xaigateway.admin.application.integrations.OutboundDeliveryService$$SpringCGLIB$$0.processDueRetries(<generated>) ~[main/:na]
+	at com.prodigalgal.xaigateway.admin.application.integrations.OutboundRetryService.processRetries(OutboundRetryService.java:17) ~[main/:na]
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565) ~[na:na]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.runInternal(ScheduledMethodRunnable.java:128) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.lambda$run$1(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at io.micrometer.observation.Observation.observe(Observation.java:569) ~[micrometer-observation-1.16.4.jar:1.16.4]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.run(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.config.Task$OutcomeTrackingRunnable.run(Task.java:88) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.DelegatingErrorHandlingRunnable.run(DelegatingErrorHandlingRunnable.java:54) ~[spring-context-7.0.6.jar:7.0.6]
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:545) ~[na:na]
+	at java.base/java.util.concurrent.FutureTask.runAndReset(FutureTask.java:369) ~[na:na]
+	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:310) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614) ~[na:na]
+	at java.base/java.lang.Thread.run(Thread.java:1474) ~[na:na]
+Caused by: org.hibernate.exception.JDBCConnectionException: Unable to acquire JDBC Connection [HikariPool-1 - Connection is not available, request timed out after 63753ms (total=1, active=1, idle=0, waiting=0)] [n/a]
+	at org.hibernate.exception.internal.SQLExceptionTypeDelegate.convert(SQLExceptionTypeDelegate.java:49) ~[hibernate-core-7.2.7.Final.jar:7.2.7.Final]
+	at org.hibernate.exception.internal.StandardSQLExceptionConverter.convert(StandardSQLExceptionConverter.java:34) ~[hibernate-core-7.2.7.Final.jar:7.2.7.Final]
+	at org.hibernate.engine.jdbc.spi.SqlExceptionHelper.convert(SqlExceptionHelper.java:115) ~[hibernate-core-7.2.7.Final.jar:7.2.7.Final]
+	at org.hibernate.engine.jdbc.spi.SqlExceptionHelper.convert(SqlExceptionHelper.java:101) ~[hibernate-core-7.2.7.Final.jar:7.2.7.Final]
+	at org.hibernate.resource.jdbc.internal.LogicalConnectionManagedImpl.acquire(LogicalConnectionManagedImpl.java:190) ~[hibernate-core-7.2.7.Final.jar:7.2.7.Final]
+	at org.hibernate.resource.jdbc.internal.LogicalConnectionManagedImpl.acquireConnectionIfNeeded(LogicalConnectionManagedImpl.java:87) ~[hibernate-core-7.2.7.Final.jar:7.2.7.Final]
+	at org.hibernate.resource.jdbc.internal.LogicalConnectionManagedImpl.getPhysicalConnection(LogicalConnectionManagedImpl.java:126) ~[hibernate-core-7.2.7.Final.jar:7.2.7.Final]
+	at org.hibernate.resource.jdbc.internal.LogicalConnectionManagedImpl.getConnectionForTransactionManagement(LogicalConnectionManagedImpl.java:277) ~[hibernate-core-7.2.7.Final.jar:7.2.7.Final]
+	at org.hibernate.resource.jdbc.internal.LogicalConnectionManagedImpl.begin(LogicalConnectionManagedImpl.java:286) ~[hibernate-core-7.2.7.Final.jar:7.2.7.Final]
+	at org.hibernate.resource.transaction.backend.jdbc.internal.JdbcResourceLocalTransactionCoordinatorImpl$TransactionDriverControlImpl.begin(JdbcResourceLocalTransactionCoordinatorImpl.java:226) ~[hibernate-core-7.2.7.Final.jar:7.2.7.Final]
+	at org.hibernate.engine.transaction.internal.TransactionImpl.begin(TransactionImpl.java:75) ~[hibernate-core-7.2.7.Final.jar:7.2.7.Final]
+	at org.springframework.orm.jpa.vendor.HibernateJpaDialect.beginTransaction(HibernateJpaDialect.java:147) ~[spring-orm-7.0.6.jar:7.0.6]
+	at org.springframework.orm.jpa.JpaTransactionManager.doBegin(JpaTransactionManager.java:411) ~[spring-orm-7.0.6.jar:7.0.6]
+	... 23 common frames omitted
+Caused by: java.sql.SQLTransientConnectionException: HikariPool-1 - Connection is not available, request timed out after 63753ms (total=1, active=1, idle=0, waiting=0)
+	at com.zaxxer.hikari.pool.HikariPool.createTimeoutException(HikariPool.java:714) ~[HikariCP-7.0.2.jar:na]
+	at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:184) ~[HikariCP-7.0.2.jar:na]
+	at com.zaxxer.hikari.pool.HikariPool.getConnection(HikariPool.java:142) ~[HikariCP-7.0.2.jar:na]
+	at com.zaxxer.hikari.HikariDataSource.getConnection(HikariDataSource.java:127) ~[HikariCP-7.0.2.jar:na]
+	at org.hibernate.engine.jdbc.connections.internal.DataSourceConnectionProvider.getConnection(DataSourceConnectionProvider.java:137) ~[hibernate-core-7.2.7.Final.jar:7.2.7.Final]
+	at org.hibernate.internal.NonContextualJdbcConnectionAccess.obtainConnection(NonContextualJdbcConnectionAccess.java:47) ~[hibernate-core-7.2.7.Final.jar:7.2.7.Final]
+	at org.hibernate.resource.jdbc.internal.LogicalConnectionManagedImpl.acquire(LogicalConnectionManagedImpl.java:187) ~[hibernate-core-7.2.7.Final.jar:7.2.7.Final]
+	... 31 common frames omitted
+
+2026-05-25T10:07:49.619+08:00  WARN 36140 --- [x-ai-gateway] [xag-scheduler-1] ewayObservabilityAsyncPersistenceService : 从 Redis 读取 observability 热路径队列失败，等待下一轮重试。
+
+org.springframework.dao.QueryTimeoutException: Redis command timed out
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:84) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceExceptionConverter.convert(LettuceExceptionConverter.java:44) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.PassThroughExceptionTranslationStrategy.translate(PassThroughExceptionTranslationStrategy.java:39) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.FallbackExceptionTranslationStrategy.translate(FallbackExceptionTranslationStrategy.java:38) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.convertLettuceAccessException(LettuceConnection.java:313) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1015) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.lambda$doInvoke$2(LettuceConnection.java:450) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker$Synchronizer.invoke(LettuceInvoker.java:658) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceInvoker.just(LettuceInvoker.java:106) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.lettuce.LettuceListCommands.lPop(LettuceListCommands.java:202) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.connection.DefaultedRedisConnection.lPop(DefaultedRedisConnection.java:806) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.lambda$leftPop$0(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:414) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.RedisTemplate.execute(RedisTemplate.java:381) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.AbstractOperations.execute(AbstractOperations.java:166) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at org.springframework.data.redis.core.DefaultListOperations.leftPop(DefaultListOperations.java:92) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushBatch(GatewayObservabilityAsyncPersistenceService.java:162) ~[main/:na]
+	at com.prodigalgal.xaigateway.gateway.core.observability.GatewayObservabilityAsyncPersistenceService.flushScheduledBatch(GatewayObservabilityAsyncPersistenceService.java:146) ~[main/:na]
+	at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:104) ~[na:na]
+	at java.base/java.lang.reflect.Method.invoke(Method.java:565) ~[na:na]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.runInternal(ScheduledMethodRunnable.java:128) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.lambda$run$1(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at io.micrometer.observation.Observation.observe(Observation.java:569) ~[micrometer-observation-1.16.4.jar:1.16.4]
+	at org.springframework.scheduling.support.ScheduledMethodRunnable.run(ScheduledMethodRunnable.java:122) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.config.Task$OutcomeTrackingRunnable.run(Task.java:88) ~[spring-context-7.0.6.jar:7.0.6]
+	at org.springframework.scheduling.support.DelegatingErrorHandlingRunnable.run(DelegatingErrorHandlingRunnable.java:54) ~[spring-context-7.0.6.jar:7.0.6]
+	at java.base/java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:545) ~[na:na]
+	at java.base/java.util.concurrent.FutureTask.runAndReset(FutureTask.java:369) ~[na:na]
+	at java.base/java.util.concurrent.ScheduledThreadPoolExecutor$ScheduledFutureTask.run(ScheduledThreadPoolExecutor.java:310) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1090) ~[na:na]
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:614) ~[na:na]
+	at java.base/java.lang.Thread.run(Thread.java:1474) ~[na:na]
+Caused by: io.lettuce.core.RedisCommandTimeoutException: Command timed out after 5 second(s)
+	at io.lettuce.core.internal.ExceptionFactory.createTimeoutException(ExceptionFactory.java:63) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.internal.Futures.awaitOrCancel(Futures.java:233) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at io.lettuce.core.LettuceFutures.awaitOrCancel(LettuceFutures.java:59) ~[lettuce-core-6.8.2.RELEASE.jar:6.8.2.RELEASE/34f8700]
+	at org.springframework.data.redis.connection.lettuce.LettuceConnection.await(LettuceConnection.java:1013) ~[spring-data-redis-4.0.4.jar:4.0.4]
+	... 26 common frames omitted
+

@@ -1,0 +1,150 @@
+{
+  "schemaVersion": "2026-05-19.functional-provider-smoke-record-replay.v1",
+  "replayMode": "record_replay",
+  "providerType": "JINA",
+  "protocol": "JINA_NATIVE",
+  "baseUrl": "https://api.jina.ai",
+  "baseUrlHost": "api.jina.ai",
+  "certificationStatus": "FAILED",
+  "dryRun": false,
+  "recordedAt": "2026-05-24T00:00:00Z",
+  "summary": {
+    "PASS": 1,
+    "FAIL": 1,
+    "SKIPPED": 0,
+    "UNSUPPORTED": 1,
+    "NO_PERMISSION": 0,
+    "BUDGET_BLOCKED": 0
+  },
+  "replayPolicy": {
+    "network": "disabled_by_default",
+    "billableOperations": "replay_only",
+    "writeOperations": "replay_only",
+    "secretMaterial": "redacted",
+    "dryRunEvidenceAccepted": false,
+    "fixtureSource": "functional_provider_smoke_certification",
+    "liveExecutionRequiresAllowLive": true,
+    "billableExecutionRequiresAllowBillableProbes": true
+  },
+  "fixtures": [
+    {
+      "providerType": "JINA",
+      "protocol": "JINA_NATIVE",
+      "resourceFamily": "EMBEDDINGS",
+      "status": "LIVE_SMOKE_OK",
+      "classification": "PASS",
+      "method": "POST",
+      "path": "/v1/embeddings",
+      "model": "jina-embeddings-v3",
+      "billable": true,
+      "writeOperation": false,
+      "httpStatus": 200,
+      "upstreamRequestId": "req_jina_embeddings",
+      "durationMs": 29,
+      "evidence": {
+        "object": "list",
+        "model": "jina-embeddings-v3",
+        "dataSeen": 1
+      },
+      "requestPreview": {
+        "providerType": "JINA",
+        "protocol": "JINA_NATIVE",
+        "method": "POST",
+        "baseUrl": "https://api.jina.ai",
+        "path": "/v1/embeddings",
+        "model": "jina-embeddings-v3",
+        "headers": {
+          "accept": "application/json",
+          "content-type": "application/json",
+          "authorization": "Bearer ***"
+        },
+        "body": {
+          "model": "jina-embeddings-v3",
+          "input": [
+            "functional provider smoke embedding probe"
+          ]
+        }
+      }
+    },
+    {
+      "providerType": "JINA",
+      "protocol": "JINA_NATIVE",
+      "resourceFamily": "RERANK",
+      "status": "LIVE_SMOKE_FAILED",
+      "classification": "FAIL",
+      "method": "POST",
+      "path": "/v1/rerank",
+      "model": "jina-reranker-v2-base-multilingual",
+      "billable": true,
+      "writeOperation": false,
+      "httpStatus": 400,
+      "upstreamRequestId": "req_jina_rerank_failure",
+      "durationMs": 33,
+      "failureType": "HTTP_400",
+      "failureMessage": "native rerank probe returned a non-2xx response during record/replay capture",
+      "evidence": {
+        "probeKind": "jina_native_rerank",
+        "errorClass": "invalid_request"
+      },
+      "requestPreview": {
+        "providerType": "JINA",
+        "protocol": "JINA_NATIVE",
+        "method": "POST",
+        "baseUrl": "https://api.jina.ai",
+        "path": "/v1/rerank",
+        "model": "jina-reranker-v2-base-multilingual",
+        "headers": {
+          "accept": "application/json",
+          "content-type": "application/json",
+          "authorization": "Bearer ***"
+        },
+        "body": {
+          "model": "jina-reranker-v2-base-multilingual",
+          "query": "native rerank smoke query",
+          "documents": [
+            "first document",
+            "second document"
+          ],
+          "top_n": 1
+        }
+      }
+    },
+    {
+      "providerType": "JINA",
+      "protocol": "JINA_NATIVE",
+      "resourceFamily": "UPLOADS",
+      "status": "OUT_OF_SCOPE",
+      "classification": "UNSUPPORTED",
+      "skippedReason": "OUT_OF_FUNCTIONAL_API_SCOPE",
+      "method": "POST",
+      "path": "/v1/embeddings",
+      "model": "jina-embeddings-v3",
+      "billable": false,
+      "writeOperation": false,
+      "evidence": {
+        "reason": "UNSUPPORTED_FAMILY",
+        "unsupportedFamily": "UPLOADS",
+        "supportedFamilies": [
+          "EMBEDDINGS",
+          "RERANK"
+        ]
+      },
+      "requestPreview": {
+        "providerType": "JINA",
+        "protocol": "JINA_NATIVE",
+        "method": "POST",
+        "baseUrl": "https://api.jina.ai",
+        "path": "/v1/embeddings",
+        "model": "jina-embeddings-v3",
+        "headers": {
+          "accept": "application/json",
+          "content-type": "application/json",
+          "authorization": "Bearer ***"
+        },
+        "body": {
+          "unsupportedFamily": "UPLOADS"
+        }
+      }
+    }
+  ]
+}

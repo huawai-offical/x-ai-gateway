@@ -1,0 +1,144 @@
+- generic [ref=e2]:
+  - generic [ref=e54]:
+    - complementary [ref=e55]:
+      - generic [ref=e56]:
+        - generic [ref=e59]:
+          - generic [ref=e60]: x-ai-gateway
+          - generic [ref=e61]: 管理控制台
+        - navigation [ref=e63]:
+          - button "智能运维" [ref=e65]:
+            - generic [ref=e66]: 智能运维
+            - img [ref=e67]
+          - button "接入与模型" [ref=e70]:
+            - generic [ref=e71]: 接入与模型
+            - img [ref=e72]
+          - button "路由治理" [ref=e75]:
+            - generic [ref=e76]: 路由治理
+            - img [ref=e77]
+          - button "观测记录" [ref=e80]:
+            - generic [ref=e81]: 观测记录
+            - img [ref=e82]
+          - generic [ref=e84]:
+            - button "用户与计费" [ref=e85]:
+              - generic [ref=e86]: 用户与计费
+              - img [ref=e87]
+            - generic [ref=e89]:
+              - link "用户清单" [ref=e90] [cursor=pointer]:
+                - /url: /console/users
+                - img [ref=e92]
+                - generic [ref=e95]: 用户清单
+              - link "套餐管理" [ref=e96] [cursor=pointer]:
+                - /url: /console/plans
+                - img [ref=e98]
+                - generic [ref=e101]: 套餐管理
+              - link "权益/授权组" [ref=e102] [cursor=pointer]:
+                - /url: /console/access-groups
+                - img [ref=e104]
+                - generic [ref=e108]: 权益/授权组
+              - link "订阅关系" [ref=e109] [cursor=pointer]:
+                - /url: /console/subscriptions
+                - img [ref=e111]
+                - generic [ref=e114]: 订阅关系
+              - link "公告中心" [ref=e115] [cursor=pointer]:
+                - /url: /console/announcements
+                - img [ref=e117]
+                - generic [ref=e120]: 公告中心
+              - link "邀请码" [ref=e121] [cursor=pointer]:
+                - /url: /console/invitation-codes
+                - img [ref=e123]
+                - generic [ref=e127]: 邀请码
+              - link "兑换码" [ref=e128] [cursor=pointer]:
+                - /url: /console/promo-codes
+                - img [ref=e130]
+                - generic [ref=e134]: 兑换码
+          - button "系统工具" [ref=e136]:
+            - generic [ref=e137]: 系统工具
+            - img [ref=e138]
+          - button "集成扩展" [ref=e141]:
+            - generic [ref=e142]: 集成扩展
+            - img [ref=e143]
+        - generic [ref=e146]: 任务：X-227
+    - generic [ref=e147]:
+      - banner [ref=e148]:
+        - generic [ref=e152]:
+          - generic [ref=e153]:
+            - button "切换侧边栏" [ref=e154]:
+              - img
+              - generic [ref=e155]: 切换侧边栏
+            - generic [ref=e156]:
+              - navigation "breadcrumb" [ref=e157]:
+                - list [ref=e158]:
+                  - listitem [ref=e159]:
+                    - generic [ref=e160]: 用户与计费
+                  - listitem [ref=e161]:
+                    - img [ref=e162]
+                  - listitem [ref=e164]:
+                    - link "邀请码" [disabled] [ref=e165]
+              - heading "邀请码" [level=1] [ref=e168]
+          - generic [ref=e169]:
+            - generic [ref=e170]:
+              - button "切换到深色主题" [ref=e171]:
+                - img
+                - text: 深色
+              - button "切换到浅色主题" [ref=e172]:
+                - img
+                - text: 浅色
+            - button "搜索" [ref=e173]:
+              - img
+              - text: 搜索
+            - button "admin" [ref=e174]:
+              - generic [ref=e175]:
+                - img
+                - generic [ref=e176]: admin
+              - img
+      - main [ref=e177]:
+        - generic [ref=e179]:
+          - generic [ref=e180]:
+            - generic [ref=e182]:
+              - generic [ref=e183]:
+                - generic [ref=e184]: 用户域
+                - heading "邀请码" [level=2] [ref=e185]
+              - button "创建邀请码" [ref=e187]
+            - generic [ref=e188]:
+              - generic [ref=e189]:
+                - textbox "搜索邀请码或备注" [ref=e190]
+                - combobox [ref=e191]:
+                  - option "全部状态" [selected]
+                  - option "仅启用"
+                  - option "仅停用"
+              - generic [ref=e192]:
+                - img [ref=e194]
+                - generic [ref=e198]: 还没有邀请码
+          - generic [ref=e199]:
+            - generic [ref=e202]:
+              - generic [ref=e203]: 增长
+              - heading "邀请排行榜" [level=2] [ref=e204]
+            - generic [ref=e206]:
+              - img [ref=e208]
+              - generic [ref=e212]: 还没有邀请排行数据
+          - generic [ref=e213]:
+            - generic [ref=e216]:
+              - generic [ref=e217]: 层级
+              - heading "邀请树" [level=2] [ref=e218]
+            - generic [ref=e219]:
+              - generic [ref=e220]:
+                - generic [ref=e221]:
+                  - generic [ref=e222]: 根用户 ID
+                  - textbox "根用户 ID" [ref=e223]:
+                    - /placeholder: 输入邀请人用户 ID
+                    - text: "999999"
+                - generic [ref=e224]:
+                  - generic [ref=e225]: 最大深度
+                  - combobox "最大深度" [ref=e226]:
+                    - option "1 层"
+                    - option "2 层"
+                    - option "3 层"
+                    - option "5 层" [selected]
+                    - option "10 层"
+                - button "查询" [ref=e228]:
+                  - img
+                  - text: 查询
+              - generic [ref=e230]:
+                - img [ref=e232]
+                - generic [ref=e240]: 输入用户 ID 查看邀请层级
+  - region "Notifications alt+T"
